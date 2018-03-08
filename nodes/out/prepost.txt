@@ -1,0 +1,94 @@
+= Pre Post = 
+
+#type: node
+#context: out
+#internal: prepost
+#icon: ROP/prepost
+
+"""Renders ROPs before and after a main job."""
+
+== Overview ==
+
+Renders the first input, then _all frames_ of the second input, then the third input. This lets you run the "preprocessing" and "postprocessing" nodes _once_ per job. This is useful for render jobs that use frame-interleaved rendering. If you simply connected the nodes (pre -> main -> post), the "pre" and "post" nodes would render before and after each frame. 
+
+For example, the following network:
+
+[Image:/images/render/prepost.png]
+
+...will render: pre<sub>1</sub>, pre<sub>2</sub>, pre<sub>3</sub>, mantra<sub>1</sub>, mantra<sub>2</sub>, mantra<sub>3</sub>, post<sub>1</sub>, post<sub>2</sub>, post<sub>3</sub>.
+
+A simple chain:
+
+[Image:/images/render/prepost2.png]
+
+...would render pre<sub>1</sub>, mantra<sub>1</sub>, post<sub>1</sub>, pre<sub>2</sub>, mantra<sub>2</sub>, post<sub>2</sub>, pre<sub>3</sub>, mantra<sub>3</sub>, post<sub>3</sub>.
+
+Only the second (main) input is required. The "pre" and "post" connections are optional. You can also connect the inputs but then disable them with the __Run pre render operation__ and __Run post render operation__, allowing you to base pre and post rendering on the value of an expression.
+
+NOTE:
+    To render multiple inputs _at the same time_ instead of serially, use the [Merge ROP|Node:out/merge].
+
+== Limitations ==
+
+* None of the inputs can refer to the same ROP, as this would cause dependency cycles.
+
+* The Pre render and Post render ROPs cannot branch out to meet each other or the main render branch. They must be separate, self-contained branches.
+
+* ROPs that are dependent on the Pre Post ROP (outputs), either directly or indirectly, should not also be dependent on any nodes in the Pre render, Main job or Post render branches. This could cause cyclic dependencies or double processing of a frame.
+
+Essentially, each input should have its own branch which no other outside ROPs reference.
+
+@parameters
+
+[Include:standard#render_buttons_only/]
+
+Run pre render operation:
+    When enabled, the pre render branch is performed before the main render ob.
+
+Pre Frame Range:
+    Allows the frame range of the Pre render ROP to be overriden.
+
+    Pre render ROP's specified range:
+    Use the frame range specified in the Pre render ROP. If set to 
+    __Render Current Frame__, it will be rendered once at the time of the first frame of the main job.
+
+    Main job's first frame:
+    Run the Pre render ROP once at the frame time of the first frame 
+    rendered by the main job.
+
+    Main job's last frame:
+    Run the Pre render ROP once at the frame time of the last frame 
+    rendered by the main job.
+
+Main job's frame range:
+    Run the Pre render ROP across the frame range of the main render job. 
+
+Run Post render operation:
+    When enabled, the Post render branch is performed after all the frames of the main render job.
+
+Post Frame Range:
+    Allows the frame range of the Post render ROP to be overriden.
+
+    Post render ROP's specified range:
+    Use the frame range specified in the Post render ROP. If set to 
+    __Render Current Frame__, it will be rendered once at the time of the last frame of the main job.
+
+    Main job's first frame:
+    Run the post-render ROP once at the frame time of the first frame 
+    rendered by the main job.
+
+    Main job's last frame:
+    Run the Post render ROP once at the frame time of the last frame 
+    rendered by the main job.
+
+Main job's frame range:
+    Run the Post Render ROP across the frame range of the main render job. 
+
+@locals
+
+N:
+    Frame being rendered.
+    
+NRENDER:
+    Total number of frames being rendered.
+

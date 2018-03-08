@@ -1,0 +1,121 @@
+= Ragdoll simulation =
+
+== Overview ==
+
+:vimeo: Crowds RBD ragdoll
+    #id: 142306095
+
+:vimeo: Crowds RBD ragdoll
+    #id: 142306102
+
+Sometimes you want to transition agents to a state where instead of being controlled by animation, they are controlled by rigid body simulation. For example, if an agent dies, you want it to fall to the ground, with its body and limbs being knocked about by collisions.
+
+[Image:/images/crowds/ragdolls_in_sand.jpg]
+
+
+== Setting up characters == (setup)
+
+First, you must add ragdoll-specific information to your character using tools on the __Crowds__ shelf.
+
+# Use the [Icon:SOP/agentcollisionlayer][Collision Layer|Node:sop/agentcollisionlayer] tool to set up simple collision geometry around the agent's skeleton.
+
+    Select the agent from the [agent setup network|setup#agent_setup] (not from the crowd source network if you already have it).
+
+    * Click a major bone.
+    * Use the handle to adjust the collision shape size.
+    * You can pick different simple shapes to wrap around bones, such as capsules or boxes.
+    
+    Don't add collision . For example, for the hand, you might use just a single sphere or box.
+
+# Use the [Icon:SOP/agentconfigurejoints][Configure Joints|Node:sop/agentconfigurejoints] tool to specify the range of motion for each joint. This is where you specify, for example, that a character's elbow can't bend backward.
+
+    Select the agent from the [agent setup network|setup#agent_setup] (not from the crowd source network if you already have it).
+
+    * Click a joint.
+    * Use the handle to adjust the rotation limits of the joint.
+    * You can set the limit to 0 in one direction to create a hinge (like an elbow or knee).
+
+
+=== Creating named joint groups === (joint_groups)
+
+You can create named groups of joints on the agent so you can apply [ragdoll effects|#effects] to some parts of the agent and not others.
+
+# In the geometry network that sets up the agents, find the [Agent Transform Group node|Node:sop/agenttransformgroup].
+
+# In the parameter editor, use the __Transform groups__ multi-parm to create new groups. For each group:
+    
+    * Set the __Name__ to the name of the joint group. For example, `upper_body`.
+    
+    * In __Root transforms__, select the root joint(s) for the group. Each root and its descendents will be added to the group.
+    
+    * You can turn on __Blend into group__ to get a ramp that controls how much effects applied to the group (such as stiffness, ) apply to the root vs the "outermost" joints.
+    
+    * You can turn on __Show guide geometry__ to draw spheres around the selected joints (you can scale the spheres on the __Guides__ tab). This makes it easy to see which joints are part of the group.
+
+
+=== Testing ===
+
+When you use the Collision Layer and Configure Joints tools, they create a `TEST_RAGDOLL_SIM` node in the [agent setup network|setup#agent_setup]. You can switch the display flag to this node and click [Smallicon:PLAYBAR/play_forward] Play in the playbar to play a simple simulation of the agent in ragdoll state with gravity.
+
+The test node lets you give the agent an initial velocity, so you can test how it the agent reacts to when you throw it in different directions.
+
+This node is also useful because if you have joint limits mistakenly set up so that the skeleton's initial state is outside the limit, when you start the test sim, the joint will immediately pop, showing you where there's a problem.
+
+
+== Ragdolls in DOPs ==
+
+=== Ragdoll state ===
+
+In a [Crowd State DOP|Node:dop/crowdstate], you can choose to make agents in that state ragdolls using the __RBD Ragdoll__ parameter.
+
+Active:
+    Agents are ragdolls controlled by the Bullet RBD solver.
+Animated Static:
+    Agents are controlled by the crowd solver, but can affect other dynamics objects (for example, kicking things around as they walk).
+Ignore:
+    Agents are controlled by the crowd solver, and not affected by rigid body dynamics.
+
+
+=== Impact trigger ===
+
+The [Crowd Trigger DOP|Node:dop/crowdtrigger] has an "RBD Impact Data" type that lets you trigger a transition when an agent is hit by an RBD object. For example, you could have agents change to ragdolls when they're hit by a boulder.
+
+The node lets you specify a list of RBD objects that can activate the trigger, and how strong the impact must be for the trigger to activate.
+
+TIP:
+    To have agents be able to trigger based on colliding with other agents, set the crowd object as one of the __DOP Impact objects__.
+
+
+=== Behind the scenes ===
+
+When the Bullet solver sees ragdoll agents, it looks at the agent's transforms, and treats each transform with a shape in the collision layer as a rigid body. At the end of each simulation timestep, it updates the agent's transforms to account for the change in the simulated rigid bodies. It tries to sensibly adjust the agent's position and orientation so the agent's local transforms stay "in place".
+
+
+=== Additional ragdoll effects === (effects)
+
+When the agent is in a [state|states] where __RBD Ragdoll__ is "Active", you can apply effects such as Stiffness (resistance to animation/simulation), Partial ragdoll (part of the agent can be simulated while the rest follows an animation clip), and Motors (joints can be partially driven by an animation clip but still react to simulation forces). See the parameters on the [Crowd State DOP|Node:dop/crowdstate] for more information.
+
+
+== Detaching limbs (advanced) ==
+
+[Image:/images/crowds/detached_limbs.jpg]
+
+* The [Agent Constraint Network|Node:sop/agentconstraintnetwork] node in the [crowd source geometry network|setup#agent_setup] creates a set of polylines representing every constraint for every joint on every agent. The `ragdoll_constraints` [Constraint Network DOP|Node:dop/constraintnetwork] in the crowd simulation network solves this constraint network, applying forces to maintain the constraints.
+
+    The `ragdoll_constraints` node has a `modify_ragdoll_constraints` [SOP Solver|Node:dop/sopsolver] network attached that you can use to modify the constraints as part of the simulation. This is where you can delete constraint lines to detach limbs. 
+
+* If you have agents that are ragdoll (the __RBD Ragdoll__ parameter on their state is "Active") or can potentially switch to ragdoll (__RBD Ragdoll__ is "Animated static"), the ragdoll solver adds attributes to the constraints you can use to trigger constraint changes.
+
+    Right-click the `relationship_geometry` node in the SOP solver network and choose __Spreadsheet__ to see the attributes.
+
+* The `torque` primitive attribute contains the force the solver had to use to maintain the constraint in the current timestep. In other words, the amount of force on the joint.
+
+    You can set up a primitive wrangle that deletes any constraint line where the `torque` is above a certain limit to detach limbs upon impact:
+    
+    {{{
+    #!vex
+    if (f@torque > 50)
+        removeprim(0, @primnum, /* andpoints */ 1);
+    }}}
+
+*  If you have deforming geometry on the agent, the detached part will move away, but the skin will stretch over to it. You will need to switch to an alternate [layer|diversity#layers] with separate skin geometry for detached agents.

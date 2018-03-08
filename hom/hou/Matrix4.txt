@@ -1,0 +1,320 @@
+= hou.Matrix4 =
+#type: homclass
+#cppname: HOM_Matrix4
+#group: utility
+
+"""A 4x4 matrix of floating point values."""
+
+4x4 matrices are typically used in Houdini to represent a 3D transformation
+(e.g. some combination of rotation, scaling, shearing, and translation).  A
+single matrix compactly represents a transformation, and is much easier to deal
+with than multiple translate, rotate, scale, shear, transformation order, and
+rotation order values.
+
+Note that Houdini's matrices are stored in row-major format, and vectors that
+are multiplied with matrices are treated as row vectors.  So, if `p` is a
+[Hom:hou.Vector4] representing a point and `M` is a Matrix4, you write
+`p*M`, *not* `M*p`.  Similarly, `p*M1*M2` will first transform
+`p` by `M1`, and then transform it by `M2`.
+
+NOTE:
+    Most mathematical notations treat vectors and points as column vectors
+    instead of row vectors.  They will often use `A*B*C` (or simply `ABC`) to
+    refer to a combined transform that first applies `C`'s transform, then
+    `B`'s, and then applies `A`'s. However, the convention is different in
+    Houdini. To represent the equivalent matrix expression in Houdini, you need
+    to concatenate the transforms in the reverse order.  So, you would instead
+    write `C'*B'*A'`, where `C'`, `B'`, `A'` are the transpose of C, B, A
+    respectively.
+
+You can multiply Vector3s or Vector4s by Matrix4s.  If you multiply a
+Vector3, it is the same as multiplying a Vector4 where the fourth component
+is 1 (see [Hom:hou.Vector3#__mul__]).
+
+To transform a normal (as opposed to a point or vector), you need to multiply by
+the inverse transpose of the matrix.  For example, suppose:
+
+`p`:
+    is a [Hom:hou.Vector3] object representing a position (or a
+    [Hom:hou.Vector4] with `v[4]==1`)
+`v`:
+    is a [Hom:hou.Vector4] object representing a vector (a direction with a
+    length but no fixed location in space), with `v[3]==0`
+`n`:
+    is a [Hom:hou.Vector4] object representing a normal, with `v[3]==0`
+`m`:
+    is a Matrix4 object representing a transform matrix
+
+Then you would write:
+
+{{{
+#!python
+p * m # to transform the point
+v * m # to transform the vector
+n * m.inverted().transposed() # to transform the normal
+# (note that m.inverted().transposed() is mathematically equivalent to m.transposed().inverted())
+}}}
+
+Here is a concrete example:
+
+{{{
+#!pycon
+>>> m = hou.hmath.buildTranslate((1, 1, 2))
+>>> m
+<hou.Matrix4 [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [1, 1, 2, 1]]>
+>>> p = hou.Vector3(1, 2, 3)
+>>> p * m
+<hou.Vector3 [2, 3, 5]>
+}}}
+
+Both VEX and the UT_DMatrix4 class in the Houdini Development Kit (HDK) also
+store matrices in row-major format.
+
+@methods
+
+::`__init__(self, values)`:
+    #cppname: HOM_Matrix4::HOM_Matrix4
+    #replaces: Exp:matrix
+    Return a new Matrix4.  You can pass no parameters (the result will contain
+    all zeros), a float (the result's diagonal values will contain that float
+    and the rest is all zeros), a sequence of 16 floats, a sequence of
+    sequences of 4 floats, or a [Hom:hou.Matrix3].
+
+    {{{
+    #!pycon
+    >>> hou.Matrix4()
+    <hou.Matrix4 [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]]>
+
+    >>> hou.Matrix4(1)
+    <hou.Matrix4 [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]]>
+
+    >>> hou.Matrix4((0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15))
+    <hou.Matrix4 [[0, 1, 2, 3], [4, 5, 6, 7], [8, 9, 10, 11], [12, 13, 14, 15]]>
+
+    >>> hou.Matrix4(((0, 1, 2, 3), (4, 5, 6, 7), (8, 9, 10, 11), (12, 13, 14, 15)))
+    <hou.Matrix4 [[0, 1, 2, 3], [4, 5, 6, 7], [8, 9, 10, 11], [12, 13, 14, 15]]>
+
+    >>> matrix3 = hou.Matrix3((0, 1, 2, 3, 4, 5, 6, 7, 8))
+    >>> matrix3
+    <hou.Matrix3 [[0, 1, 2], [3, 4, 5], [6, 7, 8]]>
+    >>> hou.Matrix4(matrix3)
+    <hou.Matrix4 [[0, 1, 2, 0], [3, 4, 5, 0], [6, 7, 8, 0], [0, 0, 0, 1]]>
+    }}}
+
+    Note that Houdini's matrices are stored in row-major order, so the matrix's
+    contents are grouped by row.
+
+::`at(self, row, col)` -> `float`:
+    #cppname: HOM_Matrix4::at
+    Return the value of the matrix at the given row and column.
+
+    Raises IndexError if the row or column are not between 0 and 3, inclusive.
+    Note that negative indices will not index from the end.
+
+::`setAt(self, row, col, value)`:
+    #cppname: HOM_Matrix4::setAt
+    Set the value of the matrix at the given row and column.
+
+    Raises IndexError if the row or column are not between 0 and 3, inclusive.
+    Note that negative indices will not index from the end.
+
+::`asTuple(self)` -> `tuple` of `float`:
+    #cppname: HOM_Matrix4::asTuple
+    Return the contents of the matrix as a tuple of 16 floats.
+
+::`asTupleOfTuples(self)` -> `tuple` of `tuple` of `float`:
+    #cppname: HOM_Matrix4::asTupleOfTuples
+    Return the contents of the matrix as a tuple of tuples of 4 floats.
+
+::`setTo(self, sequence)`:
+    #cppname: HOM_Matrix4::setTo
+    Set this matrix's contents.  The sequence may contain either 16 floats
+    or 4 sequences, each with 4 floats.
+
+    See [Hom:hou.Matrix4#__init__] for examples of suitable parameter values.
+
+::`setToIdentity(self)`:
+    #cppname: HOM_Matrix4::setToIdentity
+    #replaces: Exp:identity
+    Set this matrix to the multiplicative identity, having 1's in the diagonal.
+
+    The matrix will contain the values
+    `[[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]]`.  Note that
+    you can construct a new matrix with these values using
+    [Hom:hou.hmath#identityTransform] or `hou.Matrix4(1)`.
+
+::`setToZero(self)`:
+    #cppname: HOM_Matrix4::setToZero
+    #replaces: Exp:mzero
+    Set this matrix to contain all zeros.
+
+    Note that you can construct a new matrix with all zeros with
+    `hou.Matrix4()`.
+
+::`__add__(self, matrix4)` -> [Hom:hou.Matrix4]:
+    #cppname: HOM_Matrix4::__add__
+    Add two matrices by adding corresponding entries together and return a new
+    matrix.  This method lets you write `m1 + m2`, where `m1` and `m2` are
+    Matrix4 objects.
+
+::`__sub__(self, matrix4)` -> [Hom:hou.Matrix4]:
+    #cppname: HOM_Matrix4::__sub__
+    Subtract another matrix from this one, subtracting corresponding entries,
+    and return a new matrix.  This method lets you write `m1 - m2`, where `m1`
+    and `m2` are Matrix4 objects.
+
+::`__mul__(self, matrix4_or_scalar)` -> [Hom:hou.Matrix4]:
+    #cppname: HOM_Matrix4::__mul__
+    Multiply this matrix by another matrix or by a scalar, returning a new
+    matrix.  This method lets you write `m1 * m2`, where `m1` and `m2` are
+    Matrix4 objects, or `m1 * s`, where `s` is a float.
+
+    If `m1` and `m2` are transformation matrices and `v` is a vector,
+    `v * m1 * m2` will transform `v` by `m1`, and then transform it by `m2`.
+    This ordering occurs because Houdini's Matrices are stored in row-major
+    format, and is opposite from the ordering used in traditional mathematical
+    notation.  Note that `m1 * v` is not a valid expression in Houdini
+    
+    See the Matrix4 class documentation and [Hom:hou.Vector3#__mul__] for
+    more information.  See [Wikipedia's matrix multiplication
+    page|Wp:Matrix_multiplication] for details on
+    how each element in the result is computed.
+
+::`preMult(self, matrix4)` -> [Hom:hou.Matrix4]:
+    #cppname: HOM_Matrix4::preMult
+    Returns `matrix4 * self`.  Note that `__mul__` returns `self * matrix4`,
+    which is a different result because matrix multiplication is not
+    commutative.
+
+::`determinant(self)` -> `float`:
+    #cppname: HOM_Matrix4::determinant
+    #replaces: Exp:determinant
+    Return the determinant of the matrix.
+
+    See [Wikipedia's determinant page|Wp:Determinant].
+
+::`explode(self, transform_order='srt', rotate_order='xyz', pivot=hou.Vector3(), pivot_rotate=hou.Vector3())` -> `dict` of `str` to [Hom:hou.Vector3]:
+    #cppname: HOM_Matrix4::explode
+    #replaces: Exp:explodematrix, vorigin
+    Return a dictionary with keys `'rotate'`, `'scale'`, `'translate'`, and
+    `'shear'` whose values are [Hom:hou.Vector3] objects.  When applied in the
+    specified order, the corresponding rotations, scales (and shears), and
+    translations will give this matrix.
+
+    The rotation is returned as a set of Euler angles, in degrees.  See
+    [Wikipedia's Euler angles
+    page|Wp:Euler_angles] for more information.
+
+    transform_order:
+	A string containing a permutation of the letters `s`, `r`, and `t`.
+	The rotate, scale, and translate results are dependent on the order in
+	which you perform those operations, and this string specifies that
+	order.
+
+	For example, imagine a transformation where you first translate in x
+	by one unit, then you rotate in z by 45 degrees.  With a transform
+	order of `'trs'` (translate, rotate, scale), the translate component
+	is (1, 0, 0).  However, this same transformation could be constructed,
+	for example, by first scaling, then rotating, and then translating.
+	For this transformation order, the translate component would be
+	`(1.0 / math.sqrt(2), 1.0 / math.sqrt(2), 0)`.
+
+    rotate_order:
+	A string containing a permutation of the letters `x`, `y`, and `z`
+	that determines the order in which rotations are performed about
+	the coordinate axes.
+
+    pivot:
+	A Vector3 containing a position about which rotations and scales are
+	performed.  By default, this parameter is set to the origin.
+
+    pivot_rotate:
+	A Vector3 containing the Euler angles about the `x`, `y`, and `z` axes,
+        in degrees, that specifies the base rotation about the pivot.  These
+        angles are always processed in `'xyz'` order.
+
+    Raises [Hom:hou.OperationFailed] if the matrix does not represent a valid
+    transform matrix (e.g. it is singular), the transform order is not a
+    permutation of the string `'srt'`, or the rotate order is not a
+    permutation of the string `'xyz'`.
+
+    See [Hom:hou.hmath#buildRotateAboutAxis] for an example of how to convert
+    Euler angles into an axis and rotation.
+
+    See [Hom:hou.ObjNode#setParmTransform] for an example.  This method is
+    the inverse of [Hom:hou.hmath#buildTransform].  See also the other
+    functions in [Hom:hou.hmath] that build transformation matrices.
+
+::`extractTranslates(self, transform_order='srt', pivot_rotate=hou.Vector3())` -> [Hom:hou.Vector3]:
+    #cppname: HOM_Matrix4::extractTranslates
+    #replaces: Exp:vtorigin
+    A shortcut for `self.explode(transform_order, hou.Vector3(), pivot_rotate)['translate']`.
+    See [Hom:hou.Matrix4#explode] for more information.
+
+    {{{
+    #!pycon
+    >>> matrix = hou.hmath.buildTranslate(1, 0, 0) * hou.hmath.buildRotate(0, 0, 45)
+    >>> matrix.extractTranslates('trs')
+    <hou.Vector3 [4, 0, 0]>
+    >>> matrix.extractTranslates('srt')
+    <hou.Vector3 [0.707107, 0.707107, 0]>
+    }}}
+
+::`extractRotates(self, transform_order='srt', rotate_order='xyz', pivot=hou.Vector3(), pivot_rotate=hou.Vector3())` -> [Hom:hou.Vector3]:
+    #cppname: HOM_Matrix4::extractRotates
+    #replaces: Exp:vrorigin
+    A shortcut for
+    `self.explode(transform_order, rotate_order, pivot, pivot_rotate)['rotate']`.
+    See [Hom:hou.Matrix4#explode] for more information.
+
+::`extractScales(self, transform_order='srt', pivot=hou.Vector3(), pivot_rotate=hou.Vector3())` -> [Hom:hou.Vector3]:
+    #cppname: HOM_Matrix4::extractScales
+    A shortcut for
+    `self.explode(transform_order, rotate_order, pivot, pivot_rotate)['scale']`.
+    See [Hom:hou.Matrix4#explode] for more information.
+
+::`extractShears(self, transform_order='srt', pivot=hou.Vector3(), pivot_rotate=hou.Vector3())` -> [Hom:hou.Vector3]:
+    #cppname: HOM_Matrix4::extractShears
+    A shortcut for
+    `self.explode(transform_order, rotate_order, pivot, pivot_rotate)['shear']`.
+    See [Hom:hou.Matrix4#explode] for more information.
+
+::extractRotationMatrix3(self)` -> [Hom:hou.Matrix3]:
+    #cppname: HOM_Matrix4::extractRotationMatrix3
+    Extracts the 3x3 rotation matrix from this matrix, assuming it is a
+    transformation matrix. If it fails to extract the rotation, for example
+    if scaling is zero on one axis, it returns the identity matrix instead.
+    
+::`inverted(self)` -> [Hom:hou.Matrix4]:
+    #cppname: HOM_Matrix4::inverted
+    #replaces: Exp:invert
+    Return the inverse of this matrix.
+    
+    Raises [Hom:hou.OperationFailed] if the matrix is not invertible.
+    Otherwise,
+    `(self * self.inverted()).isAlmostEqual(hou.hmath.identityTransform())` is
+    True.
+
+    See [Wikipedia's invertible matrix
+    page|Wp:Invertible_matrix] for more information.
+
+::`transposed(self)` -> [Hom:hou.Matrix4]:
+    #cppname: HOM_Matrix4::transposed
+    #replaces: Exp:transpose
+    Return the transpose of this matrix.  The result is such that
+    `self.at(i, j) == self.transposed().at(j, i)` for `0 <= i,j <= 3`.
+
+    See [Wikipedia's transpose page|Wp:Transpose]
+    for more information.
+
+::`isAlmostEqual(self, matrix4, tolerance=0.00001)` -> `bool`:
+    #cppname: HOM_Matrix4::isAlmostEqual
+    Return whether this matrix is equal to another, within a tolerance.
+
+@related
+
+- [Hom:hou.hmath]
+- [Hom:hou.Matrix3]
+- [Hom:hou.Quaternion]
+- [Hom:hou.Vector3]
+- [Hom:hou.Vector4]

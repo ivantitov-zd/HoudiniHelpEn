@@ -1,0 +1,67 @@
+= Mantra: VEX Volume Procedural =
+
+#type: node
+#context: shop
+#internal: vm_geo_vexvolume
+#icon: SHOP/vm_geo_vexvolume
+
+"""Render a volume from fields created by a CVEX shader."""
+
+This procedural uses a CVEX shader to define a set of 3D fields in space
+for volume rendering.  The export parameters on the CVEX shader will be
+evaluated during rendering and bound to surface shader parameters of the
+same name.  If you are rendering isosurfaces, you should define a "density"
+export from the shader since mantra relies on this field being present for
+isosurface root finding.
+
+The following inputs parameters are available in the CVEX context used by
+the VEX Volume Procedural:
+
+P:
+    Position to evaluate, in object space.
+Time:
+    Equivalent to the Time global variable passed to the surface shader,
+    indicates the motion blur interframe time for evaluation.  Time will be
+    a value between 0 and 1.
+
+When using this procedural, you should always specify an explicit bounding
+box.  If you don't specify a box, parts of your function may appear clipped
+in the render.  The default rendering quality for VEX volume procedurals is
+set in relation to the box size, so larger boxes will use a larger ray
+march step size.  You can adjust quality from the default using
+`vm_volumesteprate`.
+
+@parameters
+
+=== Main ===
+
+Shader:
+    Specifies the CVEX shader that will define the fields in the volume.
+    
+Octree Divisions:
+    Specifies the number of divisions to use in constructing an
+    acceleration data structure for the volume.  The default of 1 division
+    will cause the renderer to generate samples within the entire bounding
+    box for the volume.  Larger values will trigger a preprocessing phase
+    before rendering that will evaluate the VEX function on a uniform grid
+    to try to determine the important parts of the volume, so that empty
+    portions of the image will render much faster.  
+    
+    NOTE:
+        Values larger than 1 will only produce a correct result if the feature size in your
+    volume is larger than the division size - otherwise the preprocessing phase will miss small details in the volume which will then fail to appear in the render, so increasing the octree divisions is not recommended.
+    
+=== IFD Bounds ===
+
+Bounding Box:    
+    The bounding box controls let you specify a bounding box for the referenced geometry. Only when this bounding box is "on screen" will mantra load the referenced geometry. You can set __Bounding box__ to __No bounding box required__, in which case mantra will always load the references geometry regardless. You can also specify the bounding box by referencing the SOP's bounding box in the __SOP Bounds__ parameter.
+       
+SOP Bounds:
+    The geometry whose bounding box you want to reference.
+
+Min Bounds:
+    The minimum bounding box dimensions, when setting explicit bounds.
+
+Max Bounds:
+    The maximum bounding box dimensions, when setting explicit bounds.
+

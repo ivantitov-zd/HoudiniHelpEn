@@ -1,0 +1,138 @@
+= How to render using Mantra =
+
+#flow: mug
+
+
+== Overview ==
+
+Mantra is the highly advanced renderer included with Houdini. It is a _multi-paradigm_ renderer, implementing scanline, raytracing, and physically-based rendering. You should use the *physically based rendering* engine unless you have a good reason to use another engine. Mantra has deep integration with Houdini, such as highly efficient rendering of [packed primitives|/model/packed] and [volumes|/model/volumes].
+
+You can implement Mantra [shaders|/shade] using a [VOP network|/nodes/vop/] or by writing a program in the [VEX shading language|/vex/].
+
+TIP:
+    Houdini also lets you integrate third-party renderers such as RenderMan(tm), Arnold(tm), mental ray(tm), and Maxwell(tm). See [other renderers|other].
+
+In general, rendering in Houdini uses a [camera|cameras] defining the viewpoint to render from, [lights|lights] to illuminate the scene, and a [render node|#node] representing the renderer and render settings to use. However, you can still make preview renders using the current view, a headlight, and default render settings.
+
+
+== Preview rendering ==
+
+The [Render view|/ref/views/ipr], sometimes called the _IPR_ (interactive photorealistic render) view, shows a rendered image that updates as you move lights and objects, change parameters, and so on.
+
+[Image:/images/render/ipr_tab.png]
+
+The [Icon:TOOLS/render_region] [Render region tool|renderregion] lets you outline a rectangle in the 3D viewer that acts like a mini render view. It renders that part of the view and updates the rendered rectangle as you change things.
+
+[Image:/images/render/render_region.png]
+
+
+== Starting a final render == (start)
+
+You can do most of your work in the [Render view|/ref/views/ipr] to see an interactive updating render. This lets you [assign materials|/shade/assign] and change render node and shader node parameters and see the results as you work.
+
+When you want to do a final render:
+
+* In the render node's parameter editor, click __Render to Disk__ or __Render to Mplay__.
+
+~~~ or ~~~
+
+* Choose __Render > Start Renderer > <<render node>>__ in the main menus.
+
+~~~ or ~~~
+
+* Click the [Icon:NETWORKS/rop] __Launch render__ button in the toolbox on the left side of the viewer.
+
+    Right-click the [Icon:NETWORKS/rop] button and choose a render output node to render, or __View: Mantra__ to render the current view.
+    
+    After you set the default render node in the menu, clicking the icon will use that render node. The initial default renders the current view.
+
+~~~ or ~~~
+
+* You can script rendering using the [Cmd:render] HScript command or the [Hom:hou.RopNode] interface in Python.
+
+
+== Setting up a render node == (node)
+
+Add lights to the scene and create a camera. See [lights and cameras|/shelf/lightsandcameras]. If you don't have lights in the scene the render will come out black.
+
+:task:Create a render node:
+    In the main menus, choose __Render > Create Render Node > Mantra__. Mantra is Houdini's powerful built-in renderer.
+    
+    If you only have one camera in the scene, it is automatically chosen as the camera the new render node will render from. 
+
+:task:Edit the parameters of a render node:
+    You can edit a render node's parameters and render properties in the [parameter editor|/ref/panes/parms].
+
+    * Choose __Render > Edit Render Node > <<node name>>__ to open a floating parameter editor for the render node.
+    
+        ~~~ or ~~~
+    
+    * In the network editor, go to the "Outputs" (`/out`) network. (Click the first segment of the path at the top of the network editor pane and choose `out`.) Select the node to open it in the parameter editor pane.
+    
+    For help on the render parameters, see the [Mantra node help|Node:out/ifd].
+
+:task:Set whether to render a single frame or animation:
+    The __Valid Frame Range__ menu controls whether this render node renders single frames or sequences (animations). Choose __Any frame__ to render single frames. Choose __Frame range__ to render a sequence.
+
+    If you are rendering a sequence, make sure to include the frame number variable `$F` in the filename, otherwise the renderer will overwrite ever frame with the same name. See [expressions in filenames|expressions].
+
+:task:Set the output size/resolution:
+    The size of the rendered image is controlled by a parameter on the _camera_. Select the camera object and set the __View > Resolution__ parameter in the parameter editor. (For help on the other camera parameters, see the [Camera node help|Node:obj/cam].)
+    
+    _or_
+    
+    You can override the camera's image size parameters in the render node by turning on __Properties > Output > Override camera resolution__.
+    
+:task:Set the camera to render from:
+    Click the __Main__ tab and edit the __Camera__ field. (Click the button to the right of the field to choose the camera from a list.)
+
+    [Image:/images/rendering/out_network.png]
+
+
+== Controlling object visibility ==
+
+:task:Make an object visible or invisible in the viewer:
+    Turn the object's Display flag on or off.
+    
+    [Image:/images/nodes/obj_node_anno.png]
+
+:task:Make an object totally invisible in the render:
+    In the object's parameter editor, click the __Render__ tab and turn off __Renderable__.
+
+:task:Make an object invisible but cast reflections/shadows:
+    In the object's parameter editor, click the __Render__ tab and turn __Renderable__ off and __Phantom__ on.
+
+:task:Use different geometry for viewport display and rendering:
+    In the geometry network of an object, you can set the [display and render flags|/basics/objects#display_flag] on different nodes to indicate different geometry output for display and rendering.
+    
+    This is useful to replace low-resolution proxy geometry for display with high-resolution geometry for rendering.
+
+:task:Instance geometry onto points at render time:
+    See [point instancing|/copy/instancing].
+
+:task:Prevent an object from reflecting:
+    * Edit the __Render > Shading > Reflection Mask__ parameter on the reflective object.
+
+
+== Tips ==
+
+* You can render a [deep camera map|dcm] to get a "2.5-D" image with depth information. (When rendering `.pic` or `.rat`, the depth information is embedded in the file. When rendering `.exr` it is saved to an additional output file.) The depth information lets you composite rendered images in 3D.
+
+* The [Switcher object|Node:obj/switcher] is a special camera that lets you animate switching between the viewpoints of several different cameras.
+
+* Click the __Controls__ button on the parameter editor of the render node to open the [Render Control window|/ref/windows/rendercontrol]. This window lets you temporarily override render parameters (such as the frame range, or whether to render dependencies) per-render, without having to edit the parameters on the node (and remember to change them back).
+
+    # In the main menu, choose __Render > Edit Render Node > <<render node>>__.
+    
+    # Click the __Render Control__ button on the parameter editor of the render node.
+    
+    # Set the __Frame Range__ option in the __Output Overrides__ section.
+    
+    You can also override the rendering of [dependencies|/render/batch] from the window. See [how to set up a render node|batch] and the [Render Control window|/ref/windows/rendercontrol] for more information.
+
+
+@related
+
+* [Render quality|quality]
+* [Batch rendering|batch]
+* [Render tips|tips]

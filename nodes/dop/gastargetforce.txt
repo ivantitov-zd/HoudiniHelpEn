@@ -1,0 +1,110 @@
+#type: node
+#context: dop
+#internal: gastargetforce
+#icon: DOP/gas
+
+= Gas Target Force =
+
+"""A microsolver that applies a force towards a target object."""
+
+The Gas Target Force DOP is a microsolver used in building larger fluid
+simulations. The [Fluid Solver|Node:dop/fluidsolver] and [Smoke Solver|Node:dop/smokesolver] DOPs that allow
+microsolvers to be added before or after the main solver step to extend
+or tweak the simulation. Alternatively, enterprising people may attempt
+to build an entire new solver out of microsolvers.
+
+The Gas Target Force DOP builds a force field that directs smoke
+towards a target shape.  It does this by building a Signed Distance
+field out of the target smoke, using 0.5 as the cut off surface.  A
+force is then applied to the smoke, proportional to the density, in
+the direction of this target.
+
+When the shape is reached the inward pointing force will be canceled
+out by hydrostatic pressure.
+
+@parameters
+
+== Force ==
+    Force Scale:
+	How strongly the force is applied.
+    Use Existing Goal Field:
+	Instead of building a goal field from the target relationship of this
+	object, an existing scalar field will be used.  The name used defaults
+	to goal and is set in the __Fields__ tab.
+    Animated Goal:
+	If not set, the vector force field of the goal is only
+	built on the first frame.  This saves a lot of work if the
+	goal field isn't animated.
+    Liquid Mode:
+	When set the __Density Field__ and __Goal Field__ are both treated
+	as signed distance fields.  The force is no longer scaled by
+	the density field and no expansion term is applied to the
+	positive error.  These changes are appropriate for liquid
+	simulations.
+    Soft Target:
+	If set no signed distance field is computed.  Instead, an
+	error field is built.  This error field is used as a goal
+	divergence in computing the desired force vectors.  This
+	allows the matching of grey scale fields rather than just the
+	0.5 cutoff of a fog surface.
+    Normalize Error:
+	When the __Density Field__ closely matches the __Goal Field__ the
+	error, and hence magnitude of the forces, decreases.
+	Normalizing the error tries to preserve the total force to help
+	the convergence feel constant.
+    Force Blurring:
+	When in hard-target mode, this is the radius to blur the gradient field
+	with.  A blurred gradient avoids harsh discontinuities where smoke is
+	pulled in opposite directions, resulting in a smoother separation when
+	topology changes.
+    Minimum/Maximum Goal Distance:
+	Controls the range that the goal distance ramp operates on.
+	The minimum goal distance refers to the left side of the ramp,
+	the maximum the right side.  Negative values imply inside the
+	goal object.
+    Map Goal Distance to Force:
+	Scales the force according to how far from the goal object it
+	is.  This can be used to disable the suction effect at a
+	far distance, or to cut off the inward force once the smoke
+	reaches the goal.
+
+== Guides ==
+
+    Each of the fields that cotnrol the smoke attraction can be
+    visualized in a number of ways.  The help for the [Scalar Field
+    Visualization|Node:dop/scalarfieldvisualization] or [Vector Field Visualization|Node:dop/vectorfieldvisualization] provides more
+    details about how these work.
+
+== Fields ==
+    These parameters control what name will be used for the input
+    fields and the internal fields.
+
+    Density Field:
+	The smoke field to drive to the goal shape.  The force is
+	scaled by this field.
+    Goal Field:
+	The target shape.  The 0.5 contour is used as the goal
+	perimeter.
+    Goal SDF:
+	An SDF version of the target shape built from the 0.5
+	contour of the goal.
+    Goal Force Field:
+	A vector field pointing towards the goal field.  This is
+	what is used for the force.
+    Velocity Field:
+	The vector field to add the force to.
+    Collision Field:
+	The scalar field to use as a collision hint when soft
+	target is enabled.  The generated force field will know to
+	avoid the collision objects so specified.
+
+@outputs
+    [Include:standard_data_outputs]
+
+@locals
+    [Include:standard_data_locals]
+
+    [Include:standard_locals]
+
+
+

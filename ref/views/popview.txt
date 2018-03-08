@@ -1,0 +1,220 @@
+﻿= Particle viewer =
+
+A particle viewer pane is a Viewer pane with its Network menu set to
+Particles (POP). The viewer shows you the particle simulation you are
+editing.
+
+<!--
+TBD.
+-->
+
+NOTE:
+    The particle viewer simulates how a POP SOP would convert the
+    particle system you are editing into geometry. The display options
+    available in the particle viewer closely resemble the parameters of
+    the POP SOP.
+
+== POP Viewer State Parameters - Standard Page ==
+
+    NOTE:
+        All of these parameters are actually the parameters of the
+        POPNET (inside of which the POPs live, just like SOPs live
+        inside Objects) being viewed. Thus these parameters can also be
+        changed by going to the parameter dialog of the POPNET being
+        viewed.
+
+    == Start Time _/timestart_ ==
+
+        The start time is the time at which the pop simulation starts
+        cooking. Before this, the particle system will be empty. The
+        default is _Tstart_(frame one).
+
+    == Preroll Time _/timepreroll_ ==
+
+        How many seconds of the pop simulation to bypass, after the
+        reset time is reached. For example, if you put the number 33
+        into this field (and reset is at _Tstart_), frame one will show
+        the simulation that was at a time of 33 seconds. In other words,
+        the first thirty-two seconds have been bypassed, and the time at
+        thirty-three seconds is shifted to frame one. The first
+        thirty-two seconds must still be calculated in order to compute
+        the status of the points, so you will notice some delay upon
+        reset.
+
+    == Initial State ==
+
+        Instead of starting from an empty particle system, you can use a
+        geometry file to specify the initial state for the simulation.
+        Create a geometry file by using a Geometry Output OP, and
+        specifying a POP sop as its output.
+
+    == Oversampling ==
+
+        Oversampling is how many times in between frames to cook the
+        simulation. For example, a value of 1 means to cook once per
+        frame. A value of 2 means to cook at frame 1, frame 1.5, frame
+        2, etc.
+
+        Access Oversampling in the POPnet > Parameters, or in the POP
+        sop.
+
+        NOTE:
+            The Sampling Rate in the POP Editor is not associated in any
+            way with the oversampling in the SOP. The SOP's oversampling
+            is the only one used when rendering, or for display of the
+            SOP's data. The POP Viewport oversampling is only for the
+            POP editor (there may be multiple SOPs referencing the same
+            POP network with different oversampling rates).
+
+    == Max # of Particles ==
+
+        Specifies the maximum number of particles allowed to exist in
+        the system.
+
+    == Remove Unused Points ==
+
+        Removes all unused points from the input geometry. When points
+        are removed, memory is conserved. On the other hand, re-using
+        points saves the time needed to purge the points from memory.
+
+== POPs Viewer State Parameters - RBD Page ==
+
+    The RBD solver requires a number of new parameters to specify how to
+    cook the network. These parameters can be found on the Rigid Body
+    Dynamics page of the Particle CHOP, the POP SOP, and the POP Viewer
+    parameter dialog. The following sections describe each of the new
+    parameters.
+
+    == Rest Threshold ==
+
+        This parameter is used to specify the relative velocity between
+        objects that is considered as resting contact by the RBD solver.
+        Resting contact is treated differently from collision contacts,
+        which is why this division is necessary. Usually the default
+        value should be used here unless your objects are very large.
+
+    == Contact Tolerance ==
+
+        This is the distance between two objects at which the RBD solver
+        considers them to be touching. If this value is made large,
+        objects will collide and bounce in obviously unrealistic ways
+        (i.e. before they actually contact). If this value is made
+        small, you should increase the Max Time Splits value which will
+        allow more accurate simulation of collisions but will also slow
+        the simulation.
+
+    == Max Time Splits ==
+
+        This parameter specifies how finely the RBD solver is allowed to
+        split up a time step. The solver splits time steps to find the
+        precise moment at which two object collide. The larger the
+        number of time splits you allow the more accurately collision
+        can be simulated, but also the longer the simulation may take.
+        This parameter should take into account the maximum velocity at
+        which particles will be moving in the simulation, the Contact
+        Tolerance value, and the size of each time step (which is one
+        frame time divided by the Oversampling parameter on the Standard
+        page).
+
+    == Constraint Time ==
+
+        This parameter specifies the approximate time (in seconds) that
+        the RBD solver can take to satisfy an unsatisfied constraint
+        (see the Constraint POP for information about setting up
+        constraints). The smaller this value is, the more rigidly
+        constraints behave, but the larger the forces are that get
+        applied to the objects. The larger this value is, the less
+        likely you are to produce an unstable situation in your
+        simulation.
+
+    == Solver Type ==
+
+        Choose from: Euler (fastest, but least accurate), Midpoint, and
+        Runge-Kutta (slowest, but most accurate).
+
+== POP Viewer State Parameters - Input Geo Page ==
+
+    == Object n / SOP n ==
+
+        Specify the Input geometry objects here by specifying their
+        Object and SOP from the pop-up menus provided. These let you set
+        the context geometry to use for the POP network.
+
+    == Context Geometry ==
+
+        All POP networks can have 'Context Geometry'. These context
+        geometries are set in the parameters of the POPNET, the Particle
+        CHOP, or the POP OP. In the POP OP they can also be set by
+        wiring OPs into the inputs of the POP OP. These context
+        geometries can be referenced by the following POPs: Source POP,
+        Collision POP, SoftBody POP, Attractor POP, Creep POP (All of
+        which have the parameter - Geometry Source > Use Context
+        Geometry). So, instead of hard-coding a specific piece of source
+        geometry or collision geometry, a single POP network can be used
+        by several POP OPs to generate several different outputs,
+        depending on the geometry input into the POP OP.
+
+        == Context Geometry - Example ==
+
+            The main point of 'Context Geometry' is that a POP network
+            can be used as a macro instead of a dedicated effect. For
+            example, suppose you want to have a piece of geometry emit
+            particles from it's points, and then have those particles
+            fly over to the points of some other piece of geometry. You
+            create a Source POP that references an object, an Attractor
+            POP that references some other object, then you put a POP
+            SOP into an object somewhere and you're done. You don't even
+            provide any inputs into the POP SOP. Now suppose you have
+            another pair of objects where you want to have this same
+            effect. Without Context Geometry you would have to create a
+            whole new POP network that was identical to the first,
+            except it referenced different objects in the source and
+            attractor POPs. Suppose you have 50 of these pairs of
+            objects where you want to use this effect - that's 50 POP
+            networks.
+
+            Enter Context Geometry. Change the Source POP to use Context
+            Geometry 1, and the Attractor POP to use Context Geometry 2.
+            In your POP SOP, connect the source geometry to input 1 and
+            the attractor geometry to input 2. But now you want to do
+            this same thing with 50 pairs of objects. You still need 50
+            POP SOPs. Each one takes as input the pair of geometries you
+            want to work with. But you only need one POP network. This
+            is a tremendous advantage if you ever want to make a change
+            to the POP Network.
+
+            In the POP Viewport, you go to the 'Operation Parameters'
+            dialog ( ((P))), and to the Input Geo page. On this page,
+            you specify the Object and SOP to use for each of your four
+            Context Geometries. So, for this example, when you're
+            designing your POP network, you would set the 'Object 1' and
+            'SOP 1' to point to the source geometry. You would set the
+            'Object 2' and 'SOP 2' to point to the destination Attractor
+            geometry. Now in the POP Viewport, the Source POP will
+            behave exactly as if you had entered these Object and SOP
+            values into its parameters. Even templating geometry works.
+
+== POP Viewer State Parameters - Viewer Page ==
+
+    == Transform Object ==
+
+        When you create a pop network, you must specify a geometry
+        source from where the particles are birthed. The pop network
+        will automatically assume the coordinate space of the geometry
+        in that object, just as if the source geometry contained an
+        Object merge sop. You select which object - whose space you
+        would like to use - from this menu (this is the same menu in the
+        POP Viewport > Select state > sub-icons Transform Object).
+
+    == Cache Size ==
+
+        Specifies the size of the cache - which will hold the result of
+        the pop simulation for faster subsequent playback. A zero (0)
+        turns off caching, -1 sets infinite caching, and any other value
+        sets the maximum number of frames to cache.
+
+        Note that to get an up-to-date and accurate particle simulation,
+        you should reset the simulation with the yellow Recook
+        simulation from Start button at the top of the POP Viewport.
+
+

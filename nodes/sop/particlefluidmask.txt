@@ -1,0 +1,145 @@
+#type: node
+#context: sop
+#internal: particlefluidmask
+#icon: SOP/particlefluidmask
+#index: no
+
+#tags: fluid, surface, ocean
+
+= Particle Fluid Mask =
+
+"""Generates a Volume mask from a particle fluid simulation."""
+
+Connect particles and/or velocity fields from a particle fluid simulation to the __Particles and Volumes__ input of this node to generate a volumetric mask according to several different criteria.  
+
+Additionally one or more Ocean Spectrum layers can be connected to the third input of this node, and the generated mask can be composited into the existing spectra masks, with optional frequency filtering applied to the spectra.
+
+@parameters
+
+== Mask ==
+
+Particle Separation:
+    The distance between two particles in the fluid simulation. This parameter should generally reference the same parameter on the [FLIP Object|Node:dop/flipobject] of the input simulation.
+
+Resolution Scale:
+    Scale the output mask volume relative to the input particles and/or velocity fields.  This parameter can often be set below 1, because a mask is often blurred using the __Filter__ parameter, and very high resolution masks are usually not worth the processing expense.
+
+Use Input Volumes Only:
+    Ignore particle input and create the mask only from an input velocity volume.  In general this operation is faster than using particles and is very useful for previewing mask values; however, it will be less accurate and might miss areas where only a few particles exist and the velocity field is not defined in the source FLIP simulation.  
+
+Spectrum Mask Type:
+    Controls if the mask should be combined with any ocean spectra plugged into the second input, and if so, whether it should suppress or contribute to the ocean waves.
+
+=== Conditions ===
+
+Velocity Range:
+    Generate a mask where surface areas with velocity below the minimum speed get no masking, while areas above the maximum speed get full masking.
+
+Vorticity Range:
+    Generate a mask where surface areas with vorticity below the minimum speed get no masking, while areas above the maximum vorticity get full masking.
+
+Collision Offset:
+    Generate a mask within the specified world-space offset of any collision objects or volumes connected to the second input.
+
+Height Range:
+    Generate a mask where areas below the minimum height get no masking, while areas above the maximum height get full masking.   The height is measured relative to the specified __Plane__.
+
+Conditions Combine:
+    The operation used to combine multiple filter masks from the __Conditions__ tab.
+
+=== Regions ===
+
+Use Bounding Box:
+    Fade out the mask as it reaches the edge of the specified bounding box, according to the __Falloff Shape__ and __Falloff Distance__.
+
+Size: 
+    The size of the bounding box.
+
+Center:
+    The center of the bounding box.
+
+Falloff Shape:
+    The shape in which the mask should falloff as it approaches the edges of the bounding box.  If creating a mask for a fluid mesh created with the [Particle Fluid Surface SOP|Node:sop/particlefluidsurface] with __Flatten Geometry__ enabled, this value should match the flattening __Shape__.
+
+Falloff Distance:
+    The distance at which the mask should falloff as it approaches the edges of the bounding box.  If creating a mask for a fluid mesh created with the [Particle Fluid Surface SOP|Node:sop/particlefluidsurface] with __Flatten Geometry__ enabled, this value should match the flattening __Distance__.
+
+Plane:
+    The plane in which height is measured and falloff occurs.
+
+Invert Bounding Box:
+    Invert the mask created by the specified bounding box.
+
+Regions Combine:
+    The operation used to combine masks from the __Regions__ tab with those from the __Conditions__.
+
+=== Mapping ===
+
+Filter:
+    The type of smoothing to apply to the mask.
+
+Use World Space Radius Units:
+    Specify the __Filter Radius__ in world space rather than voxel units.
+
+Voxel Radius:
+    The size of the filter radius in voxel units.
+
+Filter Radius:
+    The size of the filter radius in world units.
+
+Iterations:
+    The number of smoothing iterations to perform.
+
+Invert Mask:
+    Invert the output mask.
+
+Remap Mask:
+    Remap the output mask according to the __Remap Ramp__.
+
+Remap Ramp:
+    The ramp for remapping the mask output.
+
+== Spectrum ==
+
+=== Amplitude ===
+
+Filter Above Resolution:
+    Dampen any waves that would exist in an ocean spectrum higher than this resolution.  For example if set to 8, this spectrum will have no higher frequencies than a spectrum of resolution 8.  This parameter can be useful along with __Filter Below Resolution__ when layering spectra and applying masks and noise to only the highest frequencies.
+
+Filter Below Resolution:
+    Dampen any waves that would exist only in an ocean spectrum lower than this resolution.  For example if set to 8, this spectrum will contain only frequencies higher than a spectrum of resolution 8.  This parameter can be useful along with __Filter Above Resolution__ when layering spectra and applying masks and noise to only the highest frequencies.
+
+Filter Above Wavelength:
+    Dampen any waves that have a longer wavelength than this value.
+
+Filter Below Wavelength:
+    Dampen any waves that have a shorter wavelength than this value.
+
+Remove Non-Spectral Waves:
+    Remove any non-spectral instanced waves, usually those created by the [Ocean Waves SOP|Node:sop/oceanwaves].  Since these waves are typically low-frequency, this option is useful in combination with __Filter Below Resolution__ to remove all low frequencies from the input spectra.
+
+@inputs
+
+Particles and Volumes:
+    Particle geometry and/or velocity field, usually from a FLIP simulation.
+
+Collision Objects and Volumes:
+    Geometry and SDF volumes to subtract from the fluid surface.
+
+Ocean Spectrum:
+    One or more ocean spectrum layers from Ocean Spectrum SOP(s).
+
+@outputs
+
+Mask:
+    The mask volume.
+
+Ocean Spectrum:
+    The input ocean spectrum layers possibly filtered and / or with the generated mask composited in.
+
+@related
+
+- [Node:sop/particlefluidsurface]
+- [Node:sop/oceanspectrum]
+- [Node:dop/flipsolver]
+- [Node:sop/fluidcompress]

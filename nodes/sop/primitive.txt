@@ -1,0 +1,448 @@
+#type: node
+#context: sop
+#internal: primitive
+#icon: SOP/primitive
+
+#tags: tech, attrs, trim
+
+= Primitive =
+
+"""Edits primitive, primitive attributes, and profile curves."""
+
+In Houdini, each geometry primitive has attributes such as XYZ position,
+size, orientation, color, and alpha.
+
+A Bezier surface is a single primitive, as is a NURBS surface, while a
+polygon mesh can be made of hundreds of individual primitives.
+
+You can use this operator to:
+
+* Translate, rotate, and scale primitives.
+
+* Apply parametric affine transformations to a profile curve.
+
+  (When transforming profile curves, you can only rotate around the Z
+  axis, since the X and Y axes are projected onto the surface and so
+  cannot rotate off the surface. Similarly, you cannot scale along the Z
+  axis.)
+
+* Make primitives open or closed.
+
+* Reverse the vertex order of all faces.
+
+* Reverse surface normals (for example, to map a texture onto the inside
+  of a sphere).
+
+* Apply transforms per-primitive.
+
+* Set primitive attributes such as color.
+
+== Template geometry ==
+
+    Various options let you modify the input primitives in relation to
+    another piece of geometry. For example, you can match the normals of
+    the input primitives to the normals of the template geometry.
+
+    You can use a group within the input primitives as the template
+    geometry (using the __Template group__ parameter), or connect the
+    template geometry to this node's second (Template) input.
+
+
+TIP:
+    The local variables in the Primitive SOP are relative to the
+    primitive. You can use the prefixes "det", "pt", or "vtx" to use
+    detail, point, or vertex variables. For example, `$ptTX, $ptTY,
+    $ptTZ` for point coordinates.
+
+@parameters
+
+Source Group:
+    Primitive and/or profile group to operate on.
+
+Template Group:
+    A subset of template points to transform to.
+
+== Transform ==
+
+Do Transformation:
+    Transform the input primitives using the parameters below.
+
+Rotate to template:
+    Available when geometry is connected to the second
+    (template) input. Rotates primitives to face template
+    normals. Match Normals
+
+
+    Off:
+        Do not match the template.
+    On:
+        Rotate primtives to _face_ the normals of template
+        geometry.
+    Match normals:
+        Rotate primitive so their normals _match_ the normals of
+        the template geometry.
+Transform Order:
+    Order in which transformations occur.
+
+Rotate Order:
+    Order in which rotations occur.
+
+Translate:
+    #channels: /tx /ty /tz
+
+    Moves primitives along X, Y, and Z axes.
+
+Rotate:
+    #channels: /rx /ry /rz
+
+    Rotates primitives.
+
+Scale:
+    #channels: /sx /sy /sz
+
+    Scales primitives along X, Y, and Z axes.
+
+Shear:
+    Amount of shearing. The three values represent X on XY
+    plane, X on XZ plane, and Y on YZ plane respectively.
+Pivot:
+    #channels: /px /py /pz
+
+    Local pivot point for transformations.
+
+Lookat Object:
+    Rotates the input primitives to point at this object.
+
+Up-Vector:
+    #channels: /upvectorx /upvectory /upvectorz
+
+    Orientation along axes.
+
+Vector Attributes to Transform:
+    #channels: /xformattribs
+
+    Names of the vector attributes to transform using the
+    parameters above. You can only transform point and primitive
+    vectors can be transformed. You cannot transform vertex
+    attributes.
+
+    A value of `*` means to transform all known vector
+    attributes. If the field is empty, no attributes are
+    transformed.
+
+
+== Attributes ==
+
+These attribute changes only apply to primitives, not to
+profiles.
+
+Color:
+    #channels: /diffr /diffg /diffb
+
+    Diffuse color (RGB)
+
+Alpha:
+    #channels: /alpha
+
+    Transparency value
+
+Crease:
+    #channels: /crease
+
+    Crease weight for polygonal subdivision
+
+Texture:
+    #channels: /texture
+
+    Create a string attribute for texture maps
+
+== Face/Hull ==
+
+Preserve Shape U/V:
+    If clamping or closing rounded, preserves shape.
+
+Close U/V:
+    Closes, opens, or unrolls primitive in U direction.
+
+Clamp U/V:
+    Clamps NURBS endpoints to original positions.
+
+Operation:
+
+    Reverse:
+        Reverses U for faces, U & V for hulls
+    Reverse U/V:
+        Reverses U or V.
+    Swap:
+        Interchanges U, V. Preserves topology.
+    Shift:
+        Cycles vertices by U/V Offset.
+
+U Offset:
+    #id: vtxuoff
+
+    Amount to cycle vertices in U direction.
+
+V Offset:
+    #id: vtxvoff
+
+    Amount to cycle vertices in V direction.
+
+
+== Meta ==
+
+Overview:
+    These options apply only to meta-surfaces.
+
+Meta-surface Weight:
+    Allows meta-surface weighting.
+
+Weight:
+    Weight of meta-surface.
+
+== Particles ==
+
+Overview:
+    These options apply only to particle primitives.  They can
+    be used to override the options usually set by the Render
+    POP.
+
+Particle Render Type:
+    Controls if the particle primitive's render attributes
+    should be overridden.
+
+Particle Type:
+    How the particles are rendered.
+
+    If you are outputting to RenderMan, use Disk for RiPoint and
+    Line for RiCurve.
+
+    Spheres:
+        Render particles as spheres.
+    Disks:
+        Render particles as flat discs oriented toward the camera.
+    Lines:
+        Render particles as lines between their previous and current
+        positions. This is similar to how particles appear in the 3D
+        viewport.
+    Tubes:
+        Render particles as open tubes between their previous and
+        current positions.
+    Capped:
+        Render particles as capped tubes between their previous and
+        current positions.
+    Rounded:
+        Render particles as round-capped tubes between their
+        previous and current positions.
+Particle Size:
+    #id: prsize
+
+    Sets the size of rendered particles. To change particle size for
+    individual particles, use the [Property POP|Node:pop/property]
+    to set the particle's scale (`pscale`) attribute.
+
+Particle Blur:
+    #id: prblur
+
+    How long the particles will appear when rendered. For end to end
+    connectivity, set this to `1/$FPS`. To stretch particles
+    increase this value, or to squash them decrease it.
+
+== Volumes ==
+
+These options only apply to volume primitives.  They can
+adjust certain internal parameters of the volume
+primitives, such as the behavior when sampled outside
+their bounding box or their tolerance for compression.
+
+These options can also apply to VDB primitives where sensible.
+
+Adjust Visualization:
+    Controls if the visualization options will be changed.
+    This also affects VDB primitives.
+
+Display Mode:
+    How this volume primitive will be displayed in the
+    viewport.  This does not affect the underlying volume at
+    all, just its display-time appearance.
+
+    This also affects VDB primitives.
+
+    Smoke:
+        The volume is rendered as smoke.  Values of 0 or less
+        are fully transparent.  If lights are present, they
+        are self-shadowed with the volume.
+
+    Rainbow:
+        The volume is rendered as transparent smoke.  Values
+        of 0 or less are fully transparent.  Lights are
+        ignored, reducing computation time.  Instead, the
+        smoke is colored a rainbow hue according to the
+        position in the bounding box.
+
+    Isosurface:
+        An isosurface of equal valued voxels is extracted from
+        the volume and displayed.  This Display Isocontour is
+        used to determine which isosurface is extracted.
+
+    Invisible:
+        The contents of the volume are not rendered at all.
+
+Display Density:
+    Controls the fall off rate for the smoke visualization.
+    Lower values allows the smoke to be more transparent.
+
+    This also affects VDB primitives.
+
+Display Isocontour:
+    Which isocontour to extract from the volume.  The default
+    of 0 is good for SDF volumes.  Fog style volumes would
+    work better with something non-zero, such as 0.5.
+
+    This also affects VDB primitives.
+
+Taper:
+    Allows you to override the tapering of the volume along the Z
+    direction.  This allows a volume that better fits a camera's
+    viewing area, so you can have a greater density of volumes close to
+    the camera than far away.
+
+    The X taper can also control VDB primitives that have
+    defined frustums.
+    
+=== Volumes ===
+
+These options only apply to Volume primitives.
+
+Adjust Border:
+    Controls if the border type will be changed.
+
+Border Type:
+    The behavior when the volume is sampled outside of its
+    defined box.
+
+    Constant:
+        The border value will be returned.
+    Repeat:
+        The volume will wrap, returning values from the
+        opposite side of the volume.
+    Streak:
+        The value at the edge of the volume closest to the
+        sample will be returned.
+    SDF:
+        The volume will be treated as a signed distance field.
+        The distance from the sample point to the closest
+        point on the volume will be added to the value at that
+        closest point.  This ensures the volume continues to
+        approximate distances outside of its defined box.
+
+Border Value:
+    When the border type is constant, this is the value
+    returned for out of bounds sampling.
+
+Adjust Compression:
+    Controls if the compression tolerance will be changed.
+
+Compression Tolerance:
+    When tiles in the volume are compressed this will be the
+    tolerance used for lossy compression.  A value of 0 will
+    ensure lossless compression.  (Note compression to
+    constant tiles will still occur)
+
+=== VDB ===
+
+These options only apply to VDB primitives
+
+Class:
+    The semantic meaning of the volume.
+
+    Other:
+        No specific interpretation.
+    Level Set:
+        The volume represents a surface.
+    Fog Volume:
+        The volume consists of density values (eg. smoke).
+    Staggered Vector Field:
+        Volume data for simulation grids.
+
+Creator:
+    An optional string of the entity responsible for creating the VDB.
+    
+Transform Values:
+    If set, the actual voxel values of the VDB will be altered by transformation operations, when those transformation operations support this.
+
+Vector Type:
+    #id: vdbvectortype
+
+    The semantic meaning of the components of a vector volume.  This affects how transformations are applied.
+
+    Tuple/Colow/UVW:
+        Does not transform.
+        
+    Gradient/Normal:
+        Applies the inverse-transpose of the transform matrix, ignoring translation.
+        
+    Unit Normal:
+        Applies the forward transform matrix, ignoring translation.
+        
+    Displacement/Velocity/Acceleration:
+        Applies the forward transform matrix, ignoring translation.
+    
+    Position:
+        Applies "regular" transformation, vector translates.
+
+Write 16-Bit Floats:
+    A flag to specify that when writing to disk that the volume should be down converted to 16 bit.  This does not affect how it is stored in memory.
+
+@inputs
+
+Primitive(s):
+    Geometry to process.
+    
+Template:
+    Geometry you can use to control various modifications of the
+    input geometry. For example, you can match the normals of the
+    input primitives to the template geometry. You can also use a
+    group within the input geometry as the template geometry instead
+    of connecting a node to this input.
+
+@locals
+
+PR:
+    Primitive or profile number.
+
+NPR:
+    Total number of primitives or profiles.
+
+PT:
+    Point number of first point in primitive.
+
+NVTX:
+    The number of vertices in the primitive.
+
+CEX, CEY, CEZ:
+    Centroid of the primitive or profile.
+
+DX, DY, DZ:
+    Direction from the centroid to the primitive centroid.
+
+NX, NY, NZ:
+    Normal of the primitive.
+
+CR, CG, CB, CA:
+    Diffuse primitive color & Alpha for primitive.
+
+CREASE:
+    Crease weight for each edge of primitive
+
+WEIGHT:
+    Weight of meta-primitive (0 for non-meta-primitive)
+
+@related
+
+- [Node:sop/ends]
+- [Node:sop/xform]
+- [Node:sop/point]
+- [Node:sop/reverse]
+- [Node:sop/vertex]
+

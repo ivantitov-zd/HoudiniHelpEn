@@ -1,0 +1,112 @@
+= Python parameter expressions =
+
+"""You can write parameter expressions in Python instead of the default Hscript expression language."""
+
+== Setting the parameter expression language == (set)
+
+You can mix-and-match expressions in different languages (HScript or Python) on the same node. Parameters that use a different language from the node's default language are highlighted in pink.
+
+:task:Globally set the default language for new expressions:
+    Choose __Edit > Preferences > Scripting__ and set the __Expression language__ option.
+
+:task:Set the default language for new expressions on a node:
+    In the [parameter editor|/ref/panes/parms], use the menu to the right of the [Smallicon:BUTTONS/gear] gear menu to choose either [Smallicon:BUTTONS/hscript] Hscript or [Smallicon:MISC/python] Python.
+
+:task:Change the language of an animated parameter:
+    Right-click the parameter and choose __Expression > Change language to <<X>>__.
+
+Most expressions are not equivalent between the two languages, so changing the language will cause an error until you change the expression. However, several commonly used expression functions such as [Hom:hou.ch], [Hom:hou.bezier], and [Hom:hou.cubic] are designed to use the same syntax as in Hscript.
+
+== Local Variables ==
+
+* To access the values of Hscript local variables in Python, use `lvar("name")` ([Hom:hou.lvar]). For example, to get `$TX`, use `lvar("TX")`.
+
+    The [Hom:hou.lvar] function cannot access Hscript global variables (use [Hom:hou.expandString]).
+
+* Many SOPs evaluate parameter expressions separately for each primitive or point, with the local variables changed on each iteration. To write these kinds of expressions in Python without using `lvar()`, use `pwd().curPoint()` or `pwd().curPrim()` to operate on the current [Hom:hou.Point] or [Hom:hou.Prim] object.
+
+    For example, instead of `lvar("Cr")`, you could use `curPoint().attribValue("C")[0]`. While this is more verbose, it is more flexible, allowing you to access information on the point/primitive that may not be available in local variables.
+
+== String Parameter Expressions ==
+
+For plain values of text parameters, Houdini will do _string expansion_ on the value. For example it will expand `image$F.pic` to `image1.pic`. However, if you use an expression to generate the string, Houdini will _not_ expand the result, so you need to do the equivalent of string expansion in the expression. For example `"image%d.pic" % frame()`.
+
+== Single and multi-line parameter expressions ==
+
+Single line parameter expressions are evaluated as Python expressions.
+
+If you use ((Ctrl + E)) in a parameter to open the multi-line editor and create a multi-line parameter expression, it is evaluated as a _function body_ and *must use return*.
+
+For example, a single line expression could be `ch("ty") + 2`. A multi-line parameter script would be something like (note the use of the `return` statement):
+
+{{{
+#!python
+if ch("ty") == 0:
+    return 0
+if ch("ty") < 0:
+    return ch("tx")
+return ch("tz")
+}}}
+
+You have the full power of Python in the parameter scripts. However, beware that Houdini may
+evaluate the parameter more often than you expect.
+
+NOTE:
+    The function [Hom:hou.pwd] will return the node containing the expression (i.e., the node on which the expression is being evaluated), and not Houdini's current node. Similarly, [Hom:hou.phm] will return the python module associated with the definition of the node containing the expression.
+    
+    You can also use relative parameter and node references in parameter expressions in functions such as [Hom:hou.ch], [Exp:ch], and [Hom:hou.evalParm].
+    
+    Use `hou.pwd().parm( expandString('$CH') )` to access the [Hom:hou.Parm] being evaluated. The `$CH` global variable returns the channel name.
+
+== Evaluation context ==
+
+* Houdini runs Python parameter expressions/scripts in a context separate from the global namespace you use in the Python shell, so you don't have to worry about global Python variables affecting parameter expressions, and vice-versa.
+
+    If you actually want to access a global variable from a Python parameter expression, you can import `__main__` to get access to Houdini's global Python namespace. For example, to access the `foo` variable in the global namespace in a parameter expression, use `__import__("__main__").foo`.
+
+* Python parameter expressions/scripts don't need to prepend `hou.` to HOM function/class names, or `hou.session.` for objects in the [session module|locations#session]. You can also call common math functions from Python's `math` module.
+
+    Basically, they run in a context with the following imports:
+
+    {{{
+    #!python
+    from hou import *
+    from hou.session import *
+    from math import (
+        acos, asin, atan, atan2, ceil, cos, cosh, degrees, exp, fabs,
+        floor, log, log10, pow, radians, sin, sinh, sqrt, tan, tanh
+    )
+    }}}
+
+* You can modify the parameter expression context using [Hom:hou.expressionGlobals]. For example, to make a custom function available to all parameter expressions:
+
+    {{{
+    #!python
+    # This would go in a startup script like $HOME/houdiniX.Y/python2.7libs/pythonrc.py
+    
+    # Add a clamp function to the parameter context
+    def clamp(value, min, max):
+        return (min if value < min else (max if value > max else value))
+    hou.expressionGlobals()["clamp"] = clamp
+    
+    # Make a pi variable available in the parameter context
+    from math import pi
+    hou.expressionGlobals()["pi"] = math.pi
+    }}}
+    
+* In a parameter expression, the `pwd()` function ([Hom:hou.pwd]) will return the node containing the expression, not Houdini's current node. Similarly, [Hom:hou.phm] will return the python module associated with the definition of the node containing the expression. You can also use relative parameter and node references in parameter expressions in functions such as [Hom:hou.ch] and [Hom:hou.evalParm].
+
+== Vector Parameter Expressions ==
+It is convenient to have expressions be aware of the channel's vector index 
+since expressions are applied individually on vector components.
+
+{{{
+vec_id = pwd().parm( expandString('$CH') ).componentIndex()
+return vtorigin("/obj/obj1","/obj/obj2")[vec_id]
+}}}
+
+@related
+
+:: [Spare parameters|spare]
+:: [Expression cookbook|/ref/expression_cookbook]
+:: [Custom expression functions|expression_functions]

@@ -1,0 +1,114 @@
+= Digital asset versions and namespaces =
+
+== Overview ==
+
+* When you add or change the functionality of an asset, you don't always want every existing instance of the asset to be upgraded. For example, the new version might work differently, and you don't want finished shots to suddenly render differently. Or the new version might have a different interface that would break channel references in previous scene files.
+
+    The solution is to add a _version_ to the asset. This lets previous versions of the asset co-exist with the current version.
+
+* When you name digital assets, there is a risk that someday Side Effects, or a subcontractor, or a third party vendor, will use the same name, causing a conflict.
+
+    You can guard against this by including a _namespace_ in the name of the asset.
+
+Namespaces and versioning were introduced in Houdini 12.
+
+== Versions ==
+
+The _version string_ allows you to create multiple independent versions of an asset without having to change the "main name" (that is, without having to have nodes named, `copy`, `new_copy`, `newer_copy`, and so on). If Sasha wants to completely change the interface and/or implementation of her `copy` asset, she can create an asset named `com.sade::copy::2.0`. Instances of the old version will still work and use the old implementation, while users placing a new node will get the latest version.
+
+The version can only contain numbers and periods (`.`). For example, `myasset::2`, `myasset::2.1`, `myasset::19.1.3`, but not `myasset::2a` or `myasset::alpha`.
+
+When multiple definitions of an asset with the same name are available, Houdini will automatically make only the latest version available in the user interface.
+
+NOTE:
+    The [operator type properties window|/ref/windows/optype] for an asset contains a __Version__ field. This field is left over from previous versions of Houdini where it functioned more as an annotation. It has no relation to the `::<<version>>` part of the node type name.
+
+== Namespaces ==
+
+The _namespace identifier_ lets you name your assets without worrying about using the same name as a built-in Houdini node or as a third-party asset you might use someday. (Note that this only applies to the _internal name_ of the node... you can always use any string you want for the human readable _label_ that appears in the user interface.)
+
+For example, Sasha's Unbelievably Natural Discount Animation Emporium might produce a surface node for copying geometry, and name it `com.sundae::copy`. This keeps it separate from the built-in `copy` node, as well as Joe's Geometry Hut's `com.joesgeohut::copy` node.
+
+This is useful for creating assets you might want to distribute to other users. It is also useful to allow separate artists in the same facility to create their own assets without having to worry about name clashes when their assets are used together later.
+
+A useful convention to ensure you use a unique namespace name is to reverse the DNS address of your website. For example, if Ada's Houdini appreciation website is at `houdini.bacon.org`, she would use `org.bacon.houdini` as the namespace for her assets. You can use additional conventions, such as adding the name of the asset creator, for example `org.bacon.houdini.ada`.
+
+== The parts of an asset name ==
+
+The general form of an asset's internal name is
+
+`[<<namespace>>::]<<node_name>>[::<<version>>]`.
+
+The namespace and version are both optional. You can have a name with both a namespace and a version, or just a namespace, or just a version, or neither.
+
+Some scripting commands require the node category and node name together (for example `Object/geo`, `Sop/copy`, `Dop/popsolver`). To use namespaced names with these commands, use the form `[<<namespace>>::]<<node_category>>/<<node_name>>[::<<version>>]`. For example, `com.sundae::Sop/copy::2.0`.
+
+== How to ==
+
+:task:Specify the namespace and/or version of an asset:
+    When you [create a digital asset from a node|create] (using ((RMB)) __> Create Digital Asset__ on a node in the network editor), you can include a namespace and/or version as part of the asset name in the __Operator Name__ field of the "Create New Digital Asset" dialog box.
+
+    [Image:/images/assets/op_name_dialog.png]
+
+:task:Create a new version of an asset:
+    # Choose __Windows > Operator Type Manager__.
+    
+    # Find the asset in the tree, right-click it and choose __Copy__.
+    
+    # Increase the version number in the __Operator Name__ field of the "Copy Operator Type" dialog.
+    
+        For example, if the old name was `myasset` -> `myasset::2`, or `myasset:2.0` -> `myasset::2.1`.
+
+:task:Prefer an old version of an asset in the user interface:
+    # Choose __Windows > Operator Type Manager__.
+    
+    # Find the asset in the tree, right-click it and choose __Use this definition__.
+
+:task:Show all old versions as well as current versions in the user interface:
+    # Choose __Edit > Preferences > Shelves and Tab Menu__.
+    
+    # Click __Show all nodes__.
+
+== Referencing node types in scripts ==
+
+When you refer to node types in scripts, you can use a "fully qualified" name (for example `com.sundae::vines::2.0`) to refer to a specific node and version exactly, or use an "ambiguous" reference (for example, `vines`) and have Houdini infer which node you want. Ambiguous references are often useful when you always want to use the latest version of an asset, or want to allow the user to prefer another asset in a different namespace without having to change all your scripts.
+
+In cases where an ambiguous name could refer to several nodes, Houdini uses the following rules to select one.
+
+* If you don't specify a version number, Houdini selects the node with the highest version number. A node that was created without a "version" part on the end of its name is always considered to be the lowest version.
+
+* Houdini selects nodes that are [limited to the current scope|#scope] before nodes that are not scoped.
+
+* Houdini selects nodes created without a namespace before nodes that have a namespace.
+
+* Houdini always prefers names or namespaces listed in the `HOUDINI_OPNAMESPACE_HIERARCHY` environment variable. You can set this variable to a space-separated list of namespace names and/or node names to control ambiguous name resolution. Namespaces appearing first in the list are used before namespaces later in the list, or not in the list at all.
+
+    For example, if your `HOUDINI_OPNAMESPACE_HIERARCHY` contains...
+    
+    {{{
+    com.sundae org.bacon.houdini
+    }}}
+    
+    Then if Houdini knows about assets named `vines`, `org.bacon.houdini::vines`, and `com.sundae::vines`, and you use the command...
+    
+    {{{
+    #!hscript
+    opadd vines
+    }}}
+    
+    ...Houdini will use `com.sundae::vines` because it is earliest in the `HOUDINI_OPNAMESPACE_HIERARCHY` list.
+    
+    You can add a fully-qualified name to the list to make it take precedence even over a later version. For example, adding `com.sundae::vines::1.0` to the list would make Houdini use that for an ambiguous `vines` reference, even if `com.sundae::vines::2.0` is available.
+    
+    You can use wildcards (`*` and `?`) in the names in the `HOUDINI_OPNAMESPACE_HIERARCHY` list.
+
+TIP:
+    To unambiguously refer to a node without a namespace part in its name, use `::<<node_name>>`. For example, `::copy`. To unambiguously refer to a node without a version part in its name, use `<<node_name>>::`. For example, `copy::`.
+
+Some scripting commands/methods have an explicit option to disable namespace resolution and `HOUDINI_OPNAMESPACE_HIERARCHY`. For example, [Cmd:opadd] has a `-e` option to require an exact operator name. Similarly, [Hom:hou.Node#createNode] has an `exact_type_name` argument.
+
+== Subnet scoping == (scope)
+
+You can specify in an asset's name that it is only valid within a certain type of sub-network, using the form `[<<Node_category>>/<<node_name>>::]<<node_spec>>`. For example, if you have an asset `com.example::mysop`, you can specify that it is only valid within a SOP Solver DOP by naming it `Dop/sopsolver::com.example::mysop`. This would prevent users from adding the asset inside a Geometry object (`Object/geo`) network.
+
+This may be useful in reducing clutter in the ((Tab)) menu by restricting the contexts in which a very specialized asset appear.

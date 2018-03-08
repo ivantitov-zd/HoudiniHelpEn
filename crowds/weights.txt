@@ -1,0 +1,38 @@
+= Crowd force weights =
+
+"""How the Houdini crowd solver decides which behaviors to apply to an agent at each time step."""
+
+== Overview ==
+
+Crowd steering force nodes, and the default forces on the solver, each have _weights_. At any given moment, an agent can potentially be affected by multiple forces (for example, both "follow this path" and "avoid obstacles"). The crowd solver deals with multiple forces by _normalizing_ the weights (scaling them so they add up to 1) before multiplying the individual forces by them.
+
+== Example ==
+
+Imagine an agent has the following potential forces that might apply to it at a given moment, with these weights:
+
+Force type ||
+    Force amount ||
+        Weight ||
+Avoid |
+    10 |
+        1.0
+Follow path |
+    1 |
+        0.5
+Align |
+    2 |
+        0.2
+
+# The solver normalizes the weights so they add up to 1, making the avoid weight 0.59, the follow weight 0.29, and the align weight 0.12.
+
+# The solver then multiplies the force amounts by the normalized weights, so the avoid force is `10 * 0.59 = 5.9`, the follow force is `1 * 0.29 = 0.29`, and the align force is `2 * 0.2 = 0.4`.
+
+# Finally, the solver adds the forces to get the overall force on the agent.
+
+== Using weights ==
+
+All forces in the agent's current state (and any forces that apply to all agents regardless of state) are applied to the agent. It's not possible to have a behavior that completely overrides any other behavior. However, you can use a very high weight (for example, `10`), so that when other forces are normalized, they are made unnoticeably small.
+
+== Particle forces ==
+
+You can use regular particle force nodes and other DOPs inside a state to define behavior, not just crowd-specific "steering" nodes. However, non-crowd-specific nodes don't have __Weight__ parameters, so they will not be subject to the normalization described above. Instead they will simply be _added on_ to any other forces on the agents.

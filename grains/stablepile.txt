@@ -1,0 +1,68 @@
+= How to simulate a stable pile of sand without grid patterns =
+
+This tutorial explains how to get a pile of sand to keep it's original shape, while avoiding regular patterns in the particle distribution. Our goal is to let the particles keep the initial shape, while allowing them to react properly to additional collisions and forces.
+
+NOTE:
+    In addition to the tips on this page, you may need to increase your __Constraint Iterations__ on the [POP Grains|Node:dop/popgrains] node when moving to higher particle counts. This is especially true with higher stacks of particles.
+
+The sand tools on the [Grains shelf|/shelf/grains] set up particle sources in a regular grid pattern. This ensures a stable simulation with nice stacking and fast settling, when you have a flat ground plane. 
+
+== Creating the pile of sand ==
+
+# Create a closed cone that you will eventually fill with sand. You can do this by clicking the [Icon:SOP/tube][Tube|/shelf/tube] tool on the __Create__ shelf  and pressing ((Enter)) to place it at the origin. Set the following parameters on your [tube geometry|Node:sop/tube] to make a cone.
+                
+    * __End Caps__: `on`
+    * __Radius__: `0.0`, `0.8`
+    * __Radius Scale__:`1.0`
+    * __Center__: `0`, `0.25` or `0.5*ch("height")`, `0`
+    * __Height__: `0.5`
+    
+    NOTE:
+        Make sure the bottom is flush with the ground plane.
+
+    [Image:/images/howto/sandpile_cone.png]
+
+# Go back up to the object level, select the tube object, and click the [Icon:SHELF/dry_sand][Dry Sand|/shelf/drysand] tool on the __Grains__ shelf.
+
+    NOTE:
+        For best results, make sure the particles are sitting right on the ground at `y=0`. In this case, the shelf tools should have taken care of this for you by setting an expression in the __Grid Offset__ parameter on the [Grain Source|Node:sop/grainsource] node.
+                
+# Create a flat [Icon:DOP/groundplane][Ground Plane|/shelf/groundplane] for your base using the tool on the __Rigid Bodies__ shelf.
+
+    NOTE:
+        The solver will push up the particles on the first frame, so it is important to make sure that the particles are flush with `Y=0` before creating the ground plane.
+
+# On the __Solver__ tab of the [POP Grains|Node:dop/popgrains] node, turn on __Drift Threshold__. This is critical to getting a pile like this to rest perfectly.
+
+    TIP:
+        If you have the necessary hardware and drivers, you may also want to turn on __Use OpenCL__ at this point in order to speed up the computation.
+
+# Press [Icon:PLAYBAR/play_forward] on the [playbar|/anim/playbar] to run the simulation. The particles should stay very close to the original shape. If some particles are slighting off the sides, you can increase the __Scale Kinetic__ parameter on `sand_update` node's __Behavior__ tab to `0.15` or `0.2`.
+
+    [Image:/images/howto/sandpile_regular.gif]
+        
+== Getting rid of the regular pattern ==
+
+Getting rid of the regular pattern, makes it a bit harder for the particles to settle as well as before.
+
+# Go back to `/obj/tube_object1/grainsource1` and turn on the toggle to the left of __Jitter Scale__. This randomizes the particles positions, but created some overlap between particles, which would cause an initial explosion in the simulation. Which is why __Relax Iterations__ is activated. This ensures that particles don't overlap and stay inside the cone, at the cost of some additional cook time.
+
+    If you run the simulation now, you will see the pile flattening a lot. It also takes a long time to stop moving. This is mostly because particles aren't packed quite as perfectly.
+
+    [Image:/images/howto/sandpile_jittered_unstable.gif]
+
+    The best way to counter this is to again increase the kinetic friction scale (__Scale Kinetic__). We'll need a much higher value though, which would lead to unnaturally sluggish behavior during the main part of the simulation. To get around this, we'll use an expression to set a higher friction value while the particles settle.
+
+# Set the following expression in the __Scale Kinetic__ parameter: `if($T<1, 0.8, 0.1)`. This will evaluate to a very high `0.8` during the first second, and to a more realistic value of `0.1` afterward.
+
+# Change the __Drift Threshold__ value to `0.01` on the __Solver__ tab, .
+
+# Press [Icon:PLAYBAR/play_forward] again. The particles should stay close to the original shape again and settle quickly.
+
+[Image:/images/howto/sandpile_jittered_stable.gif]
+
+NOTE:
+    It's generally best to leave the __Drift Threshold__ as low as possible. Raising it should only be necessary with relatively steep slopes. Unfortunately, using an expression like in __Scale Kinetic__ doesn't tend to work quite as well here, since particles will start to drop again after the value goes down.
+
+TIP:
+    [Grain Source|Node:sop/grainsource]'s __Relax Iterations__ can take a substantial amount of time to cook with millions of particles. An alternative is to turn it off and use a [POP Drag|Node:dop/popdrag] node activated only on the first few frames (put `$T<1` in the __Activation__ parameter). This will stop particles from flying too far during the initial explosion.

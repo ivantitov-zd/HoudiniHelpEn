@@ -1,0 +1,224 @@
+﻿= hou.DopSimulation =
+#type: homclass
+#cppname: HOM_DopSimulation
+#group: dynamics
+
+"""A dynamics simulation contained inside a DOP network node."""
+
+See [Hom:hou.DopData] for more information about the contents of a DOP
+simulation.  Note that methods of this class implicitly use the simulation
+data from the current frame.
+
+@methods
+
+::`findData(self, data_spec)` -> [Hom:hou.DopData] or `None`:
+    #cppname: HOM_DopSimulation::findData
+    Return the DOP data with the given name.  Note that the name may also be a
+    slash-separated path to nested subdata.
+
+    If the data path refers to a DOP object, this method returns a
+    [Hom:hou.DopObject] instance.  If it refers to a DOP relationship, it
+    returns a [Hom:hou.DopRelationship] instance.  Otherwise, it returns a
+    [Hom:hou.DopData] instance.
+
+    Note this method implicitly uses the simulation data from the current
+    frame.
+
+    See also [Hom:hou.DopData#findSubData].
+
+::`findAllData(self, data_spec)` -> tuple of [Hom:hou.DopData]:
+    #cppname: HOM_DopSimulation::findAllData
+    Given a pattern, return a tuple of DOP data whose names match the pattern.
+    See also [Hom:hou.DopSimulation#findData].
+
+::`objects(self)` -> tuple of [Hom:hou.DopData]:
+    #cppname: HOM_DopSimulation::objects
+    #replaces: Exp:dopnumobjects, Exp:dopnodeobjs
+    Return a tuple of all the DOP objects in the simulation.
+
+    You cannot index into this list using the object ID (see
+    [Hom:hou.DopObject#objid]). To create a dictionary mapping object IDs to
+    [Hom:hou.DopObject]s, do this:
+
+    {{{
+    #!python
+    id_dict = dict((obj.objid(), obj) for obj in simulation.objects())
+    }}}
+
+::`findObject(self, obj_spec)` -> [Hom:hou.DopObject] or `None`:
+    #cppname: HOM_DopSimulation::findObject
+    Return the DOP object with the given name, or `None` if no object exists
+    with that name.  See also [Hom:hou.DopSimulation#findData] and
+    [Hom:hou.DopSimulation#objects].
+
+::`findAllObjects(self, obj_spec)` -> tuple of [Hom:hou.DopObject]:
+    #cppname: HOM_DopSimulation::findAllObjects
+    #replaces: Exp:dopobjectlist
+    Given a pattern, return a tuple of DOP objects whose names match the
+    pattern.
+
+    {{{
+    #!pycon
+    >>> simulation = hou.node("/obj/AutoDopNetwork").simulation()
+    >>> [obj.name() for obj in simulation.findAllObjects("box_object?")]
+    ['box_object1', 'box_object2']
+    >>> [obj.name() for obj in simulation.findAllObjects("o* b*")]
+    ['obj1', 'obj2', 'box_object1', 'box_object2']
+    }}}
+
+::`relationships(self)` -> tuple of [Hom:hou.DopRelationship]:
+    #cppname: HOM_DopSimulation::relationships
+    Return a tuple of [Hom:hou.DopRelationship] objects for all the DOP
+    relationships in the simulation.
+
+    {{{
+    #!pycon
+    # The following example assumes you have created two box objects and made
+    # them rigid bodies.
+    >>> simulation = hou.node("/obj/AutoDopNetwork").simulation()
+    >>> relationship = simulation.relationships()[1]
+    >>> affecting_objects = [
+    ...     simulation.objects()[record.field("objid")]
+    ...     for record in relationship.records("ObjInAffectors")]
+    >>> [obj.name() for obj in affecting_objects]
+    ['box_object1']
+    >>> affected_objects = [
+    ...     simulation.objects()[record.field("objid")]
+    ...     for record in relationship.records("ObjInGroup")]
+    >>> [obj.name() for obj in affected_objects]
+    ['box_object2']
+    }}}
+
+::`findRelationship(self, rel_spec)` -> [Hom:hou.DopRelationship]:
+    #cppname: HOM_DopSimulation::findRelationship
+    Find a DOP relationship by name.  Return None if no such relationship
+    with that name exists.  See also [Hom:hou.DopSimulation#relationships].
+
+::`findAllRelationships(self, rel_spec)` -> tuple of [Hom:hou.DopRelationship]:
+    #cppname: HOM_DopSimulation::findAllRelationships
+    Return a tuple of [Hom:hou.DopRelationship] objects whose names match
+    a pattern.  See also [Hom:hou.DopSimulation#relationships] and
+    [Hom:hou.DopSimulation#findRelationship].
+
+::`dopNetNode(self)` -> [Hom:hou.Node]:
+    #cppname: HOM_DopSimulation::dopNetNode
+    Return the DOP network node containing this simulation.
+
+::`save(self, file_name)`:
+    #cppname: HOM_DopSimulation::save
+    #replaces: Cmd:dopsave
+    #status: ni
+    Save the contents of this simulation to a `.sim` file that you can load
+    in with a file DOP.
+
+::`time(self)`:
+    #cppname: HOM_DopSimulation::time
+    #replaces: Exp:doptime
+    Return the simulation's current time.  This value is often the same
+    as [Hom:hou.time], unless it is called from a Python solver DOP or
+    the `Time Scale` or `Offset Time` parameters of the DOP network have been
+    changed from their default values.
+
+::`memoryUsage(self)`:
+    #cppname: HOM_DopSimulation::memoryUsage
+    Return the simulation's total memory usage.
+
+::`frame(self)`:
+    #cppname: HOM_DopSimulation::frame
+    #replaces: Exp:dopframe
+    #status: ni
+    Return the simulation's current frame.  This value is often the same
+    as [Hom:hou.frame], unless the `Time Scale` or `Offset Time` parameters
+    of the DOP network have been changed from their default values.
+
+    This method is a shortcut for `hou.timeToFrame(self.time())`.
+
+::`globalTimeToSimTime(self, global_time)`:
+    #cppname: HOM_DopSimulation::globalTimeToSimTime
+    #replaces: Exp:dopttost
+    #status: ni
+    Given a global (playbar time), return the corresponding simulation time.
+    See [Hom:hou.DopSimulation#time] for more information.
+
+::`globalFrameToSimTime(self, global_frame)`:
+    #cppname: HOM_DopSimulation::simFrameToSimTime
+    #replaces: Exp:dopframetost
+    #status: ni
+    Given a global (playbar frame), return the corresponding simulation frame.
+    See [Hom:hou.DopSimulation#frame] for more information.
+
+::`simTimeToGlobalTime(self, sim_time)`:
+    #cppname: HOM_DopSimulation::simTimeToGlobalTime
+    #status: ni
+    Given a simulation time, return the corresponding global (playbar) time.
+    See [Hom:hou.DopSimulation#time] for more information.
+
+::`simTimeToGlobalFrame(self, sim_time)`:
+    #cppname: HOM_DopSimulation::simTimeToSimFrame
+    #replaces: Exp:dopsttoframe
+    #status: ni
+    Given a simulation frame, return the corresponding global (playbar) frame.
+    See [Hom:hou.DopSimulation#frame] for more information.
+
+::`objectGroups(self)` -> `tuple` of [Hom:hou.DopObjectGroup]:
+    #cppname: HOM_DopSimulation::objectGroups
+    #replaces: Exp:dopgrouplist
+    #status: ni
+    Return a tuple of [Hom:hou.DopObjectGroup] objects for the DOP object
+    groups in this simulation.
+
+::`findObjectGroup(self, name)` -> DopObjectGroup or None:
+    #cppname: HOM_DopSimulation::findObjectGroup
+    #replaces: Exp:dopgrouphasobject
+    #status: ni
+    Given a DOP object group name, return the corresponding
+    [Hom:hou.DopObjectGroup], or None if no such group exists.
+
+::`createObject(self, name, solve_on_creation_frame)` -> [Hom:hou.DopObject]:
+    #cppname: HOM_DopSimulation::createObject
+    Create and return a new DOP object, or return None if the object was not
+    created successfully.
+
+    `name`:
+	The name of the new object.
+
+    `solve_on_creation_frame`:
+	If True, the object will be solved on its first frame of existance.
+
+    Raises [Hom:hou.PermissionError] if called from outside a Python DOP.
+
+    Use [Hom:hou.DopData#copyContentsFrom] to clone data from an existing
+    object.
+
+::`removeObject(self, object)`:
+    #cppname: HOM_DopSimulation::removeObject
+    Remove the given DOP object from the simulation.
+
+    `object`:
+        The [Hom:hou.DopObject] to remove.
+
+    Raises [Hom:hou.PermissionError] if called from outside a Python DOP.
+
+::`createRelationship(self, name)` -> [Hom:hou.DopRelationship]:
+    #cppname: HOM_DopSimulation::createRelationship
+    Create and return a new DOP relationship, or return None if the
+    relationship was not created successfully.
+
+    `name`:
+	The name of the new relationship.
+
+    Raises [Hom:hou.PermissionError] if called from outside a Python DOP.
+
+    Use [Hom:hou.DopData#copyContentsFrom] to clone data from an existing
+    relationship, and use [Hom:hou.DopRelationship#setGroup] and
+    [Hom:hou.DopRelationship#setAffectorGroup] to update the "ObjInGroup"
+    and "ObjInAffectors" records.
+
+::`removeRelationship(self, rel)`:
+    #cppname: HOM_DopSimulation::removeRelationship
+    Remove the given DOP relationship from the simulation.
+
+    `rel`:
+        The [Hom:hou.DopRelationship] to remove.
+
+    Raises [Hom:hou.PermissionError] if called from outside a Python DOP.

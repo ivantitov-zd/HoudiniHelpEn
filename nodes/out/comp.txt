@@ -1,0 +1,154 @@
+#type: node
+#context: out
+#internal: comp
+#icon: NETWORKS/cop2
+
+= Composite =
+
+"""The Composite output operator renders the image(s) produced in the
+Compositing Editor."""
+
+The Composite output operator renders the image(s) produced in the
+Compositing Editor.
+
+Arguments may be passed to the scripts and variable expansion is done
+before calling the script.
+
+
+@parameters
+    [Include:standard#render_buttons/]
+
+    Set Valid Frame Range:
+        If on, the render is only valid between the start and end
+        frames, at the specified frame increment. If a frame is outside
+        the range, or falls on a frame that isn't included by the frame
+        increment, the frame will not be rendered.
+
+        If off, the render is valid at any frame.
+
+        NOTE:
+            If you want to temporarily set a sub-range to render, use
+            the 'Frame Range' parameter in the Render Control dialog
+            (click the 'Render Control...' button at the top of this
+            dialog).
+
+
+    == Composite ==
+
+        COP Name:
+            Path to the COP to render.
+        Override Default Res:
+            Allows specification of the rendered resolution.
+        Resolution:
+            Resolution of rendered images.
+        Output Picture:
+            Selects where the output is sent.
+        Image Format:
+            The format to write the image in.
+
+	[Include:standard#mkpath]
+
+        Color Plane:
+            Plane to use as the RGB channels.
+        Alpha Plane:
+            Plane to use as the A channel (in RGBA image).
+	Convert to Image Format's Colorspace:
+	    Image data in COPs is always linear. When writing to image formats
+            that are not linear (sRGB, for example), this will convert the 
+            colorspace to preserve the look of the image. An 8bit format that
+            has an unspecified colorspace is assumed to be sRGB.
+        Output Gamma:
+            Gamma correction that is applied to saved images.
+        Output Frames Reused in Composite:
+            When on, this tells the compositor that output frames
+            may be read back in during the same composite. This disables
+            threaded file writes and batch frame cooking. By default,
+            this is off.
+        Batch Cook Frames:
+            If on, the compositor cooks frames in groups, rather than
+            individually. This can improve output performance on
+            multi-processor platforms (there is generally no difference
+            for single processor machines). Groups of two frames are
+            recommended when using this option, as the performance gain
+            drops off quickly for larger groups. This option generally
+            uses a bit more memory (instead of a buffer for one file,
+            several are allocated).
+
+            Batch cooking speeds up processing of small to medium sized
+            networks, which spend a higher percentage of their time
+            preparing to cook a frame and writing the output image.
+
+        Reload All Files:
+            If on, any composite nodes referencing files (such as a
+            File COP) will reload their files. Enable this option if
+            files are being replaced on disk between renders.
+
+    == Image Area ==
+
+        Output Area:
+            Defines the area to be written to the file. Some file
+            formats support data windows and crop areas (TIFF, Open EXR,
+            pic), which allow you to write portions of an image or extra
+            bordering information. In all cases, the image is written at
+            the resolution specified, but the data window written may be
+            different.
+
+            If a format does not support a data window or crop region,
+            the image area requested will be clipped against the image
+            frame. Any data outside the crop region will be black.
+
+
+            Frame:
+                The normal image frame area is used, which is what you
+                normally see in the viewport. No data window or crop
+                region is written.
+            Crop Region:
+                Only data in the crop region is written. All other
+                pixels are set to black. For image formats supporting
+                crop regions, a crop region is set in the file (so it
+                takes up less disk space).
+            Frame + Surrounding Canvas:
+                This option allows you to write extra image data outside
+                the frame area, so that you can use it when compositing.
+                If the canvas size is less than or equal to the frame
+                area, the frame area is written. In other words, this
+                only differs from the "Frame" option if the COP has a
+                large canvas.
+        Pixel / UV Crop:
+            Specifies the crop region, in either pixels or UV coords.
+            The fields represent the lower and upper corners of the
+            region (left, bottom, right, top).
+        Limit Canvas Pixels:
+            If on, the extra canvas information written to the file is
+            limited to this many pixels beyond the frame area. This
+            prevents very large files from being written, and generally
+            gives you the most useful data.
+        Limit Canvas Percent:
+            If on, the extra canvas information written to the file is
+            limited to a percentage of the horizontal or vertical
+            resolution. So, for a 640x480 image, limiting to 10% will
+            write a maximum of 64 pixels on the left and right, and 48
+            pixels on the top and bottom.
+
+    == Auxiliary File 1-5 ==
+
+        Overview:
+            Save additional images which allows separation of planes
+            into multiple files.
+
+    == Script ==
+
+        Pre-Render Script:
+            Execute this script before any rendering.
+        Pre-Frame Script:
+            Execute this script before each frame
+        Post-Frame Script:
+            Execute this script after each frame
+        Post-Render Script:
+            Execute this script after all rendering
+@locals
+    N:
+        Frame being rendered.
+    NRENDER:
+        Total number of frames being rendered.
+

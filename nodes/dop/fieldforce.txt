@@ -1,0 +1,222 @@
+= Field Force =
+
+#type: node
+#context: dop
+#internal: fieldforce
+#icon: DOP/fieldforce
+
+"""Applies forces to an object using some piece of geometry as a vector
+field."""
+
+== Overview ==
+
+This node lets you define a vector field using attributes on imported
+geometry, and then use the vector field to "push" dynamics objects.
+
+For each object/voxel to move, the node applies the force of the closest 
+point/voxel in the force geometry.
+
+For example, in the following example, one ball provides the geometry for a 
+"repulsor" field that pushes the other ball away.
+
+[Anim:/images/nodes/dop/fieldforce.gif]
+
+TIP:
+    If you want to push RBD objects around using a field extracted from
+    another simulation type, there may be a _more optimized and interactive
+    alternative to using a field force_.
+
+    * [FLIP fluid simulations|/fluid/] interact quite efficiently with 
+      RBD simulation objets when you enable force feedback.
+
+    * For [Pyro simulations|/pyro/pyro], change the solver from Multigrid
+      to PCG and again enable the feedback option.
+
+    * You can use Pump objects to inject velocity in to a FLIP fluid 
+      or Pyro/Smoke simulation.
+      
+    (You can also use a Pump to create a velocity field to feed into a 
+    Field Force.)
+
+== How to ==
+
+[Image:/images/nodes/dop/fieldforce_network.png]
+
+:task:Set up geometry to shape the field:
+    In [geometry object|/model], create geometry where each point has an
+    attribute containing a vector representing the force direction at that
+    point.
+    
+    The default is to use the `v` (velocity) attribute. If you use simulated
+    geometry it will have a `v` attribute automatically. To create a velocity
+    attribute on animated geometry, use a [Trail SOP|Node:sop/trail] set to
+    "Compute velocity". Of course you can use any other attribute, such as
+    using point normals as the force attribute to push things away from an
+    object.
+    
+    Alternatively you can create a vector volume in a geometry object and use
+    that as the source for the force vectors. You can also use a scalar (one
+    value per voxel) volume in which case the field force will use the
+    _gradient_ of the values as the force direction.
+
+:task:Attach the force geometry to the Field Force node:
+    Create a Field Force node and wire it into the stream of objects/solvers
+    you want the force to affect.
+
+    Create a [SOP Geometry node|Node:dop/sopgeo] and set the __SOP Path__ to the path of the surface node you want to use. Wire the SOP Geometry
+    node's green output to the green input of the Field Force node.
+    
+    (If the geometry you want is already in the DOP network you can grab the
+    `Geometry` data yusing a [Fetch Data node|Node:dop/fetchdata], however 
+    importing  from a geometry network is the most common way to use the 
+    node.)
+    
+    If the source geometry is moving, you also need to attach position data
+    for the geometry so the force position follows the geometry position.
+    For an animated object use an
+    [Position DOP|Node:dop/position] to get the object's 
+    position as data. For a simulated object use a
+    [Fetch Data node|Node:dop/fetchdata] to grab the simulated object's
+    `Position` data. In either case, attach the node's green output to the
+    Field Force node's green input to attach the position data. The Field
+    Force node will then use it to transform the force.
+
+:task:Choose between speed and accuracy:
+    The __Sampling mode__ setting gives you a trade-off between speed of
+    the simulation and accuracy of the effect of the force on objects. See
+    the [help for Sampling Mode|#samplemode]
+
+@parameters
+
+== Data Options ==
+
+Force Attribute:
+    #id: forceattribname
+
+    Provides the name of the attribute on the attached geometry
+    subdata which contains the force values. This must be a
+    triple of floats or a vector attribute.
+    
+Scale Force:
+    #id: forcescale
+
+    The force attribute value extracted from the geometry is
+    multiplied by this value.
+    
+Torque Attribute:
+    #id: torqueattribname
+
+    Provides the name of the attribute on the attached geometry
+    subdata which contains the torque values. This must be a
+    triple of floats or a vector attribute.
+    
+Scale Torque:
+    #id: torquescale
+
+    The torque attribute value extracted from the geometry is
+    multiplied by this value.
+    
+Use Max Distance:
+    Turning on this option causes this force to only apply a
+    force or torque if the object is within a given distance of
+    one of the geometry points.
+    
+Max Distance:
+    #id: maxdistance
+
+    If the nearest point on the geometry is greater than this
+    maximum distance value, then no force or torque is applied.
+    This test is only done if the Use Max Distance option is
+    enabled.
+    
+Treat As Wind:
+    Instead of applying a force proportional to the velocity
+    field, apply a drag effect with the velocity field being
+    the rest-velocity.  This will cause objects to accelerate
+    until they match velocity field.
+    
+Sampling Mode:
+    #id: samplemode
+    
+    Controls 
+    
+    "Default" is the same as "Circle".
+    
+    Point:
+        Samples the nearest point of the force geometry to determine
+        the force to apply to an object. This is the fastest option and is 
+        fine for radiating forces and simple objects, where the result is 
+        not noticeably different than the more accurate options.
+    
+    Circle:
+        Samples a cross-section of the force geometry, giving greater
+        fidelity at the cost of slower simulation. If the force geometry has
+        detailed and varying forces, this is a good choice.
+        
+        For example, if you're sliding colliding RBD objects down a 
+        complicated surface in close-up, with subtle sculpted and heavily 
+        directed forces, you should use Circle mode. 
+        
+    Sphere:
+        Samples the SDF of the force geometry. This is the slowest option
+        but also the most accurate.
+
+== Guide Options ==
+
+Show Guide Geometry:
+    Enables the display of guide geometry for this force in the viewport. The guide geometry consists of a series of line segments that start at each point on the force geometry, and indicate the force and torque attribute values.
+
+    Guide geometry is only shown when Geometry is used as the subdata.  If Vector Field or Scalar Fields are used, guide geometry can be added by using a Vector Field Visualization or Scalar Field Visualization.
+    
+Show Force Vectors:
+    Turning on this option causes the force attribute values on
+    the geometry to be displayed as line segments.
+    
+Scale Force Vectors:
+    #id: guidescalef
+
+    The force attribute values are scaled by this amount before
+    being displayed. Note that the Force Scale parameter is also
+    used to scale the force attribute values for display.
+    
+Force Vector Color:
+    #id: guidecolorfr /guidecolorfg /guidecolorfb
+
+    The color used to display the force vectors.
+    
+Show Torque Vectors:
+    Turning on this option causes the torque attribute values
+    on the geometry to be displayed as line segments.
+    
+Scale Torque Vectors:
+    #id: guidescalet
+
+    The torque attribute values are scaled by this amount
+    before being displayed. Note that the Torque Scale parameter
+    is also used to scale the torque attribute values for
+    display.
+    
+Torque Vector Color:
+    #id: guidecolortr /guidecolortg /guidecolortb
+
+    Controls the color used to display the torque vectors.
+
+[Include:standard_force_parms]
+
+[Include:standard_data_parms]
+
+@inputs
+
+[Include:standard_data_inputs]
+
+@outputs
+
+[Include:standard_data_outputs]
+
+@locals
+
+[Include:standard_data_locals]
+
+[Include:standard_locals]
+
+

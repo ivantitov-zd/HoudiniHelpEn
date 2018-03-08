@@ -1,0 +1,100 @@
+= Cryptomatte =
+
+== Overview ==
+
+Cryptomatte is a multichannel image, typically in EXR format, that stores ID
+and pixel coverage pairs, along with additional metadata that stores the
+original name of each ID (be it material name, or object name, or any arbitrary
+user property of your choosing).
+
+It allows you to extract matte based on selected IDs which can be used to mask
+out specific elements when making minor adjustments in compositing.
+
+The following example illustrates how Cryptomatte is used to isolate gold
+material and make hue adjustment in COP:
+
+[Image:/images/render/crypto_example.png]
+
+Please see Cryptomatte's [official site|https://github.com/Psyop/Cryptomatte]
+for specifications and plugins for popular compositing applications.
+
+== Using mantra to output Cryptomatte ==
+
+# Select mantra ROP.
+
+# Click on __Images__ > __Cryptomatte__ tab.
+
+# Add a layer by clicking on `+` next to __Cryptomatte Layers__.
+
+# Select the property to generate IDs from. You can use the dropdown menu to choose built-in properties, `Material Name` or `Object Name`.
+
+    [Image:/images/render/crypto_builtin.png]
+
+    You can also type in any user string property that are added to objects or materials (using `Properties` node). See [render properties|/props/] for detailed information on how to add user properties to objects or materials.
+
+    [Image:/images/render/crypto_user.png]
+
+# Set __Output Picture__ to the name of the Cryptomatte image you want to save. EXR format is strongly recommended.
+
+# Render.
+
+See [mantra properties|/props/mantra#vm_cryptolayers] for description of each
+parameter.
+
+== Instancing and unique IDs ==
+
+In order to matte a particular instance among other instances, you need to generate Cryptomatte using a user string property whose value is unique to each instance.
+
+[Image:/images/render/crypto_inst.png]
+
+Here's an example method using Material Stylesheets:
+
+# Set up [instancing|/nodes/obj/instance].
+
+# Make sure you're using __fast point instancing__.
+
+# Using [Attribute Expression|/nodes/sop/attribexpression] (or any method you prefer), give each point inside `Instance` node a unique integer.
+
+# Add a user string property to the `Instance` node.
+
+# Add a root level stylesheet, target __Point Instances__, override script __Render Property__ using __Inline Script__, and set up appropriate bindings:
+    [Image:/images/render/crypto_mss.png]
+
+    Example inline script:
+    {{{
+    #!vex
+    cvex myFn(int id=0; export string myuserprop="") 
+    { 
+	myuserprop = sprintf("foo%d", id);
+    }
+    }}}
+
+In this example, the name of the user property is `myuserprop`. The name of the
+point integer attribute is `mypointid`. The unique property values that are
+generated are `foo0`, `foo1`, `foo2` etc (the # comes from `mypointid` attribute).
+
+Note that, in this example, __Inline Script__ was only necessary to convert
+integer attribute to string property. If you're using a string attribute then
+you could simply use __Attribute Binding__ and skip the script and data binding
+altogether.
+
+See [Material Stylesheets|/shade/stylesheets] for more information on how to
+use stylesheets.
+
+== Using Cryptomatte COP ==
+
+See [Cryptomatte COP|/nodes/cop2/cryptomatte] for more information.
+
+== Tips and notes ==
+
+* Keep in mind that opacity and transparency are two separate things: 
+  Partially opaque materials let camera rays through, while transparent
+  materials obstruct camera rays and cast secondary (refraction) rays. The
+  pixel coverage is computed based on opacity, so you won't be able to generate
+  matte for objects behind refractive materials.
+
+* Cryptomatte uses the primary plane's [pixel filter|/props/mantra#vm_pfilter].
+  Custom pixel filter plugins can be used as well, but a filter that reads data
+  from additional image planes (for example, `minmax` filter reads data from
+  `Z` plane) are not allowed.
+

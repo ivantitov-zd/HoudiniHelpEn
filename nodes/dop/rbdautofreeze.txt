@@ -1,0 +1,123 @@
+#type: node
+#context: dop
+#internal: rbdautofreeze
+#icon: DOP/rbdautofreeze
+
+= RBD Auto Freeze =
+
+"""Automatically freezes RBD Objects that have come to rest"""
+
+The RBD Auto Freeze DOP provides an easy way to freeze down elements of
+an RBD simulation that have come to a rest.
+
+Freezing is done by adding a new piece of data to the [RBD Object|Node:dop/rbdobject] called
+CumulativeMovement. This data tracks the total magnitude of the linear
+and angular velocity over time. It stores a moving-average which ensures
+that even if an object momentarily reaches equilibrium (say, at the top
+of a bounce), the object isn't frozen. This does mean that the
+thresholds have to be adjust depending on the simulation, however. The
+default values are set up for approximately unit-sized objects.
+
+Frozen RBD objects will continue to support other RBD objects, but will
+no longer move as a result of collisions. This allows for faster
+processing and ensures that no jittering will occur.
+
+The Melt parameter can be used to wake up [RBD Object|Node:dop/rbdobject] on a per-object
+basis. Note that barring the use of melt, once the object is frozen it
+will stay frozen. Even if the ground disappears from under it, it will
+continue to float in air unaware of the change.
+
+NOTE:
+    Often an RBD simulation will have a lot of objects initially at rest, then start moving, and then come to a rest a second time. The RBD Freeze DOP is supposed to mark as frozen objects that return to rest.
+
+    For example, if you have a sphere dropping onto a ground plane, at frame 0 the sphere is stationary and has zero cumulative motion. We don't want to freeze this sphere so we wait for it to first acquire enough motion to be considered truly moving before it is eligible for freezing.
+
+
+@parameters
+    Activation:
+        Determines if any testing will be done for auto-freezing. If
+        this is zero, the objects are not tested for freezing and their
+        active values are not updated. 
+
+	If you are switching to keyframed
+        animation, it is important to make sure that this parameter is
+        zero during keyframed animation to prevent the active value from
+        being overwritten.
+    Group:
+        #channels: /group
+
+        Only the input objects which match the Object Group filter will
+        be tested and frozen.
+    Angular Velocity Scale:
+        The angular velocity of an object is measured in degrees per
+        second. A unit sized object moving its own length every second
+        will have a velocity of 1, but the same sized object rotating
+        once every second would have an angular velocity of 360. 
+
+	Because
+        this DOP tries to combine these two measurements, it is
+        important to have a scale factor to bring them into the same
+        general range. This factor can be approximate and, for unit
+        sized objects, the default of 0.01 is good.
+    Motion Decay:
+        The total motion over time is tracked by adding the current motion and scaling the previous amount of motion by this decay factor.
+
+        Values of `1` will cause motion to remain 100% intact, while a value of `.9` would cause the motion to decay to 90% of it's previous motion. A value of `0` will cause each frame’s motion to have to stand on its own. This means that objects at the top of their parabolic arcs may suddenly freeze.
+
+        NOTE:
+            This will also affect the values needed for the __Enable Threshold__ and __Freeze Threshold__.
+
+    Enable Threshold:
+        Before an object is a candidate for freezing, it must first
+        attain a minimum cumulative movement. 
+
+	By having a high threshold
+        you can ensure that objects that are waiting to be hit are not
+        frozen before they first get hit. On the other hand, if this is
+        not high enough, moving objects may never become candidates for
+        freezing.
+
+        If you monitor the CumulativeMovement data over time you can
+        get a good idea of a proper threshold for a simulation.
+
+        Note that the Enable Threshold should always be larger than the
+        Freeze Threshold or there is the risk that an object freezes
+        before it manages to get moving.
+
+    Freeze Threshold:
+        When an object's cumulative movement has exceeded the Enable
+        Threshold, it is then tested against the Freeze Threshold. When
+        its cumulative movement falls below the Freeze Threshold, the
+        RBD Auto Freeze DOP will turn off the Active Value for that
+        object. This causes the object to stop reacting to the
+        simulation. 
+
+	The object's velocity is also zeroed out since,
+        because its simulation has been turned off, it will no longer be
+        moving.
+    Melt:
+        Setting the object's melt value to 1 will wake it up again if
+        it is frozen. If it is not yet frozen, it will clear the history
+        of whether the Enable Threshold has been reached. After setting
+        the object's melt value to one, the object will not refreeze
+        until the Enable Threshold is again reached and then the Freeze
+        Threshold is passed.
+
+        If the Melt parameter evaluates to non-zero, the object will
+        have its Active Value set to one. The object will then react to
+        the simulation. When the melt parameter is set to one, the
+        object also resets the hasbeenbig flag in the CumulativeMovement
+        data. The object thus will not refreeze until the Enable
+        Threshold is again reached.
+
+@inputs
+    First:
+        The RBD Objects who will be tested for automatic freezing.
+@outputs
+    First:
+        The exact same set of objects that feed into the input are sent
+        out through the single output.
+@locals
+    [Include:standard_locals]
+
+

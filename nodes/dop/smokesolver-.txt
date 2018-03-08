@@ -1,0 +1,466 @@
+﻿#type: node
+#context: dop
+#internal: smokesolver
+#icon: DOP/smokesolver
+#index: no
+
+= Smoke Solver =
+
+""" Sets and configures a Smoke solver. """
+
+The Smoke Solver DOP sets objects to use the Smoke Dynamics solver.
+
+If an object has this DOP as its "Solver" subdata, it will evolve
+itself as a Smoke object.
+
+This solver makes use of various field subdata on the object. The
+object should have a scalar field `density` to track the density of the
+smoke in space. The object should have a vector field called `vel` to
+track the velocity of each point in space. Optionally, a scalar field
+called `temperature` is needed for the internal buoyancy calculations.
+
+To setup an object with the requisite subdata, use the [Smoke Configure
+Object DOP|Node:dop/smokeconfigureobject].
+
+TIP:
+    If you are sourcing from an object that deforms, or collides with a deforming object, the solver will not pay attention to the per-point deformation. You need to set the __Velocity Type__ to __Point Velocity__ on the __Fields > Sources__ subtab.
+
+
+@parameters
+
+== Substepping ==
+
+Minimum Substeps:
+    While the Smoke Solver tries to estimate the correct
+    substep size for a stable simulation, if unusual forces are
+    present it may take too large of a step. 
+    
+    By setting the minimum substep you can enforce stability.
+    
+Maximum Substeps:
+    The Smoke Solver will not break the simulation down into
+    more substeps than this. 
+    
+    It is a very good idea to always
+    have a maximum to ensure frames will be finished regardless
+    of their complexity. Lowering this ceiling can ensure a
+    minimum computation time at the expense of accuracy.
+    
+CFL Condition:
+    The CFL Condition is a factor used for automatically
+    determining what size substep a scene requires. The idea is
+    that any substep should not allow any objects to
+    interpenetrate by more than one voxel cell. 
+    
+    This condition
+    is met when this parameter is at 1. A value of 10 would
+    allow a substep to move the smoke by as much as 10 voxel
+    cells, possibly tunneling through objects rather than
+    properly deflecting.
+
+Advection Type:
+    The type of advection to use.  The __Single Stage__ method is equivalent to the [Gas Advect DOP|Node:dop/gasadvect], where each point is back traced
+    through the velocity field once to find the new voxel value.
+
+    The __BFECC__ and __Modified MacCormack__ methods do a second basic
+    advection stage to compute an estimate of the error introduced by the
+    advection process.  The field can then be corrected by this error,
+    resulting in a sharper fluid that doesn't disperse as much.
+Clamp Values:
+    The error correction factor can result in the new voxel values lying
+    outside the range of the original field, resulting in negative density
+    values, for example.  Clamping will restrict each voxel to the range of
+    values that are possible given its eight original values.  Revert will, if
+    the error-corrected voxel is out of range, revert back to the single-stage
+    value.  Reverting can avoid checker like artifacts where the error
+    correction breaks down.
+
+Advect Vel Type:
+    The advection type of the velocity field can be controlled separately from
+    the base fields.  Using the higher advection methods will reduce the
+    apparent viscosity of the field, but may end up adding energy or causing
+    chatter.
+
+Advection Method:
+    Controls particle tracing.
+    
+    Single step:
+        Takes the velocity at each voxel and makes a single step in
+        that direction for the time step.  This is fastest and is
+        independent of the speed of the velocity field, but will start
+        to break up for large time steps.
+        
+    Trace:
+        Ensures the backtracking does not move more than a single
+        voxel before its velocity is updated, allowing for larger
+        time steps.
+        
+    Midpoint:
+        Like Trace but uses a higher order advection for more accuracy
+        but slower simulation.
+Advection CFL:
+    When tracing the particles, this controls how many voxels may be
+    stepped in a single iterations.  Higher values will result in faster
+    tracing, and hence faster advection, but more errors.
+
+Projection Method:
+    Controls what method is used to make the velocity field non-divergent.  The
+    PCG method has more accurate boundary conditions.  It also avoids
+    computations inside collision objects.  The Multigrid method, however, is
+    significantly faster, especially as the number of voxels increases.
+
+Guass Seidel Iterations:
+    When a velocity field's __Velocity Sampling__ is "Center" (on the
+    __Initial Data__ tab of the [Smoke object DOP|Node:dop/smokeobject]),
+    this specifies the number of iterations to project it.
+
+    The number of iterations also controls the maximum distance any change
+    in the velocity field can have, so it should be about the width of the
+    volume in voxels. Lower iterations will be faster but the field will
+    not be as nice.
+
+Multigrid Iterations:
+    The multigrid method has inaccurate boundary enforcement.  By repeating the
+    enforcement/projection multiple times, it can quickly converge to an
+    accurate solution.  This should not have to be higher than 5.
+    
+
+== Forces ==
+
+Density Force Mask:
+    Determines which DOP Forces will be scaled by the density
+    value before being applied.  These forces will be
+    proportional to the amount of the smoke in the voxel.
+    
+Absolute Force Mask:
+    Determines which DOP Forces will be applied uniformly to
+    all of the voxels of the simulation.  The density field
+    will not be taken into account when evaluating these
+    forces.
+    
+Viscosity:
+    Viscosity is a force which tries to ensure that
+    neighboring voxels have the same velocity. A zero value
+    allows fluid in adjacent voxels to move any direction
+    without resistance. 
+    
+    Higher values introduce a penalty effect
+    when a voxel's velocity varies from that of its neighbors.
+    This is currently implemented by applying a diffusive term
+    to the velocity field.
+    
+Cooling Rate:
+    Controls how fast the temperature field trends to zero.  A
+    value of 0.9 will cause the temperature of hot gas to fall
+    to 90% of its original value after one second.
+    
+Temperature Diffusion:
+    Controls how fast the temperature field mixes.  Causes
+    temperature values to average between voxels, spreading
+    smoothing out temperature spikes.
+    
+Buoyancy Dir:
+    The buoyancy force will be applied in this direction. It
+    usually corresponds to the logical "up" direction.
+    
+Buoyancy Lift:
+    An upwards force proportional to the difference between the
+    ambient temperature and this voxel's temperature will be
+    applied with this scale factor. Thus voxel's whose
+    temperatures are higher than average will rise and those
+    with values lower will sink.
+    
+Vorticle Strength:
+    An overall scale adjustment for the vorticle forces.  Note
+    vorticle forces are only present if data named vorticles
+    is attached to the object.
+
+Vortex Confinement:
+    Instead of using explicit vorticles, the vortex locations can be
+    detected from the velocity field directly.  This parameter will
+    cause existing vortices to be boosted by this value, increasing
+    turbulence in the simulation that would otherwise be lost by the
+    grid resolution.  Too high a value can cause the simultaion to
+    become unstable and blow up.
+
+    Negative numbers can be used to suppress vortices and smooth out
+    the simulation - but usually a better solution is just to use a
+    lower resolution grid.
+
+    The scalar field called "confinement" is also multiplied into the
+    vortex confinement value, allowing you to vary the amount of
+    vortex boosting over space, or using a Gas Ramp, another field.
+    
+Feedback Scale:
+    A scale factor used in applying feedback forces to other
+    objects.  A value of zero prevents any feedback from
+    occurring.  
+    
+    The value can be thought of as a density, so to
+    have a default RBD object to balance a value of 1000 should
+    be used.
+    
+Speed Limit:
+    If set, each axis of the velocity field will be clamped to
+    this maximum speed.  This is done after the force
+    computation and before the divergence or advection, so it
+    is possible for the speed to end up slightly larger than
+    this value.  
+    
+    NOTE:
+        As the clamping is done per-axis, the velocity along the diagonal can be up to `sqrt(3)` higher.
+
+== Rest ==
+
+Rest Speed:
+    Controls how fast the rest field moves in response to the velocity
+    field.  To get the rest field to stick perfectly to the smoke a
+    value of 1 would be used.  This, however, quickly results in the
+    rest field smearing out in streaks which is often not desired.  By
+    moving it slower than the actual smoke velocity the streaking can
+    be diminished while still letting the rest field move with the
+    smoke.
+
+Rest Frame:
+    Which frame the rest field will be reset on.  Delaying the
+    initalization of the rest field until after any pre-roll is done
+    can give a better result.
+
+Reset Every Frames:
+    The rest field will be reset every time this number of frames goes
+    by.
+
+== Reactions ==
+
+Use Fuel Model:
+    Determines if the fuel field will be used to compute a
+    simple combustion model.  
+    
+    If set, the fuel field will
+    combust anywhere it exceeds the ignition temperature,
+    creating heat, gas, and soot in the process.
+
+Compress Gas:
+    If Gas Released is non-zero, the velocity field will no
+    longer be non-divergent.  Some areas may gain or lose
+    mass.  The default advection procedure will not properly
+    react to this.  
+    
+    For example, if gas is injected in a cloud
+    of smoke causing the smoke to expand, it would not
+    properly dissipate in thickness.  This option will attempt
+    to take this sort of dissipation and compression into
+    account by scaling the density and fuel fields according
+    to the velocity field.
+
+Ignition Temperature:
+    The combustion model will only occur if the temperature
+    field is above this value.  If one wants all fuel to
+    instantly ignite, a negative value can be used.
+
+Burn Rate:
+    The amount of fuel to burn per second.  This is a
+    ratio: 0.9 means after one second 90% will be burned.
+
+Soot Rate:
+    The amount of soot that will be created for every unit of
+    fuel burnt.  This is added to the density field that is
+    usually rendered as smoke.
+
+Temperature Output:
+    The amount to increase the temperature field by for every
+    unit of fuel consumed.
+
+Gas Released:
+    A scale factor controlling how much gas is injected into
+    locations where fuel is burnt.  This causes burning areas
+    to blow outwards.
+
+Normalize Burn Field:
+    The burn field stores the amount of fuel burned in the last
+    timestep.  This will thus vary with the size of the timestep.
+    
+    Normalizing the burn field will divide by the timestep,
+    storing the amount of fuel burned per second rather than
+    instantly.
+
+Heat Source:
+    Controls what initializes the heat field.  If set to None, the
+    heat field will not be changed by the smoke solver, which means it
+    also will not cool down.  Source means objects with a source
+    relationship will set the heat field to 1 inside of the objects.
+    Burn means to apply a maximum operation with the burn field, this
+    is most sensible if a Use Fuel Model is enabled.  The heat field
+    tracks the velocity of the fluid so is useful to create a history
+    of the burn field.
+
+Cool Heat Time:
+    How many seconds it takes the heat field to drop from a value of 1
+    to a value of 0.  Note that the heat field will keep dropping
+    below 0, becoming a sort of time-since-sourced field.
+
+== Fields ==
+
+=== Collisions ===
+
+Restrict Mask to Bandwidth:
+    The collision mask is an SDF built storing the distance to
+    the collision geometry for each node.  By default, it is
+    only calculated up to a certain distance from the
+    collision geometry.  
+    
+    However, if you want to use this
+    field for special effects (such as having things react
+    before they reach the object), one might want to compute
+    the full range of the mask.
+    
+Use Point Velocity for Collisions:
+    When building the collision field for the smoke use the
+    collision objects per-point motion to detect deformation.
+    
+    This allows one to properly react to deforming objects. This
+    only will work if the objects have a consistent point count,
+    however.
+    
+Use Volume Velocity for Collisions:
+    When building the collision field for the smoke use the
+    collision objects change in volume representation to detect
+    deformation. 
+    
+    This allows objects that are deforming over
+    time and changing point count to still properly affect the
+    smoke.
+
+Collide with Non-SDF:
+    Allows the fluid to collide with objects that don't have
+    Geometry/SDF, such as other fluids.
+
+Extrapolate into Collisions:
+    The density and fuel fields are copied into the collision field, causing the smoke to become sticky and not have an air gap
+    between it and the collision surface when rendered.  This also
+    helps prevent smoke from tunneling through moving collision
+    objects.
+
+Correct Collisions:
+    Density and fuel fields that are inside the collision object are
+    set to 0.  This helps ensure fuel and density can not leak
+    through moving objects.
+
+=== Sources ===
+
+Add Source to:
+    Controls what the destination of the objects with a source
+    relationship will be.
+    
+    Density:
+        Wherever source objects are present, the density
+        field will be set to 1.
+    Fuel:
+        Wherever source objects are present, the fuel
+        field will be set to 1.  Depending on ignition
+        temperature, this may not immediately trigger a
+        reaction.
+
+Velocity Merge:
+    Controls how the source object's velocity will affect the
+    smoke's velocity field.
+    
+    None:
+        The source velocity will be ignored.
+    Weighted Average:
+        A blend of the gas's velocity field and the source
+        object's velocity will be done with the weights
+        for each dependent on the relative densities.
+    Net New Source:
+        The object's velocity will affect the field to an
+        extent that the source's density is greater than
+        the original density.  
+        
+        If you add smoke with a
+        maximum operator (the default) this has the effect
+        of only having newly added smoke affect the
+        velocity field.
+            
+Velocity Type:
+    Rigid Velocity:
+        The velocity of the object treating it as a rigid
+        body.  Only the angular velocity and linear velocity
+        will be used, no local deformation will be taken into
+        account.
+    Point Velocity:
+        The velocity of the object attempting to take into
+        account deformation by using point history.  This only
+        works if the topology doesn't change.
+    Volume Velocity:
+        Uses the SDF representation of the object to detect
+        deformation.  Does not require a fixed topology over
+        time, but cannot detect tangential velocities.
+        
+Temperature Merge:
+    Controls how the source object's temperature physical
+    parameter will affect the smoke's temperature field.  The
+    options match those for Velocity Merge.
+
+=== Pumps ===
+
+    Velocity Type:
+        Controls how the pump object's per point velocity is
+        computed.
+        
+        Rigid Velocity:
+            The velocity of the object treating it as a rigid
+            body.  Only the angular velocity and linear velocity
+            will be used, no local deformation will be taken into
+            account.
+        Point Velocity:
+            The velocity of the object attempting to take into
+            account deformation by using point history.  This only
+            works if the topology doesn't change.
+        Volume Velocity:
+            Uses the SDF representation of the object to detect
+            deformation.  Does not require a fixed topology over
+            time, but cannot detect tangential velocities.
+    
+    Temperature Merge:
+        Controls how the pump object's temperature physical
+        parameter will affect the smoke's temperature field.  
+        
+        The choices are to leave it unaffected or to directly set the
+        interior of the pump to the pump temperature.
+    
+=== Clear ===
+
+    Fields to Clear:
+	Zeros out the specified types of fields after the solve
+	step.  This ensures the .sim files, which store the
+	complete state of the simulation, do not have any
+	information not needed, reducing their size and save time.
+	    None:
+		No special clearing of fields is done.
+	    Hidden:
+		Fields not needed for the next time step that do
+		not have guide parameters are cleared.
+	    Static:
+		Fields not needed for next time step are cleared.
+		Note that some guides will thus start showing up
+		as zero as the underlying field got cleared.
+    Additional:
+	A space separated list of extra fields that should be
+	cleared post-solve.
+[Include:standard_solver_parms]
+
+@inputs
+
+[Include:standard_data_inputs]
+
+@outputs
+
+[Include:standard_data_outputs]
+
+@locals
+
+[Include:standard_data_locals]
+
+[Include:standard_locals]
+
+

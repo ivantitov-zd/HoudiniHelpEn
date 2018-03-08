@@ -1,0 +1,825 @@
+= Material stylesheets =
+
+"""Material stylesheets are a highly technical solution for assigning materials and overriding material parameters on packed geometry."""
+
+#helpid: h.pane.datatree.materialstylesheets
+
+
+== Overview ==
+
+:vimeo: Material stylesheets
+    #id: 142466794
+
+
+=== What are stylesheets ===
+
+A stylesheet is a collection of styles. A style contains target conditions that match certain primitives, and instructions for how to change the material and/or material parameters on the matching primitives. For example, you could create a style that essentially says "In the `char1` object, in the `skin` packed primitive, on faces in the `shirt` group, change the diffuse color to blue".
+
+NOTE:
+    #glyph: fa-eye-slash
+    
+    Mantra applies stylesheets _at render time_ just before the renderer shades the geometry.
+
+
+=== What are stylesheets for? ===
+
+* Stylesheets are a workaround for the limitation that you can't select and apply materials to geometry inside a packed primitive. Instead, you must "target" the packed geometry with a style to set/change its materials.
+    #glyph: fa-sitemap
+
+* Stylesheets can target geometry that is only "real" at render time. They let you apply material changes (including scripted/random changes) to instanced geometry and agents at render time. This gives you the benefit of instancing the same geometry, but still allows you to make the instances look different.
+    #glyph: fa-user-secret
+
+* Stylesheets can let you change looks without having to edit the geometry or regenerate the scene description (IFD) file. This may be useful for studios working with huge scenes, where a quick tweak with a stylesheet might be faster than regenerating a huge IFD.
+    #glyph: fa-clock-o
+
+
+=== Stylesheet locations and priorities ===
+
+You can apply stylesheets at different levels:
+
+* Stylesheet specified on the Mantra command line using the `-S` option.
+    #glyph: fa-terminal
+
+* You can save stylesheets in a scene (`.hip`) file that can target any geometry in the file.
+    #glyph: fa-file
+
+* You can add a stylesheet parameter to a Houdini object that can target any geometry inside the object.
+    #glyph: fa-cube
+
+* You can specify a stylesheet on primitives using a `material_stylesheet` attribute. On a packed primitive, this can target the packed geometry inside.
+    #glyph: fa-th
+
+Each level can target geometry at lower levels.
+
+If two levels target the same geometry, the _higher level stylesheet overrides the lower level_. This ordering has a few advantages:
+
+* A stylesheet on a packed primitive can override any material assignments/parameters on the geometry inside.
+
+* It lets you override anything at render time by specifying a top-level stylesheet at the command line. This can be useful for huge scenes because you can change material assignments and parameters without having to regenerate the IFD.
+
+Styles listed _later_ in a stylesheet override styles listed earlier.
+
+
+=== Viewport display ===
+
+The viewport shows stylesheet material assignments and overrides on geometry. You can use controls in the [viewport display options|/ref/windows/displayopts_3d#mat_assign] to enable or disable certain stylesheet features (overrides, packed primitive targets) or turn off stylesheet display completely.
+
+There are some limitations to stylesheet display in the viewport:
+
+* The effects of stylesheets are only visible in the viewport if the stylesheet assigns a material -- or overrides a material parameter -- with a [GL tag|/shade/opengl#gl_tags].
+
+* By default, the viewport will only display up to 100 materials on a single
+object to keep the display responsive. You can change this limit in the [display options|/ref/windows/displayopts_3d#mat_assign] window's __Optimize__ tab.
+
+* Materials defined "on the fly" in a stylesheet do not appear in the viewport.
+
+* The viewport will update when the stylesheet changes.  However, Houdini will not detect changes to any external scripts or CVEX nodes referenced by the stylesheet. To manually update the display, right click the [Icon:VIEW/materials] View Materials button on the display options toolbar (to the right of the viewer) and choose __Update stylesheets__.
+
+    (Alternatively you can click the __Update__ button on the display options window's __Optimize__ tab.)
+
+* The viewport cannot currently show material changes for stylesheets that change the target per packed instance if the target is within the packed primitive, when there are more than one of that instance.
+
+
+=== Terms ===
+
+Stylesheet:
+    Contains information about how to override material assignments/parameters on geometry matching certain conditions. A stylesheet can contain _styles_ as well as _shared material_ definitions, _shared scripts_, and references to other stylesheets.
+
+Style:
+    Contains a target specification and a list of _overrides_ to apply to the targeted geometry.
+    
+    Styles can contain their own overrides, or reference a set of shared overrides that multiple styles can use.
+
+Target:
+    A list of [conditions|#conditions] that match certain geometry. See [targets|#targets] below.
+
+Override:
+    A new material assignment and/or material parameter values to apply to targeted geometry. See [overrides|#overrides] below.
+
+Shared material:
+    You can reference materials with overrides in stylesheets, and then assign them to targeted geometry.
+
+Scripts:
+    You can use CVEX scripts in overrides to compute material parameter values at render time. See [scripts|#scripts] below.
+
+Target binding:
+    You can "bind" attributes on matched geometry to script arguments. See [binding|#binding] below.
+
+
+=== Targets === (targets)
+
+The _target_ part of a style specifies which geometry to apply the style's overrides to.
+
+A target can contain four items:
+
+Target type:
+    What type of geometry your rule will apply to.
+
+    Primitive:
+        Geometry primitives (such as polygons).
+    
+    Point instances:
+        Points. You can apply materials to and set attributes on the points which will be inherited by instanced geometry.
+    
+    Object:
+        Top-level objects, such as characters and props.
+    
+    Context dependent:
+        Target objects if the stylesheet is on an object, or primitives if the stylesheet is in a primitive attribute.
+
+Conditions:
+    See [conditions|#conditions] below.
+
+Sub-targets (optional):
+    Targets can recursively contain sub-targets, allowing you to match objects within objects, or geometry inside [packed primitives|/model/packed].
+
+Target bindings (optional):
+    This lets you bind the results of matches in the "targets" part of a style to script arguments in the "overrides" part.
+
+
+=== Conditions === (conditions)
+
+A target can have the following _conditions_. If you have multiple conditions, the must _all_ match. If you have no conditions, the style matches everything.
+
+Self name or path:
+    (When the Target's type is "Context dependent".) If the stylesheet is on an object, This condition is equivalent to an object path condition. If it's on a primitive, this condition is equivalent to a primitive name or path attribute condition.
+
+Primitive name or path attribute:
+    A primitive number or the value of a primitive's `name` or `path` attribute, for example `/alembicarchive/*book*`.
+
+Object path:
+    A pattern matching the name or path of an object, for example `/obj/subnet1/character1`.
+
+Object category:
+    Matches objects by [category|/render/lights#categories] tags.
+
+Object bundle:
+    Matches the objects inside the given [bundle|/basics/bundles].
+
+Primitive group:
+    Matches primitives using [group syntax|/model/groups#manual].
+
+Point group:
+    Matches any primitives that share the points specified by [group syntax|/model/groups#manual]. 
+
+Vertex group:
+    Matches any primitives that share the vertices specified by [group syntax|/model/groups#manual]. 
+
+Agent shape:
+    Matches a "shape" geometry inside an agent primitive by name.
+
+Multi-level Entity Path:
+    (Deprecated. Only available after loading older style sheets that use this option.) This condition type can be used as an equivelent to the self name or path condition. In addition, this condition can specify multiple levels of nested entities by separate components with forward slashes, for example `*book*/45` to specify primitive 45 inside any packed geometry with a `name` or `path` attribute that matches `*book*`. Finally, to specify both an object and primitive path in one condition, the object and primitive parts must be separated by a colon, for example `/obj/geo*:*book*/45`. This condition type has been deprecated because all the functionality it provides can be more clearly expressed using nested targets.
+
+
+=== Overrides === (overrides)
+
+The _overrides_ of a style specifies how to change the material assigned to the matched geometry. You can assign a new material, and/or change parameter values on the material. You can also specify a CVEX script to compute the override values instead of using static values.
+
+A style can contain different types of overrides. Each override type can be
+set using a constant value for all targeted geometry, or as a CVEX script that
+gets run for each targeted component to calculate that component's value.
+
+Set material:
+    Changes the material assigned to the geometry.
+
+Render property:
+    Changes the value of a render property for the geometry. Render properties are settings that affect the way geometry is rendered but which are not parameters to the surface or displacement shaders. These settings allow you to control, for example, whether the geometry is rendered as a subdivision surface, or whether to use true displacement mapping.
+
+Material parameter:
+    Changes the value of a parameter on the geometry's material. Overrides of this type affect both surface and displacement shaders.
+
+Surface parameter:
+    Changes the value of a parameter only on the geometry's surface shader.
+
+Displacement parameter:
+    Changes the value of a parameter only on the geometry's displacement shader.
+
+
+== Style sheet editor pane == (editor)
+
+You can edit style sheets using a tree editor in the Data Tree pane. The tree view shows any top-level stylesheets stored in the file, as well as the contents of any stylesheet parameters on objects.
+
+Despite being easier than hand-editing JSON files and string attributes, the editor pane is a pretty thin interface over the JSON format. Items in the tree correspond to objects in the JSON. To add something to the tree, right click an item in the tree and choose the type of item to add under it.
+
+:task:Create a material style sheet editor pane:
+    # Click the [Smallicon:BUTTONS/new_tab] New tab icon in the top line of a pane.
+
+    # Choose __New pane tab type > Data tree__.
+    
+    # Click the pop-up menu in the top left corner and choose "Material Style Sheets".
+
+:task:Create a new stylesheet:
+    # Click __New style sheet__ in the editor pane.
+    # Give the new stylesheet a name, and optionally a description.
+    
+        * To start the new stylesheet blank, click __New style sheet__.
+    
+        * To start the new stylesheet with the contents of an existing file, click __Import from file__ and choose the file. This only takes the contents of the file -- the file location is not saved.
+    
+        * To create a stylesheet containing instructions equivalent to all existing assignments of materials to geometry in the current file, click __Existing material overrides__. This may be useful if you want to replace all geometry-level material assignments in a file with a stylesheet.
+
+:task:Add a stylesheet to an object:
+    # In the editor pane, find the object under `obj/` (below the stylesheets in the tree).
+    
+    # Right click the object in the tree and choose "Add stylesheet parameter". This sets up a parameter on the object that applies a stylesheet to its contents.
+    
+        ~~~ or ~~~
+        
+        Right click the object and choose "Create style sheet from existing overrides". This sets up a parameter on the object with a stylesheet equivalent to any geometry-level material assignments inside the object.
+
+:task:Add a style to a stylesheet:
+    In the editor pane, right click the stylesheet in the tree and choose __Add style__.
+
+:task:Add a target specification to a style:
+    In the editor pane, right click the style in the tree and choose __Add target__.
+    
+    * To add a condition to the new target spec, right click it and choose __Add condition__. See [conditions|#conditions] for the different types of conditions.
+    * To add a recursive target on the results of the new target, right click it and choose __Add sub-target__.
+    * To automatically add conditions to the target that would match whatever's currently selected in the viewport, right click the new target spec and choose __Set target from viewport selection__.
+
+:task:Override the material assignment in a style:
+    # In the editor pane, right click the style in the tree and choose __Add override__.
+    
+    # In the "Type" column, choose the "Set Material" menu item.
+    
+    # In the "Override value" column, click the [Icon:BUTTONS/chooser_node] node chooser icon to pick the material.
+    
+    You can only have one material override in a style (since it wouldn't make sense to override the material more than once).
+
+:task:Override a material parameter in a style:
+    # In the editor pane, right click the style in the tree and choose __Add override__.
+    
+    # In the "Override name" column, click the [Icon:DATATYPES/parameter] parameter chooser icon to pick a parameter on the material.
+    
+        (If you don't have the material instantiated in the current scene file, you can type the _internal_ name of the parameter in the column instead of using the chooser.)
+    
+    # In the "Override value" column, click to set the new value.
+
+:task:Share the same overrides between multiple styles:
+    First, create a _shared override set_ that multiple styles can reference:
+    
+    # In the tree, under the stylesheet item, right click the "Shared override sets" item and choose __Add shared override set__. Give the override set a name and press ((Enter)).
+    
+    # Right-click the new override set item and choose [overrides|#overrides] to add to the set.
+    
+    Then, to reference the a shared override set in a style:
+    
+    # Right-click the style and choose __Add shared override set__.
+    
+    # In the new item, click the popup menu in the __Value__ column and choose the override set.
+    
+    You can reference multiple shared override sets in the same style. This allows you to break common overrides into smaller sets and apply any that are needed in a particular style.
+
+:task:Change the order of style sheets:
+    Drag them up or down in the tree.
+
+:task:Reference the contents of another stylesheet:
+    # In the tree, under the stylesheet item, right click the "Imported files" item and choose __Add stylesheet reference__.
+    
+    # In the "Type" column, click to choose whether to reference a stylesheet embedded in the scene file, or a JSON file on disk.
+    
+    # In the "Value" column, click to choose the stylesheet to reference.
+
+:task:Find items in the editor:
+    Use the __Filter__ field to only show rows that contain certain text. For example, you can show the styles that assign a material with a given name.
+
+:task:Get extra information:
+    Press ((MMB)) on a style, target, or condition item.
+
+:task:Save a stylesheet as JSON:
+    # In the tree, right click the stylesheet item and choose __View JSON__.
+    
+    # Select the JSON code in the window and copy it to the clipboard.
+    
+    # Paste it into a text editor application to save it.
+
+
+== Solo and mute == (solo)
+
+When you're creating and editing stylesheets, it can be useful to limit the effects of different items so you can isolate which effects in the render are coming from which styles.
+
+You can use the "solo" and "mute" controls in the stylesheet editor tree to quickly turn stylesheets and styles on and off.
+
+:task:See only the effect of a single stylesheet or style:
+    Click the radio button in the [Smallicon:BUTTONS/light_solo] Solo column next to the stylesheet or style.
+
+:task:Hide the effect of a stylesheet or style:
+    Click the checkbox in the [Smallicon:BUTTONS/light_mute] Mute column next to the stylesheet or style.
+
+
+== Using CVEX scripts == (scripts)
+
+Wherever stylesheets allow you to specify a new material name or material parameter value, you can use a CVEX script to compute the new value at render time instead of specifying a static value.
+
+CVEX scripts are [VEX language|/vex/] scripts. CVEX stands for "contextless VEX", meaning no context-specific functions (such as geometry manipulation functions) are available to the script.
+
+The script must have a function with the `cvex` return type. Because `cvex` functions have no return type, you must use an `export` argument to output the result of the script. If the function only has one `export` argument, Mantra will use it automatically. If the function has more than one `export`, or you can specify which to use as the output using the `return` key [in JSON|#script_json].
+
+NOTE:
+    The _name_ of the CVEX function does not matter. Mantra will simply call whatever function has the `cvex` return type.
+
+{{{
+#!vex
+cvex
+mySharedFn(int packed_id=0; int unpacked_id=0; export vector c={0,0,0}) {
+    c.r = 0.3 * float(packed_id);
+    c.g = 0.2 * float(unpacked_id);
+}
+}}}
+
+TIP:
+    When targeting point instances, you might want to use the _point number_ in the script. Unfortunately this is not possible directly. Points do not have "intrinsics" (computed pseudo-attributes) for the CVEX script to bind like packed geometry does. As a workaround, you can create an attribute on the points containing their point number.
+
+
+=== Setting up scripts in the stylesheet editor ===
+
+:task:Create a script item to calculate a new material:
+    In the tree, right-click a style and choose __Add override script__. Click in the "Type" column to change the override to "Set Material".
+
+:task:Create a script item to calculate a new material parameter value:
+    In the tree, right-click a style and choose __Add override script__.
+
+:task:Create a script item to share between multiple overrides:
+    In the tree, right-click the "Shared scripts" item and choose __Add shared script__.
+
+    Click in the "Override type" column to set the location of the script:
+
+    Inline:
+        Put a single line of VEX code in the "Override value" column. This might be useful for quick tests or very short scripts, but usually not since you can't use line breaks (although you can put a `\n` escape sequence in the single line) and you must escape quote characters.
+
+    Shared script:
+        Click in the "Override value" column to choose one of the scripts under the "Shared scripts" item.
+
+    External script file:
+        Enter or choose the location of a script file in the "Override value" column (either a file path or URL).
+
+    Script from SHOP:
+        Choose a VEX SHOP or [VOP CVEX SHOP|/nodes/shop/vopcvex] as the "script" to generate the value. This lets you define "script" behavior by wiring up a VOP network.
+
+    Attribute binding:
+        Generates CVEX code that simply sets a material parameter value based on an attribute value (or [bound name|#bindings]). Enter the attribute/bound name in the "Override value" column.
+
+
+=== Script bindings === (binding)
+
+A script can "bind" the value of attributes on the matched geometry to named arguments of the CVEX function.
+
+Higher [target|#targets] levels in a targeting hierarchy can also bind the value of attributes at _that_ level. You can then make those _bound data_ available as arguments to the CVEX script.
+
+For example, suppose a style targets packed primitives `1` and `2`, and a sub-target
+matches the `color_prims` group inside the packed primitive. If you use a parameter override script, Mantra will run the script for each primitive in `color_prims`. You might need the script to know the primitive number of the packed primitive. To accomplish this, you can _bind_ the value of the `intrinsic:indexorder` attribute to the name `top_level_prim` in the top target. When the script is called, Mantra will pass it a `top_level_prim` argument containing the packed primitive number.
+
+:task:Add a binding to a script or target:
+    # In the tree, right-click the script/target item and choose __Add script binding__.
+    # In the new binding row, click the "Override name" column and enter the _argument name_.
+    # Click the "Override value" column and enter the _attribute name_.
+
+
+== Tips ==
+
+* When you're creating preview renders in Houdini, Houdini will not automatically detect changes the included stylesheets. If you change an included stylesheet, you may need to manually re-render (for example, by clicking the __Render__ button in the render view).
+
+== Examples ==
+
+:load_example:Basic style sheets:
+    #examplefile: /examples/stylesheets/mss_basic_overrides.otl
+    
+    Basic use of style sheets: how to identify the primitive whose material to override and what to override it with. Also demonstrates the use of VEX scripting to randomize primitive colors.
+
+:load_example:Style Sheets for Packed Primitives:
+    #examplefile: /examples/stylesheets/mss_packed_primitives.otl
+    
+    How to assign materials to primitives inside packed geometry, and nested packed geometry.
+
+:load_example:Basic Style Sheets for Crowds:
+    #examplefile: /examples/stylesheets/mss_crowd_textures.otl
+    
+    How to assign a different texture map to each agent in a crowd.
+
+:load_example:Style Sheets for Crowd Shapes:
+    #examplefile: /examples/stylesheets/mss_per_agent_color.otl
+    
+    How to assign materials to primitive groups inside the shapes that make up the crowd agent geometry.
+
+
+== Style sheet HOM scripting ==
+
+The [Hom:hou.styles] module and the [Hom:hou.StyleSheet] object let you manipulate stylesheets programmatically in Python.
+
+
+== Style sheet JSON format ==
+
+A style sheet is a [JSON file|Wp:JSON]. The [stylesheet editor|#editor] lets you edit the JSON as a graphical tree, but you can also generate the JSON by hand or programmatically.
+
+The easiest way to see how the JSON works is to create the structure you want in the stylesheet editor and then right click the stylesheet in the tree and choose __View JSON__.
+
+The top level object has four keys: [importFiles|#imports_json], [scriptDefinitions|#scripts_json], [materialDefinitions|#material_defs], and [styles|#styles_json].
+
+
+=== Example ===
+
+{{{
+#!json
+{
+    "importFiles" : [ "mss/main_style.json" ],
+
+    "scriptDefinitions" : {
+        "mss_shared_script" : {
+            "code" : "cvex mySharedFn(int packed_id=0; int unpacked_id=0; export vector c={0,0,0}) { c.r = 0.3 * float(packed_id); c.g = 0.2 * float(unpacked_id); }",
+            "bindings": {
+                "unpacked_id" : "intrinsic:indexorder",
+                "packed_id" : "top_level_prim"
+            }
+        }
+    },
+
+    "materialDefinitions" : {
+        "mss_const_mat" : {
+            "properties" : {
+                "surface" : "opdef:/Shop/v_constant clr 0.1 0.1 0.8"
+            }
+        }
+    },
+    
+    "styles" : [
+        {
+            "selfTarget" : {
+                "objectName" : "/obj/colored_object"
+            },
+            "overrides" : {
+                "material" : {
+                    "name" : "mss_const_mat"
+                },
+                "materialParameters" : {
+                    "clr" : [ 0.8, 0.1, 0.2 ]
+                }
+            }
+        },
+        {
+            "target" : {
+                "group" : "1 2",
+                "preBindings" : {
+                    "top_level_prim" : "intrinsic:indexorder"
+                },
+                "subTarget" : {
+                    "subTarget" : {
+                        "group" : "colored_prims"
+                    }
+                }
+            },
+            "overrides" : {
+                "materialParameters" : {
+                    "clr" : {
+                        "script" : { "importScript" : "mss_shared_script" }
+                    }
+                }
+            }
+        }
+    ]
+}
+}}}
+
+
+=== Imports === (imports_json)
+
+The `importFiles` top-level key maps to a list of strings representing stylesheet locations (file paths or URLs). The data from these files are included in the current stylesheet. Shared scripts and override sets in the current file will override things with the same name in included stylesheets.
+
+{{{
+#!json
+{
+    "importFiles" : [ "mss/main_style.json", "prim_style.json" ]
+}
+}}}
+
+
+=== Shared Scripts === (scripts_json)
+
+The `scriptDefinitions` top-level key maps to an object mapping shared script names to [script objects|#script_json].
+
+{{{
+#!json
+{
+    "scriptDefinitions" : {
+        "mss_shared_script" : {
+            "code" : "cvex mySharedFn(int packed_id=0; int unpacked_id=0; export vector c={0,0,0}) { c.r = 0.3 * float(packed_id); c.g = 0.2 * float(unpacked_id); }",
+            "bindings": {
+                "unpacked_id" : "intrinsic:indexorder",
+                "packed_id" : "top_level_prim"
+            }
+        }
+    }
+}
+}}}
+
+
+=== Material Definitions === (material_defs)
+
+Theoretically, you can define materials inside a stylesheet. This would allow you to make a self-contained stylesheet that could introduce new materials into an already-generated IFD file. In practice, this requires that you know enough about [IFD|/render/ifd] to write a raw IFD shader string.
+
+Additionally, the VEX code to define the material's surface or displacement shader can be embedded into the material definition. This requires using the reserved shader names "mss:surface_shader" or "mss:displace_shader" depending on the type of shader. The VEX code is then added as a property with that same name to the material definition. Again, this is most likely to be useful in a large pipeline where style sheets can be generated automatically by python scripts, rather than created manually.
+
+{{{
+#!json
+{
+    "materialDefinitions" : {
+        "mss_const_mat" : {
+            "properties" : {
+                "surface" : "opdef:/Shop/v_constant clr 0.1 0.1 0.8",
+		"displace" : "mss:displace_shader parm 0 0 1",
+		"mss:displace_shader" : "displace disp1(vector parm=0) { P = P
++ parm; }"
+            }
+        }
+    }
+}
+}}}
+
+
+=== Styles === (styles_json)
+
+The `styles` top-level key maps to a list of style objects.
+
+A style object can have the following keys:
+
+* `target`: [target object|#target_json]
+* `overrides`: [overrides object|#overrides_json]
+
+{{{
+#!json
+{
+    "styles" : [
+        {
+            "target" : {
+                "type": "self",
+                "objectName" : "/obj/colored_object"
+            },
+            "overrides" : {
+                "material" : {
+                    "name" : "mss_const_mat"
+                },
+                "materialParameters" : {
+                    "clr" : [ 0.8, 0.1, 0.2 ]
+                }
+            }
+        }
+    ]
+}
+}}}
+
+{{{
+#!json
+{
+    "target" : {
+        "group" : "1 2",
+        "preBindings" : {
+            "top_level_prim" : "intrinsic:indexorder"
+        },
+        "subTarget" : {
+            "subTarget" : {
+                "group" : "color_prims"
+            }
+        }
+    },
+    "overrides" : {
+        "materialParameters" : {
+            "clr" : {
+                "script" : { "importScript" : "mss_shared_script" }
+            }
+        }
+    }
+}
+}}}
+
+
+=== Targets === (target_json)
+
+A `target` object specifies which entities the style will affect. See [targeting geometry|#targets].
+
+It can have the following keys:
+
+`type`: `"<<string>>"`:
+    If this key is set to `"self"`, this target must match the thing the stylesheet is attached to, instead of the thing's contents.
+    
+    If the stylesheet is attached to a scene file, this has no effect.
+    
+    If the stylesheet is attached to an object, the "self" target must match that object. If the stylesheet is attached to a primitive in an attribute, the "self" target must match that primitive. This only makes sense on the "top" target in a style, not on a sub-target.
+
+`name`: `"<<object name>>"`:
+    For objects, the name or path of the object, for example `/obj/geo*` or simply `geo*`. For primitives, either the primitive number or the value of a `name` or `path` attribute.
+
+`objectName`: `"<<object_path>>"`:
+    Matches the path to an object. You can use this even at the primitive level to match the object containing the primitives. This lets you avoid having to use two levels to target the object and then the primitives.
+
+`path`: `"<<path string>>"`:
+    One or both of:
+    
+    * The network path to an object. For example, `/obj/subnet1/char1`.
+    * A path of "names" to a primitive. As with the `name` target type, a "name" can be a primitive number or the value of a `name` or `path` attribute. For example, `agent_0/shape/0`.
+
+    If you use both, you must separate them with a colon, for example: `/obj/crowd_object:agent_0/shape/primitive`. This is equivalent to using multiple nested targets, but is less clear when expressed in the user interface, so this option has been deprectated in the Style Sheet Editor pane.
+
+`group`: `"<<group spec>>"`:
+    Matches primitives using the [group specification syntax|/model/groups#manual].
+    
+    {{{
+    #!json
+    {
+        "target" : { "group" : "0 5 10 some_group" }
+    }
+    }}}
+    
+    {{{
+    #!json
+    {
+        "target" : { "group" : "@Cd.r>0.5" }
+    }
+    }}}
+
+`shape`: `"<<string>>"`:
+    Match a certain "shape" inside an agent primitive by name.
+
+`subTarget`: <<target object>>:
+    Recursively matches entities inside whatever entities match this target.
+    
+    For example, this target object would match a packed primitive with primitive ID #0, and then match the primitive #10 packed inside:
+    
+    {{{
+    #!json
+    {
+        "target" : {
+            "group" : "0",
+            "subTarget" : {
+                "group": "10"
+            }
+        }
+    }
+    }}}
+    
+`preBindings`: `{"<<attribute name>>": "<<bound name>>"}`:
+    An object takes attributes on the matched geometry, and assigns names to the values of those attributes, so they can be passed to CVEX scripts as arguments. See [binding|#binding].
+
+
+=== Overrides === (overrides_json)
+
+An `overrides` object specifies how to change the material on the primitives targeted by a style. See [overrides|#overrides].
+
+An overrides object can have the following keys:
+
+`material`: `{"name": "<<value>>"}`:
+    The value of the `name` key inside can one of:
+    * A string specifying the path to a material node.
+    * If you are using [embedded materials|material_defs] it can be the name of a shared material.
+
+`materialParameters`: `{"<<parameter name>>": <<value>>}`:
+    Changes the values of parameters on the material assigned to the matched geometry.
+
+{{{
+#!json
+{
+    "material" : {
+        "name" : "/shop/material1"
+    },
+    "materialParameters" : {
+        "clr" : [ 0.8, 0.1, 0.2 ],
+        "reflect": 0.5,
+    }
+}
+}}}
+
+The <<value>>s inside the three keys can be a literal value (a string, number, or array), or an object like `{"script": <<script object>>}`, where the value of the `script` key is a [script object|#script_json] referencing a CVEX script to use to compute the value. See [using CVEX scripts|#scripts].
+
+{{{
+#!json
+{
+    "materialParameters" : {
+        "clr" : {
+            "script" : { "importScript" : "mss_shared_script" }
+        }
+    }
+}
+}}}
+
+
+=== Script objects === (script_json)
+
+See [how to use CVEX scripts|#scripts]. The object has the following keys:
+
+One of the following keys:
+
+    `command`: `"<<path to .vex file>>"`:
+        Use the script at the given location (file path or URL).
+
+    `importScript`: `"<<shared script name>>"`:
+        References a shared script in the `scriptDefinitions` object.
+
+    `code`: `"<<inline VEX code>>"`:
+        A single line of VEX code in a string.
+
+`return`: `"<<argument name>>"`:
+    Since a `cvex` function has no return type, you must use an `export` argument to output the result of the function. If the function has more than one `export`, this lets you specify which argument to use as the result.
+
+`bindings`::
+    An object mapping primitive attribute names to function arguments. This lets you pass the contents of an attribute/binding to the function as an argument. See [bindings format|#bindings_json].
+
+{{{
+#!json
+{
+    "command" : "$HIP/cvex/recolor.vex",
+    "bindings": {
+        "unpacked_id" : "intrinsic:indexorder",
+        "packed_id" : "top_level_prim"
+    }
+}
+}}}
+
+
+=== Bindings object === (bindings_json)
+
+A bindings object maps function arguments to attributes or other values by name. The keys in the object represent the function argument names. The stylesheet format supports a few different binding methods for the values.
+
+The default binding style associates an argument name with an attribute name (note that this can include intrinsic attributes). The value is a string naming an attribute. If no attribute with the given name is found, it looks for a [target binding|#target_json] by that name.
+
+    {{{
+    #!json
+    "bindings": {
+        "foo": "P",
+        "bar": "intrinsic:indexorder"
+    }
+    }}}
+
+Alternatively you can specify a different type of binding using an object instead of a string. This object has a `sourceType` key that determines the binding method:
+
+`default`:
+    This is the same as using the default format mapping to a string as shown above. The object has a `name` key to specify the attribute (or target binding) name.
+    
+    {{{
+    #!json
+    "bindings": {
+        "foo": {
+            "sourceType": "default",
+            "name": "P"
+        },
+        "bar": {
+            "sourceType": "default",
+            "name": "intrinsic:indexorder"
+        }
+    }
+    }}}
+
+`preBinding`:
+    This skips the check for a geometry attribute, and just looks for a target binding with the given name.
+    
+    {{{
+    #!json
+    "bindings": {
+        "foo": {
+            "sourceType": "preBinding",
+            "name": "aTargetName"
+        }
+    }
+    }}}
+
+`constant`:
+    This associates the function argument with a constant value.
+    
+    {{{
+    #!json
+    "bindings": {
+        "stringArg": {
+            "sourceType": "constant",
+            "value": "string"
+        },
+        "intArg": {
+            "sourceType": "constant",
+            "value": 23
+        },
+        "vectorArg": {
+            "sourceType": "constant",
+            "value": [1.0, 1.0, 2.0]
+        }
+    }
+    }}}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,165 @@
+= hou.VDB =
+#type: homclass
+#cppname: HOM_VDB
+#superclass: hou.Prim
+#group: geo
+
+"""A VDB is a kind geometry primitive (Prim object) that stores data in a three
+dimensional grid of voxels."""
+
+@methods
+
+::`sample(self, position)` -> `float`:
+    #cppname: HOM_VDB::sample
+    Given a sequence of three floats containing a 3D position, return the value
+    of the volume at that position.  If the position is not in the middle of
+    a voxel, Houdini will interpolate using values from surrounding voxels.
+
+    See also [Hom:hou.VDB#voxel] and [Hom:hou.VDB#posToIndex].
+
+::`gradient(self, position)` -> [Hom:hou.Vector3]:
+    #cppname: HOM_VDB::gradient
+    Given a sequence of three floats containing a 3D position, return a
+    vector which points in the direction of the greatest rate of increase
+    of the volume's value.
+
+    See [Wikipedia's gradient page|Wp:Gradient] for more information.
+
+::`voxel(self, index)` -> `float`:
+    #cppname: HOM_VDB::voxel
+    Given a sequence of three integers containing a voxel index, return the
+    value of the corresponding voxel.
+
+::`resolution(self)` -> [Hom:hou.Vector3]:
+    #cppname: HOM_VDB::resolution
+    Return the x, y, and z dimensions of [Hom:hou.VDB#activeVoxelBoundingBox].
+    Since VDB volumes are sparse, this represents the virtual resolution of all
+    the voxels which have data (or are "active").
+
+::`indexToPos(self, index)` -> [Hom:hou.Vector3]:
+    #cppname: HOM_VDB::indexToPos
+    Given a sequence of three ints containing an index into the voxel array,
+    return the corresponding 3D position of the middle of that voxel.
+
+::`posToIndex(self, position)` -> `tuple` of `int`:
+    #cppname: HOM_VDB::posToIndex
+    Given a sequence of three floats containing a 3D position, return a tuple
+    of three ints containing the corresponding index into the voxel array.
+
+::`isSDF(self)` -> `bool`:
+    #cppname: HOM_VDB::isSDF
+    Return whether or not the volume should be semantically treated as a signed
+    distance field. If true, the volume can be thought of as representing a
+    closed surface, where the negative voxel values are inside, the positive
+    voxel values are outside, and voxels on the surace are zero.
+
+    For VDB volumes, there is typically only a 3 voxel radius around the
+    surface where there exists data.
+
+::`transform(self)` -> [Hom:hou.Matrix3]:
+    #cppname: HOM_VDB::transform
+    Return a 3x3 matrix containing the scale and rotation transformations
+    for this volume.
+
+    Note that the position information for the volume can be obtained by
+    calling `volume.vertex(0).point().position()`.
+
+    The following function returns a 4x4 transformation matrix for the volume
+    that includes the translation:
+    {{{
+    #!python
+    def fullTransform(volume):
+	return (hou.Matrix4(volume.transform()) *
+	    hou.hmath.buildTranslate(volume.vertex(0).point().position()))
+    }}}
+
+    NOTE:
+        You need to get the object node's transform to get to worldspace.
+
+::`taper(self)` -> `int`:
+    #cppname: HOM_VDB::taper
+    Returns the taper value of the volume's transform. For untapered
+    transforms, this value will be 1.
+
+::`isEmpty(self)` -> `bool`:
+    #cppname: HOM_VDB::isEmpty
+    Returns whether the VDB volume has no data.
+
+::`activeVoxelCount(self)` -> `int`:
+    #cppname: HOM_VDB::activeVoxelCount
+    Returns the number of active voxels in the volume.
+
+::`activeVoxelBoundingBox(self)` -> `hou.BoundingBox`:
+    #cppname: HOM_VDB::activeVoxelBoundingBox
+    Returns the smallest exclusive bounding box within the VDB volume that has
+    active voxels.
+
+::`voxelSize(self)` -> `hou.Vector3`:
+    #cppname: HOM_VDB::voxelSize
+    Returns the size of voxels within the VDB volume. All voxels will be of
+    this size for untapered volumes. For tapered volumes, this size represents
+    the size of voxel at the origin of the frustum.
+
+::`dataType(self)` -> `hou.vdbData`:
+    #cppname: HOM_VDB::dataType
+    Returns the voxel data type within the VDB volume.
+
+::`voxelRange(self, range)` -> tuple of bool, float, int, or hou.Vector3:
+    #cppname: HOM_VDB::voxelRange
+    Return a tuple containing the values of all voxels withing a bounding box
+    range.  It is faster to call this method to retrieve all the voxels than it
+    is to loop through the voxel array in Python.
+
+    The result voxel type is determine by the underlying [Hom:hou.VDB#dataType].
+
+    This method can be approximately implemented as follows (though this Python
+    implementation is much slower):
+    {{{
+    #!python
+    def allVoxels(self):
+	result = []
+	xres, yres, zres = self.activeVoxelBoundingBox()
+	for z in range(zres):
+	    for y in range(yres):
+		for x in range(xres):
+		    result.append(self.voxel((x, y, z)))
+	return tuple(result)
+    }}}
+
+    See also [Hom:hou.VDB#voxelRangeAsBool],
+    [Hom:hou.VDB#voxelRangeAsFloat],
+    [Hom:hou.VDB#voxelRangeAsInt],
+    [Hom:hou.VDB#voxelRangeAsVector3].
+
+::`voxelRangeAsBool(self, range)` -> tuple of bool:
+    #cppname: HOM_VDB::voxelRange
+    Return a tuple containing the values of all voxels withing a bounding box
+    range.  It is faster to call this method to retrieve all the voxels than it
+    is to loop through the voxel array in Python.
+
+    See help for [Hom:hou.VDB#voxelRange] for implementation details.
+
+::`voxelRangeAsFloat(self, range)` -> tuple of float:
+    #cppname: HOM_VDB::voxelRange
+    Return a tuple containing the values of all voxels withing a bounding box
+    range.  It is faster to call this method to retrieve all the voxels than it
+    is to loop through the voxel array in Python.
+
+    See help for [Hom:hou.VDB#voxelRange] for implementation details.
+
+::`voxelRangeAsInt(self, range)` -> tuple of int:
+    #cppname: HOM_VDB::voxelRange
+    Return a tuple containing the values of all voxels withing a bounding box
+    range.  It is faster to call this method to retrieve all the voxels than it
+    is to loop through the voxel array in Python.
+
+    See help for [Hom:hou.VDB#voxelRange] for implementation details.
+
+::`voxelRangeAsVector3(self, range)` -> tuple of hou.Vector3:
+    #cppname: HOM_VDB::voxelRange
+    Return a tuple containing the values of all voxels withing a bounding box
+    range.  It is faster to call this method to retrieve all the voxels than it
+    is to loop through the voxel array in Python.
+
+    See help for [Hom:hou.VDB#voxelRange] for implementation details.
+

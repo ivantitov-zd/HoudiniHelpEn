@@ -1,0 +1,55 @@
+= hou.saveImageDataToFile =
+#type: homfunction
+#cppname: hom::saveImageDataToFile
+#group: image
+
+"""Create an image file from color and alpha pixel data."""
+
+:usage: `saveImageDataToFile(color_and_alpha_data, width, height, file_name)`
+
+`color_and_alpha_data`:
+    Either a sequence of floats or a string containing the image data.  The
+    data must be in interleaved format, meaning that the first 4 values are the
+    red, green, blue, and alpha (RGBA) values for the first pixel, the next 4
+    are for the second pixel, and so on.  The first row of pixels in the data
+    corresponds to the top scanline in the image.
+
+    The length of this sequence must be `width * height * 4`.
+
+    If you are writing a `.pic` file, the file will store 32-bit float data
+    if you pass in a sequence of floats and 8-bit unsigned data if you pass
+    in a string.
+
+`width`, `height`:
+    The width and height of the image to be written.
+
+`file_name`:
+    The name of the output image file to create.  Houdini will automatically
+    determine which type of file to create based on this file's extension.
+
+This function provides two features not provided by other imaging libraries:
+- It lets you create files in Houdini's `.pic` format.
+- It lets you save images with 32-bit float data.
+
+Raises [Hom:hou.OperationFailed] if the data is not the correct
+size, the output file could not be created, or the output file format is not
+supported by Houdini.
+
+The following example uses the Python imaging library (PIL) to read in a file
+and calls this function to write it out.  Using the `convertImage` function
+below, you can convert any image that can be read by PIL into Houdini's `.pic`
+format.
+{{{
+#!python
+import Image
+
+def convertImage(input_image, output_image):
+    im = Image.open(input_image)
+    im.mode != "RGBA":
+	raise ValueError("The image must contain alpha information")
+    hou.saveImageDataToFile(im.tostring(), im.size[0], im.size[1], output_image)
+
+convertImage("image.png", "image.pic")
+}}}
+
+See also [Writing a COP in Python|/hom/pythoncop].

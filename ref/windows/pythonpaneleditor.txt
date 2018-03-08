@@ -1,0 +1,438 @@
+= Python Panel Editor =
+
+#helpid: h.pythonpanel.editor
+
+== Overview ==
+
+The Python Panel Editor window lets you create, edit and delete PySide2 or PyQt5 interfaces that can be displayed in Python Panel panes.  The editor also lets you manage the entries in the Python Panel interfaces menu as well as the entries in the Houdini pane tab menu.
+
+=== Requirements ===
+
+There are no requirements when building PySide2 interfaces.  Houdini ships with PySide2 modules out-of-the-box.
+
+To build interfaces with PyQt5, install the PyQt5 modules on your system.  Houdini does its best to find the PyQt5 modules automatically however, if the modules cannot be found then add the installed location to the Python search path.
+
+For example, if PyQt5 is installed at `/path/to/site-packages/PyQt5`, then set `PYTHONPATH=/path/to/site-packages` in your environment before starting Houdini.  Alternatively, append `/path/to/site-packages` to the search path through Python code like so:
+
+{{{
+#!python
+
+# Modify search path
+import sys
+sys.path.append("/path/to/site-packages")
+
+# Now you can import PyQt5
+from PyQt5 import QtWidgets
+}}}
+
+=== New to Houdini 16.5 ===
+
+Houdini 16.5 no longer automatically scales PySide/PyQt interfaces by Houdini's
+Global UI Size preference.   The automatic scaling used Qt's screen scale
+factor which caused several problems in Houdini's UI.
+
+In Houdini 16.5 if you desire to use your PySide/PyQt interface with other
+Houdini UI sizes (i.e. High DPI, or Large, etc.) and have your interface to
+scale accordingly, then you can do so by calling the new
+[Hom:hou.ui#scaledSize] method on hard-coded sizes.
+
+For example, if you had code like this:
+{{{
+#!python
+button = QtWidgets.QPushButton()
+button.resize(200, 30)
+}}}
+
+Then you can change it to this:
+{{{
+#!python
+button = QtWidgets.QPushButton()
+button.resize(hou.ui.scaledSize(200), hou.ui.scaledSize(30))
+}}}
+
+You can also call the new [Hom:hou.ui#globalScaleFactor] function to scale
+things other than widget sizes.  For example:
+{{{
+#!python
+web_view = QWebEngineWidgets.QWebEngineView()
+web_view.setZoomFactor(hou.ui.globalScaleFactor())
+}}}
+
+=== New to Houdini 16 ===
+
+Houdini 16 is built with Qt5 so only PySide2 and PyQt5 are supported in Python Panels.  
+
+TIP:
+    If you want to continue using PySide or PyQt4 then you must install a
+    Houdini Qt4 build.
+
+Here are a few tips when porting your Python Panel code from PySide to PySide2 and similarly from PyQt4 to PyQt5:
+- Import modules from `PySide2` instead of `PySide`.  Similarly, import modules
+  from `PyQt5` instead of `PyQt4`.
+- Additionally import the `QtWidgets` module because all widget classes have been
+  moved out of `QtGui` and into `QtWidgets`.
+- Call `.setProperty("houdiniStyle", True)` on top-level widget to restore
+  Houdini styling.  With PySide2 and PyQt5, Houdini does not automatically
+  apply Houdini styling to custom widget classes.
+- When creating a `QMenuBar` widget call `.setNativeMenuBar(False)` to prevent the
+  menu bar from populating the system's main menu bar on MacOS.  The native
+  menu bar default setting changed between Qt4 and Qt5.  Alternatively call
+  [Hom:hou.qt#createMenuBar] to create a `QMenuBar` widget that works across
+  all platforms.
+
+TIP:
+    [Hom:hou.qt] has a collection of methods for creating common widgets with
+    the Houdini look and feel.  The module also has methods for retrieving
+    Houdini icons and colors.
+
+For example, this code in PySide:
+{{{
+#!python
+from PySide import QtGui
+
+class MyCustomWidget(QtGui.QWidget):
+    """A custom widget class that contains a label."""
+    def __init__(self):
+	QtGui.QWidget.__init__(self)
+
+	label1 = QtGui.QLabel("Hello World")
+
+	layout = QtGui.QVBoxLayout()
+	layout.addWidget(label1)
+	self.setLayout(layout)
+}}}
+
+Becomes this code in PySide2:
+{{{
+#!python
+from PySide2 import QtWidgets
+
+class MyCustomWidget(QtWidgets.QWidget):
+    """A custom widget class that contains a label."""
+    def __init__(self):
+	QtWidgets.QWidget.__init__(self)
+
+	label1 = QtWidgets.QLabel("Hello World")
+
+	layout = QtWidgets.QVBoxLayout()
+	layout.addWidget(label1)
+	self.setLayout(layout)
+
+	# Apply Houdini styling to the main widget.
+	self.setProperty("houdiniStyle", True)
+}}}
+
+	
+
+=== Creating and Editing Interfaces ===
+
+# Open the Python Panel Editor from the Windows menu or from the [Icon:BUTTONS/gear] toolbar button in a Python Panel pane tab.
+
+# To create a new interface definition, choose the __Interfaces__ tab and click the __New Interface__ button. The interface will be loaded in the editor and added to the menu list.
+
+# To edit an existing interface, select the interface from the drop down menu on the __Interfaces__ tab.
+
+# Edit the name, label, icon using the interface editor.
+
+# Write Python code in the script text area which builds the interface.  An `onCreateInterface()` function must be defined which returns the root widget of your interface.  The returned root widget is embedded in the Python Panel.
+
+# Save changes by pressing the Accept or Apply button.
+
+== Editing the Interface Menu ==
+
+# Open the Python Panel Editor from the __Windows__ menu or from the [Icon:BUTTONS/gear] toolbar button in a Python Panel pane tab.
+
+# Select the __Edit Menu__ tab in the editor.
+
+# Drag and drop available interface definitions from the list on the left and into the menu list on the right. Entries in the menu list can also be reordered using drag and drop.  You can alternatively use the [Icon:BUTTONS/move_to_right] button to add entries to the menu and the [Icon:BUTTONS/move_to_left] button to remove entries. Multiple entries can be moved at the same time.
+
+== Deleting Interfaces ==
+
+# Open the Delete Interfaces dialog from the Python Panel Editor or from the [Icon:BUTTONS/gear] toolbar button in a Python Panel pane tab.
+
+# In the dialog, select the interfaces to delete from the list. Multiple interfaces can be selected by holding the ((Ctrl)) key during selection.
+
+# Press the __Delete__ button to the delete the selected entries. A confirmation dialog will display before entries are deleted.
+
+WARNING:
+    The deletion process is irreversible since interface definitions are also deleted from disk. To remove entries from the interface menu without deleting the definitions, please refer to the Editing the Interface Menu section above.
+
+== Interfaces tab ==
+
+The interfaces tab is used to create and edit Python interfaces. The drop down
+menu at the top can be used to select which interface to edit. __New
+Interface__ creates a new interface and loads it into the editor. __Delete
+Interface__ displays a dialog with a list of all interfaces that can be
+deleted.
+
+Save To:
+    #id: saveto
+    
+    The file path that the interface definition is saved to. The file
+    must be writeable by Houdini for changes to be saved correctly. If the path
+    is not writeable then an error message is displayed when attempting to
+    apply changes to the interface. The file path can be typed manually or
+    selected using the file browser on the right of the field.
+
+Name:
+    #id: name
+    
+    The internal name of the interface.  This must be unique across all loaded
+    Python interfaces.  That is, at most one interface is loaded into for a
+    given internal name.  The name must start with a letter and can contain
+    letters, numbers, and/or underscores.
+
+Label:
+    #id: label
+    
+    The human-readable name of the interface. The label is used in the Python
+    Panel pane tab and in the menu interfaces menu.  Multiple interfaces may
+    share the same Label.
+
+Icon:
+    #id: icon
+    
+    Internal name, file path, or URL of the icon to use for the interface.
+
+    Click the chooser button at the right end of the field to choose a file.
+    Note that you can choose a file contained in a digital asset (click
+    `opdef:` on the left side of the file chooser).
+    
+    If you don't supply an absolute path or URL, Houdini will look for the
+    icon using the path in the `$HOUDINI_UI_ICON_PATH` environment variable.
+    
+    You can use an SVG file or any image format Houdini supports (such
+    as PNG or `.pic`). The icon image should be square.
+    
+    Houdini ships with a number of stock SVG icons. You can see bitmap
+    representations of these icons in `$HFS/houdini/help/icons/large`. To specify a
+    stock icon, use the form `<<dirname>>_<<filename>>`, where...
+    
+    - <<dirname>> is the directory name under `$HFS/houdini/help/icons/large`, such as `OBJ`, `SHELF`, or `MISC`, and
+    - <<filename>> is the icon's filename minus any extension. For example, `OBJ_sticky` specifies the standard icon for the Sticky object.
+
+Menu Hints:
+    #id: menu_hints
+
+    When no menu definition is loaded from disk then the interface menu hints
+    are used to instruct Houdini on whether to include the interface in the
+    menu and where to insert the interface into the menu.
+
+    Include in toolbar menu:
+	#id: include_in_toolbar_menu
+
+	Check this option to include the interface in the toolbar menu
+	when no toolbar menu definition has been loaded from disk.
+
+	Menu position:
+	    #id: toolbar_menu_position
+
+	    The position where the interface should be inserted into the menu.
+	    The position is not absolute but instead relative to the specified
+	    positions of the other interfaces.  For example, suppose there are
+	    three interfaces in Houdini -- interface A with position 4,
+	    interface B with position 1 and interface C with position 25.  Then
+	    interface B will appear first in the menu followed by A and then
+	    followed by C.
+
+	Create preceding separator:
+	    #id: create_separator_in_toolbar
+
+	    Check this option to create a separator immediately before the
+	    interface in the menu.
+
+    Include in pane tab menu:
+	#id: include_in_panetab_menu
+
+	Check this option to include the interface in the panetab menu
+	when no panetab menu definition has been loaded from disk.
+
+	Menu position:
+	    #id: panetab_menu_position
+
+	    The position where the interface should be inserted into the menu.
+	    The position is not absolute but instead relative to the specified
+	    positions of the other interfaces.  For example, suppose there are
+	    three interfaces in Houdini -- interface A with position 4,
+	    interface B with position 1 and interface C with position 25.  Then
+	    interface B will appear first in the menu followed by A and then
+	    followed by C.
+
+	Create preceding separator:
+	    #id: create_separator_in_panetab
+
+	    Check this option to create a separator immediately before the
+	    interface in the menu.
+
+    NOTE:
+	If a menu definition has been loaded from disk then Houdini will ignore
+	the interface's menu hints.  In this case a warning will appear below
+	the menu hints.
+
+Script:
+    #id: script
+    
+    The script definition for the Python interface. This is where PySide2 or
+    PyQt5 code is written to build the interface. When the interface is loaded
+    in a Python Panel, the script is executed and the root widget returned by
+    the `onCreateInterface()` function is embedded into the panel.
+
+    Python Panels recognize and execute the following functions when certain
+    events occur:
+    
+    - `onCreateInterface()` -> `PySide2.QWidget or PyQt5.QWidget`
+	Executed when the Python Panel creates the Qt interface.
+	The function must return the root Qt widget of the interface.
+
+    - `onDestroyInterface()`
+	Executed when the Python Panel is about to destroy the Qt interface.
+	This can happen when the Python Panel pane tab is closed or if
+	the interface is reloaded.
+
+    - `onActivateInterface()`
+	Executed when the interface becomes active and visible.
+
+    - `onDeactivateInterface()`
+	Executed when the interface becomes inactive and hidden.
+
+    Only the `onCreateInterface()` function is required by the interface.
+    The other functions are optional.
+    
+
+    NOTE:
+	In older Houdini versions, the `createInterface()` function was
+	required.  This function is now deprecated and replaced by
+	`onCreateInterface()`.
+
+    NOTE:
+	The kwargs dictionary is available in the interface script.  The dictionary contains the following entries:
+	- _paneTab_ - The pane tab ([Hom:hou.PaneTab]) that contains the interface.
+
+	Here is an example of using kwargs in the script:
+	{{{
+	#!python
+	from PySide2 import QtWidgets
+
+	def onCreateInterface():
+	    panetab = kwargs["paneTab"]
+
+	    label = QtWidgets.QLabel()
+	    label.setText("Running in pane tab '%s'" % panetab.name())
+	    return label
+	}}}
+
+== Menu tab ==
+
+The menu tab can be used to reorder the entries in the interface drop down menu
+and to add separators between entries. Only entries in the menu are 
+displayed when selecting an interface from within a Python Panel.
+
+On the left of the menu tab is a list of all interfaces currently loaded into
+Houdini. The list on the right displays the current state of the Python Panel
+menu. Entries can be added and removed from the Menu Entries list using drag
+and drop actions or by clicking the arrows between the lists.
+
+Only a single copy of an interface can be in the menu at a given time, so
+Available Interfaces entries are disabled once they have been added to the
+menu. An unlimited number of separators can be added to the Menu Entries list.
+
+The __Save To__ field indicates which file the menu is saved to. This file must
+be writeable by Houdini.
+
+== Python Panel files ==
+
+Python Panel menu and interface definitions are stored in `.pypanel` files on disk.
+
+When Houdini starts up, it searches for `.pypanel` files in `$HFS/houdini/python_panels` and then in `$HOUDINI_USER_PREF_DIR/python_panels` by default and loads the definitions stored in those files.
+
+If `$HOUDINI_PATH` is set, then Houdini instead searches for files in the `python_panels` subdirectory for each path listed in `$HOUDINI_PATH`.
+
+You can override the search path by setting `$HOUDINI_PYTHON_PANEL_PATH`.
+
+NOTE:
+    Houdini loads `.pypanel` files in the order of the directories specified by
+    `$HOUDINI_PYTHON_PANEL_PATH` and then in alphabetcial order by filename.
+
+    If multiple Python Panel interfaces with the same internal name are found
+    on disk, then Houdini uses the last interface definition that it
+    loaded.  
+
+    Similarly, Houdini uses the last interfaces menu definition that it loaded.
+
+== Examples ==
+
+<table class="examplestable">
+<tbody>
+    <tr>
+	<th>Example name</th>
+	<th></th>
+    </tr>
+    <tr>
+	<td class="examplelink">Linked Parameters</td>
+	<td class="exampleload"><strong><a href="javascript:loadExample('/examples/python_panels/linkedparameters.pypanel', false)">Load</a></strong>
+	</td>
+    </tr>
+    <tr>
+	<td colspan="2" class="exampletext">
+	<p>This example demonstrates how to link PySide2 parameter widgets (i.e. text fields and sliders) to Houdini node parameters and vice versa.</p>
+	</td>
+    </tr>
+    <tr>
+	<td class="examplelink">Drag and Drop</td>
+	<td class="exampleload"><strong><a href="javascript:loadExample('/examples/python_panels/dragdrop.pypanel', false)">Load</a></strong>
+	</td>
+    </tr>
+    <tr>
+	<td colspan="2" class="exampletext">
+	<p>This example demonstrates how to respond to drag and drop events from Houdini.</p>
+	</td>
+    </tr>
+    <tr>
+	<td class="examplelink">Custom Graphics Scene</td>
+	<td class="exampleload"><strong><a href="javascript:loadExample('/examples/python_panels/customgraphicsscene.pypanel', false)">Load</a></strong>
+	</td>
+    </tr>
+    <tr>
+	<td colspan="2" class="exampletext">
+	<p>This example demonstrates how to use a custom GraphicsScene subclass in a Python panel to make OpenGL calls.</p>
+	</td>
+    </tr>
+
+    <tr>
+	<td class="examplelink">Qt Events</td>
+	<td class="exampleload"><strong><a href="javascript:loadExample('/examples/python_panels/qtevents.pypanel', false)">Load</a></strong>
+	</td>
+    </tr>
+    <tr>
+	<td colspan="2" class="exampletext">
+	<p>This example demonstrates how to handle widget events in a Python Panel.</p>
+	</td>
+    </tr>
+    <tr>
+	<td class="examplelink">Qt Designer</td>
+	<td class="exampleload"><strong><a href="javascript:loadExample('/examples/python_panels/qtdesigner.pypanel', false)">Load</a></strong>
+	</td>
+    </tr>
+    <tr>
+	<td colspan="2" class="exampletext">
+	<p>This example demonstrates how to load an interface created by <a href="http://qt-project.org/doc/qt-4.8/designer-manual.html">Qt Designer</a>.</p>
+	</td>
+    </tr>
+    <tr>
+	<td class="examplelink">Viewport Color Editor</td>
+	<td class="exampleload"><strong><a href="javascript:loadExample('/examples/python_panels/viewportcoloreditor.pypanel', false)">Load</a></strong>
+	</td>
+    </tr>
+    <tr>
+	<td colspan="2" class="exampletext">
+	<p>This example provides a PySide2 interface for editing viewport colors.</p>
+	</td>
+    </tr>
+</tbody>
+</table>
+
+:load_example:
+    #path: /examples/python_panels/viewportcoloreditor
+
+@related
+- [Python Panel|/ref/panes/pythonpanel]

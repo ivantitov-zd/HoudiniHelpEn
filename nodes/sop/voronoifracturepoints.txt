@@ -1,0 +1,202 @@
+#type: node
+#context: sop
+#icon: SOP/voronoifracturepoints
+#internal: voronoifracturepoints
+
+#tags: break
+
+= Voronoi Fracture Points =
+
+"""Given an object and points of impact on the object, this SOP
+generates a set of points that can be used as input to the [Voronoi
+Fracture|Node:sop/voronoifracture] SOP to simulate fracturing the
+object from those impacts."""
+
+The Voronoi Fracture Points SOP takes two primary inputs: the
+polygonal mesh upon which to generate fracture points, and a set of
+points which represent "impacts" on the mesh.  These impact points can
+be generated a number of ways, such as through the [Add|Node:sop/add]
+SOP or by [scattering|Node:sop/scatter] points on the surface itself
+or a separate object.
+
+This SOP works by generating an impact volume from metaballs copied to
+each impact point.  The second input can also accept metaball
+primitives directly, which will be merged with any copied metaballs to
+form the impact volume.  This volume is then used to divide the input
+object into three regions.  
+
+The [Surface|#surface] region is the surface of the object where it
+intersects the impact volume.  The [Interior|#interior] region is the
+intersection of a volume representation of the object and the impact
+volume. The [Exterior|#exterior] region is the volume of the object
+that is outside the impact volume.
+
+In the following cross-section diagram of a box with a single impact
+point at the end, the purple wireframe represents the impact volume,
+yellow indicates the surface region, red the interior region, and blue
+the exterior region.
+
+[Image:/images/voronoifracturepoints_regions.png]
+
+Each region has parameters that control the density of points
+generated within it, and how
+[clustering|Node:sop/voronoifracture#clustering] should be applied by
+a subsequent [Voronoi Fracture SOP|Node:sop/voronoifracture]. A point group is also created for
+the points generated in each region.
+
+This SOP serves as a key component in [Dynamic
+Fracturing|Node:dop/voronoifractureconfigureobject] in DOPs.
+
+NOTE:
+    - This node creates a "cluster" attribute on the output points
+      that will only have an effect in fracturing if the [Cluster
+      Pieces|Node:sop/voronoifracture#clustering] parameter is enabled
+      on the __Voronoi Fracture__ SOP.
+
+@inputs
+    Geometry for Impact:
+        The polygonal geometry around which to generate the fracture points.
+
+    Impact Points and Metaballs:
+	Input points, where each point represents an "impact" on the
+	object, and metaballs which are merged to form an impact
+	volume.
+
+    Optional SDF For Depth Sampling:
+	An optional SDF Volume of the object, usually created by
+	[IsoOffset|Node:sop/isooffset], used internally in several
+	volume-based operations to generate points in the different
+	volume regions. If not connected, a default one will be
+	created.
+
+@parameters
+
+Impact Radius:
+    The radius of the metaball to be copied to each impact point.  
+    
+    TIP: 
+        Each metaball can be transformed by the usual [copying attributes|/copy/instanceattrs] on the impact points.
+
+Snap Points to Object:
+   Snap each impact point to the object before copying.
+
+Compute Number of Points:
+    Calculate the number of points to scatter in each region based on
+    its surface area.
+
+Points Per Area:
+    The number of points per unit of surface area.  This can be scaled
+    by the __Point Density__ parameter for each region.
+
+Number of Points:
+    The number of points to generate.
+    
+Per Impact:
+    Whether the __Number of Points__ parameter specifies the total
+    number of generated points or the number of generated points for
+    each impact point.
+    
+Volume Resolution:
+    The resolution of the volume representations of the impact
+    metaballs and the object.  
+
+Random Seed:
+    The random seed for point scattering.
+    
+Visualize Points:
+    Visualize the generated points. The colors for each region are as
+    follows: yellow/surface, red/interior, blue/exterior.
+    
+== Surface == (surface)
+
+Point Density:
+    The density of point generation for this region.  If __Compute
+    Number Of Points__ is enabled, this parameter is a multiplier of
+    the __Points Per Area__ value. If an explicit __Number of Points__
+    value is specified, this parameter determines the proportion of
+    those points allocated to this region.
+    
+Surface Offset:
+    The amount to offset the generated points from the object surface.
+    
+Radius Scale:
+    The amount to scale the impact radius before calculating the
+    surface region.
+    
+Clustering:
+    Use Fracture Settings:
+	Create a cluster attribute value of zero for points in this
+	region, allowing a subsequent [Voronoi Fracture SOP|Node:SOP/voronoifracture] to override
+	with its own values.  Use the parameters on the Voronoi Fracture SOP to control the size of the clustered pieces.
+    Disabled:
+	Create a unique cluster attribute value for each point in this
+	region, disabling clustering for every fractured piece
+	subsequently generated.
+    Single Piece:
+	Create the same cluster value for all points in this region,
+	causing all fractured pieces subsequently generated to be
+	clustered together as a single piece.
+    
+== Interior == (interior)
+
+Point Density:
+    The density of point generation for this region.  If __Compute
+    Number Of Points__ is enabled, this parameter is a multiplier of
+    the __Points Per Area__ value. If an explicit __Number of Points__
+    value is specified, this parameter determines the proportion of
+    those points allocated to this region.
+    
+Clustering:
+    Use Fracture Settings:
+	Create a cluster attribute value of zero for points in this
+	region, allowing a subsequent [Voronoi Fracture SOP|Node:SOP/voronoifracture] to override
+	with its own values.  Use the parameters on the Voronoi
+	Fracture SOP to control the size of the clustered pieces.
+    Disabled:
+	Create a unique cluster attribute value for each point in this
+	region, disabling clustering for every fractured piece
+	subsequently generated.
+    Single Piece:
+	Create the same cluster value for all points in this region,
+	causing all fractured pieces subsequently generated to be
+	clustered together as a single piece.
+        
+== Exterior == (exterior)
+
+Point Density:
+    The density of point generation for this region.  If __Compute
+    Number Of Points__ is enabled, this parameter is a multiplier of
+    the __Points Per Area__ value. If an explicit __Number of Points__
+    value is specified, this parameter determines the proportion of
+    those points allocated to this region.
+    
+Scatter Location:
+    At Impact:
+        Scatter points at the boundary of the Interior and Exterior regions.
+    Exterior Volume:
+        Scatter points throughout the exterior volume.
+    Both:
+        Scatter points at both of the above locations.
+        
+Impact Offset:
+    The offset of the Interior/Exterior boundary when scattering
+    using the __At Impact__ or __Both__ setting above.
+    
+Clustering:
+    Use Fracture Settings:
+	Create a cluster attribute value of zero for points in this
+	region, allowing a subsequent [Voronoi Fracture SOP|Node:SOP/voronoifracture] to override
+	with its own values.  Use the parameters on the Voronoi
+	Fracture SOP to control the size of the clustered pieces.
+    Disabled:
+	Create a unique cluster attribute value for each point in this
+	region, disabling clustering for every fractured piece
+	subsequently generated.
+    Single Piece:
+	Create the same cluster value for all points in this region,
+	causing all fractured pieces subsequently generated to be
+	clustered together as a single piece.
+    
+@related
+    - [Voronoi Fracture|Node:sop/voronoifracture]
+    - [How to control the effects of voronoi fracture|/dyno/voronoifracture]

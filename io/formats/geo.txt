@@ -1,0 +1,631 @@
+= geo/bgeo format =
+
+The ASCII `.geo` and binary `.bgeo` file formats are the standard
+formats for storing Houdini geometry. The `.geo` format stores all the
+information contained in the Houdini geometry detail.
+
+== Header Section ==
+
+    {{{
+    Magic Number: PGEOMETRY
+    Point/Prim Counts: NPoints # NPrims #
+    Group Counts: NPointGroups # NPrimGroups #
+    Attribute Counts: NPointAttrib # NVertexAttrib # NPrimAttrib # NAttrib # 
+    }}}
+    In each of these cases, the # represents the number of the element
+    described. Groups are named and may be defined to contain either
+    points or primitives. Each point or primitive can be a member of any
+    number of groups, thus membership is not exclusive to one group.
+
+    Attributes in GPD have been generalized. Attributes can be assigned
+    per point, per vertex, per primitive or on the detail. Therefore,
+    the number of attributes is declared at the top of the file. Later,
+    each of these attributes will be defined in full.
+
+== Attribute Definitions ==
+
+    Internally, there are "dictionaries" to define the attributes
+    associated with each element. These dictionaries define the name of
+    the attribute, the type of the attribute and the size of the
+    attribute. Also, the default value of the attribute is stored in the
+    dictionary.
+
+    When the dictionary is saved, each attribute (in a specific order)
+    is defined. The definition is basically as follows:
+
+    {{{
+    Name Size Type Default
+    }}}
+    For example, the attribute name for normals is "N", so the attribute
+    definition would look like:
+
+    {{{
+    N 3 float 0 0 0
+    }}}
+    ...specifying the attribute name "N", that there are three elements
+    in this attribute and the type is float. The default value would be
+    (0, 0, 0)
+
+    Following the element definition is the attribute data associated
+    with the element. There are braces delineating the attribute data.
+    The attribute data appears in the order that the dictionary for the
+    element was defined.
+
+    For example, a dictionary might look like:
+
+    {{{
+    PointAttrib
+    Cd 3 float 0 0 0 # Color attrib., 3 floats, default 0 0 0
+    Alpha 1 float 1 # Alpha attribute, 1 float, default 1
+    N 3 float 0 0 0 # Normal attribute
+    uv 2 float 0 0 # Texture coordinate 
+    }}}
+    The data for the point might look like:
+
+    {{{
+    0 0 0 1 (1 0 0 1 0 0 1 .5 .5)
+    ^^^^^^^ ^^^^^^^^^^^^^^^^^^^^^^^ Position Attributes 
+    }}}
+    The point would have:
+
+    {{{
+    Cd = (1, 0, 0)
+    Alpha = 1
+    N = (0 0 1)
+    uv = (.5, .5) 
+    }}}
+    The types of attribute data supported are: integer, float, string
+    and index. The "string" type is stored as a 32 character string
+    since each attribute must have a fixed length. The integer and float
+    types are pretty self-explanatory. The index attribute type is used
+    for specifying things like material. It contains a list of strings
+    which are indexed by integer values. Thus the storage for an index
+    attribute is an integer. In the definition of the index attribute,
+    the attribute values are defined as well.
+
+    {{{
+    mat 1 index 3 marble gold crystal_glass3
+    }}}
+    The default value for all index attributes is -1 indicating that the
+    attribute has not been assigned.
+
+== Point Definitions ==
+
+    If there are point attributes, the attribute dictionary is saved
+    before the definition of the points.
+
+    {{{
+    Dictionary Name: PointAttrib
+    Dictionary Data: -- Attribute Definition -- 
+    }}}
+    Following the attribute dictionary, is the point data for the
+    points. Each point is stored with four components (`x, y, z, w`).
+    The positions are not true homogeneous coordinates. To get the
+    homogeneous coordinate, simply multiply each `x`, `y`, and `z` by
+    `w`.
+
+    If (and only if) there is attribute data, the attribute data is
+    defined following the point position. The attribute data is enclosed
+    in parentheses "()".
+
+== Primitive / Vertex Definitions ==
+
+    If (and only if) there are vertex attributes, the attribute
+    dictionary is found here.
+
+    Following the vertex attribute dictionary is the primitive attribute
+    dictionary (if and only if there are attributes for primitives).
+
+    Since every primitive may have local information which needs to be
+    saved, the format of every primitive is different. In general, the
+    format is:
+
+    {{{
+    PrimKey <local_information> [attributes]
+    }}}
+    Here, the local_information is primitive specific.
+
+    As part of the local information, a vertex or multiple vertices are
+    specified. Each vertex is saved in the same format, which is:
+
+    {{{
+    point_number attribute_data
+    }}}
+    The point numbers start at 0 and go through ` <<number of points>> -
+    1`. If there is vertex attribute data, the data is delimited by
+    parenthesis `()`. If there is primitive attribute data, it is
+    delimited by brackets `[]`.
+
+    Each primitive has a unique identifier. The current primitives and
+    their identifiers are:
+
+    {{{
+    Polygon: "Poly"
+    NURBS Curve: "NURBCurve"
+    Rational Bezier Curve: "BezierCurve"
+    Linear Patch: "Mesh"
+    NURBS Surface: "NURBMesh"
+    Rational Bezier Patch: "BezierMesh"
+    Ellipse/Circle: "Circle"
+    Ellipsoid/Sphere: "Sphere"
+    Tube/Cone: "Tube" Metaball "MetaBall"
+    Meta Super-Quadric: "MetaSQuad"
+    Particle System:  "Part"
+    Paste Hierarchy: "PasteSurf" 
+    }}}
+    The primitive keys are case sensitive. For example:
+
+    {{{
+    VertexAttrib
+    uv 3 float 0 0 0
+    PrimitiveAttrib
+    Cd 3 float 0 0 0
+    Poly 3 < 0 (1 0.5 0) 1 (0 0 0) 2 (0 1 0) [1 1 0 .5] 
+    }}}
+    ...would specify a closed polygon (see below) which has three
+    vertices referencing points 0, 1 & 2. Each vertex has 3D texture
+    coordinates specified in (), the polygon has Color and Alpha
+    specified in `[]`. The color is yellow, with 50% alpha coverage.
+
+    When there are two or more consecutive primitives of the same type,
+    this is specified as a run of primitives. In this case, the
+    following should appear in the file:
+
+    {{{
+    Run # PrimKey
+    }}}
+    Where # is the number of primitives in the run. In this case, the
+    following primitives are not saved with the <<PrimKey>> identifier
+    since it is implicit in the run.
+
+== POLYGON Local Information Format ==
+
+    {{{
+    #Vtx OpenClose Vertex_List
+    }}}
+    Where...
+
+    `#Vtx` :
+        Number of vertices in the polygon
+    `OpenClose` :
+        A single character flag: "<" = Closed face ":" = Open face
+== NURBS / BEZIER CURVE Local Information Format ==
+
+    {{{
+    #Vtx OpenClose Basis Vertex_List
+    }}}
+    The basis definition for both NURBS and Bezier primitives starts
+    with:
+
+    {{{
+    Keyword Order
+    }}}
+    Where:
+
+    Keyword:
+        "Basis"
+    Order:
+        The order of the basis (degree + 1)
+    == The NURBS Basis ==
+
+        The NURBS basis requires an end condition flag and a list of
+        knots sorted in increasing order. The complete definition of the
+        NURBS basis is:
+
+        {{{
+        Keyword Order EndCondition Knots
+        }}}
+        Where:
+
+        `EndCondition` :
+            `end` to touch the end CVs, `noend` otherwise.
+        Knots:
+            Floating point numbers in increasing order.
+        The number of knots in the list is determined by the order of
+        the basis, its end conditions, the number of CVs in the
+        Vertex_List, and the `OpenClose` flag.
+
+        Let #K be the number of expected knots, and `#Vtx` the number of
+        CVs. Then, if the `EndCondition` is false (`noend`).
+
+        {{{
+        #K = #Vtx + Order - 2
+        }}}
+        The two missing end knots (and the periodicity knots if closed)
+        are generated internally. If `theEndCondition` is true (`end`),
+        then:
+
+        if the curve is open `#K = #Vtx - Order + 2` if the curve is
+        closed `#K = #Vtx - Order + 3`.
+
+    == The Bezier Basis ==
+
+        The Bezier basis does not require a list of knots if the knots
+        start at 0 and grow with unit increments (e.g. 0 1 2 3 ...) The
+        complete definition of the Bezier basis is:
+
+        {{{
+        Keyword Order Knots
+        }}}
+        The number of knots in the list is determined by the order of
+        the basis, the number of CVs in the Vertex_List, and the
+        `OpenClose` flag.
+
+        Let `#K` be the number of expected knots, `#Vtx` the number of
+        CVs. Then:
+
+        * If the curve is open `#K = (#Vtx-1) / (Order-1) + 1` if the
+          curve is closed `#K = (#Vtx ) / (Order-1)`.
+
+        * If the curve is closed, the periodicity knot is generated
+          internally.
+
+== MESH Local Information Format ==
+
+    {{{
+    #Cols #Rows UWrap VWrap connectivity
+    }}}
+    Where:
+
+    `UWrap / VWrap` :
+        "open" or "wrap" columns or rows respectively
+    `connectivity` :
+        `rows` = Rows only, `cols` = Columns only, `rowcol` = Rows &
+        Columns, `quad` = Quads, `tri` = Triangulated quads, `atri` =
+        Alternate triangulated
+    The connectivity is ignored in many cases, but is critical for
+    operations like sweeping or conversion to polygons.
+
+    Triangulated and Alternate meshes are structured like this:
+
+    [Image:/images/Houdini-13-1-2.jpg]
+
+== NURBS / Bezier SURFACE Local Information Format ==
+
+    {{{
+    #Cols #Rows UWrap VWrap connectivity UBasis VBasis
+    }}}
+    `#Cols, #Rows, UWrap, VWrap, connectivity, Vertex_List` are the
+    same as for Mesh.
+
+    `UBasis / VBasis` are the same as for NURBS / Bezier Curve.
+
+    `Profiles` is an optional list of profile curves (curves on
+    surfaces). The structure of the profiles section is very similar to
+    that of the main geometry, including a header section, points,
+    primitives, point and primitive groups. The differences are that
+    this section doesn't contain any attributes and has only four
+    primitive types: polygon, NURBS curve, Bezier curve, and Trim
+    Sequence.
+
+    The profile header is "Profiles:". It is followed by "none" if there
+    are no profiles. If there are profiles, the profile section has the
+    following structure:
+
+    `Point/Prim Counts` :
+        `NPoints # NPrims #`
+    `Group Counts` :
+        `NPointGroups # NPrimGroups #`
+    `TrimLevel #` :
+        # is a number representing the sea-level for nested trimmed
+        loops, and can be either positive or negative. Usually it is 0.
+    `Point list` :
+        `u v w` triplets
+    `Primitive list` :
+        polygons, NURBS/Bezier curves, trim sequences
+    `Point groups` :
+        Point group definitions
+    `Prim. groups` :
+        Primitive group definitions
+    == Header Section ==
+
+        `Point/Prim Counts:` :
+            `NPoints # NPrims # NLoops #`
+        `Group Counts:` :
+            `NPointGroups # NPrimGroups #`
+        In each of these cases, the # represents the number of the
+        element described.
+
+        Nested trim level::
+            `TrimLevel #`
+        In this case, # represents the sea-level for nested trimmed
+        loops, and can be either positive or negative. Usually it is 0.
+
+        A primitive is a 2D profile: a polygon, a Bezier curve, or a
+        NURBS curve living within the domain of the spline surface. The
+        points are 2D locations (i.e. UV pairs with a third, W (weight)
+        component) in the surface domain.
+
+        The loops are trimming loops, also know as "trim regions",
+        defined by the primitive profiles mentioned above. It is
+        possible to have several profiles on a surface and yet no trim
+        loops.
+
+        Groups are named and may be defined to contain either points or
+        profiles. Each point or primitive can be a member of any number
+        of groups, thus membership is not exclusive to one group.
+
+    == Point Section ==
+
+        Each point is stored with 3 components (`x, y, w`). The
+        positions are not true homogeneous coordinates. To get the
+        homogeneous coordinates, simply multiply each `x` and `y` by
+        `w`.
+
+    == Primitive Section ==
+
+        Since every profile may have local information which needs to be
+        saved, the format of every primitive is different. In general,
+        the format is:
+
+        {{{
+        ProfileKey <local_information>
+        }}}
+        Here, the local_information is profile specific.
+
+        As part of the local information, a vertex or multiple vertices
+        are specified. Each vertex is saved in the same format, which
+        is:
+
+        {{{
+        point_number
+        }}}
+        The point numbers start at 0 and go through ` <<number of
+        points>> - 1`.
+
+        Each profile has a unique identifier. The current profiles and
+        their identifiers are identical to their 3D counterparts:
+
+        {{{
+        Polygon: "Poly"
+        NURBS Curve: "NURBCurve"
+        Rational Bezier Curve: "BezierCurve" 
+        }}}
+        The profile keys are case sensitive. For example:
+
+        {{{
+        Poly 3 < 0 1 2
+        }}}
+        ...specifies a closed polygon (see below) which has 3 vertices
+        referencing 2D points 0, 1 & 2.
+
+        When there are two or more consecutive profiles of the same
+        type, this is specified as a run of profiles. In this case, the
+        following should appear in the file:
+
+        {{{
+        Run # ProfileKey
+        }}}
+        ...where # is the number of profiles in the run. In this case,
+        the following profiles are not saved with the `ProfileKey`
+        identifier since it is implicit in the run.
+
+        The format of the three profile types - polygon, NURBS curve,
+        and Bezier curve - is identical to that of the 3D primitives and
+        won't be listed again here.
+
+    == Trimming Section ==
+
+        If `NLoops` is not zero, the surface will contain one or more
+        trim regions. Each region can contain one or more profiles.
+
+        Typically, the profiles should intersect to form a closed loop.
+        Sometimes, though, as in the case of a loop that intersects the
+        domain boundaries, the loop is partially defined by the domain
+        boundaries and need not be explicitly closed.
+
+        Single profile loops that are open and do not intersect the
+        domain boundaries will be closed straight by Houdini.
+
+        The trimming section contains one or more lines like the one
+        below, one line per trim region:
+
+        {{{
+        TrimRegion [natural] #Profiles <profile_number ustart uend>...
+        }}}
+        If "natural" is specified, open profiles are treated casually,
+        i.e. their parametric direction is not checked and will not be
+        reversed.
+
+        `profile_number` :
+            is the index of each profile in the current trim region.
+        `ustart and uend` :
+            are the parametric values defining the beginning and end of
+            the profile. It is thus possible to use only a section of a
+            profile for trimming.
+        To reverse the direction of the trim curve without reversing the
+        vertices of the profile itself, specify a `ustart` greater than
+        `ustop`. A profile can therefore be used in more than one trim
+        region, and can have different orientations and lengths in each
+        region.
+
+        When punching holes in a surface, an outer profile is needed to
+        specify the area of the surface to be kept. Usually, the outer
+        profile is a closed polygon that envelops the perimeter of the
+        domain.
+
+        Example:
+
+        {{{
+        TrimRegion 2 0 1 0 5 -3.5 8
+        }}}
+        The trim region has two profiles: 0 and 5. Profile 0 is reversed
+        by evaluating between 1 and 0. Profile 5 is used between -3.5
+        and 8.
+
+    == Groups Section ==
+
+        The point groups are saved first, followed by the profile
+        groups. There is no identifier indicating the groups. The format
+        for a group depends on whether it is ordered or unordered:
+
+        {{{
+        GroupName Type NElements BitMask ElementList
+        }}}
+        `GroupName` :
+            is the name of the group.
+        `Type` :
+            is "unordered" or "ordered".
+        `NElements` :
+            Specifies the total number of bits in the `BitMask`. This is
+            equivalent to `NPrims` in the profile header.
+        `BitMask` :
+            A string of 0's and 1's, where 1 indicates inclusion in the
+            group.
+        `ElementList` :
+            If the groups is ordered, the element list contains the
+            index of each selected point or profile in selection order.
+            The first element of the list is the number of ordered
+            elements in the list.
+== PASTE HIERARCHY Local Information Format ==
+
+    `#Features` :
+        followed by as many lines as feature surfaces, in the order in
+        which the surfaces are pasted. Each feature line has the
+        format:
+
+        {{{
+        Feature prim_number height up_or_down <domain_xform>
+        }}}
+    `prim_number` :
+        is the index of the spline surface in the list of primitives.
+        height is the elevation of the pasted surface from its base.
+    `up_or_down` :
+        is 1 is pasted upward, 0 if downward. The domain transformation
+        is either linear or bilinear.
+    == Linear Transformation Format ==
+
+        {{{
+        Linear tx ty UT_Matrix2 m00 m01 m10 m11 
+        }}}
+        The translation in the domain is given by `(tx,ty)`. The
+        rotation and scaling components are captured in the 2 x 2
+        matrix.
+
+    == Bilinear Transformation Format ==
+
+        {{{
+        Bilinear origUL origUR origLR origLL warpUL warpUR warpLR warpLL 
+        }}}
+        `L,U,L,R` :
+            stand for Lower, Upper, Left and Right respectively. Each of
+            the eight locations is a `(u,v)` pair in the surface
+            domain.
+        Example of a paste hierarchy with three surfaces:
+
+        {{{
+        PasteSurf 3
+          Feature 0 0 1 Linear 0 0 UT_Matrix2 1 0 0 1
+          Feature 2 0.02 1 Bilinear 0 0.6 0.6 0.6 0.6 0 0 0  100.1 -22 100.4 -22 100.4 -28 100.1 -28
+          Feature 3 0.07 0  Bilinear 0 1 1 1 1 0 0 0 100.2 -21 100.45 -21 100.45 -26 100.2 -26 
+        }}}
+== Circle Local Information Format ==
+
+    {{{
+    Vertex_Info Matrix33
+    }}}
+    There is always only one vertex for a Circle. The 3 x 3 matrix
+    contains scaling and rotation transformations about the center of
+    the circle. Sheared circles are thus allowed.
+
+== Sphere Local Information Format ==
+
+    {{{
+    Vertex_Info Matrix33
+    }}}
+    There is always only one vertex for a Sphere. The 3 x 3 matrix
+    contains scaling and rotation transformations about the center of
+    the sphere. Sheared spheres are thus allowed.
+
+== Tube / Cone Local Information Format ==
+
+    {{{
+    Vertex_Info Taper Closure Matrix33
+    }}}
+    There is always only one vertex for a Tube/Cone. The vertex lies in
+    the center of the tube (along the axis connecting the centers of the
+    top and bottom circles/ellipses). The taper value affects the radius
+    of the top circle. A regular tube has a taper value of 1. A cone's
+    taper is 0. The closure - "closed" or "open" - indicates whether the
+    tube is end-capped. The 3 x 3 matrix contains scaling and rotation
+    transformations about the center of the tube. Sheared tubes are thus
+    allowed.
+
+== METABALL Local Information Format ==
+
+    {{{
+    Vertex_Info Kernel_Function Weight Matrix33
+    }}}
+    There is always only one vertex for a metaball. The kernel function
+    is one of: `wyvill`, `quartic`, `blinn`, or `links`. The 3 x 3
+    matrix contains scaling and rotation transformations about the
+    center of the metaball. Sheared metaballs are thus allowed.
+
+== Meta Super-Quadric Local Information Format ==
+
+    {{{
+    Vertex_Info XY_Exponent Z_Exponent Kernel_FunctionWeight Matrix33
+    }}}
+    There is always only one vertex for a meta super-quadric. The
+    exponents are float values. The kernel function is one of: `wyvill`,
+    `quartic`, `blinn`, or `links`. The 3 x 3 matrix contains scaling
+    and rotation transformations about the center of the metaball.
+    Sheared metaballs are thus allowed.
+
+== PARTICLE SYSTEM Local Information Format ==
+
+    {{{
+    Part_Count Vertex_List
+    }}}
+    Where Part_Count is the number of particles in the system.
+
+== Detail Attributes ==
+
+    The Detail Attribute Dictionary is saved after the Primitives and
+    before the group information.
+
+== Point / Primitive Group Definitions ==
+
+    The Point groups are saved first, followed by the primitive groups.
+    There is no identifier indicating the groups. The format for a group
+    depends on whether it is ordered or unordered:
+
+    {{{
+    GroupName Type NElements BitMask ElementList
+    }}}
+    `GroupName` :
+        is the name of the group.
+    `Type` :
+        is "unordered" or "ordered".
+    `NElements` :
+        Specifies the total number of bits in the `BitMask`. This is
+        equivalent to the number of elements in the detail.
+    `BitMask` :
+        In the ascii format, this is a string of 0's and 1's, where 1
+        indicates membership in the group.
+    `ElementList` :
+        If the groups is ordered, the element list contains the index of
+        each selected point or primitive in selection order. The first
+        element of the list is the number of ordered elements in the
+        list. In the case of primitive lists a second profile element
+        may be described by appending a period and a secondary index
+        number to each element.
+
+        For example, 5 specifies the fifth primitive while 5.12
+        specifies the twelfth profile curve of the fifth primitive. The
+        list must be empty if the group is unordered.
+
+== Other Information ==
+
+    This is meant for saving information such as metaball expressions
+    and surface hierarchies. Currently this section contains only the
+    delimiting tokens, one per line:
+
+    {{{
+    beginExtra endExtra 
+    }}}
+    For now the Extra body is empty because all the metaballs are merged
+    ("add"-ed implicitly) and there is no support for surface
+    hierarchies.
+
+

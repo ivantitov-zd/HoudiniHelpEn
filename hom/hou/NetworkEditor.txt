@@ -1,0 +1,898 @@
+= hou.NetworkEditor =
+#type: homclass
+#cppname: HOM_NetworkEditor
+#superclass: hou.PathBasedPaneTab
+#group: ui
+
+"""Represents a Network Editor panetab."""
+
+@methods
+
+== Bounds and Transformations ==
+
+::`cursorPosition(self, confine_to_view=True)` -> `hou.Vector2`:
+    #cppname: HOM_NetworkEditor::cursorPosition
+    Return the current mouse cursor position expressed in network view
+    coordinates. If `confine_to_view` is `True`, the returned value
+    will be clipped to the area of the network currently visible in the
+    network editor.
+
+    Here is an example of moving a node underneath the mouse cursor:
+    {{{
+    #!python
+    # Get the network editor.
+    net_editor = hou.ui.paneTabOfType(hou.paneTabType.NetworkEditor)
+
+    # Get the node.
+    node = hou.node("/obj/myNode")
+
+    # Set the node's new position.
+    node.setPosition(net_editor.cursorPosition())
+    }}}
+
+::`isShowingConnectors(self)` -> `bool`:
+    #cppname: HOM_NetworkEditor::isShowingConnectors
+    Return True if the network editor zoom level is high enough that input
+    and output connectors are visible. This can be useful in network editor
+    event handlers that expect the user to click on a connector. If the
+    connectors are not visible, some alternative interaction is required.
+
+::`isPosInside(self, pos)` -> `bool`:
+    #cppname: HOM_NetworkEditor::isPosInside
+    Return True if the [Hom:hou.Vector2] passed as the `pos` parameter is
+    inside the network view. The values in `pos` are mouse coordinates
+    expressed relative to the network editor pane.
+
+::`setCursorPosition(self, pos)`:
+    #cppname: HOM_NetworkEditor::setCursorPosition
+    Moves the mouse cursor to the position specified by the [Hom:hou.Vector2]
+    `pos` parameter.
+
+::`screenBounds(self)` -> [Hom:hou.BoundingRect]:
+    #cppname: HOM_NetworkEditor::screenBounds
+    Return the screen space bounds of the network editor viewing area. This
+    does not include the menu bar, toolbar, or other UI elements. Only the area
+    where the network contents are displayed is returned. The bounds are
+    relative to the network area itself, so the lower left corner of the
+    returned bounding box will always be `(0, 0)`.
+
+::`visibleBounds(self)` -> [Hom:hou.BoundingRect]:
+    #cppname: HOM_NetworkEditor::visibleBounds
+    Return the network space bounds of the network editor viewing area.
+
+::`setVisibleBounds(self, bounds, transition_time=0.0, max_scale=0.0, set_center_when_scale_rejected=False)`:
+    #cppname: HOM_NetworkEditor::setVisibleBounds
+    Sets the visible bounds of the network editor viewing area, expressed in
+    network space coordinates. This method will never alter the screen space
+    size or location of the network editor. If the area specified by the
+    `bounds` parameter has a different aspect ratio from the actual network
+    editor, this method will automatically adjust the bounds to ensure that
+    the area specified is fully visible.
+
+    `bounds`:
+	A [Hom:hou.BoundingRect] specifying the area that should be visible
+	in the network editor.
+
+    `transition_time`:
+	The amount of time, in seconds, over which the network editor will
+	animate the transition from the current visible bounds to the new
+	visible bounds.
+
+    `max_scale`:
+	If set to a non-zero value, this parameter controls the maximum zoom
+	level that will be allowed. The default maximum scale used by the
+	network editor code is 100.
+
+    `set_centered_when_scale_rejected`:
+	If set to `True`, but the new zoom level is determined to be the same
+	as the previous zoom, no change is made to the bounds at all. This
+	prevents a bounds change, that was intended as a pure zoom, from
+	inadvertently panning the view if the zoom doesn't actually change.
+
+::`setLocatingEnabled(self, enabled)`:
+    #cppname: HOM_NetworkEditor::setLocatingEnabled
+    Enables or disables highlighting of UI elementes under the mouse in the
+    network editor. When disabled, mouse events sent to the network editor
+    event processing code will never specify a located or selected UI element.
+    In some modes (such as when in a viewing state where mouse events only
+    modify the view) it is desirable to disable this behavior.
+
+::`locatingEnabled(self)` -> `bool`:
+    #cppname: HOM_NetworkEditor::locatingEnabled
+    Return True if the network editor will highlight UI elementes under the
+    mouse, and allow clicking on those UI elements.
+
+::`lengthToScreen(self, len)` -> `float`:
+    #cppname: HOM_NetworkEditor::lengthToScreen
+    Given a length value `len`, expressed in network units, return the
+    equivalent length in screen units (pixels). The result will depend on the
+    current zoom level of the network editor.
+
+::`lengthFromScreen(self, len)` -> `float`:
+    #cppname: HOM_NetworkEditor::lengthFromScreen
+    Given a length value `len`, expressed in screen units (pixels), return the
+    equivalent length in network units. The result will depend on the
+    current zoom level of the network editor.
+
+::`sizeToScreen(self, size)` -> `hou.Vector2`:
+    #cppname: HOM_NetworkEditor::sizeToScreen
+    Given a box size value `size` as a [Hom:hou.Vector2], expressed in network
+    units, return the equivalent size in screen units (pixels). This is
+    equivalent to making two separate calls to `lengthToScreen()` for the
+    width and height. The result will depend on the current zoom level of the
+    network editor.
+
+::`sizeFromScreen(self, size)` -> `hou.Vector2`:
+    #cppname: HOM_NetworkEditor::sizeFromScreen
+    Given a box size value `size` as a [Hom:hou.Vector2], expressed in screen
+    units (pixels), return the equivalent size in network units. This is
+    equivalent to making two separate calls to `lengthFromScreen()` for the
+    width and height. The result will depend on the current zoom level of the
+    network editor.
+
+::`posToScreen(self, pos)` -> `hou.Vector2`:
+    #cppname: HOM_NetworkEditor::posToScreen
+    Given a position value `pos` as a [Hom:hou.Vector2], expressed in network
+    units, return the equivalent position in screen units (pixels). The result
+    will depend on both the current zoom level and view position of the
+    network editor.
+
+::`posFromScreen(self, pos)` -> `hou.Vector2`:
+    #cppname: HOM_NetworkEditor::posFromScreen
+    Given a position value `pos` as a [Hom:hou.Vector2], expressed in screen
+    units (pixels), return the equivalent position in network units. The result
+    will depend on both the current zoom level and view position of the
+    network editor.
+
+::`overviewPosToScreen(self, pos)` -> `hou.Vector2`:
+    #cppname: HOM_NetworkEditor::overviewPosToScreen
+    Given a position value `pos` as a [Hom:hou.Vector2], expressed in network
+    units, return the equivalent position in screen units (pixels) within the
+    overview gadget in the network editor. This method returns a value that
+    assumes the overview area is visible, even if it is not.
+
+::`overviewPosFromScreen(self, pos)` -> `hou.Vector2`:
+    #cppname: HOM_NetworkEditor::overviewPosFromScreen
+    Given a position value `pos` as a [Hom:hou.Vector2], expressed in screen
+    units (pixels) within the overview gadget, return the equivalent position
+    in network units. This method returns a value that assumes the overview
+    area is visible, even if it is not. If the provided position is outside
+    the overview area, this method returns a value that assumes the overview
+    gadget extends as far as required to reach the specified coordinates.
+
+::`overviewVisible(self)` -> `bool`:
+    #cppname: HOM_NetworkEditor::overviewVisible
+    Return a boolean indicating whether or not the overview gadget is
+    currently visible. This result reflects the true state of the overview
+    gadget even if the overview is configured to display automatically.
+
+::`overviewVisibleIfAutomatic(self)` -> `bool`:
+    #cppname: HOM_NetworkEditor::overviewVisibleIfAutomatic
+    Return a boolean indicating whether or not the overview gadget would
+    currently be visible if it was configured to display automatically. In
+    other words, this method returns `True` if any part of the network is
+    currently outside the visible bounds of the editor.
+
+== Selection and Highlighting ==
+
+::`networkItemsInBox(self, pos1, pos2, for_drop=False, for_select=False)` -> `tuple` of ([Hom:hou.NetworkItem], `str`, `int`):
+    #cppname: HOM_NetworkEditor::networkItemsInBox
+    Return any network items inside the bounding box defined by the
+    [Hom:hou.Vector2] points `pos1` and `pos2`. These points are specified in
+    screen space, which makes it easy to call this function given a mouse
+    position.
+
+    The returned tuple of triples are sorted in increasing distance from the
+    center of the specified bounding box. Each triple consists of a network
+    item (which may be a node, sticky note, wire, etc.), a string which
+    describes the part of the UI for that item that was found in the box, and
+    an optional index value which differentiates between different instances
+    of the same item/name combination. For example, if the connector for input	
+    2 of the node `geo1` was the only thing inside the provided box, the
+    return value would be:
+    {{{
+    #!pycon
+    >>> editor = hou.ui.paneTabOfType(hou.paneTabType.NetworkEditor)
+    >>> editor.networkItemsInBox(pos1, pos2)
+    ((<hou.ObjNode of type subnet at /obj/subnet1>, 'input', 2),)
+    }}}
+
+    One of `for_drop` or `for_select` may be set to `True` to use a different
+    criteria for deciding what a valid target is. By default, any UI widget
+    that highlights with the mouse over it will be returned by this method.
+    Setting `for_drop` to `True` will return only UI widgets that can be drop
+    targets. Setting `for_select` to `True` will only return UI widgets that
+    result in the item being selected when box picking.
+
+::`setDragSourceData(self, items)`:
+    #cppname: HOM_NetworkEditor::setDragSourceData
+    Controls the network items that are put into the drag and drop buffer.
+    The values in this buffer are only used when dragging items out of the
+    network editor (such as when the user drags a node from the network
+    editor onto a textport, or a parameter dialog.
+
+::`setDropTargetItem(self, item, name, index)`:
+    #cppname: HOM_NetworkEditor::setDropTargetItem
+    When the user is performing a drag and drop operation within the network
+    editor, it is important that they receive some feedback about where the
+    thing they are dragging will be dropped if they let go of the mouse
+    button. This indication is provided by highlighting the drop target in the
+    UI. This method allows the current drop target to be specified in python
+    code. Usually the `item`, `name`, and `index` will be values returned in
+    one of the tuples from the `networkItemsInBox` method.
+
+::`dropTargetItem(self)` -> ([Hom:hou.NetworkItem], `str`, `int`):
+    #cppname: HOM_NetworkEditor::dropTargetItem
+    Return the currently set drop target item information. These are just the
+    values passed into the last call to `setDropTargetItem`.
+
+::`setDecoratedItem(self, item, interactive)`:
+    #cppname: HOM_NetworkEditor::setDecoratedItem
+    This method is similar to `setDropTargetItem` in that it tells the
+    network editor to highlight a particular item when drawing it. In the case
+    of the decorated item, however, only the network item needs to be provided.
+    The result of setting a node as the decorated item is to bring up the node
+    ring. Network dots may also be the decorated item, in which case the input
+    and output connectors for the dot are shown. The `interactive` boolean flag
+    indicates whether the user is allowed to interact with the decorations. If
+    not, the node ring is drawn faded, and its buttons cannot be clicked. This
+    non-interactive mode corresponds to having the Control key pressed while
+    moving the mouse around the network editor.
+
+::`decoratedItem(self)` -> `hou.NetworkItem`:
+    #cppname: HOM_NetworkEditor::decoratedItem
+    Return the currently set decorated item. This is just the `item`
+    value passed into the last call to `setDecoratedItem`.
+
+::`decorationInteractive(self)` -> `bool`:
+    #cppname: HOM_NetworkEditor::decorationInteractive
+    Return whether the currently decorated item is interactive. This is just
+    the `interactive` value passed into the last call to `setDecoratedItem`.
+
+::`setPreSelectedItems(self, items)`:
+    #cppname: HOM_NetworkEditor::setPreSelectedItems
+    When box selecting items in the network, it is useful to be able to see
+    what will be selected if the mouse button is released. These items are
+    drawn to the overlay layer of the network editor canvas in a light blue
+    color with transparency. The network items passed as a tuple to this
+    method are the ones that get drawn with this pre-selection highlight.
+
+::`preSelectedItems(self)` -> tuple of `hou.NetworkItem`:
+    #cppname: HOM_NetworkEditor::preSelectedItems
+    Return the currently pre-selected items. These are just the
+    values passed into the last call to `setPreSelectedItems`.
+
+::`setNetworkBoxPendingRemovals(self, items)`:
+    #cppname: HOM_NetworkEditor::setNetworkBoxPendingRemovals
+    When moving items around the network, network boxes automatically resize
+    to contain their child items as they move. To indicate that items will
+    be removed from their network box, pass them as a tuple to this method.
+    Doing so will cause their network box containers to not resize to fit the
+    items as they move.
+
+::`networkBoxPendingRemovals(self)` -> tuple of `hou.NetworkMovableItem`:
+    #cppname: HOM_NetworkEditor::networkBoxPendingRemovals
+    Return the items currently pending remove from their network box. These
+    are just the values passed into the last call to
+    `setNetworkBoxPendingRemovals`.
+
+== Decoration ==
+
+::`nodeShapes(self)` -> tuple of `str`:
+    #cppname: HOM_NetworkEditor::nodeShapes
+    Return a list of all valid node shape names. These are the values that can
+    be set into the user data of a node to control the shape of a specific
+    node. They are also the shape names that can be used as defaults for
+    node types.
+
+    This code sets a node to a random shape:
+    {{{
+    #!pycon
+    >>> import random
+    >>> editor = hou.ui.paneTabOfType(hou.paneTabType.NetworkEditor)
+    >>> shapes = editor.nodeShapes()
+    >>> hou.node('/obj/geo1').setUserData('nodeshape', random.choice(shapes))
+    }}}
+
+::`reloadNodeShapes(self)` -> tuple of `str`:
+    #cppname: HOM_NetworkEditor::reloadNodeShapes
+    Forces all node shape files to be reloaded. This may cause new shapes to
+    become available, or existing shapes to be removed. Returns a tuple of
+    strings that indicate the name of each loaded node shape, and any error
+    messages generated while parsing each shape. Use `nodeShapes()` to get a
+    simple list of all successfully loaded shapes after calling this method.
+
+::`setFootprints(self, footprints)`:
+    #cppname: HOM_NetworkEditor::setFootprints
+    Configure the footprint rings that the network editor should display.
+    The `footprints` parameter must be a tuple of [Hom:hou.NetworkFootprint]
+    objects. See that class for more information.
+
+::`footprints(self)` -> `tuple` of [Hom:hou.NetworkFootprint]:
+    #cppname: HOM_NetworkEditor::footprints
+    Return the current footprint configuration as a tuple of
+    [Hom:hou.NetworkFootprint] objects. These are just the values passed into
+    the last call to `setFootprints`.
+
+::`setCursorMap(self, cursors)`:
+    #cppname: HOM_NetworkEditor::setCursorMap
+    Tells the network editor which mouse cursor to use based on what UI widget
+    is under the mouse. This configuration is specified as a dictionary
+    mapping a tuple to a string. The string is the name of the cursor, which
+    can be any of the cursor file names from the `$HFS/houdini/config/Cursors`
+    directory. Each tuple consists of a string and an integer. The string is
+    the name of the UI widget, and the integer represents the specific index
+    value within that UI widget.
+
+    The following code sets the network editor to show a "connect" cursor for
+    all node inputs and outputs:
+    {{{
+    #!pycon
+    >>> editor = hou.ui.paneTabOfType(hou.paneTabType.NetworkEditor)
+    >>> editor.setCursorMap({
+    ... ('input', -1): 'wire',
+    ... ('output', -1): 'wire'
+    ... })
+    }}}
+
+    The following code sets the network editor to show an appropriate resize
+    icon based on the specific section of the sticky note border under the
+    mouse:
+    {{{
+    #!pycon
+    >>> editor = hou.ui.paneTabOfType(hou.paneTabType.NetworkEditor)
+    >>> editor.setCursorMap({
+    ... ('stickynoteborder', 0): 'arrowSWNE',
+    ... ('stickynoteborder', 1): 'arrowLeftRight',
+    ... ('stickynoteborder', 2): 'arrowNWSE',
+    ... ('stickynoteborder', 3): 'arrowUpDown',
+    ... ('stickynoteborder', 4): 'arrowSWNE',
+    ... ('stickynoteborder', 5): 'arrowLeftRight',
+    ... ('stickynoteborder', 6): 'arrowNWSE',
+    ... ('stickynoteborder', 7): 'arrowUpDown'
+    ... })
+    }}}
+
+::`cursorMap(self)` -> `dict` of (`str`, `int`) to `str`:
+    #cppname: HOM_NetworkEditor::cursorMap
+    Return the current mouse cursor configuration. This will just be the
+    dictionary passed into the last call to `setCursorMap`.
+
+::`setDefaultCursor(self, cursor_name)`:
+    #cppname: HOM_NetworkEditor::setDefaultCursor
+    Tells the network editor which mouse cursor to use when none of the UI
+    mentioned in the dictionary sent to `setCursorMap()` is under the mouse.
+
+::`defaultCursor(self)` -> `str`:
+    #cppname: HOM_NetworkEditor::defaultCursor
+    Return the default mouse cursor set by the last call to
+    `setDefaultCursor()`.
+
+::`setBackgroundImages(self, images)`:
+    #cppname: HOM_NetworkEditor::setBackgroundImages
+    Configures the background images to be displayed in the network editor.
+    The network editor saves and loads the image descriptions into the user
+    data for each network, which allows a different set of background images
+    for each network. The images are specified as a tuple of
+    [Hom:hou.NetworkImage] objects. See the documentation of that class for
+    more information.
+
+::`backgroundImages(self)` -> `tuple` of [Hom:hou.NetworkImage]:
+    #cppname: HOM_NetworkEditor::backgroundImages
+    Return the descriptors for the current set of background images being
+    displayed in the network editor. This will be the tuple passed into the
+    last call to `setBackgroundImages`.
+
+::`setAdjustments(self, items, adjustments, auto_remove=False)`:
+    #cppname: HOM_NetworkEditor::setAdjustments
+    Configures temporary adjustments to the sizes and locations of network
+    items in the editor. The `items` parameter is a tuple of
+    [Hom:hou.NetworkMovableItem] objects. The `adjustments` parameter is a
+    tuple of [Hom:hou.NetworkAnimValue] objects to associate with each
+    network item in the `items` tuple. See the documentation of that class
+    for more information about specifying adjustments.
+
+    The `auto_remove` parameter may be set to `True` to indicate that the
+    network editor should automatically delete the adjustments once the
+    animation on them has completed. This is useful for animations performed
+    at the end of a user action, where the following events do not relate to
+    the changes being made, and so it is easier not to have to manage the
+    reset of the adjustment values explicitly in the future.
+
+::`setShapes(self, shapes)`:
+    #cppname: HOM_NetworkEditor::setShapes
+    The `shapes` parameter specifies a tuple of [Hom:hou.NetworkShape] objects
+    which will be drawn into the network editor. See documentation of the
+    network shape class and its subclasses for more information.
+
+::`setOverlayShapes(self, shapes)`:
+    #cppname: HOM_NetworkEditor::setOverlayShapes
+    The `shapes` parameter specifies a tuple of [Hom:hou.NetworkShape] objects
+    which will be drawn into the overlay layer of the network editor canvas.
+    See documentation of the network shape class and its subclasses for more
+    information.
+
+::`redraw(self)`:
+    #cppname: HOM_NetworkEditor::redraw
+    Forces the network editor to redraw. This may be necessary in cases where
+    your code updates aspects of your Houdini session which indirectly affect
+    the drawing of the network editor (such as changing default node shapes
+    and colors). Direct changes to the network (such as changing the shape or
+    color of a specific node) should automatically cause the network editor
+    to redraw. Only use this function when you see that a redraw is not
+    being triggered automatically by the your code.
+
+== Network Item Information ==
+
+::`itemRect(self, item, adjusted=True)` -> [Hom:hou.BoundingRect]:
+    #cppname: HOM_NetworkEditor::itemRect
+    Return the bounding rectangle of the [Hom:hou.NetworkMovableItem]
+    specified by the `item` parameter. If the `adjusted` parameter is set to
+    `True`, any adjustments to this item's size and position set in the most
+    recent call to `setAdjustments()` will be taken into account. If `False`,
+    these adjustments will be ignored. Note that for nodes, only the node
+    body is taken into account, not the node name, badges, or other
+    decorations.
+
+::`itemInputPos(self, item, input_index, adjusted=True)` -> [Hom:hou.Vector2]:
+    #cppname: HOM_NetworkEditor::itemInputPos
+    Return the center point of the input connector of the
+    [Hom:hou.Node] or [Hom:hou.NetworkDot] specified by `item`. The
+    `input_index` parameter specifies the specific input of interest. For
+    network dots, this value must be zero. If the `adjusted` parameter is set
+    to `True`, any adjustments to this item's size and position set in the
+    most recent call to `setAdjustments()` will be taken into account.
+    If `False`, these adjustments will be ignored.
+
+::`itemInputDir(self, item, input_index)` -> [Hom:hou.Vector2]:
+    #cppname: HOM_NetworkEditor::itemInputDir
+    Return a normalized vector indicating the direction at which the wire
+    connected to the specified input should emerge from its connector. The
+    `item` parameter may be a [Hom:hou.Node] or [Hom:hou.NetworkDot]. The
+    `input_index` specifies which input is of interest. This value must be
+    zero if the item is a network dot.
+
+::`itemOutputPos(self, item, output_index, adjusted=True)` -> [Hom:hou.Vector2]:
+    #cppname: HOM_NetworkEditor::itemOutputPos
+    Return the center point of the output connector of the
+    [Hom:hou.Node], [Hom:hou.NetworkDot], or [Hom:hou.SubnetIndirectInput]
+    specified by `item`. The `output_index` parameter specifies the specific
+    output of interest. For network dots and subnet indirect inputs, this value
+    must be zero. If the `adjusted` parameter is set to `True`, any
+    adjustments to this item's size and position set in the most recent call to
+    `setAdjustments()` will be taken into account.  If `False`, these
+    adjustments will be ignored.
+
+::`itemOutputDir(self, item, output_index)` -> [Hom:hou.Vector2]:
+    #cppname: HOM_NetworkEditor::itemOutputDir
+    Return a normalized vector indicating the direction at which the wire
+    connected to the specified output should emerge from its connector. The
+    `item` parameter may be a [Hom:hou.Node], [Hom:hou.NetworkDot], or
+    [Hom:hou.SubnetIndirectInput]. The `output_index` specifies which output
+    is of interest. This value must be zero if the item is a network dot or
+    subnet indirect input.
+
+::`allVisibleRects(self, ignore_items)` -> `tuple` of ([Hom:hou.NetworkMovableItem], [Hom:hou.BoundingRect]):
+    #cppname: HOM_NetworkEditor::allVisibleRects
+    This method is equivalent to calling `itemRect()` for every network item
+    that is currently visible in the network editor. Getting these results in
+    a single method call is significantly faster, and eliminates the need to
+    test each item for visibility. This method is used for finding items to
+    snap against when moving nodes. The `ignore_items` parameter is a tuple
+    of [Hom:hou.NetworkMovableItem] objects that should not be returned in
+    the result tuple.
+
+== Prompts ==
+
+::`setTooltip(self, tooltip)`:
+    #cppname: HOM_NetworkEditor::setTooltip
+    Sets the tooltip string that should be shown under the mouse if it remains
+    stationary for a short time. This string should generally be set to
+    correspond to the network item currently under the mouse cursor. Because
+    it appears after a delay, it is okay to make this text more verbose than
+    the prompt text passed to `setPromptText()`.
+
+::`tooltip(self)` -> `str`:
+    #cppname: HOM_NetworkEditor::tooltip
+    Return the current tooltip string. This is the value that was last passed
+    to the `setTooltip()` method.
+
+::`setPrompt(self, prompt)`:
+    #cppname: HOM_NetworkEditor::setPrompt
+    Sets the prompt text that appears at the bottom of the network editor.
+    This string should generally be set to correspond to the network item
+    currently under the mouse cursor. This text should be fairly brief.
+    More detailed information can be put into the tooltip through the
+    `setTooltip()` method.
+
+::`prompt(self)` -> `str`:
+    #cppname: HOM_NetworkEditor::prompt
+    Return the current prompt string. This is the value that was last passed
+    to the `setPromptText()` method.
+
+::`flashMessage(self, image, message, duration)`:
+    #cppname: HOM_NetworkEditor::flashMessage
+    Causes a message to appear briefly in the upper left corner of the network
+    editor, then fade away. The `image` parameter specifies an icon or image
+    file that should be displayed along with the text specified in the
+    `message` parameter. Either of these parameters may be `None` if only
+    an image or only text is desired. The `duration` parameter specifies the
+    time in seconds before the message should fade away.
+
+== Standard Menus and Editors ==
+
+::`openTabMenu(self, key=None, auto_place=False, branch=False, src_item=None, src_connector_index=-1, dest_item=None, dest_connector_index=-1, node_position=None, src_items=[], src_indexes=[], dest_items=[], dest_indexes=[])`:
+    #cppname: HOM_NetworkEditor::openTabMenu
+    Opens the tab menu in the network editor. When the user chooses a tool
+    from the tab menu, the parameters passed to this function determine the
+    context information that will be sent to the tool script. Generally, most
+    tools treat these parameters in a consistent way as described below.
+
+    `key`:
+	The key used (if any) to open the menu. This same key pressed with
+	the menu up will cause the menu to close.
+
+    `auto_place`:
+	Set to `True` to make the tab menu turn on auto placement when a
+	tool is chosen from the menu. The new node will be placed at a
+	position determined automatically by the tab menu based on the
+	source and destination nodes.
+
+    `branch`:
+	Set to `True` to cause the new node to create a new branch instead
+	of inserting the new node between the source and destination nodes.
+
+    `src_item`:
+	The node, dot, or subnet indirect input that will be connected to the
+	input of the new node created by the tab menu.
+
+    `src_item_connector_index`:
+	The output index of the node that will be connected to the input of
+	the new node created by the tab menu.
+
+    `dest_item`:
+	The node or dot that will be connected to the output of the new node
+	created by the tab menu.
+
+    `dest_connector_index`:
+	The input index of the node or dot that will be connected to the
+	output of the new node created by the tab menu.
+
+    `node_position`:
+	The location to use for the new node created by the tab menu.
+
+    `src_items`:
+	A list of nodes, dot, or subnet indirect inputs that will be connected
+	to the input of the new node created by the tab menu. This parameter
+	(and all other list-based source and destination paramaters) take
+	precedence over the single item parameters if both are specified.
+
+    `src_item_connector_indexes`:
+	A list of output indexes of the nodes that will be connected to the
+	input of the new node created by the tab menu.
+
+    `dest_items`:
+	A list of nodes or dots that will be connected to the output of the
+	new node created by the tab menu.
+
+    `dest_connector_indexes`:
+	A list of input indexes of the nodes or dots that will be connected to
+	the output of the new node created by the tab menu.
+
+::`openNodeMenu(self, node = None, items = [])`:
+    #cppname: HOM_NetworkEditor::openNodeMenu
+    Brings up a node context menu under the current mouse position. The
+    two parameters contol which node(s) will be affected by the menu option
+    chosen by the user. If a [Hom:hou.Node] object is specified in the
+    `node` parameter, the menu operation will affect that node, and, if that
+    node is currently selected, all other selected network items will also be
+    affected. If the `items` parameter is passed a non-empty list of
+    [Hom:hou.NetworkMovableItem] objects, those items and only those items
+    will be affected by the menu, regardless of the current selection.
+
+    If the chosen menu item only operates on a single node, the original
+    `node` parameter value or the last [Hom:hou.Node] object in the
+    `items` list will be affected. If the selected menu item can
+    affect multiple nodes, all nodes will be affected. And in the few cases
+    where network items other than nodes may be altered by a menu item, all
+    items (nodes or otherwise) will be affected.
+
+::`openVopEffectsMenu(self, node, input_index)`:
+    #cppname: HOM_NetworkEditor::openVopEffectsMenu
+    Brings up the VOP node effects menu for the [Hom:hou.VopNode] specified in
+    the `node` parameter, at the input specified by the `input_index`
+    parameter.
+
+::`openVopOutputInfoMenu(self, node, output_index)`:
+    #cppname: HOM_NetworkEditor::openVopOutputInfoMenu
+    Brings up the VOP node output info menu for the [Hom:hou.VopNode] specified
+    in the `node` parameter, at the output specified by the `output_index`
+    parameter. This menu is used to control the behavior of the VOP node when
+    the Debug or Bypass flags are enabled.
+
+::`openCommentEditor(self, item, select_all = False)` -> `int`:
+    #cppname: HOM_NetworkEditor::openCommentEditor
+    Opens an input field for editing the comment of the network box specified
+    in the `item` parameter. Returns an integer id which is passed to the
+    network editor as part of an event indicating when the user finishes
+    editing the text.
+
+    If `select_all` is set to `True`, the editor is opened with all text
+    selected.
+
+::`openNameEditor(self, item, select_all = False)` -> `int`:
+    #cppname: HOM_NetworkEditor::openNameEditor
+    Opens an input field for editing the name of the node specified in the
+    `item` parameter. Returns an integer id which is passed to the
+    network editor as part of an event indicating when the user finishes
+    editing the text.
+
+    If `select_all` is set to `True`, the editor is opened with all text
+    selected.
+
+::`openNoteEditor(self, stickynote, select_all = False)` -> `int`:
+    #cppname: HOM_NetworkEditor::openNoteEditor
+    Opens an input field for editing the text of the sticky note specified in
+    the `stickynote` parameter.  Returns an integer id which is passed to the
+    network editor as part of an event indicating when the user finishes
+    editing the text.
+
+    If `select_all` is set to `True`, the editor is opened with all text
+    selected.
+
+::`closeTextEditor(self, id, apply_changes = True)`:
+    #cppname: HOM_NetworkEditor::closeTextEditor
+    Immediately closes and commits any changes made to input fields opened
+    with the `openNameEditor()`, `openCommentEditor()`, or `openNoteEditor()`
+    methods. The `id` parameter is the value returned by the method that
+    opened the editor. Set the `apply_changes` parameter to `False` if the
+    changes made to the input field should not be applied.
+
+== Event Handling ==
+
+::`scheduleTimerEvent(self, seconds)` -> `int`:
+    #cppname: HOM_NetworkEditor::scheduleTimerEvent
+    Requests that a timer event be sent to the network editor after `seconds`
+    has elapsed. The returned integer id is included in the triggered event
+    to differentiate between timers if more than one is scheduled at a time.
+
+::`handleCurrentKeyboardEvent(self, resend=False)`:
+    #cppname: HOM_NetworkEditor::handleCurrentKeyboardEvent
+    Requests that the network editor handle the current keyboard event. This
+    method only makes sense when handling a keyboard event.
+
+    If the `resend` parameter is set to `True`, the keyboard event is sent to
+    the network editor's python handling code a second time rather than the
+    network editor handling the keyboard event itself. This is useful if the
+    network editor is in a state or mode that does not know how to handle a
+    key, but which the state recognizes as one that should exit the current
+    state, and possibly trigger some other python event handling code. This
+    parameter is used in the state for selecting the position of a new node if
+    the Tab key is pressed (which exits the positions selection state, and
+    triggers a new Tab menu instead).
+
+    If this method is not called when handling a keyboard event, the network
+    editor assumes that the python event handling code has handled the keyboard
+    event.
+
+::`setVolatileKeys(self, keys)`:
+    #cppname: HOM_NetworkEditor::setVolatileKeys
+    The `keys` parameter specifies a tuple of keyboard keys that should be
+    processed as volatile keys. This means they generate a `"keydown"` event
+    when the key is pressed, and a `"keyup"` event when the key is released.
+    All other keys simply send a `"keyhit"` event after the key is released,
+    with no notification when the key is first pressed. The key strings are
+    of the form returned by the [Hom:hou.ui#hotkeys] method, which is a
+    combination of the symbol on the key, and any modifier keys involved,
+    such as `"Ctrl+Shift+G"`.
+
+::`isVolatileKeyDown(self, key)` -> `bool`:
+    #cppname: HOM_NetworkEditor::isVolatileKeyDown
+    Return `True` if the specified keyboard key is currently pressed. This
+    allows the current state of a volatile key to be tested without seeing
+    the `"keydown"` event triggered when the user pressed the key. Calling
+    this method with a key that has not been registered through the
+    `setVolatileKeys` method will always return `False` even if the key
+    is currently pressed. The key string is of the form returned by the
+    [Hom:hou.ui#hotkeys] method, which is a combination of the symbol on the
+    key, and any modifier keys involved, such as `"Ctrl+Shift+G"`.
+
+::`pushEventContext(self, module, data)`:
+    #cppname: HOM_NetworkEditor::pushEventContext
+    Causes all future events generated in the network editor to be passed to
+    the python module specified by `module` (which is `import`ed by the event
+    handling code). The `data` parameter should be a python `dict` which can
+    contain any additional information required by the module. It can also
+    be populated to return values from the module to the code that calls
+    this method.
+
+    This method does not return until the pushed module calls
+    [Hom:hou.NetworkEditor#popEventContext], so it is very important that
+    the provided module always provide some means of exiting the module
+    with a call to that method.
+
+    This method name starts with the word "push" to indicate that there can
+    be a stack of event contexts, not just a single alternate context.
+
+::`popEventContext(self)`:
+    #cppname: HOM_NetworkEditor::pushEventContext
+    Pops an event context off the stack, returning control to the python code
+    which most recently called [Hom:hou.NetworkEditor#pushEventContext].
+
+::`eventContextData(self)` -> `dict`:
+    #cppname: HOM_NetworkEditor::pushEventContext
+    Accesses the context data passed into the most recent call to the
+    [Hom:hou.NetworkEditor#pushEventContext] method. If no calls have been
+    made to this method, there is still a python `dict` available to store
+    any global information that may be used by the network editor event
+    handling code. As an example, the current view bounds for each network
+    visited by the editor are stored as part of this context data dictionary.
+
+== Preferences ==
+
+::`setPref(self, pref, value)`:
+    #cppname: HOM_NetworkEditor::setPref
+    Sets the preference named `pref` to `value`. The value is always a string,
+    and must be converted to or from a number, enum, or other format as
+    appropriate. If the preference specified by `pref` is a global preference,
+    all network editors will automatically update with the new value.
+    Otherwise the change will only affect this network editor.
+
+::`getPref(self, pref)` -> `str`:
+    #cppname: HOM_NetworkEditor::getPref
+    Return the value of the preference named `pref`. This preference may be
+    a global or local preference. The returned value is always a string which
+    can be interpreted as a number or other data structure as appropriate for
+    the specific preference.
+
+::`setPrefs(self, prefs)`:
+    #cppname: HOM_NetworkEditor::setPrefs
+    Sets a number of preference values with a single method call. The `prefs`
+    parameter must be a python dictionary mapping preference name strings to
+    value strings. The preferences may be local or global, but this method is
+    most often used for saving and loading the local preferences for a single
+    network editor.
+
+::`getPrefs(self)` -> `dict` of `str` to `str`:
+    #cppname: HOM_NetworkEditor::getPrefs
+    Return all global and local preferences for this network editor as a
+    python dictionary mapping preference name strings to value strings.
+
+::`registerPref(self, pref, value, global)`:
+    #cppname: HOM_NetworkEditor::registerPref
+    Registers a preference with the name `pref`, and default value `value`.
+    If `global` is `True`, this preference is treated as a global preference
+    that is applied to all network editors and saved in
+    `$HOUDINI_USER_PREF_DIR/networkeditor.pref`. Otherwise the preference is
+    considered local to each network editor, and will be saved to the desk
+    file with each network editor instance.
+
+    Registering a preference is required to ensure the preference is saved
+    when it is not a preference used internally by the network editor. The
+    preference that enables snapping, or the one to enable dropping a node
+    onto an existing wire are examples of preferences that are only used by
+    the python event handling code, and so must be explicitly registered.
+    This registration should be done in response to the network editor
+    initialization event which is sent once to each network editor when it
+    is first created.
+
+::`badges(self)` -> `tuple` of `tuple` of `str`:
+    #cppname: HOM_NetworkEditor::badges
+    Return descriptions of the optional node badges that can be shown in the
+    network editor. Each tuple contained in the returned value contains three
+    strings describing the badge. The first is the preference value that
+    controls whether the badge is hidden, or appears as a small or large icon.
+    The second string is a description of the badge. The third string is the
+    name of the badge icon. These values can be used to present an interface
+    for configuring the badges.
+
+::`textBadges(self)` -> `tuple` of `tuple` of `str`:
+    #cppname: HOM_NetworkEditor::textBadges
+    Return descriptions of the optional node text that can be shown in the
+    network editor. Each tuple contained in the returned value contains three
+    strings describing the text. The first is the preference value that
+    controls whether the text is hidden, or appears as truncated or full text.
+    The second string is a description of the text. The third string is the
+    name of an icon that can be used to represent the meaning of the text.
+    These values can be used to present an interface for configuring the text.
+
+== Deprecated ==
+
+::`frameSelection(self)`:
+    #cppname: HOM_NetworkEditor::frameSelection
+    Centers the nodes within the network editor to show the current
+    selection and zooms to its extents. This method wraps a call to
+    [Hom:hou.NetworkEditor#setVisibleBounds].
+
+::`homeToSelection(self)`:
+    #cppname: HOM_NetworkEditor::homeToSelection
+    Centers the nodes within the network editor to show the current
+    selection. This method wraps a call to
+    [Hom:hou.NetworkEditor#setVisibleBounds].
+
+::`listMode(self)` -> bool:
+    #cppname: HOM_NetworkEditor::listMode
+    Return True if the network editor is in list mode and False otherwise.
+
+::`setListMode(self, on)`:
+    #cppname: HOM_NetworkEditor::setListMode
+    Set the network editor to enter list mode if `on` is True and to exit list
+    mode if `on` is False. 
+
+::`selectPosition(self, input_node=None, output_index=0, output_node=None,
+input_index=0)` -> [Hom:hou.Vector2]:
+    #cppname: HOM_NetworkEditor::selectPosition
+    This method wraps a call to [Hom:hou.NetworkEditor#pushEventContext],
+    with the event context set to `'nodegraphselectpos'`, and appropriate
+    context data to give behavior similar to the old network editor.
+
+    Prompt the user to select a position in the network editor for a new node
+    to be placed.  The network editor visualizes the position with a dotted
+    outline of a node placeholder.  The user can then move the mouse to change
+    the position and ((LMB)) to confirm.  The user can also press ((Esc))
+    instead to cancel the selection.
+
+    You can optionally pass in [Hom:hou.Node] objects to the `input_node` and
+    `output_node` arguments to visualize the node placeholder with connections
+    to the specified input and output nodes.
+
+    Return a [Hom:hou.Vector2] containing the x,y coordinates of the selected
+    position.
+
+    Raise [Hom:hou.OperationInterrupted] if the user canceled the selection.
+    Raise [Hom:hou.OperationFailed] if the network editor is in list mode.
+
+    This method can be useful for scripts that create new nodes and prompts for
+    node positions.  Here is an example:
+    {{{
+    #!python
+
+    # Get the input and output nodes that the new node will connect to.
+    input_node = hou.node("/obj/myInput")
+    output_node = hou.node("/obj/myOutput")
+
+    # Set the new node to connect to the first output of the input node
+    # and the second input of the output node.
+    output_index = 0
+    input_index = 1
+
+    # Get the network editor.
+    network_editor = hou.ui.curDesktop().paneTabOfType(
+	hou.paneTabType.NetworkEditor)
+
+    # Prompt the user to select a position for the new node.
+    position = network_editor.selectPosition(
+	input_node, output_index, output_node, input_index)
+
+    # Create the new node.
+    new_node = hou.node("/obj").createNode("geo")
+
+    # Position the new node and wire it to the input and output nodes.
+    new_node.move(position)
+    new_node.setInput(0, input_node, output_index)
+    output_node.setInput(input_index, new_node, 0)
+    }}}
+
+::`autoAddToNetbox(self, node)`:
+    #cppname: HOM_NetworkEditor::autoAddToNetbox
+    This method is deprecated in the new network editor and does nothing.
+
+::`insertIntoUnderlyingConnections(self, node, x, y)`:
+    #cppname: HOM_NetworkEditor::insertIntoUnderlyingConnections
+    This method is deprecated in the new network editor and does nothing.
+
+::`modifyPositionForNode(self, vector2, node)` -> Vector2:
+    #cppname: HOM_NetworkEditor::modifyPositionForNode
+    This method is deprecated in the new network editor, and simply returns
+    the position passed into the function.
+
+::`autoPlaceNodes(self)` -> bool:
+    #cppname: HOM_NetworkEditor::autoPlaceNodes
+    This method is deprecated in the new network editor and always
+    returns `False`.
+
+::`autoScrollNodes(self)` -> bool:
+    #cppname: HOM_NetworkEditor::autoScrollNodes
+    This method is deprecated in the new network editor and always
+    returns `False`.
+

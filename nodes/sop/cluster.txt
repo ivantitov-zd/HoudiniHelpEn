@@ -1,0 +1,138 @@
+= Cluster =
+
+#type: node
+#context: sop
+#internal: cluster
+#icon: SOP/cluster
+#tags: lowlevel, cluster, points
+
+"""Low-level machinery to cluster points based on their positions (or any vector attribute)."""
+
+== Overview ==
+
+This is a low-level node that can output either points with a cluster attribute or cluster centers. For a higher-level clustering node that can do both at the same time, see the [Cluster points node|Node:sop/clusterpoints].
+
+This node creates a `cluster` integer attribute on the points which indicates the cluster number the point belongs to (all points in the same cluster will have the same `cluster` value).
+
+This node uses the [K-means clustering algorithm|Wp:K-means] to group the points.
+
+TIP:
+    To visualize the clusters as colors, you can add a [Color node|Node:sop/color] with __Color type__ set to "Random from attribute" and __Attribute__ set to `cluster`. (To see the colors in the geometry viewport, you will need to also add an [Add node|Node:sop/add] with __Particles > Add Particle System__ turned on.)
+
+== Change the Seed to change the clustering == (seeding)
+
+The K-means clustering algorithm used by this node is sensitive to the randomly chosen initial cluster centers, especially when you create a small number of clusters. For example, if you have geometry divided into two parts that are far from each other, you might end up with all the points of part A in one cluster, and the points of part B divided into many clusters, just because none of the initial centers happened to be near part A.
+
+[Image:/images/nodes/sop/clusterpoints_bad_clusters.png]
+
+In this case you can change the __Seed__ parameter until you get a better clustering.
+
+== Threshold attribute == (threshold)
+
+This node lets you cluster by blending multiple attributes (by increasing the __Control attributes__ parameter). Each attribute has a __Weight__ parameter controlling its linear contribution to the proximity measurement that controls which cluster each point goes into.
+
+For some attributes, you may find that a linear scale is not what you want. The example that motivated the threshold feature is clustering points by _impact time_. For example:
+
+* You use an [Impact Analysis DOP|Node:dop/impactanalysis] to create points where RBD objects hit the ground, in order to create dust clouds. The impact points have an `impacttime` attribute containing a time stamp of when the impact occurred.
+
+* You want to cluster the impact points to put them in separate fluid simulation boxes.
+
+* You want to sort by location (so points close to each other are in the same box), but also by _impact time_ (so impact points that occur far apart from each other in time are in separate boxes, even if they occur at the same place).
+
+* You could use two "control attributes", position (`P`) and `impacttime`, to control clustering, with a higher __Weight__ value for `impacttime` to group the points by impact time, then by position.
+
+* However, the linear nature of the __Weight__ parameter may make it difficult to pick the right weight value to get the behavior you want, where impacts that are "close enough" in time go into the same box, but otherwise are clustered separately.
+
+This is what the threshold feature is useful for. Instead of a linear weight, it adds a high "penalty" to the final distance calculation if the distance of a certain attribute is more than a certain amount (the _threshold_).
+
+[Image:/nodes/images/cluster_threshold.png]
+
+In this example, the red points represent early impacts, and the green points represent later impacts. You can see that in some places points impacts that overlap in position are sorted into different boxes based on different impact times.
+
+[Image:/images/cluster_impact.png]
+
+@inputs
+
+Points to Cluster:
+    The input points to sort into clusters. This node will create an attribute (by default called `cluster`) on each point containing the cluster number the point belongs to.
+    
+Cluster Centers:
+    If this input is connected, the node will use these points as the centers of the clusters, instead of calculating average cluster centers from the input points.
+    
+    If this input is connected, several parameters such as the number of clusters are ignored.
+
+@parameters
+
+Clusters:
+    #id: num_clusters
+    
+    The number of clusters to group the input points into.
+    
+Cluster Attribute:
+    #id: cluster_attrib
+    
+    The name of the attribute to set on the points. This attribute will contain the cluster number the point belongs to. The default is `cluster`.
+
+Output Cluster Centers:
+    #id: output_center
+    
+    Instead of outputting the input points with a cluster attribute, output the cluster centers as new points.
+    
+    If you want both the cluster centers as points and the clustered input points, you can use two cluster nodes, with one set to output cluster centers. Connect the output of the "cluster centers" node to the second input of the "clustered points" node.
+    
+    Alternatively you can use the [Cluster points node|Node:sop/clusterpoints], which can output both the clustered points and cluster centers automatically.
+    
+Control Attributes:
+    #id: num_controls
+    
+    The number of vector attributes to blend together to determine which points should be grouped together. The default is to use the position attribute (`P`), so the node will cluster together points that are near each other.
+    
+Control Attribute:
+    #id: control_attrib
+    
+    The name of a vector attribute to use to cluster points. Points with close values of this attribute will be grouped together.
+    
+Weight:
+    #id: control_weight
+    
+    The strength of a particular vector attribute in controlling which points should be grouped together. This is a linear scale. For a more discrete grouping method, use the [threshold|#threshold].
+
+Iterations:
+    #id: iterations
+    
+    Higher numbers give more accurate clustering but take longer to compute.
+    
+    The K-means clustering algorithm starts with random cluster centers, assigns points to clusters based on their distance from the centers, then moves to centers based on the points in the cluster and repeats. This iterative process usually converges toward more accurate clusters.
+
+Seed:
+    #id: random_seed
+    
+    Changing this will usually generate different groupings and cluster number assignments.
+    
+    The K-means clustering algorithm starts with random cluster centers and then iterates to refine the cluster centers. Changing the initial positions can potentially change the groups.
+
+Threshold Attribute:
+    #id: threshold_attrib
+    
+    Use the value of this float or integer attribute as a [threshold|#threshold], where points that aren't "close enough" (within the __Goal threshold__) in this attribute will not be grouped together, even if they are close according to the control attribute.
+
+Weight:
+    #id: threshold_weight
+    
+    The strength of the __Threshold Attribute__. Set this to `0` to turn off the threshold.
+    
+Initial Threshold:
+    #id: initial_threshold
+    
+    The initial "cutoff" value of the threshold attribute, used in the first clustering iteration. The threshold value works better if it's high at first (so the control attribute dominates) and lowers toward the __Goal threshold__ at each iteration. As a rule of thumb, start by setting this to 4 times the __Goal threshold__.
+
+Goal Threshold:
+    #id: final_threshold
+    
+    The "cutoff" value of the threshold attribute, used in the final clustering iteration. Points with values farther apart than this value will be unlikely to end up in the same cluster.
+
+@related
+
+- [Node:sop/clusterpoints]
+- [Node:sop/partition]
+- [Node:dop/impactanalysis]

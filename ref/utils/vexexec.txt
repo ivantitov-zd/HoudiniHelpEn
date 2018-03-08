@@ -1,0 +1,103 @@
+= vexexec =
+
+"""Execute a cvex shader."""
+
+== Synopsis ==
+
+{{{
+vexexec [-j nthreads] [-p nproc] [-t] [-v list] [-V verbose] <program.vex> <program arguments> ... 
+}}}
+
+== Description ==
+
+`vexexec` executes a cvex shader on the command line.  It can be used to
+debug simple VEX code without needing to start Houdini or another
+heavyweight context, for example by using the `printf` function.
+
+The `-j` option specifies the number of CPU threads to run.
+
+The `-p` option specifies the VEX array size on which the shader will
+execute (by default, the shader will be executed as a scalar program -
+a default of 1).  Larger values of `-p` can be used to test how the
+program behaves or performs with a larger array size, which will be
+more indicative of how shaders are executed in Houdini and mantra.  For
+example, the [VOP SOP|Node:sop/vopsop] will have an array size equal to the
+number of points in the geometry.
+
+The `-t` option turns on timing of the VEX execution.
+
+The `-v` option specifies a comma separated list of additional inputs to bind.
+
+The `-V` option specifies verbosity when running VEX.  The argument to the `-V` option can consist of a combination of:
+- `0`:
+    Set verbose level to 0.
+- `1`:
+    Set verbose level to 1.
+- `2`:
+    Set verbose level to 2.
+- `c`:
+    Enable coloring of log messages (default).
+- `C`:
+    Disable coloring of log messages.
+- `t`:
+    Enable time stamps on log messages (default).
+- `T`:
+    Disable time stamps on log messages.
+- `p`:
+    Enable VEX profiling.
+- `P`:
+    Enable VEX profiling and NAN detection.
+For example:
+-  `-V 2PC`:
+    Set verbosity to 2, perform VEX profiling and NAN detection and disable
+    log message coloring.
+
+== Bindings ==
+
+There are a few predefined shader parameter bindings supported by
+vexexec that can be used to manage the context of the shader. You can add
+new bindings with the -v command-line option.
+
+int proc = 0;:
+        The current processor number.
+        
+int ival = 0;:
+        The offset into the current batch of data.
+        
+float fval = 0;:
+        A varying value initialized to random floats in [0,1].
+        
+vector vval = 0;:
+        A varying value initialized to random floats in [0,1].
+        
+vector4 pval = 0;:
+        A varying value initialized to random floats in [0,1].
+
+These values are queried by cvex after the shader executes:
+
+export float result = 0;:
+        A floating point result.
+
+== Examples ==
+{{{
+    cvex simple(int proc = 0; export float result = 0)
+    {
+	result = proc * proc;
+	printf("proc = %g, proc^2 = %g\n", proc, result);
+    }
+}}}
+
+Save to simple.vfl and execute the following commands:
+    
+{{{
+    vcc simple.vfl
+    vexexec -p3 simple.vex
+}}}
+
+Output:
+
+proc = 0, proc^2 = 0
+
+proc = 1, proc^2 = 1
+
+proc = 2, proc^2 = 4

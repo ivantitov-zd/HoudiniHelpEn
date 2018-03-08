@@ -1,0 +1,93 @@
+#type: node
+#context: dop
+#internal: gasadvectfield
+#icon: DOP/gas
+
+= Gas Advect Field =
+
+"""A microsolver that advects fields and geometry by a velocity
+field."""
+
+The Gas Advect Field DOP is a microsolver used in building larger fluid
+simulations. The [Fluid Solver|Node:dop/fluidsolver] and [Smoke Solver|Node:dop/smokesolver] DOPs that allow
+microsolvers to be added before or after the main solver step to extend
+or tweak the simulation. Alternatively, advanced users could try to build an entire new solver out of microsolvers.
+
+The Gas Advect Field DOP evolves fields and geometry according to a specified
+velocity field. The fields and geometry will be moved by the velocity
+field for a distance proportional to the current solver timestep.
+
+Gas Advect Field builds on top of the simpler building block of the [Gas Advect
+DOP|Node:dop/gasadvect] to provide some higher order advection types.
+
+
+@parameters
+Advection Type:
+    The type of advection to use.  The __Single Stage__ method is equivalent to the [Gas Advect DOP|Node:dop/gasadvect], where each point is back traced
+    through the velocity field once to find the new voxel value.
+
+    The __BFECC__ and __Modified MacCormack__ methods do a second basic
+    advection stage to compute an estimate of the error introduced by the
+    advection process.  The field can then be corrected by this error,
+    resulting in a sharper fluid that doesn't disperse as much.
+
+    __BFECC__ produces the best results for fast moving fluids, but requires
+    three advection stages.  __Modified MacCormack__ becomes as blurry as
+    __Single Stage__ when the fluid moves very quickly, but produces sharp
+    results for slow motion and only requires two advection stages.
+Clamp Values:
+    The error correction factor can result in the new voxel values lying
+    outside the range of the original field, which will create negative density
+    values, for example.  Clamping will enforce a global maximum and
+    minimum to the original values.
+Blend:
+    Apply a smooth blend between non-clamped and clamped values as the advected field
+    approaches the clamping limit. Particularly with the __Revert__ option, applying a small
+    amount of __Blend__ (e.g. 0.05 - 0.1) can reduce grid artifacts in the advected field
+    at the cost of some additional smoothing of the field.
+
+Field:
+        The list of fields to move according to the velocity field.
+	This can be a space separated or globbed list. __Scalar__, __Vector__,
+	and __Matrix__ fields can all be advected.
+Velocity Field:
+        The velocity field used to drive the other field and geometry
+        values. This must be a Vector field. 
+
+	It is possible to advect the velocity field with itself, however in
+	this case you should do so without advecting any other
+	fields or geometry.  You must set the __Allow Self Advection__.
+Advection Method:
+	Controls how the particle tracing is performed.  Single step
+	takes the velocity at each voxel and makes a single step in
+	that direction for the timestep.  This is fastest and is
+	independent of the speed of the velocity field, but will start
+	to break up if large timesteps have to be performed.  Trace
+	will ensure the backtracking does not move more than a single
+	voxel before it the velocity is updated, allowing for larger
+	timesteps.  Midpoint, RK3, and RK4 are like __Trace__ but use progressively higher order advection for more accuracy but at greater speed cost.
+Advection CFL:
+	When tracing the particles, this controls how many voxels may be
+	stepped in a single iterations.  Higher values will result in faster
+	tracing, and hence faster advection, but more errors.
+Allow Self Advection:
+	When advecting a velocity field with itself, extra temporary fields are
+	needed to do the higher order advection types.
+[Include:standard_gas_timestep]
+[Include:standard_solver_parms]
+
+@inputs
+    [Include:standard_data_inputs]
+
+@outputs
+    [Include:standard_data_outputs]
+
+@locals
+    [Include:standard_data_locals]
+
+    [Include:standard_locals]
+
+
+
+@related
+    - [Node:dop/gasadvect], [Node:dop/gasadvectcl]

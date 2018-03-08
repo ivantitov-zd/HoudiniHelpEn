@@ -1,0 +1,145 @@
+= Adding detail with normal, bump, and displacement mapping =
+
+== Overview ==
+
+Normal, bump, and displacement maps are ways to create the _appearance_ of high-resolution geometry on low-resolution models by adding detail at display/render time.
+
+In this image, the head on the left is a low-res model, the head in the middle is a highly detailed high-res model. The head on the right is the low-res model with a normal map generated from the hi-res model. It is visually almost indistinguishable from the high-poly model.
+
+[Image:/images/shade/normal_map.jpg]
+
+The different types of detail maps have different tradeoffs.
+
+=== Normal Maps & Bump Maps ===
+#display: pull left
+
+Normal and bump maps create the _appearance_ of additional surface detail by changing normals at render time, without actually creating additional geometry. This makes them faster and use less memory.
+
+* Bump maps store height deltas as grey levels in a monochrome map.
+
+* Normal maps store vectors as RGB in a color map.
+
+Because they only change the normal, they *do not affect the silhouette* of the object. For example, if you add normal mapping to a sphere, you can make the surface area of the sphere look rough and craggy, but the edges will still be perfectly smooth.
+
+=== Displacement Mapping ===
+#display: pull left
+
+Displacement maps add actual new geometry at render time. The renderer subdivides the existing geometry and the moves it according to the texture values.
+
+* Displace Along Normal stores height deltas, similar to bump maps.
+
+* Vector Displacement stores offset vectors as RGB. The vectors can be in tanget, object, or world space.
+
+    In contrast to __Displace Along Normal__, this allows parts of a surface to arch over neighboring parts.
+
+=== Comparison ===
+
+||
+    Bump ||
+        Normal ||
+            Displacement ||
+
+Memory usage ||
+    Memory used by the texture, ideally greyscale. |
+        Memory used by the texture, must be RGB. |
+            Uses more memory for 16/32 bits to avoid banding. Potentially large memory usage for lots of small polygons †.
+
+Rendering speed ||
+    Small slowdown, requires multiple texture samples. |
+        Faster, single texture sample. |
+            Slower in raytracing/PBR because it adds polygons †.
+
+Startup time ||
+    Small impact due to texture loading. |
+        Small impact due to texture loading. |
+            Larger impact with raytracing/PBR because renderer must generate displaced geometry.
+
+Art workflow ||
+    Easy to manipulate in 2D apps, but can be hard to get desired result painting in 2D. Can be baked by rendering a height pass in 3D applications. |
+        Requires specialized texture painting tools. Can be baked from a high-resolution model or generated from a normal pass. |
+            Similar to bump maps.
+
+† Displacement mapping has less of an impact on render time and memory usage if you are using micropolygon rendering with no raytracing (for example, no raytraced shadows).
+
+== How to ==
+
+:task: Generate a detail map:
+    Use the [Bake Texture ROP|Node:out/baketexture] to export the maps as an extra image plane in a render.
+
+:task: Use a detail map:
+    The [Node:shop/principledshader] and the [Mantra Surface Shader|Node:shop/mantrasurface] have parameters to specify different types of detail maps to apply to the shaded surfaces.
+
+:task: Use a detail map in a custom shader:
+    Use the [Node:vop/displace] and/or [Node:vop/displacetexture] VOPs.
+
+== Masterclass video ==
+
+:vimeo_ref: H15 Masterclass: Mantra rendering and texture baking
+    #id: 143618200
+    
+    This masterclass video covers detail maps.
+
+== Normal map formats ==
+
+You can store normals in a texture in a few ways. Unfortunately, there is no clearly defined standard, so mantra shaders have a few options to account for these different formats.
+
+=== Vector space ===
+#display: pull left
+
+Tangent space:
+    Stores the normal relative to the _tangent space_ of the surface. Normals will still look right when the surface deforms, like the skin of an animated character.
+
+World space:
+    Stores normals relative to world space. If the surface moves or deforms, it will appear to swim through a texture anchored in place. You should generally only this for static geometry. World space maps preserve sharp cusps better than tangent-space maps.
+
+Object space:
+    Stores normals relative to the object transform. Objects can move, but if they deform the normals will not look right.
+
+=== [0,1] vs [-1,1] ===
+#display: pull left
+
+The values of a normal vector are naturally in the `[-1,1]` range.
+
+Since negative texture values are difficult to work with and impossible to store in some texture formats, applications usually remap the values to the `[0,1]` range before they're stored in a texture.
+
+When rendering with textures stored in this format, leave the __Normal Space__ parameter on mantra shaders at the default of `0 to 1`.
+
+Formats like `.rat` and `.exr` can store the normals using their natural `[-1,1]` range, so you may sometimes encounter textures that are stored this way. In this case set __Normal Space__ to `-1 to 1`.
+
+=== Flipped X & Y ===
+#display: pull left
+
+Textures exported from some packages will have the __Y__, and more rarely the __X__ component flipped. If your texture imports flipped, use the __Flip X__ and __Flip Y__ parameters on mantra shaders to correct it.
+
+=== Color Space ===
+#display: pull left
+
+You should store detail maps in _linear color space_. If you save a map in an image format that is natively sRGB (such as TIFF, JPEG, or PNG), you must avoid applying gamma to the image.
+
+* If you write a detail map with the [Composite ROP|Node:out/comp], turn off __Convert to Image Format's Colorspace__.
+
+* If you load a map in a [Texture VOP|Node:vop/texture], set the color space to __Linear__ to prevent gamma correction.
+
+* If you load a map into the compositor with a [File COP|Node:cop2/file], turn off __Linearize Non-Linear Images__.
+
+== Create a tangent-space normal map from a height map ==
+
+You can create a normal map from a height (or displacement) map in Houdini's compositor.
+
+# Load the height map in a [File COP|Node:/cop2/file]. Turn off __Linearize Non-Linear Images__ (to prevent gamma correction).
+
+# Append a [Gradient COP|Node:/cop2/gradient].
+
+    Set the __Gradient Type__ to "Displacement", and the __Output__ to "Normal Map".
+
+    Use the __Scale__ parameter to adjust the normals. The inverse of the displacement map scale used by the material is a good scale to use: `1/(maximum displacement)`. 
+
+# Append a [ROP File Output|Node:/out/comp] node. Set the __Output Filename__ and turn off __Convert to Image Format's Colorspace__ to avoid gamma correction.
+
+@related
+
+- [Principled Shader|Node:shop/principledshader]
+- [Mantra Surface Shader|Node:shop/mantrasurface]
+- [Displace VOP|Node:vop/displace]
+- [Displacement Texture VOP|Node:vop/displacetexture]
+- [Displace Along Normal VOP|Node:vop/displacenml]

@@ -1,0 +1,134 @@
+#type: node
+#context: sop
+#internal: wirecapture
+#icon: SOP/wirecapture
+
+#tags: reshape, capture, character, curves
+
+= Wire Capture =
+
+"""Captures surfaces to a wire,
+allowing you to edit the wire to deform the surface."""
+
+WireCapture works in conjunction with the WireDeform SOP by assigning
+wire capture weights to points that fall within a given radius of the
+capture primitives in the second input. The primitives are typically
+bezier or NURBs curves although primitives such as NURBs grids can also
+be used. The closer the point is to the primitives from the second
+input, the stronger the point is attached, ie. higher weight value.
+
+The WireCapture SOP will not visibly change the geometry (except to
+possibly add point colors for feedback). To actually change the
+geometry, append a WireDeform SOP with the same second input.
+
+
+@parameters
+    Group:
+        Optional point group to assign capture weights. If empty, this
+        implies that all points should be assigned.
+
+    == Parameters ==
+
+        Kernel Function:
+            [Dropoff
+            function|/nodes/sop/metaball#kernels]
+            used to convert the distance of a point to a capture
+            primitive weight. This function is normalized according to
+            each primitive's capture parameters.
+        Treat Polygons As Lines:
+            This specifies the behavior when the capture primitives
+            from the second input are polygons. If this is turned on
+            (default), then each closed polygon is treated a line
+            primitive starting from its first vertex. If off, then each
+            closed polygon is used as a face primitive with uv
+            coordinates based off of the first three vertices.
+        Destroy Existing Weights:
+            This specifies whether existing wire capture weight
+            attributes are destroyed. If off, then a Blend Factor can be
+            given to say how the new capture weights are blended with
+            the ones already in the input geometry. Note that since the
+            capturing is based on primitive order, all layered
+            WireCapture SOPs which have this parameter turned off must
+            have the same second input.
+        Visualize Weighting:
+            If on, this will generate point color attributes reflecting
+            the wire capture weights.
+        Visualize Type:
+            This specifies the type of visualization used when Visualize
+            Weighting is turned on. The Single Primitive visualize type
+            shows the weight of each primitive along a color gradient.
+            For points affected by multiple primitives, it will use the
+            blended deformation weight for coloring. Multiple
+            Primitives uses a blend of primitive colors found in the
+            second input. If they don't exist, then Single Primitive is
+            used.
+        Visualize Mode:
+            This specifies the gradient used for visualization.
+
+            Infra-red:
+                Utilizes the entire color spectrum where they range from
+                blue (0) to red (1).
+            White to Red:
+                Provides a gradient which varies from white (0) to red
+                (1).
+            Grayscale:
+                Provides a gradient which ranges from black (0) to white
+                (1).
+            Black Body:
+                Ranges from black (0) to red, yellow, then white (1).
+        Zero Weight Point Color:
+            This specifies the color used for points which are not
+            affected by any capture primitives when using the Multiple
+            Primitive visualize type.
+
+    == Capture ==
+
+        Initialize From Primitives:
+            This will initialize the parameters below using the
+            primitives found in the second input. An entry is created
+            for each primitive using it's primitive number.
+        Initialize From Groups:
+            This will initialize the parameters below using the
+            primitive groups found in the second input. An entry is
+            created for each named primitive group.
+        Number of Primitives:
+            This specifies the number of primitive parameter sets that
+            we wish to capture with. Each set below has a toggle to
+            indicate whether it should be active.
+        Primitive:
+            This specifies the primitive group for which the Subgroup,
+            Falloff Start, U Radius and Lookup, and U Range parameters
+            apply.
+        Subgroup:
+            This specifies the subgroup of points (within that listed in
+            the Group parameter) that the parameters below are
+            assigned.
+        Min/Max Weight:
+            This gives the range to scale weight values into.
+        Falloff Start:
+            This is a percentage of the current radius from which points
+            within are assigned a weight of 1. The values for this must
+            be between 0 and 1. It may vary along the primitive's
+            parametric u value if a channel exists in the Lookup
+            parameter.
+        U Radius and Lookup:
+            The two parameter components here are multiplied together to
+            determine the effective capturing radius of the primitives.
+            If the second component (Lookup) contains a channel, then it
+            is evaluated using the current u value of the primitive
+            instead of time. This allows you to specify a varying radius
+            along the u length of the primitive. The length of the
+            channel (ie. from its first to last key) is scaled to the u
+            length of the primitive. Note that if the lookup curve is a
+            channel reference, then the length of the channel must match
+            that of the referenced one.
+        U Range:
+            This specifies a u subrange of the primitive to use for
+            capturing. The first component specifies the start u value
+            and the second component gives the ending u value. Both of
+            these must be between 0 and 1. Furthermore, the start value
+            must be less than or equal to the end value.
+
+@related
+    - [Node:sop/wiredeform]
+

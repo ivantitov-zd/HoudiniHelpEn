@@ -1,0 +1,174 @@
+#type: node
+#context: dop
+#internal: ripplesolver
+#icon: DOP/ripplesolver
+
+= Ripple Solver =
+
+"""Animates wave propagation across Ripple Objects."""
+
+== Overview ==
+
+When you attach this solver to an object with Ripple Object
+data (usually created by either a [Ripple Object|Node:dop/rippleobject]
+dynamics node or a combination of [Empty Object|Node:dop/emptyobject]
+and [Ripple Configure Object|Node:dop/rippleconfigureobject]),
+it animates wave propagation across the object's surface by
+moving the surface's points.
+    
+[Anim:/images/dynamics/ripple_height.gif]
+
+Two types of forces affect wave evolution:
+
+- The __Wave speed__ value controls how fast waves move across the
+  surface.
+  
+  You can also paint _per-point_ wave speed attributes (see the attributes
+  section below) to make some areas of the surface communicate waves
+  faster or slower than others.
+  This lets you paint "islands" of zero wave speed. Waves will bounce off
+  these areas and the surface within the area will remain at rest.
+
+  The local curvature of the surface determines the displacement speed.
+  While the solver does displacement per-point, when it calculates
+  curvature it uses the connectivity of the points. In the case of a
+  height field, this has the effect of propagating ripples across the
+  surface of the height field.
+  
+- The __Rest Spring__ value pulls the surface back towards its rest shape
+  at each time step. Higher values will dissipate waves faster and
+  make the entire surface lose wave energy and eventually settle down
+  to the rest shape.
+  
+  You can also paint _per-point_ rest-spring attributes (see the attributes
+  section below) to make some areas of the surface more resilient
+  than others.
+
+Ripple propagation, while easiest to understand on
+a height field, _is not restricted to grid topology_.  Ripples can propagate
+along a curve, through a 3d lattice of points, or even across a
+complicated triangular mesh.
+
+[Anim:/images/dynamics/ripple_sphere.gif]
+
+You can expand on the ripple solver's behavior by using it as
+part of a multi-solver setup.
+You can combine the Ripple solver with additional SOP Solvers to add bumps
+or other effects on top of the ripple.
+
+TIP:
+    When the neighboring points don't move with the ripple, they cause a boundary condition that triggers the waves to bounce off them. You can use a gradient of conservation to feather in to have a more absorbing boundary. 
+
+== Attributes ==
+
+You can  [create attributes|/model/attributes]  on the Ripple Object's
+initial geometry to influence its behavior. Most of these attributes allow
+fine-tuning of the Ripple Solver by overriding default values set in this
+node.
+
+[Include:standard_wave_attribs]
+
+@parameters
+
+Adaptive Substep:
+    For high wave speeds and small edge lengths, the computation
+    can become unstable. To prevent this, an optimal substep is
+    computed by comparing the wave speed with the minimum edge
+    length.  
+    
+    Because computing the proper substep size can be
+    expensive, after one has fixed the topology and parameters one
+    can turn off adaptive substep and just set the minimum substep to the
+    proper calculated value. (You can get the calculated value from the
+    `wave2d_sop/foreach1/Number Range` parameter.)
+    
+    NOTE:
+        This does not take into account painted wave speeds - the wave speed should be set to the maximum of any painted wave speeds.
+
+CFL Condition:
+    Adjusts how conservative the adaptive substep should be.
+    Values less than 1 will produce smaller substeps than are
+    required, larger than 1 will produce larger.  
+    
+    Larger values of
+    CFL are likely dangerous as the automatically computed value
+    is close to the maximum.
+
+Min Substep:
+    Regardless of the adaptive substep computation, this number of
+    substeps will be performed.  This is also the number of
+    substeps to use if adaptive substep is turned off.
+
+    If high rest springs are present, it might be useful to
+    increase the minimum substep to reduce dampening.
+
+Max Substep:
+    No more than this number of substeps will be performed.
+    However, if the adaptive calculation is requiring more than
+    these, it likely will be unstable.
+
+Conservation:
+    How much energy is conserved in the system.  The
+    velocity is modified by this rate directly.   It measures the
+    fraction of velocity that will be kept after one second of
+    animation.  
+    
+    1 means no velocity is lost, 0.5 means 50% after
+    one second, and 0 means the velocity is zeroed out every
+    frame.
+
+Wave Speed:
+    How fast the ripples travel from point to point.  If Use Edge
+    Len is off, this is measured in terms of topology - distance
+    between each edge is considered 1.  Otherwise, it is
+    proportional to the average edge length at the node.
+
+Rest Spring:
+    The strength of the springs tying the points to their rest
+    positions.  Because the wave speed calculation only looks at
+    curvature of the displacement field, it will not restore the
+    geometry to the rest state.  
+    
+    The total displacement will be
+    preserved by the wave speed.  Adding rest springs will drag
+    the points back to their origin, and possibly induce new
+    ripples in doing so.
+
+    The spring is solved implicitly so large values can be used
+    with small time steps.  However, doing so will introduce
+    considerable dampening in the spring behavior - if this is
+    undesired, a lower minimum substep can be used.
+
+Use Normal Frame:
+    By default, the stored velocities and curvature computations
+    are done in world space.  Alternatively, one can use the `rnml`
+    attribute to define all displacements in terms of the rest
+    geometry's normal.  This allows ripples to properly bend around
+    curves in the surface.
+
+Use Rest Data:
+    Governs if the `rest` and `rnml` attribute should be used or if a
+    separate Geometry data should be used as the rest geometry.
+
+Rest Data:
+    Name of the Geometry data which is attached to this object
+    that should be used as the rest data.
+
+[Include:standard_solver_parms]
+
+@inputs
+
+[Include:standard_data_inputs]
+
+@outputs
+
+[Include:standard_data_outputs]
+
+@locals
+
+[Include:standard_data_locals]
+
+[Include:standard_locals]
+
+
+

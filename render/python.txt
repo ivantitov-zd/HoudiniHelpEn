@@ -1,0 +1,239 @@
+= Using Python in mantra renders =
+
+== Overview ==
+
+There are two places where [mantra|Node:out/ifd] can call Python. This allows users to fine-tune mantra's processing of data.
+
+- As the IFD is parsed, mantra can call a filtering function to query and change [properties|/props/mantra].
+
+- Mantra can call a function at the completion of every tile. This lets you insert more sophisticated statistical analysis of the rendering process.
+
+== How to query and set properties in callback scripts ==
+
+In Python scripts run by [mantra|Node:out/ifd], you can import the `mantra` module. The `mantra` module has two functions:
+
+`property("<<name>>")`:
+    Returns the value associated with the property name. The value will always be returned in a list, even if there's a single scalar value.
+
+`setproperty("<<name>>", value)`:
+    This function will set the named property to the value given. The function only works in filtering callbacks (not tile callbacks).
+
+== Filtering == (filtering)
+
+Use the `-P` option to [mantra|Node:out/ifd] to specify a Python script that [mantra|Node:out/ifd] should run during parting of the IFD file. You can specify multiple scripts separated by semicolons (`;`).
+
+You can optionally specify arguments which [mantra|Node:out/ifd] passes to the Python script when it's loaded. You can use this to modify the behavior of the filtering script.
+
+This script may define any of the following functions. If the script defines a function, [mantra|Node:out/ifd] will call the function at the appropriate point while parsing the IFD file. Mantra will ignore any functions you don't define.
+
+`filterGeometry()`:
+    Called just prior to the `ray_end` statement which locks off a geometry object. This allows the program to query `geometry:` settings and possibly alter them.
+
+`filterMaterial()`:
+    Mantra has material blocks which can be applied on a per-primitive basis. This function is called before a material is locked off. The function can add or change properties on the material.
+
+`filterInstance()`:
+    Called just prior to the `ray_end` statement which locks off the settings for an instance object. The function can query `object:` settings and possibly alter them.
+
+`filterLight()`:
+    Called just prior to the `ray_end` statement which locks off the settings for a light object. The function can query `light:` settings and possibly alter them.
+
+`filterFog()`:
+    Called just prior to the `ray_end` statement which locks off the settings for a fog object. The function can query `fog:` settings and possibly alter them.
+
+`filterCamera()`:
+    Called just before the global properties are locked off for the render. This is usually prior to the declaration of any objects in the IFD. If you change global properties after this, they probably will have no effect.
+
+    Since mantra calls this function before any lights or instances are declared, you can set default light or instance properties here. Mantra will apply any Instance/Light properties you set here to any objects which don't declare the property explicitly.
+
+`filterCameraSegment()`:
+    Called just prior to the `ray_end` statement locking the settings for a camera motion segment.
+
+`filterRender()`:
+    Called just before the `ray_raytrace` command. It's not possible to change any properties at this time in the IFD processing. However, for statistics or validation, it might be useful to have this method available.
+
+`filterPlane()`:
+    
+    As of Houdini 9.1, image plane settings are now properties (see [image plane properties|/props/mantra#imageplane]. This filtering callback allows image plane properties to be queried/modified as the IFD is parsed.
+    
+    {{{
+    #!python
+    def filterPlane():
+        print 'Defining plane:',
+              mantra.property('plane:channel'),
+              mantra.property('plane:variable')
+        mantra.setproperty('plane:quantization', 'float')
+    }}}
+
+`filterEndRender()`:
+    Called just after the image has been rendered.
+
+`filterOutputAssets()`:
+    Called after the render completes, and is passed a list of assets generated during the render. The assets are passed as a list of the format:
+
+    {{{
+    #!python
+    [
+        # Asset 1
+        [assetname (str),
+            [
+                # A list of files associated with the asset
+                [file (str), filetype (int)],
+                [file (str), filetype (int)],
+                ...
+            ]
+        ],
+        # Asset 2
+        [assetname (str),
+            ...
+        ],
+        ...
+    ]
+    }}}
+
+    <assetname> - The asset name
+    <file> - The path to the file
+    <filetype> - The type of file: 0-Image, 1-Texture, 2-Geometry, 3-ShadowMap, 4-PhotonMap, 5-EnvMap
+
+    {{{
+    #!python
+    import os
+
+    def filterOutputAssets(assets):
+        # Foreach asset
+        for a in assets:
+            print 'Processing asset: \''+a[0]+'\''
+            # Foreach file in asset
+            for f in a[1]:
+                filename = f[0]
+                filetype = f[1]
+                filebase = os.path.splitext(filename)[0]
+                # Convert texture to PNG format
+                if filetype == 1:
+                    print 'Processing texture: \''+filename+'\''
+                    os.system('iconvert '+filename+' '+filebase+'.png')
+                # Convert geometry to OBJ format
+                elif filetype == 2:
+                    print 'Processing geometry: \''+filename+'\''
+                    os.system('gconvert '+filename+' '+filebase+'.obj')
+    }}}
+
+`filterQuit()`:
+    Called just before mantra quits.
+
+`filterError(level, message, prefix)`:
+    Called when mantra prints an error, warning, or info message.  `level` indicates the verbosity level of the message (0 is for errors), message is the message, and prefix is usually the 'mantra: ' prefix.  The method should return True if the error has been processed or return False to let mantra process the error message normally.
+
+`filterTexture(operation, filename)`:
+    Called when mantra encounters an issue with a texture map.  Currently, the `operations` will be one of:
+    * `missing`  -- The texture was not found.
+    * `convert`  -- The texture was not in .rat format and will be converted internally.
+
+=== Simple filter example ===
+
+{{{
+#!python
+#
+# Simple Example Filter
+#
+
+import sys, mantra
+
+Verbose = False
+
+# Process any arguments during initialization of the module
+
+for arg in sys.argv[1:]:
+    if arg == '-v':
+        Verbose = True
+
+# A callback to change the surface shader of all objects
+
+def filterInstance():
+    if Verbose:
+        print 'Filtering:', mantra.property('object:name')
+    
+    mantra.setproperty('object:surface', 'plastic diff 1 0 0'.split())
+    
+    catstr = mantra.property('object:categories')[0]
+    categories = catstr.split(', ')
+    for c in categories:
+        if c == 'pass1':
+            mantra.setproperty('object:renderable', 0)
+            
+        elif c == 'pass2':
+            mantra.setproperty('object:surface', 'matte')
+            mantra.setproperty('object:overridedetail', 1)
+}}}
+
+=== Changing the deep camera/shadow map filename ===
+
+A frequently asked question is how to change the deep camera/shadow map when Python filtering. In Mantra, the deep camera file name is part of the `deepresolver` property. This property contains all arguments passed to the deep resolver, including the filename. This example finds the existing deep resolver statement, then changes the arguments to use a new filename.
+
+{{{
+#!python
+def filterCamera():
+    # Get the existing deep resolver arguments
+    deepresolver = mantra.property("image:deepresolver")
+    if deepresolver:
+        # Create a copy of the arguments
+        args = list(deepresolver)
+
+        # Find the position of the filename argument in the list
+        # (replace "old_filename" with the filename you want to change)
+        i = args.index("old_filename") + 1
+        # Change the filename
+        args[i] = "new_filename"
+
+        # Set the new list as the property value
+        mantra.setproperty("image:deepresolver", args)
+}}}
+
+== Tile completion ==
+
+You can use the `renderer:tilecallback` property to specify a python script (and optional arguments) which [mantra|Node:out/ifd] will run after each tile is completed.
+
+Unlike the Python filters, only one script may be specified (commands may not be semi-colon separated). The script does not define functions that mantra calls. Instead, [mantra|Node:out/ifd] runs the entire script each time a tile is complete. The tile script can not call `mantra.setproperty()`.
+
+Some additional properties are available to the tile callback which might be useful for gathering/printing statistics.
+
+* `tile:ntiles` -- The total number of tiles in the image.
+* `tile:ncomplete` -- The number of tiles completed so far.
+* `tile:laptime` -- The number of seconds taken to render the last tile.
+* `tile:totaltime` -- The total number of seconds to render since the render began. This does not include time to load the scene, but rather is defined as the time since the first tile began rendering.
+* `tile:coords` -- The tile bounding box (in pixels).
+* `tile:memory` -- The amount of RAM in use by mantra.
+
+{{{
+#!python
+import sys,mantra
+
+tile = mantra.property('tile:ncomplete')[0]
+if tile == 1:
+    # This is the first tile rendered in the image
+    
+    print mantra.property('renderer:name')
+    ntiles = mantra.property('tile:ntiles')[0]
+    prev_pct = -1
+    lap = 0
+    lsum = 0
+
+lap += mantra.property('tile:laptime')[0]
+pct = tile * 100 / ntiles
+
+if pct != prev_pct:
+    mem = mantra.property('tile:memory')[0]
+    total = mantra.property('tile:totaltime')[0]
+    fpct = float(tile)/float(ntiles) # Percent complete
+    prev_pct = pct
+    
+    print('%03d%% Complete - Laptime %g/%g - ETA %g seconds\n' %
+            (pct, lap, total, total/fpct))
+    
+    lap = 0         # Reset the lap counter
+}}}
+
+@related
+
+* [Rendering properties|/props/mantra]
+

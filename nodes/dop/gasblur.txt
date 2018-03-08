@@ -1,0 +1,85 @@
+#type: node
+#context: dop
+#internal: gasblur
+#icon: DOP/gas
+
+= Gas Blur =
+
+"""A microsolver that blurs fields."""
+
+The Gas Blur DOP is a microsolver used in building larger fluid
+simulations. The [Fluid Solver|Node:dop/fluidsolver] and [Smoke Solver|Node:dop/smokesolver] DOPs that allow
+microsolvers to be added before or after the main solver step to extend
+or tweak the simulation. Alternatively, enterprising people may attempt
+to build an entire new solver out of microsolvers.
+
+The Gas Blur DOP blurs fields using an optionally time dependent blur
+kernel.
+
+@parameters
+    Field:
+        The list of fields to blur.
+        This can be a space separated or globbed list. __Scalar__, __Vector__, and __Matrix__ fields can all be blurred.
+
+    Radius Field:
+	A scalar field that modifies the radius of the blurring on a
+	per-voxel basis.  The global radius will be multiplied by the
+	value of this field.  If not present, the global radius is
+	used everywhere.
+    Mask Field:
+	Controls which voxels can *contribute* to the blurred field.  Zero
+	valued voxels will not contribute to the result of the blur.
+	If the blur's radius has no non-zero mask voxels, it is left
+	unchanged.  This is more like an object mask than a
+	transparency mask.  For example, if you blur a liquid's
+	velocity you don't want velocities from outside the liquid to
+	contribute to the blur.
+    Treat Mask As SDF:
+	The mask normally is considered a weighting function, mapping
+	zero for no weight to one for full weight.  Instead, it can be
+	a signed distance field where negative values are inside, so
+	have a value of one, and positive values outside, so have a
+	value of zero.
+    Radius:
+	The size of the blur kernel in worldspace.  Note that if the
+	blur is timedependent, this is the size of the kernel if
+	applied for a full second.
+    Filter:
+	The shape of the blur kernel.  In all cases, the box blur is
+	the underlying method.  If the blur is small or substepping
+	large, one can likely get away with a box blur as it will
+	become equivalent to a guassian blur with enough substeps.
+	    Box:
+		A simple box blur.
+	    Cone:
+		A cone shaped blur created by performing two box
+		blurs.
+	    Guassian:
+		An approximation of a guassian blur by performing four
+		box blurs.
+    
+    Use Multi Pass Blur:
+	If the blur is simple, ie, no radius or mask field is present,
+	it can be performed much faster as three 1d box blurs.  This
+	parameter enables the faster blur.  In addition to being
+	faster, it will also properly blur small blur radii that are
+	disabled in the normal blur algorithm due to rounding issues.
+	Finally, it respects the field's boundary conditions, as
+	opposed to the normal blur which treats out of bound voxels as
+	masked out.
+
+    [Include:standard_gas_timestep]
+    [Include:standard_solver_parms]
+
+@inputs
+    [Include:standard_data_inputs]
+
+@outputs
+    [Include:standard_data_outputs]
+
+@locals
+    [Include:standard_data_locals]
+
+    [Include:standard_locals]
+
+

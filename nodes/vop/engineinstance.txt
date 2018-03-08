@@ -1,0 +1,61 @@
+#type: node
+#context: vop
+#internal: hscriptinstance
+#icon: VOP/hscriptinstance
+
+= Instance with Hscript Procedural =
+
+"""Runs hscript for each point in the source geometry and instances the generated geometry to the point."""
+
+This shader lets you specify a SOP asset to generate instanced geometry at render time. For each point in the object this shader is applied to, mantra copies any point attributes onto identically named parameters on the SOP, and then cooks the SOP to generate the instanced geometry.
+
+For example, you could set the shader to use the [Platonic SOP|Node:sop/platonic], and add a point attribute named `type` on the source object. The point attribute will control which platonic solid is generated (since the Platonic node has a parameter with the internal name `type` which controls the type of solid).
+
+WARNING:
+    To render a scene using this shader, you must start mantra using the `-e basic|full` command line option. See [the help for -e|/render/batch#mantra].
+
+== Notes ==
+
+* If you don't specify the bounding box, the shader uses the bounding box of this object's geometry, increased by the predicted instance sizes.
+
+* If the SOP contains a SHOP network with SHOPs that are used, a non-displayed version of the SOP should be in your scene file. You should also set the output driver to have the __SHOP References__ parameter set to __Declare all SHOPS__.
+
+* The procedural shader will pass its level of detail to a parameter named `lod`. If there is an attribute named `lod`, it will override the level of detail calculated by mantra.
+
+@parameters
+
+== Main ==
+
+SOP:
+    Name of the SOP type.  This is the name, not the label.  Examples: box, platonic, sphere.
+
+OTL Files:
+    Filenames with paths of OTL libraries that hscript should otload prior to creating the SOP.
+
+Basic Size:
+    The estimated maximum size (as a radius in each direction) of each instance. Mantra uses this to compute the new bounding box for the object after instancing. If you underestimate how much space to add for the instances you can get rendering errors, while overestimating might slow the render down, so it's better to overestimate. 
+
+Orient to Point:
+    If this checkbox is turned on, it will try to orient to the points velocity.  If this checkbox is turned off, a translation to the point's space will be performed.
+
+Defer Geometry Creation:
+    Normally the procedural generates all geometry when the procedural is rendered.  Turning this on defers creation of instances until each instance is rendered. For example, if you have scattered instances, but only render a few of them, this option may save memory since some geometry will never be created.
+
+    When this option is on, the shader can no longer share geometry between different point instances. So if you're instancing the same geometry to a lot of points, the geometry will be duplicated (not instanced), so the mantra will use _more_ memory.
+
+SOP HDA Requires LOD:
+    The engine procedural is able to compute an approximate level of detail and pass this to the SOP HDA using a parameter named `lod`.  If the SOP HDA doesn't cook differently for different levels of detail the engine procedural is able to be more efficient.
+
+== IFD Bounds ==
+
+Bounding Box:
+    The bounding box controls let you specify a bounding box for the referenced geometry. Only when this bounding box is "on screen" will mantra load the referenced geometry. You can set __Bounding Box__ to __No bounding box required__, in which case mantra will always load the references geometry regardless. You can also specify the bounding box by referencing the SOP's bounding box in the __SOP Bounds__ parameter.
+
+SOP Bounds:
+    The geometry whose bounding box you want to reference.
+
+Min Bounds:
+    The minimum bounding box dimensions, when setting explicit bounds.
+
+Max Bounds:
+    The maximum bounding box dimensions, when setting explicit bounds. 

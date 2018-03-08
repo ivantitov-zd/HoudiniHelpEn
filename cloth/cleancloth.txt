@@ -1,0 +1,35 @@
+= How to |> create clean cloth geometry =
+
+The initial geometry for a Cloth Object is specified by the
+__SOP Path__ parameter. This geometry contains the initial positions for the cloth simulations. An initial velocity may also be specified in this geometry, by means
+of a point attribute `v`. If this velocity attribute is missing, then the cloth solver assumes that the initial velocities of all points are zero.
+
+The rest state of the cloth is determined by the geometry that is pointed to by __Rest Geometry__. The topologies of the rest geometry and the simulation geometry don't need to match. This allows the rest state to work in simulations with tearing. However, the vertex numbers in the simulation geometry must match the vertex numbers in the rest geometry.
+
+The Cloth Object expects a certain type of geometry. It will only simulate triangles and quads. Other types of primitives, such as spheres should not be present in the cloth geometry.
+
+The cloth geometry is allowed to be an arbitrary mix of triangles and quads. When quad geometry is used, the directions of the edges indicate the warped and weft directions of the cloth fabric. These directions affect how the Stretch and Shear components of the __Relative Stiffness__ apply to the geometry. Instead of working with quads, a triangle-based workflow is possible as well. For triangles, it is recommended that you specify a `materialuv` point attribute or vertex attribute. This attribute tells the Cloth Object what the warped and weft fabric directions are. When the `materialuv` is present on cloth geometry with quads, then fabric directions in the `materialuv` are used instead of the quad edge directions. So with `materialuv` is it possible to use any mix of triangles and quads for cloth.
+
+The Cloth Object is very sensitive to bad geometry. Poorly shaped triangles and quads may cause a simulation to slow down significantly and/or produce poor-quality results. A single bad triangle or quad may cause a significant slowdown of the simulation times. This is especially so when self-collisions are enabled. As a rule of thumb, aim for triangles to be as close to equilateral as possible. Quads should be as close to a square as possible.
+
+NOTE:
+        The solver will generate warnings about really bad geometry, and create primitive groups for the bad parts. For improving your quality, it is useful to enable the __Create Quality Attributes__ on the solver. This creates an primitive attribute 'quality' with values between 0 (worst) and 1 (best). Aim to get the quality values for the mesh as high as possible. The [Remesh SOP|Node:sop/remesh] can be a useful tool for this.
+
+The following are some guidelines for creating clean cloth geometry that simulates well:
+
+* Make sure that there there are no two points that have the same or nearly the same position. Points like this should be fused together or removed.
+* Avoid geometry that intersects itself.
+* Avoid highly non-planar quads.
+* Ensure that the __Cloth Thickness__ on the [Cloth Object|Node:dop/clothobject] isn't too large compared to the sizes of the polygons.
+
+    NOTE:
+        As a rule of thumb, the __Cloth Thickness__ should be between 1% and 10% of the average cloth edge lengths.
+
+* Don't mix polygons with very different scales. 
+
+    For example, in a single cloth object, don't have polygon edges of 1 meter together with polygons that are 1 centimeter. Keep the edge lengths close to the average edge length within the cloth object.
+
+* Avoid very thin or irregularly shaped polygons. The "fatter" the polygons in your geometry are the better it is. 
+
+    For example, you should not have a single polygon that has one side of 1 centimeter and another side that is 1 meter long. As a rule of thumb, for each polygon in your cloth geometry, you should be able to place inside it a circle whose diameter is not smaller than 1% of the polygon's maximum width.
+

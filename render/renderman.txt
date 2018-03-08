@@ -1,0 +1,157 @@
+= Rendering with RenderMan =
+
+Rendering with RenderMan is done in Houdini thru a [RenderMan render output driver node|/nodes/out/rib]. It generates a RIB stream and pipes it to the `prman` executable specified in the __Command__ parameter. It is also possible to save a `.rib` file to disk, by turning on the toggle next to the __Disk File__ parameter.
+
+Under the hood, the [output driver node|/nodes/out/rib] runs [SOHO|/render/soho]
+scripts, taking into consideration the RenderMan version specifiedc in the
+__Render Target__ parameter. The scripts inspect the scene and write out a
+corresponding RIB, compiling any VOP shaders such as [RSL Material|/nodes/shop/rsl_vopmaterial], if necessary.
+
+For more information, please refer to the [RenderMan documentation|https://rmanwiki.pixar.com/display/RfH/RenderMan+for+Houdini].
+
+== Setting up RenderMan ==
+In order for Houdini to be able to find all the necessary RenderMan tools, first you will need to set a few environment variables:
+* ensure the `RMANTREE` is set to the installed version of RenderMan, for example:
+    {{{
+    export RMANTREE=/opt/pixar/RenderManProServer-20.0
+    }}}
+
+* ensure the search path includes the `bin` subdirectory of RenderMan, for example:
+    {{{
+    export PATH=$PATH:$RMANTREE/bin
+    }}}
+
+* set the `HOUDINI_DEFAULT_RIB_RENDERER` to the desired version, for example:
+ 
+    {{{
+    export HOUDINI_DEFAULT_RIB_RENDERER=prman20.0
+    }}}
+
+After setting up these three environment variables, Houdini should be able to
+use RenderMan.
+
+== Choosing a renderer ==
+
+Each RIB target renderer has its own executable, way of compiling shaders, attributes, options, and features. Much of this is handled by Houdini behind the scenes. However, as a big head start, you can give Houdini a hint as to which render you are using by setting the environment variable `HOUDINI_DEFAULT_RIB_RENDERER` to the render target you want to use. The list of renderers can be inferred by looking at the `$HH/RIBtargets` and also at `$HH/soho` directory and scanning the files. The current renderers include `prman20.0`, `air6.0`,  `3Delight9.0`, and `rdc3.4`.
+
+Houdini uses this variable in several places. In the `hrmanshader` script (a wrapper around the shader compiler), the variable controls which compiler program to call. It also controls which properties appear on the RIB output driver.
+
+:task:Set the default RIB renderer:
+    Set the `HOUDINI_DEFAULT_RIB_RENDERER` environment variable, for example:
+ 
+    {{{
+    # set up for prman20.0
+    export HOUDINI_DEFAULT_RIB_RENDERER=prman20.0
+    }}}
+
+== Setting up the display driver ==
+
+RenderMan version 20.2 and up ships with a Houdini display driver, so there is no need for any additional setup, beyond specifying `houdini` in the ROP node's __Display Device__ parameter.  Once this is done, the RIB renderer will render directly to MPlay.  
+
+It is also possible to reconfigure RenderMan to remap `framebuffer` device to Houdini display driver, so that all framebuffer rendering goes to MPlay as well. This can be done in `rendermn.ini` with this line:
+{{{
+/displaytype/framebuffer houdini
+}}}
+
+== Customizing the View: RenderMan menu ==
+
+The render menu in viewports has an entry `View:RenderMan`. This will render the scene without having to create an output driver. However, Houdini needs to know which application to invoke to render the scene. This is determined by setting the environment variable `HOUDINI_VIEW_RMAN`.
+
+:task:Modify the "View: Renderman" menu command:
+    To change the renderer used when you choose __View: RenderMan__ from the render icon in the viewer, set the environment variable `HOUDINI_VIEW_RMAN`. For example:
+
+    {{{
+    # Set up for 3delight
+    export HOUDINI_VIEW_RMAN=renderdl
+    }}}
+    
+== Overriding the shader path ==
+Houdini will set the path to the default path each renderer expects. You can override the shader path in two ways:
+
+# Set the path by adding the rendering parameter to the output driver (preferred method).
+    
+# Set the environment variable `HOUDINI_RI_SHADERPATH`.
+    
+If you customize the path, you should include `$HFS/ri_shaders` in the path for light shaders. If you don't customize the path, Houdini will look for directories named `ri_shaders` in the `HOUDINI_PATH`.
+
+For RIS shader plugins there is a `HOUDINI_RI_RIXPLUGINPATH` environment variable.  But you don't need to include `$HFS/ri_shaders` in your customization, since Houdini does not look for directories named `ri_shaders` because Houdini does not ship with any custom RIS shader plugins. Thus the implicit default of `$RMANTREE/lib/RIS` usually suffices.
+
+== Customizing object parameters ==
+
+If you are using RenderMan or AIR as a primary renderer, you may not want to see all of the mantra parameters in your geometry objects. You can customize the geometry object to create objects with RenderMan/AIR parameters instead.
+
+:task:Customize object parameters:
+    # Create a [Geometry object|Node:obj/geo] in Houdini.
+    
+    # In the parameter editor, click the [Icon:BUTTONS/gear] menu and choose __Edit Rendering Parameters__.
+    
+    # Remove all of the mantra parameters.
+    
+    # Add the appropriate RIB parameters. 
+    
+        Different users may prefer different properties. The following list is not a complete list of all RenderMan parameters, but a list of useful ones.
+    
+        * Dicing
+            * Binary Dicing
+            * Raster Oriented Dicing
+            * Motion Factor
+        * Geometry
+            * Automatically Compute N for Polygons
+            * Render as points
+            * Polys as subdivision
+            * Backface Removal
+        * Shading
+            * Categories
+            * Camera Hit Mode
+            * Color (Cs)
+            * Opacity (Os)
+            * Matte
+            * Cull Shading of Backface Surfaces
+            * Shading Quality
+            
+    # Choose __Save As Permanent Defaults__ from the [Icon:BUTTONS/gear] menu in the [parameter editor|/ref/panes/parms]. This will save the presets to the `$HOME/houdiniX.X/presets` directory and can be moved to per-shot, per-job or per-site directories. For more information see the [Houdini Path|/basics/config] help.
+
+    Once you save the parameters as permanent default parameters, they will be applied to all new objects. (You can do the same with the light and camera objects, though lights should work fairly well out-of-the-box in Houdini).
+    
+TIP:
+    You can improve shading quality by adding the __Shading Interpolation__ parameter.
+
+== Importing shaders ==
+
+You can use VOPs to create RSL shaders, or you can import other shaders that you have written. Importing is done by creating Houdini Digital Assets that correspond to the written shaders.
+
+To import shaders, run a Python script which parse the output of `sloinfo` (prman), `shaderinfo` (3Delight), `aqsltell` (Aqsis), `sdrinfo `(Pixie), etc. Houdini ships with 2 scripts: `slo2otl.py` to convert prman shaders and `sdl2otl.py` to convert 3Delight shaders.
+
+The scripts are reliant on being able to parse information about shader parameters, but should be fairly easy to customize for an unsupported renderer. The script tries to implicitly guess the HDA table type and is geared for RIS shaders which are VOPs, so light and displacement .slo files implicitly yeld a VOP HDA. You can force the HDA SHOP with the -t command-line switch.
+
+For example:
+{{{
+slo2otl.py -t Shop -l myshaders.hda *.slo
+}}}
+
+This will create an HDA which can be loaded into Houdini. All of the recognized shaders will exist as SHOP nodes.
+
+NOTE:
+    Windows requires you to run hython in order to run Python.
+
+    {{{
+    hython sdl2otl.py -l myrmanshaders.otl *.sdl
+    }}}
+
+    Hython will not find the `sdl2otl.py` script unless `$HB` is included in the Python path.
+
+== Building RSL shaders using VOPs ==
+
+In addition to importing external `.slo` shaders described above,
+Houdini allows to build shaders using [VOP networks|/shade/vops] 
+such as [RSL Material|/nodes/shop/rsl_vopmaterial]. 
+You can assign [RSL Material|/nodes/shop/rsl_vopmaterial] to [objects|/basics/objects] by setting the __Material__ parameter, or to individual primitives using the [Material SOP|Node:sop/material], as described in the [shading documentation|/shade/basics].
+
+== RIS Rendering Mode ==
+
+To use RenderMan's RIS rendering mode, turn on the __RIS Mode__ parameter in the __RIS__ sub-tab of the __Properties__ tab on the [RenderMan node|/nodes/out/rib]. You can then optionally specify an integrator shader in the __Integrator__ parameter. Please see [RIS shaders|/shade/ris] for more information.
+
+@related
+
+- [How to use AIR|/render/air]
+- [Environment variables|/basics/config_env]

@@ -1,0 +1,89 @@
+= HOM cookbook |> Qt =
+
+== Overview ==
+
+This example creates a custom UI window inside Houdini using PySide2. PySide2 is included with Houdini so you don't need to install it. 
+
+TIP:
+	If you want a custom interface in a Houdini pane tab, use a [python panel|/ref/panes/pythonpanel].
+
+== Implementation ==
+
+WARNING:
+	PySide2 code must be executed from Houdini's main thread. This means from the [scene file's Houdini module|/hom/locations#session], which is run when the scene file is loaded, or from a shelf tool's __Script__ tab.
+	
+	Do not run the example code below in a Python shell. It will not work and may even crash Houdini.
+
+# Right-click an empty space on the shelf and choose __New tool__.
+
+	Set the tool's __Name__ to `pyside`, the __Label__ to `PySide2 Demo`, and the __Icon__ to `MISC_python`.
+
+# On the tool's __Script__ tab, paste the following code:
+
+	{{{
+	#!python
+	from PySide2 import QtCore
+	from PySide2 import QtWidgets
+
+	class FontDemo(QtWidgets.QWidget):
+	    def __init__(self, parent=None):
+	        QtWidgets.QWidget.__init__(self, parent)
+
+	        hbox = QtWidgets.QHBoxLayout()
+
+	        self.setGeometry(500, 300, 250, 110)
+	        self.setWindowTitle('Font Demo')
+
+	        button = QtWidgets.QPushButton('Change Font', self)
+	        button.setFocusPolicy(QtCore.Qt.NoFocus)
+	        button.move(20, 20)
+
+	        hbox.addWidget(button)
+
+	        self.connect(button, QtCore.SIGNAL('clicked()'), self.showDialog)
+
+	        self.label = QtWidgets.QLabel('This is some sample text', self)
+	        self.label.move(130, 20)
+
+	        hbox.addWidget(self.label, 1)
+	        self.setLayout(hbox)
+
+	    def showDialog(self):
+	        font, ok = QtWidgets.QFontDialog.getFont()
+	        if ok:
+	            self.label.setFont(font)
+
+	dialog = FontDemo()
+	dialog.show()
+	}}}
+
+# Click __Accept__.
+
+# Click the new PySide2 Demo shelf tool.
+
+	A custom window will open containing a button and a label. Click the button to show a font chooser dialog that will change the font of the label text.
+
+== Window lifetimes ==
+
+A PySide2 window only exists as long as there is a reference to it in Python.
+
+When you are writing your own code, if you create a window inside a function, and don't store it somewhere persistent in memory (such as `hou.session`), the window will disappear when Python garbage collects the window at the end of the function.
+
+In this example, the window continues to exist after the tool script finishes running, but this is a side effect of the fact Houdini doesn't actually recycle the script context until the tool is clicked again.
+
+One method for keeping the dialog alive without explicitly storing it somewhere persistent in memory is to parent the dialog to the main Houdini window (see [Hom:hou.ui#mainQtWindow]).  This causes the main window to manage the dialog and keep it alive for the lifetime of the window.  If you want to clean up the dialog when it is closed then you must write a _closeEvent()_ method on the dialog to unparent it from the main window.
+
+== Using PyQt5 instead of PySide2 ==
+
+If you want to use PyQt5 instead of PySide2, you must install PyQt5. Note that commercial uses of PyQt5 require a commercial license, see the PyQt5 website for more information.
+
+:platform:Windows:
+	If using PyQt5 on Windows, make sure to install the library to the Python included with Houdini (in `<<Houdini install location>>/python`).
+
+To use PyQt5 in the example, replace references to `PySide2` with `PyQt5`:
+
+{{{
+#!python
+from PyQt5 import QtCore
+from PyQt5 import QtWidgets
+}}}

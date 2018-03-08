@@ -1,0 +1,209 @@
+= Volume Wrangle =
+
+#type: node
+#context: sop
+#internal: volumewrangle
+#icon: SOP/volumewrangle
+#tags: volume, attrs, core, tech
+
+"""Runs a VEX snippet to modify voxel values in a volume."""
+
+== Overview ==
+
+This is a very powerful, low-level node that lets experts who are
+familiar with VEX tweak voxel values using code.
+
+This node corresponds to the [Volume VOP SOP|Node:sop/volumevop],
+but uses a textual VEX snippet instead of a VOP network.
+
+WARNING:
+    This node requires that you understand the [vex language|/vex].
+    It is very easy to write incorrect code using this node.
+
+This node runs the snippet _on every voxel in the input volume(s)_
+(unless the __Bind each volume to density__ parameter is on).
+The snippet can edit the input geometry by changing attributes.
+It can access information from other geometry using attributes and VEX functions.
+
+* Press ((MMB)) on the node to see any error output from the snippet.
+
+* You can use the VEX function `ch` to evaluate parameters.
+  The path is relative to this node (`ch("parm")` will evaluate the parameter `parm` on this node).
+  This evaluation will be done at the current time.
+
+* Unlike the [Volume Mix SOP|Node:sop/volumemix], this does not use local variables.
+  Further, all backtick expressions and `$F` variables will be evaluated at frame 1,
+  not the current time.
+  Use `Frame`, `Time`, or `TimeInc` instead.
+
+[Include:wrangle_syntax]
+
+== Reading and modifying the voxel value == (values)
+
+The current voxel value in a volume is available as `@<<volume_name>>`.
+You can read this variable to get the current value, and assign it to change the value.
+For example, to add `0.1` to the value of every voxel in the float volume `foo`:
+
+{{{
+#!vex
+@foo += 0.1
+}}}
+
+If a volume does not have a name, it will automatically be bound to `@density`.
+
+If you have multiple named volumes in the input, you can write a single snippet
+that modifies the different volumes in different ways, for example:
+
+{{{
+#!vex
+@foo += 0.1
+@bar += 0.2
+@baz += 0.3
+}}}
+
+Alternatively, you can turn on __Bind each volume to density__.
+This acts as if every input volume was named `density`,
+so you can use the same snippet to modify every voxel in every volume:
+
+{{{
+#!vex
+// Modify @foo, @bar, and @baz in the same way
+// (when Bind each volume to density is on)
+@density += sin(@P.x)
+}}}
+
+NOTE:
+    Unlike how the
+    [Point Wrangle|Node:sop/pointwrangle]
+    and [Attribute Wrangle|Node:sop/attribwrangle] nodes work,
+    writing to an unknown `@<<name>>` variable will not create a volume.
+
+== VEX variables ==
+
+You can create temporary variables.
+For example, the following code reads an offset location from a point.
+
+{{{
+#!vex
+vector temp = @P;
+temp += {0.1, 0.2, 0.3};
+@density = volumesample(@OpInput1, 0, temp);
+}}}
+
+== Bound Variables ==
+
+A number of variables are bound in the Volume VOP context. 
+Use the `@` prefix syntax to access them.
+
+`ix`, `iy`, `iz`:
+	The integer index of the current voxel.  With VDBs, this can be
+	negative.
+`resx`, `resy`, `resz`:
+	The resolution of the current volume primitive.  For VDBs this
+	is the size of the active voxel region.
+`dPdx`, `dPdy`, `dPdz`:
+	Vectors giving the length and orientation of the x, y, and z edges of
+	the 0th voxel.
+`center`:
+	The center of the volume in SOP space.
+`Time`:
+	Current time in seconds.
+`Frame`:
+	Current time in frames.
+`TimeInc`:
+	Time increment between frames, in seconds.
+`OpInput1`, `OpInput2`, `OpInput3`, `OpInput4`:
+	A string that can be used to refer to the corresponding input
+	of this SOP in vex operations that take file parameters.
+
+@parameters
+
+== Code ==
+
+Group:
+    Only run the program on these volumes in the input geometry.
+    Leave this blank to modify all volumes in the input.
+    
+    (See [reading and writing voxel values|#values] above.)
+
+Bind Each to Density:
+    Changes how the node applies the snippet.
+    When this is off, you must refer to specific volumes in the input by name (for example `@foo`).
+    When this is on, every input volume is treated as `@density`,
+    so you can write one snippet to affect every input volume regardless of their names.
+    
+    (See [reading and writing voxel values|#values] above.)
+    
+[Include:pointwrangle#snippet]
+
+Volumes To Write To:
+    Only modify volumes if their names match this pattern.
+    The default pattern allows any volume to be modified.
+    You can speed up the node by only listing volumes that are _actually_ modified by the snippet.
+    
+    For example, in the following snippet, only the `density` volume is modified.
+    The `temperature` volume is not modified, only read.
+    
+    {{{
+    #!vex
+    @density = @temperature;
+    }}}
+    
+    However, for obscure reasons, the node will both modify `density` and _copy_ `temperature`.
+    This uses time and memory.
+    To prevent this, you could set this parameter to `density` to prevent the node
+    from copying `temperature`.
+    Of course, this requires that you explicitly manage the list of writable volumes.
+
+Enforce Prototypes:
+    Automatic binding with the `@` syntax can be convenient, but if your
+    system becomes more complex there is the risk that a typo in an `@` binding
+    will silently just bind a non-existent attribute.
+
+    This option forces all `@` bindings to be explicitly declared as
+    prototypes before use.
+
+== Bindings ==
+
+    Autobind by Name:
+	Will use the name primitive attribute to determine which
+	volume binds with which parameter.  If the name attribute
+	isn't present, the first volume is bound to density.
+
+	A name like "foo" will be bound to the float parameter
+	"foo".  A name of "foo.x" will be bound to the x
+	component of the vector (three float) parameter "foo".  A
+	name like "foo.zx" will be bound to the x,z component of
+	the matrix (three by three) parameter "foo".
+    
+    Primitive, Primitive Name, VEX Parameter:
+	Manually specifies the bindings of each primitive.  This
+	is equivalent to those primitives having a name attribute
+	with the given name.  If Primitive Name is not empty,
+	the primitive with the matching name will be bound to the
+	given vex parameter.
+
+    Only Output Created Geometry:
+	Don't output any of the incoming volumes.  Instead, the output
+	will consiste of only geometry created by the VOPs.  This
+	is useful if generating points from volumes.  Note you will
+	still have to do a dummy write to any volume you wish
+	to iterate over.
+
+    Evaluation Node Path:
+	VEX functions like `ch()` usually evaluate with respect to this node.
+	Providing a path here can override where the path search starts
+	from.  This is useful for embedding in a digital asset where you
+	would like the top level digital asset to be the search root.
+
+    Export Parameters:
+	This pattern can be used to override
+	the export option on the VEX shader to avoid writing to 
+	certain volumes.  The pattern matches the VEX parameter, not
+	the bound volume.  The volume will still be bound for
+	reading.
+
+@related
+
+- [Node:sop/volumemix]
+- [Node:sop/volumevop]

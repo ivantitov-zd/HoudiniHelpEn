@@ -1,0 +1,339 @@
+#type: node
+#context: dop
+#internal: gasupres::2.0
+#icon: DOP/gas
+#version: 2.0
+
+= Gas Up Res =
+
+"""Up-scales and/or modifies a smoke, fire, or liquid simulations."""
+
+* This solver can *scale* a low-resolution smoke, file, or even liquid simulation into a higher-resolution container. You can add detail with turbulent noise, at a small enough scale to not affect the large-scale motion of the smoke.
+
+    This lets you set up the general motion of a simulation at a low resolution and then create a higher-resolution version while preserving the original low-resolution network.
+
+* This solver can also *modify* almost any aspect of the original simulation other than the general motion (velocity vectors). For example:
+
+* Change or add sources
+* Override __Flame Height__
+* Override __Dissipation__ 
+* Change __Combustion__ settings 
+* Change __Simulation Speed__
+
+[Include:/shelf/upres#includeme]
+
+== The up-res network ==
+
+If you [use the shelf tool|/shelf/upres] to upres a container, it will set up the up-res container and solver for you automatically. The tool creates the nodes _in a new DOP node network_ to keep the separation between the "base" network and the "up-res" version.
+
+If you are setting up an up-res network from scratch, use _the same object_ ([Smoke object DOP|Node:dop/smokeobject] or [Fluid object DOP|Node:dop/fluidobject]) you used in the base simulation. The Up Res solver works with all known container types. You should reference or copy the base simulation settings (such as the scale) but change the division size (resolution).
+
+This solver makes use of various field subdata on the object. The required fields vary based on the simulation type.
+
+* With a smoke (pyro or smoke) base simulation, the object should have a scalar field `density` for the density of the smoke.
+
+* With a fire (pyro) base simulation, the object should have a scalar field `heat` for the flames and possibly `density` for the smoke.
+
+* With a liquid base simulation, the object should have a scalar field `surface` representing the liquid's surface.
+
+* The object should have a vector field `vel` for the velocity at each voxel.
+
+* Optionally, the object can have a scalar field `temperature` for internal buoyancy and ignition calculations.
+
+== Previous versions ==
+
+Houdini 12 introduced a new up-rezzing workflow. In versions prior to 12, an Up Res Object was used to represent the modified smoke, fire or liquid. Houdini 12 uses the default container types as input objects to an Up Res solver.
+
+@parameters
+
+== Simulation ==
+
+These parameters control how the up-rezzed simulation develops, based on the velocity field from the base simulation.
+
+Use Lower Source Resolution:
+    Instead of recomputing the base simulation's source at the higher resolution, use the original source resolution, then resimulates everything else at the higher resolution. This is faster, and also preserves the "fuzziness" of the original source. Turn this off to recompute the source at the higher resolution, giving a tighter smoke effect.
+
+Source From Imported Fields:
+	Use the already simulated source fields for computing (for example) smoke dissipation or fire ignition. This is faster, but can give sampling artifacts. You should usually leave this turned off.
+	
+	
+	TIP:
+		Copy and use the original source operators! Simply connect them to the 5th (sourcing) input of the Up Res Solver.
+		This is done by default when using the `Up Res Container` shelf tool.
+		
+	NOTE:
+		What fields to supply the Up Res Solver with greatly depends on whether or not <b>Source From Imported Fields</b> is enabled.
+		When disabled (default), the same fields used in the base simulation's source calculations are required.
+		If enabled, the base simulation's already calculated fields are automatically loaded and linked so no initial fields are required.
+		This could save time but also introduces possible artifacts sampling a (most likely) lower resolution simulation object.
+		
+		Source Fields are most likely found when dealing with a smoke or fire simulation, in the form of the field not being considered the end result (like heat, density or the liquid's surface.)
+		Temperature is used to ignite fuel or control buoyancy but doesn't get rendered as smoke. This field could be imported from the base simulation.
+		Same applies to fuel, which is used to start a fire (together with temperature) but isn't rendered as flames. This field could also be imported from the base simulation.
+
+=== Initial Data ===
+
+Parameters under this tab help control and specify the data used as a base for the Up Res simulation.
+
+Fluid Type:
+
+	Controls the naming and loading of fields for the simulation type specified.
+	    
+Source:
+	Where the object looks to find the base simulation.  It
+	can be a collection of named volumes in a SOP Path, or
+	read directly from a .bgeo sequence.
+	
+	NOTE:
+		The base simulation's [Dop IO Node|Node:sop/dopio] is generally used for fetching the necessary files.
+		
+Low Res Group:
+	Specifies a specific group of geometry to import from.
+	
+===Links===
+
+These parameters are similar to the parameters found on the base simulation's solver and preferably linked.
+Changing these parameters will change the look of your simulation. The parameters available are the ones not influencing velocity.
+
+Show Simulation Links:
+	Visualizes the linked simulation parameters.
+		
+== Combustion ==
+
+The parameters on this tab are similar to the ones found on the [Pyro Solver|Node:dop/pyrosolver].
+When using the shelf these are referenced if the solver found is a Pyro Solver and combustion is enabled.
+By referencing the parameters the same output can be guaranteed. See <b> Show Simulation Links</b>.
+By changing the parameters the actual combustion can be modified.
+
+== Shape ==
+
+Similar to the Shape Operators found under the Pyro Solver's Shape tab.
+Although the source velocity is used to steer behavior, turbulence can be added to add intrinsic detail.
+It is advisable not to add any forces at this stage.
+
+=== Dissipation ===
+
+By Default <b>Dissipation</b> is referenced if the solver found is a Pyro Solver.
+By referencing the parameters the same output can be guaranteed. See <b> Show Simulation Links</b>.
+Changing the dissipation parameters changes the decay of smoke (or the field specified).
+
+=== Turbulence ===
+
+Turbulence adds detail to the simulation using turbulent noise, applied at a small enough scale to avoid affecting the bulk
+motion of the smoke. The amplitude and position is defined through information sampled from the base simulation and set using the turbulence <b>Source</b>
+
+Enable Turbulence:
+	Enables turbulence.
+
+Turbulence Scale:
+	An overall scale to the added turbulence.
+	
+Source:
+	Controls how the turbulence field is built.  The turbulence
+	field defines a per-voxel scale for the amount of turbulence
+	to add to the upres simulation.
+
+	Constant:
+		No special turbulence scale calculation is done.
+		However, if a turbulence scale field is provided, it
+		will be multiplied with the amplitude.  This allows
+		one to modulate the turbulence according to space.
+	Wavelets:
+		A wavelet decomposition is performed on the low
+		resolution velocity field and the power of the finest
+		detail coefficients used as a multiplier for
+		turbulence.  This will only introduce turbulence where
+		there existed some in the coarser smoke simulation,
+		thereby keeping smooth areas smooth.
+	Curl:
+		The magnitude of the curl of the velocity field is
+		used to scale the turbulence.  This matches the scale
+		used for vortex confinement, for example, so will add
+		extra turbulence where vortices are detected.
+
+Compute Frequency Cutoff:
+	Because the goal of the upres stage is not to affect the low
+	resolution simulation, this automatic frequency cut off can
+	have the solver properly determine what frequency will add
+	detail without changing the base simulation's behavior.
+	
+Blur Radius:
+	Sharp changes in the turbulence amplitude will result in kinks
+	in the resulting velocity field.  The Blur Radius allows one
+	to smooth out the turbulence field by the given world
+	distance.
+	
+==== Noise Frequency ====
+
+Specifies the size (swirl size / frequency) of the noise to be added. This can either be based on your original simulation or set manually.
+
+Size:
+	The size of the low resolution smoke.  This is used only in
+	calculating the cut off frequency.
+	
+Low Res Division Size:
+	The division size of the low resolution smoke.  This is used to
+	determine the cutoff frequency for the turbulent noise.
+	
+Frequency Scale:
+	The calculated frequency is multiplied by this scale.
+	Values less than one will introduce lower frequencies (bigger swirls),
+	possibly overwriting frequencies already present in the base
+	simulation.  However, because numerical diffusion has tended
+	to dampen those frequencies already, it is often useful to
+	dial this down to 0.7 to avoid their being an apparent
+	frequency gap, or lacunarity, between the base sim and the
+	upres sim.
+	
+Temporal Frequency:
+	Controls how quickly the turbulence changes over time.
+	
+Absolute Frequency:
+	Only available when <b>Compute Frequency Cutoff</b> is turned off.
+	Let's the user specify a frequency not related or based on the original simulation's division size.
+	It's advisable to enable <b>Compute Frequency Cutoff</b> and control the frequency through the <b> Frequency Scale </b> parameter.
+
+==== Noise Settings ====
+
+	Specifies noise type specifics.
+
+Noise Type:
+	What form of noise basis to use for the curl noise.
+	
+Turbulence:
+	Controls how many octaves of noise are added.  Each octave
+	doubles the effective resolution of the grid, so this should
+	be set to the number of doublings.  For example, if the base
+	smoke is 32^3 and the high res 128^3, there are two doublings
+	so 2 octaves is necessary.  If you have a frequency scale of
+	0.5, you will need an extra doubling to account for it.
+	Turbulence above this amount will show up as chatter at the
+	finest detail level, which may or may not be what you are
+	looking for.
+	
+Roughness:
+	The amount of influence added bands of __Turbulence__ have, relative to the initial __Frequency__.
+	
+Attenuation:
+	Controls the contrast.
+	
+Step Size:
+	Controls the resolution of the curl function used to generate the noise. A lower value will lead to tighter spirals in the noise.
+	
+==== Turbulence Settings ====
+	Controls where turbulence is being applied. The original turbulence is first computed using the method specified under <b>Turbulence Source</b>.
+	The resulting output is then mapped on to the fluid using the settings specified here.
+	
+Remap Turbulence Scale:
+	The turbulence field is sent through this mapping to get the
+	final amplitude.  This allows one to sculpt the fall off or
+	perform an edge detection.
+	
+Turbulence Range:
+	The to be normalized min and max values of the computed turbulence.
+	
+	TIP:
+		Play with these settings! First figure out the right range, then remap the actual values. 
+		The turbulence field can be visualized with the parameters available under <b>Visualization</b>.
+		The computed turbulence can take on any form but generally resides around a max value of 10-20. 
+		
+Turbulence Field Ramp:
+	Remaps the previously computed and normalized turbulence field.
+	
+==== Control Settings ====
+
+The controls on this tab let you vary the amount of turbulence across the container based on the values in a field.
+
+Control field:
+    When enabled, the force exerted is scaled by the content of this field.
+    
+Control Influence:
+    A scaling factor on the control field's influence on the effect. A value of `0` makes the field have no influence.
+
+Control Range:
+	 Map from this range of values in the control field.
+	 
+Remap Control Field:
+	Enables or disables the control field ramp.
+	
+Control field ramp:
+	The ramp's vertical axis is _amount of turbulence_ and the horizontal axis is the _value in the control field_. For example, the default ramp's shape, which is low on the left side and high on the right side, adds more turbulence where the density field is high.
+		
+==== Visualization ====
+    Turn this on to see a viewport visualization of the forces applied to the velocity field by this effect.
+
+== Relationships ==
+
+[Include:old_relationships]
+    
+== Advanced ==
+
+You should generally not need to change these parameters. 
+
+Frames Before Solve:
+	Specifies the number of frames to wait before a full solve cycle is computed. 
+	On those frames only operations applied to the last solver input (sources) are computed.
+	This enables the sourcing and resizing of data without actually computing a full solve on the maximum grid.
+
+=== Rest ===
+
+Auto Regenerate Rest Field:
+    The turbulence needs a rest field so it tracks naturally with
+    the smoke.  One option is to use the rest field from the base
+    simulation, in which case this should be turned off.  If this
+    is turned on, a new rest field is created.  This rest field is
+    partly-updated on demand, so is not useful for shading
+    purposes.
+
+Rest Regeneration Threshold:
+    How stretched the rest field can get before it is reset.
+    Making this too near one will just cause the rest field to
+    always be reset.
+
+Rest Advection Speed:
+    How quickly the rest field moves compared to the rest of the
+    fluid sim.  Slowing down the rest field reduces the rate it
+    stretches, but can cause the turbulence to appear to stick or
+    lag.
+
+[Include:smokesolver#adv_advectiontab]
+
+=== Bindings ===
+
+Do not change the values on this tab unless you really know what you're doing.
+
+=== Clear Fields ===
+
+Fields to Clear:
+	Zeros out the specified types of fields after the solve
+	step.  This ensures the .sim files, which store the
+	complete state of the simulation, do not have any
+	information not needed, reducing their size and save time.
+
+	None:
+		No special clearing of fields is done.
+	Hidden:
+		Fields not needed for the next time step that do
+		not have guide parameters are cleared.
+	Static:
+		Fields not needed for next time step are cleared.
+		Note that some guides will thus start showing up
+		as zero as the underlying field got cleared.
+		
+Additional:
+	A space separated list of extra fields that should be
+	cleared post-solve.
+
+@outputs
+
+[Include:standard_data_outputs]
+
+@locals
+
+[Include:standard_data_locals]
+
+[Include:standard_locals]
+
+
+
+

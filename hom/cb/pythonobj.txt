@@ -1,0 +1,98 @@
+= HOM cookbook |> Python object =
+
+== Overview ==
+
+You can create object node (OBJ) assets that are defined by a Python script instead of a subnetwork of nodes (__File > New operator type__, click __Python type__, set __Network type__ to "Object"). This example defines a Python object node that gets its transformation information from a file on disk.
+
+This example shows how you can get raw transformation information, for example generated from another software package or from a hardware device, into Houdini using Python.
+
+You can load the pre-made assets from `$HFS/houdini/help/files/hom_cookbook/PythonObjects.hda`
+
+== Cook implementation ==
+
+# Open `$HFS/houdini/help/files/hom_cookbook/xforms_from_disk.hip`.
+
+# Click [Icon:PLAYBAR/play_forward] Play.
+
+    The `xforms_from_disk1` object node loads its transforms from the file `motion.csv` in the same directory. When the object node cooks, it looks up the transformation matrix corresponding to the current time from the file, and sets its transform to that matrix.
+
+# Right-click the `xforms_from_disk1` node and choose __Type properties__ to open the asset's [type properties window|/ref/window/optype].
+
+* We created a parameter in the __Parameters__ tab for the file name, just as we would for a normal asset.
+
+* The __Code__ tab contains the Python code implementing the node's logic.
+
+{{{
+#!python
+
+# This code is called when instances of this object cook.
+
+# Get the Node object representing this node
+this = hou.pwd()
+
+# Try to get the cached transforms from this node's cached data.
+# We could be fancier here by checking if the file has changed
+# since the cache was saved.
+xforms = this.cachedUserData("diskxforms")
+if not xforms:
+    # Read and cache the transform matrices from the file,
+    # using a function defined in this asset type's Python module.
+    xforms = this.hdaModule().reload(this)
+
+if xforms:
+    # Get the transform for the current frame
+    index = max(int(round(hou.frame())), 1) - 1
+    if index < len(xforms):
+        xform = xforms[index]
+    else:
+        # If the index is after the last transform in the file, hold the
+        # final transform in the file
+        xform = xforms[-1]
+                        
+	# Construct a matrix object from the 16 floats, and set this object's
+	# transform to the matrix
+	this.setCookTransform(hou.Matrix4(xform))
+}}}
+
+== Reload function ==
+
+You'll often want to move functionality into helper functions/classes in the [asset type's Python module|../locations#asset_modules] to keep the node's actual code cleaner. In this case, we've put the function to reload the file in the asset module (on the __Scripts__ tab).
+
+{{{
+#!python
+
+def reload(this):
+    """
+    Reloads the transformation matrices from the disk file, and
+    caches them in the node's cached user data.
+    """
+
+    # Get the name of the file from my parameters
+    filename = this.evalParm("file")
+
+    xforms = []
+    with open(filename) as f:
+        # The file is a simple CSV table of floats separated by commas,
+        # 16 floats per line
+        for line in f:
+            # Strip any whitespace/newline from the line
+            line = line.strip()
+            # Split the string on commas to pull out the numeric substrings
+            ns = line.split(", ")
+            # Convert the strings to floating point numbers
+            fs = tuple(float(n) for n in ns)
+            assert len(fs) == 16
+            # Add it to the list of matrices
+            xforms.append(fs)
+    
+    # Cache the transforms
+    this.setCachedUserData("diskxforms", xforms)
+}}}
+
+The asset's parameter interface has a __Reload__ button. The callback script on the button simply calls the helper function in the asset's Python module:
+
+{{{
+#!python
+
+hou.pwd().hdaModule().reload(hou.pwd())
+}}}

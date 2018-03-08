@@ -1,0 +1,68 @@
+= hou.NetworkAnimValue =
+#type: homclass
+#cppname: HOM_NetworkAnimValue
+#group: ui
+
+"""A value to adjust the appearance of a network editor without changing the underlying node data."""
+
+The [Hom:hou.NetworkEditor] pane allows network items to be moved or resized
+by user interactions without actually changing the node positions or sizes.
+This is accomplished by associating each `NetworkAnimValue` with a network item
+through the [Hom:hou.NetworkEditor#setAdjustments] method. `NetworkAnimValue`s
+can either represent a single value, or they can represent an animation from
+one value to another. The actual animation is displayed automatically by the
+network editor.
+
+For example, to following code would animate the position of a couple of
+nodes:
+{{{
+    #!pycon
+    >>> editor = hou.ui.paneTabOfType(hou.paneTabType.NetworkEditor)
+    >>> n1 = hou.node('/obj/geo1')
+    >>> pos1 = n1.position()
+    >>> newpos1 = pos1 + hou.Vector2(5, 5)
+    >>> anim1 = hou.NetworkAnimValue(1.0, pos1, newpos1)
+    >>> n2 = hou.node('/obj/geo2')
+    >>> pos2 = n2.position()
+    >>> newpos2 = pos2 + hou.Vector2(5, 5)
+    >>> anim2 = hou.NetworkAnimValue(1.0, pos2, newpos2)
+    >>> editor.setAdjustments([n1, n2], [anim1, anim2], auto_remove=True)
+    >>> n1.setPosition(newpos1)
+    >>> n2.setPosition(newpos2)
+}}}
+
+Note that the new positions are set on the nodes immediately. But the
+animation starts them at their original positions, and makes it look like they
+move slowly to their new positions. Also note that the `auto_remove` parameter
+in the call to `setAdjustments()` has been set to `True`. This is because we
+are using the adjustments only to animate the nodes to their new positions,
+which have already been set. Once the animation is complete, the adjustments
+can be thrown away. Without this parameter, the adjustments would remain on
+the network editor until the next call the `setAdjustments`.
+
+@methods
+
+::`__init__(self, value)`:
+    #cppname: HOM_NetworkAnimValue::HOM_NetworkAnimValue
+    Construct a new adjustment value that does not change over time. The value
+    can be a float, [Hom:hou.Vector2], [Hom:hou.Vector3], or
+    [Hom:hou.Vector4]. To adjust a node or other item's position, use a
+    [Hom:hou.Vector2] value. To adjust a size and position (such as for a
+    [Hom:hou.NetworkBox]) use a [Hom:hou.Vector4], where the values within the
+    vector are `hou.Vector4(x_position, y_position, width, height)`.
+
+    The values provided are absolute values, not offsets.
+
+::`__init__(self, duration, value_start, value_end)`:
+    #cppname: HOM_NetworkAnimValue::HOM_NetworkAnimValue
+    Construct a new adjustment value that does change over time. The value
+    can be a float, [Hom:hou.Vector2], [Hom:hou.Vector3], or
+    [Hom:hou.Vector4]. To animate a node or other item's position, use a
+    [Hom:hou.Vector2] value. To animate a size and position (such as for a
+    [Hom:hou.NetworkBox]) use a [Hom:hou.Vector4], where the values within the
+    vector are `hou.Vector4(x_position, y_position, width, height)`.
+
+    The `duration` value is expressed in the number of seconds to get from the
+    `value_start` to `value_end`. The values are interpolated linearly over
+    time. The values provided are absolute values, not offsets.
+

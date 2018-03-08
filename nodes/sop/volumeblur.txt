@@ -1,0 +1,92 @@
+#type: node
+#context: sop
+#internal: volumeblur
+#icon: SOP/volumeblur
+
+#tags: volumes, merge
+
+= Volume Blur =
+
+"""Blurs the voxels of a volume."""
+
+The Volume Blur operation blurs the voxels of a volume.
+
+It does this by computing for each neighborhood around a voxel a
+single value according to some property of that neighborhood.  The 
+resulting voxel is then set to that value.  The neighborhood regions are 
+always cubic in shape, despite the term radius being used.  
+
+NOTE:
+    The volume is treated as a piecewise linear function between the voxel centers, not as a step function.  This usually results in expected behavior for sub-voxel sized filters, but may be surprising if you are attempting to work with discrete data.  Consider the [Volume Convolve 3x3x3|Node:sop/volumeconvolve3] for those cases.
+
+[Include:no_vdb]
+
+@parameters
+Source Group:
+    The volume primitives to be reduced.
+Use Voxel Radius:
+    Determine if the radius will be computed from world sizes or voxel sizes.
+Radius:
+    The world space radius to use for reduction.  This defines the cubic region of voxels that will be valid for reduction.  In the case of tapered volumes, this is approximate since the same voxel size blur will be used for all voxels.
+
+    With the exception of the median reduction, these reductions take about the same amount of time regardless of the radius.
+
+    NOTE:
+	    The world space radius is converted to voxels, and this is then capped at 5x the voxel resolution.
+
+    NOTE:
+        The __Maximum__, __Minimum__ and __Median__ reductions only work on integer voxel radiuses.
+
+Voxel Radius:
+    The number of voxels to perform the reduction in along each axis.
+
+Reduction:
+    The types of reduction to be performed.
+
+    Maximum:
+	    Find largest element of the neighborhood.  This is a sort of dilate operator that will expand a fog into surrounding voxels.
+    Minimum:
+	    Find smallest element of the neighborhood.  This is a sort of erode operator that will shrink a fog.
+    Maximum of Absolute:
+	    Find largest absolute element of the neighborhood.
+    Minimum of Absolute:
+	    Find smallest absolute element of the neighborhood.  
+    Average:
+	    Find the mean of the neighborhood.  This is equivalent to a box blur of the same radius.
+    Median:
+	    Returns the median, or 50th percentile, of the voxels in the neighborhood.  The true median is not computed, instead an approximation is made by using a separable median, ie, finding the median along each axis in turn.
+    Sum:
+	    The total of all voxels in the neighborhood.
+    Sum of Absolute:
+	    The total of the absolute value of all the voxels in the neighborhood.
+    Sum of Squares:
+	    The total of the square each voxel in the neighborhood. 
+	Root Mean Square:
+	    The square root of the average of the squares of all of the voxels in the neighborhood.
+
+Passes:
+    An approximation of a gaussian blur can be achieved by doing four box blurs of smaller radius.  For a cone blur, multiply the radius by 0.454545 and use two passes.  For a gaussian, multiply the radius by 0.33 and use four passes.
+
+Override Border:
+    Overrides the volume's border conditions for the blur.
+
+    Use Volume:
+	    Use the volume's border settings.
+    Constant:
+	    Treat exterior voxels as having a constant value.
+    Repeat:
+	    Wrap voxel values from one side of the volume to the other.
+    Streak:
+	    Extend boundary voxels.
+
+Border Value:
+    The value of the border to use when overridden with constant border conditions.
+
+@related
+    - [Node:sop/volumeconvolve3]
+    - [Node:sop/volumevop]
+    - [Node:sop/volumemix]
+    - [Node:sop/volume]
+    - [Node:sop/isooffset]
+    - [Node:sop/iso]
+

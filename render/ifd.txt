@@ -1,0 +1,325 @@
+= IFD file format =
+
+== Overview ==
+
+IFD is the scene description format produced by Houdini and consumed by mantra to produce a rendered image or animation sequence. The IFD file contains a complete description of the scene and how to render it.
+
+== Structure of an IFD ==
+
+# Header Information
+
+    Typically comments and the ray_version command
+
+# Retained Object Definitions
+# Renderer Settings
+# Camera Settings
+# Local Object Definitions (Geometry, Space, Light, Atmosphere or Instance)
+# Render command
+# Optional: additional frames
+
+Geometry may be declared anywhere in the IFD, as long as it's declared prior to being referenced.
+
+Mantra uses a subset of the hscript scripting language to process IFDs. So some constructs like variable expansion, `if` statements, looping constructs, expression evaluation can be used in IFD.
+
+== Commands ==
+
+`ray_loadotl <<path>>`:
+        Loads the OTL given by the path. This allows assets within OTLs to be properly referenced by mantra.
+
+`ray_start <<object_type>>`:
+    Begins definition of an object. The <<object_type>> may be one of:
+    
+    `material`:
+        Stores [properties|/props] which can be bound to geometry primitives using the `shop_materialpath` attribute.
+
+    `geo`:
+        Defines geometry used in rendering
+
+    `light`:
+        Defines a light source.
+        
+    `fog`:
+        Defines a fog/atmosphere object.
+    
+    `object/instance`:
+        Defines an instance of a geometry object
+        
+    `plane`:
+        Defines a plane within an image.
+        
+        New in 9.1. Previous versions used the `ray_defplane` command.
+    
+    Each object has [properties|/props] associated which determine the rendering behavior.
+
+`ray_detail`:
+    There are two ways of specifying geometry in mantra.
+
+    `ray_detail [-T] <<name>> <<filename>>`:
+        Sets the `geometry:name` [property|/props] to the name specified and load the geometry from the file name given. Often, the file name is `stdin` which allows geometry to be specified inline.
+
+        Use the `-T` option to indicate `<<filename>>` is a temporary file.  Mantra will delete the temporary file after reading the geometry.  You cannot use this option when reading from `stdin`, and it may not work properly with network rendering.
+
+    `ray_detail [-v <<postblur>>| -V <<preblur>> <<postblur>>] <<name>> <<sourcename>>`:
+
+        Instead of loading geometry from a file, use an existing geometry (specified by sourcename) and offset the position based on the `v` (velocity) attribute. Mantra sets the `geometry:name` [property|/props] to <<name>>.
+
+`ray_end`:
+    End declaration of an object
+
+`ray_property <<style>> <<token>> <<value>>...`:
+    Sets a global or object property. Each object has different [properties|/props] which may be set using this command.
+
+`ray_image <<image>> [optional settings]`:
+    Defines the output image for rendering a single frame. Image planes are defined using the `ray_defplane` and `ray_planeproperty` commands. A special image name `null:` will cause the frame to be rendered, but not saved to any image. This is sometimes useful when rendering maps (deep shadow maps, photon maps or irradiance caches).
+
+`ray_defplane <<plane_name>> <<vex_variable>> <<vex_type>>`:
+    This command was replaced in Houdini 9.1 with `ray_start plane`. The arguments to `ray_defplane` are now settings on the image plane:
+    
+    `plane_name` |
+        `ray_property plane channel <<plane_name>>`
+    `vex_variable` |
+        `ray_property plane variable <<vex_variable>>`
+    `vex_type` |
+        `ray_property plane vextype <<vex_type>>`
+
+    For versions prior to 9.1, the `ray_defplane` command defines an output image plane for the image defined by `ray_image`. Any number of planes may be given. If the output format doesn't support multiple planes, each plane will be written to an individual file (using the `plane_name` as the filename).
+
+    Any global or exported VEX variable may be used as the `vex_variable` type. There are however, two special variables which can be used:
+    
+    * `Cf+Af` (vector4) -- the combination of the `Cf` and `Af` variables will be output as an RGBA image.
+        
+    * `Z-Far` (float) -- the `Pz` variable will be output as a single channel image.
+
+`ray_planeproperty <<token>> <<value>>`:
+    NOTE:
+        This command was replaced in Houdini 9.1 with `ray_property plane`. For example:
+        
+        {{{
+        ray_property plane pfilter "sinc 3 3"
+        ray_property plane gamma 1.7
+        }}}
+
+    For versions prior to 9.1, sets the value for an image plane defined by `ray_defplane`. See below for the known plane properties.
+
+`ray_transform <<matrix4>>`:
+    Specifies a transformation matrix.
+    
+    This statement may be followed by an arbitrary number of `ray_mtransform` statements. Each `ray_mtransform` statement specifies the transform for an additional motion segment.
+
+`ray_geometry <<geometry_object>>`:
+    Specifies geometry for an instance object. This is the geometry which will be rendered for the instance. The geometry_object parameter refers to a geometry object which must already be defined in the IFD.
+    
+    Only one of `ray_geometry` or `ray_procedural` should be specified in the definition of an instance.
+
+`ray_procedural (-m xmin ymin zmin -M xmax ymax zmax) procedural (arguments)`:
+    Defines a procedural function for generating geometry. The -m/-M
+    options are used to define a bounding box for the procedural
+    geometry and may be used to optimize rendering (since mantra may
+    not have to generate any procedural geometry if the bounding box
+    is not rendered). Procedurals may be written by users using the
+    HDK.
+
+    <!--
+    TODO:  Document "factory" procedurals
+    - agent
+    - alembic
+    - enginecurvegen
+    - engineinstance
+    - enginepointgen
+    - file
+    - fur
+    - image3d
+    - image3dvolume
+    - packed
+    - program
+    - ptinstance
+    - ptreplicate
+    - sprite
+    - vexvolume
+    -->
+
+`ray_declare (-v <<array_size>>) style type name value...`:
+    Declares a user defined property.
+    
+    The `style` argument defines the type of property and may be one of `object`, `global`, `light`, `geometry`, or `plane`.
+    
+    The `type` may be one of `float`, `bool`, `int`, `vector2`, `vector3`, `vector4`, `matrix3`, `matrix4`, or `string`.
+    
+    The `name` is the name of the property. You can use this name to query the value.
+    
+    For example:
+
+    {{{
+    ray_declare object int my_property 42
+    }}}
+    
+    `my_property` can be queried using the renderstate() VEX function, or in python filtering.
+
+`ray_time <<value>>`:
+    Specifies the time (in seconds) which this frame represents. This is used as a random number seed when `image:samplelock` is false.
+
+`ray_raytrace`:
+    Perform rendering.
+
+`ray_reset [-l] [-o] [-f]`:
+    Clear object definitions. Currently only:
+    
+    * `-l` -- lights
+    * `-o` -- instance objects
+    * `-f` -- fog objects
+    
+    ...may be cleared. After a frame is rendered, `ray_reset` should usually be called with all options.
+
+`ray_deviceoption type name value`:
+    Sets an option of the output device in the plane settings.
+    
+    {{{
+    ray_deviceoption int JPEG.quality 75
+    }}}
+    
+    This command is output when you use the pre-defined [image output properties|/props/mantra#imageoutput]. You can also use the command in IFD to set arbitrary options, such as options on a custom device:
+    
+    {{{
+    ray_deviceoption float MYFORMAT.Option value
+    }}}
+    
+    Run the `iconvert` utility on the command line to see the list of available options for the built-in format devices such as TIFF and JPEG.
+
+== Image plane commands ==
+
+NOTE:
+    As of Houdini 9.1 these commands are no longer the preferred method for defining image plane settings. The preferred method is now to use the `ray_property plane` command to set properties. See [image plane properties|/props/mantra#imageplane] in the properties documentation.
+    
+    These commands will be supported for some time for backwards compatibility.
+
+`gamma <<value>>`:
+    Specifies the gamma correction for the image (default is 1).
+    
+`gain <<value>>`:
+    Each color value is multiplied by the gain prior to being quantized.
+    
+`dither <<fraction_of_quantization>>`:
+    The amount of dithering to apply. The dither is specified as a fraction of the quantization step (i.e. 0.5 will be one half of a quantization step). The option is ignored for floating point output.
+    
+`whitepoint <<value>>`:
+    The white-point of the image used during quantization.
+    
+`quantize <<value>>`:
+    The storage type for output. The value should be one of:
+    
+    `byte`:
+        8-bit unsigned integers.
+    `short`:
+        16-bit unsigned integers.
+    `int`:
+        32-bit unsigned integers.
+    `half`:
+        16-bit floating point.
+    `float`:
+        32-bit floating point.
+    `Half`:
+        16-bit floating point (de-normalized).
+    `Float`:
+        32-bit floating point (de-normalized).
+    
+    De-normalization of floating point values will cause minimal rounding of the floating point values, preventing values like 0.4999999 or 0.5000001.
+    
+`sfilter <<type>> [<<arguments>>]`:
+    Specifies the sampling filter used to composite sub-pixel samples. This determines how the individual surface samples will be composited to generate a single sub-pixel sample. The possible types are:
+    
+    * `alpha` -- Composite using Of to determine opacity.
+    * `closest` -- Take the value from the closest surface.
+    * `min` -- Take the minimum value from any sample.
+    * `max` -- Take the maximum value from any sample.
+    
+`pfilter <<type>> [<<arguments>>]`:
+    Specifies the pixel filter, used to combine sub-pixel samples to generate the value for the single pixel. There are several different pixel filters available.
+    
+    `minmax <<style>>`:
+        [Include:/props/_minmax_styles]
+    
+    `point`:
+        Choose the sub-pixel closest to the center of the pixel.
+        
+    `box [<<width>> <<height>>]`:
+        Use a box filter to combine the sub-pixels with a filter size given by width/height.
+        
+    `gauss [<<width>> <<height>>]`:
+        Use a Gaussian filter to combine the sub-pixels with a filter size given by width/height.
+        
+    `bartlett [<<width>> <<height>>]`:
+        Use a Bartlett (cone)  filter to combine the sub-pixels with a size width given by width/height.
+        
+    `blackman [<<width>> <<height>>]`:
+        Use a Blackman filter to combine the sub-pixels with a filter size given by width/height.
+        
+    `catrom [<<width>> <<height>>]`:
+        Use a Catmull-Rom filter to combine the sub-pixels with a size width given by width/height.
+        
+    `hanning [<<width>> <<height>>]`:
+        Use a Hanning filter to combine the sub-pixels with a filter size given by width/height.
+        
+    `mitchell [<<width>> <<height>>]`:
+        Use a Mitchell filter to combine the sub-pixels with a filter size given by width/height.
+
+`lightexport <<light_name>>`:
+    The value for this output variable should be generated during the evaluation of `illuminance` loops from the specified light. This allows the capture of specific contributions made by individual lights (if shaders are set up to support this).
+
+== Specifying properties in IFD ==
+
+Properties may be set anywhere in the IFD. If object properties are set outside of an object block, they change the default value for all objects declared after the change.  For example:
+
+{{{
+#!hscript
+ray_property object shadingrate 2
+ray_start object
+# Shading rate will be "2"
+ray_end
+
+ray_start object
+# Change the shading rate to 1
+ray_property object shadingrate 1
+ray_end
+}}}
+
+See the [list of Houdini render properties|/props/mantra] for mappings to IFD properties.
+
+== Categories vs. Masks ==
+
+Categories and masks provide ways to specify a set of objects or lights.
+
+_Masks_ use the object name to determine membership and use the same semantics as object globbing in Houdini, for example `/obj/geo*,^/obj/geo1`.
+
+Each object in mantra also may optionally have category membership assigned. These are arbitrary user tokens.  Category selection works using a simple boolean algebra on the category names to determine membership.  Category patterns are formed using simple expressions:
+
+`name` |
+    Matches any pattern which contains the name.
+`-name` |
+    Matches patterns which do not contain the name.
+`+` |
+    Matches patterns which have any number of entries.
+`-` |
+    Matches patterns which do not have any names.
+`*` |
+    Matches all patterns (equivalent to `+|-`).
+`-*` |
+    Matches the empty set (equivalent to `+&-`).
+    
+Multiple expressions may be joined by | (union) and & (intersection). Expression are processed from left to right with the intersection operator at a higher precedence than the union.  No parentheses are supported.
+
+So:
+
+`a & b & c | d & e | f | g & h`
+
+...is interpreted as:
+
+<code style="padding: 0.5em">
+<span style="background-color:#cdf;padding:0.25em;border:1px solid #bce">a & b & c</span> |
+<span style="background-color:#cdf;padding:0.25em;border:1px solid #bce">d & e</span> |
+<span style="background-color:#cdf;padding:0.25em;border:1px solid #bce">f</span> |
+<span style="background-color:#cdf;padding:0.25em;border:1px solid #bce">g & h</span>
+</code>
+
+For example, the category pattern `- | foo` will match any objects tagged with category `foo`, _or_ any uncategorized objects.
+
+If you specify both a mask and categories, mantra uses the intersection of the two sets (that is, only objects which are in both sets).

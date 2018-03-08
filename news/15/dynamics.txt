@@ -1,0 +1,355 @@
+= What's new in Houdini 15 |> Dynamics =
+
+== Viscous fluids ==
+
+:new:
+    New [Viscous Fluids tools|/fluid/lava] for setting up temperature and variable viscosity simulations. These tools let you create excellent simulated lava, cooling, and melting objects.
+    
+    The lava tools put blackbody point colors on the fluids to create realistic molten looks. There is also a new lava shader with dual rest controls for better tracking of crust formation.
+
+    [Image:/images/shelf/emitlava.png]
+    
+:new:
+    OpenCL support for viscous fluid simulations.
+
+:new:
+    Support for viscous fluids and lava in DOPs.
+    
+    * __Heat initialization__ on [FLIP Object|Node:dop/flipobject].
+    * [Gas Temperature Update DOP|Node:dop/gastemperatureupdate].
+    * __Target method__ on [POP Attribute from Volume DOP|Node:dop/popattribfromvolume].
+
+== Bullet solver == (bullet)
+
+=== Activation ===
+#display: pull left
+
+:new:
+    The Bullet solver can now activate static objects at the instant of collision, instead of at the end of the frame. This gives a much more accurate collision response (for example, when using a [SOP solver|Node:dop/sopsolver] on the impact data).
+    The `min_activation_impulse` point attribute specifies how strong an impact needs to be to activate an object. The `activationignore` point attribute specifies objects that should not cause activation if they collide. It uses the same syntax as the `collisionignore` attribute.
+
+:new:
+    You can now animate friction and bounce over the course of a simulation.
+
+=== Constraints ===
+#display: pull left
+
+:new:
+    The Bullet solver now supports disabling collisions between constrained objects. All constraint types that work with the Bullet solver (pin, spring, cone, twist, slider) now have a __Disable Collisions__ parameter. Constraint networks can use a `disablecollisions` primitive attribute to disable collisions on individual constraints.
+
+:new:
+    You can now override the number of constraint solver iterations per-constraint. All constraint types that work with the Bullet solver (pin, spring, cone, twist, slider) now have a __Constraint iterations__ parameter. Constraint networks can use a `numiterations` primitive attribute to set iterations on individual ties.
+
+:new:
+    Added parameters to the [Hard Constraint Relationship|Node:dop/hardconrel] and [RBD Pin Constraint|Node:dop/rbdpinconstraint] to allow angular motors. Angular motors specify a target relative angular velocity for the objects, which the constraint will attempt to enforce. The [Angular Motor Denting|/examples/nodes/dop/constraintnetwork/AngularMotorDenting] example file demonstrates one use for this.
+
+:fixed:
+    Spring constraints are much more stable.
+
+=== Solver settings ===
+#display: pull left
+
+:new:
+    A new parameter on the solver lets you randomize the constraint solving order. This may improve stability in some situations, for a slight reduction in speed.
+
+:new:
+    You can use point attributes on packed primitives referenced by RBD Packed Objects to customize bullet solver settings per-object. The attributes have names `bullet_<<name>>` where <<name>> is the internal name of a parameter on the [Bullet Data DOP|Node:dop/bulletdata]. For example, `bullet_georep`, `bullet_adjust_geometry`, `bullet_autofit`, `bullet_collision_margin`, `bullet_groupconnected`, and `bullet_shrink_amount`.
+
+=== Attributes ===
+#display: pull left
+
+:new:
+    The Bullet solver now recognizes the `dead` point attribute on packed primitives, so you can use the [POP Kill DOP|Node:dop/popkill] to remove objects from the simulation.
+
+:new:
+    If a packed primitive has a `bullet_ignore` attribute with a non-zero value, the Bullet solver will ignore it.
+
+=== Performance ===
+#display: pull left
+
+:fixed:
+    The Bullet solver is now much faster at collisions with large numbers of closely packed static objects (such as particles).
+
+:fixed:
+    The Bullet solver is now faster for simulations with a large number of animated static object. The interpolation of animated static object transforms is now multithreaded.
+
+:fixed:
+    Improved Bullet solver performance when only a small percentage of simulation objects have constraints.
+
+:fixed:
+    Collisions between compound shapes (for example glued chunks) are significantly faster. A test with four glued objects of about 20K pieces colliding against each other is around 4.5x faster than Houdini 14. 
+
+:fixed:
+    Improved the performance of constructing convex hull shapes to be about 2x faster.
+
+=== Shelf tools ===
+#display: pull left
+
+:new:
+    New tool for doing [ragdoll simulation|/crowds/ragdoll] simulation outside the crowd system.
+
+:fixed:
+    The setup created by the Glue Adjacent shelf tool now checks if the source geometry is animated, and if so re-imports it on every frame.
+
+== FLIP fluids and whitewater == (flip)
+
+=== Compression ===
+#display: pull left
+
+:new:
+    The [Whitewater Source|Node:sop/whitewatersource] and [Fluid Source|Node:sop/fluidsource] geometry nodes can now cull and distribute emission based on a camera. Whitewater Source can now use particles created by the [Pack Points|Node:sop/packpoints] geometry node, so it only has to unpack points in the active region.
+
+:new:
+    The new [Fluid Compress|Node:sop/fluidcompress] geometry node performs lossy compression of the output of FLIP simulations, often dramatically decreasing the disk space used by saved simulation data. The [Particle Fluid Surface|Node:sop/particlefluidsurface] and [Whitewater Source|Node:sop/whitewatersource] nodes recognize the compressed data and fill in missing particles using the `surface` and `vel` volumes.
+
+=== Solvers ===
+#display: pull left
+
+:new:
+    The [FLIP Solver|Node:dop/flipsolver] has new options to create decaying vorticity and dual rest attributes for use in rendering.
+    
+    The liquid shader now uses this feature.
+
+:new:
+    Distributed global pressure solve for FLIP fluids gives greatly increased performance. FLIP fluid simulations can now handle over 2,000,000,000 particles.
+
+:new:
+    The [FLIP solver|Node:dop/flipsolver] has a new __Velocity Transfer__ parameter that allows choosing between the default "Splashy Kernel" for high energy, splashy simulations, and a new "Swirly Kernel" (based on the APIC technique) for high vorticity simulations with less surface noise. The swirly kernel can be especially useful at small physical scale or high viscosity.
+
+:new:
+    The __Distributed solve__ parameter on the solver turns on global pressure solving. This prevents wave artifacts along the seams between distributed slices when you're simulating a contained fluid.
+    
+    [Image:/images/dynamics/flip_global_pressure_artifact.jpg]
+
+:changed:
+    The Whitewater solver now defaults to operating directly on volume data from SOPs, instead of copying them to DOP volumes, to save time and memory.
+    
+    Volumetric Foam is now on by default.
+
+:changed:
+    The [Gas Particle to Field|Node:dop/gasparticletofield] and [Gas Field to Particle|Node:dop/gasfieldtoparticle] DOPs have new options to __Preserve Angular Momentum__ with additional particle attributes when transferring velocity between particles and grids. 
+
+:fixed:
+    On FLIP solvers created by the shelf tools, the __Particle motion > Reseeding > Particles per voxel__ parameter now uses a channel reference to compute a value relative to the object's grid scale.
+
+=== Surfacing ===
+#display: pull left
+
+:new:
+    [Particle Fluid Surface geometry node|Node:sop/particlefluidsurface] 2.0 includes new controls for filtering the surface, optionally based on velocity, vorticity, proximity to collisions, and other criteria. This gives much better smoothing of the fluid surface without loss of important detail.
+    
+    It can also copy attributes from the particles to the surface, such as vorticity and rest.
+
+=== Shelf tools ===
+#display: pull left
+
+:changed:
+    Shelf tools that create FLIP simulation networks now add compression and the new fluid surfacer.
+
+=== Slicing ===
+#display: pull left
+
+:fixed:
+    Fixed a problem where the first cook only saw one slice if the slicing node came after the solver in the network.
+
+== Particles and grains == (particles)
+
+=== Sleep/awaken ===
+#display: pull left
+
+:new:
+    The particle solver has an option to "auto-sleep" particles by turning on their "stopped" flag. The [POP Awaken|Node:dop/popawaken] node lets you turn off the stopped flag when a key object or fast-moving particles are near. This lets you create efficient simulations where settled particles/grains don't solve unless there's something happening nearby.
+    
+    New tools on the __Grains__ shelf tab let you set up awaken relationships in the viewport.
+
+=== Shelf tools ===
+#display: pull left
+
+:new:
+    New [Sandbox|/shelf/sandbox] tool for for setting up common types of grain simulation.
+
+=== Distribution ===
+#display: pull left
+
+:new:
+    You can now distribute grains simulations.
+
+    Added the slice and distribution tools to the __Grains__ shelf tab.
+
+:fixed:
+    The [Gas Net Slice Balance DOP|Node:dop/gasnetslicebalance] can now handle more than 2 billion particles, and is better at computing time estimates.
+
+=== Grain solver ===
+#display: pull left
+
+:new:
+    The grain solver will not try to solve particles with the "stopped" flag on.
+
+:new:
+    If you know all grains in a simulation will have the same radius, you can turn on __Assume uniform radius__ in the solver to optimize lookups. 
+
+:changed:
+    Simulations created by the shelf tools have activation turned off for the first frame. This lets you set up positions/constraints/etc. without constant recooks.
+
+:changed:
+    Grains now use [Vex:pcfind] instead of [Vex:pgfind] internally. This is slower but more stable because it handles arbitrarily separated particles.
+
+:fixed:
+    5x faster grains simulation for smaller datasets.
+
+:fixed:
+    The OpenCL version of the solver now supports varying sized grains and the attraction weight and friction attributes.
+
+=== Mass-shock changes ===
+#display: pull left
+
+:changed:
+    The [POP Grains|Node:dop/popgrains] node's __Enable mass-shock scaling__ parameter is now a menu with a new "Local" option which is the default for new nodes. This computes the mass-shock "just in time", avoiding the need for an explicit origin, and possibly running faster than looking up the mass value in memory.
+    
+    The node now starts with maximum acceleration turned on and set to 50 (5x gravity). Experience shows this is effective at dampening explosions caused by suddenly overlapping objects.
+
+:changed:
+    The solver now only uses the `shockmass` attribute for particle interaction, not for explicit constraints or shape matching.
+
+=== Sourcing ===
+#display: pull left
+
+:new:
+    The [Grain Source|Node:sop/grainsource] geometry node has an option to adjust grain sizes to avoid overlaps in the initial distribution. This avoid explosions on the first frame.
+
+:new:
+    The [Points from Volume|Node:sop/pointsfromvolume] and [Grains Source|Node:sop/grainsource] geometry nodes have a new option to dither the surface. The Sand Box shelf tool now dithers the surface of the sand.
+
+:fixed:
+    The [Grain Source|Node:sop/grainsource] geometry node no longer randomizes particle orders.
+
+== Solids/FEM/Cloth == (fem)
+
+=== Performance ===
+#display: pull left
+
+:fixed:
+    FEM simulations now run up to 10x faster compared to Houdini 14.
+
+:fixed:
+    Faster viewport display with large numbers of tets or polygons.
+
+=== Self-collision ===
+#display: pull left
+
+:new:
+    The [Solid Object|Node:dop/solidobject] and [Cloth Object|Node:dop/clothobject] nodes have new controls for self-collision behaviors. You can turn off collision within connected components, and collisions within fractured parts.
+
+=== Embedding ===
+#display: pull left
+
+:changed:
+    The [Solid Object shelf tool|/shelf/solidobject] now sets up an embedded setup with separate geometry for simulation and rendering.
+    
+    This tool now uses the new [Solid Embed geometry node|Node:sop/solidembed] instead of creating a chain of geometry nodes. This node embeds an input mesh into a slightly larger mesh suitable for direct simulation in the finite element solver. You can use the __Element size__ parameter to change detail of the embedded mesh.
+    
+    The [Solid Object|Node:dop/solidobject] and [Cloth Object|Node:dop/clothobject] nodes now have a checkbox to easily enable/disable embedding.
+
+=== Sourcing ===
+#display: pull left
+
+:fixed:
+    The [Solidify geometry node|Node:sop/solidify], which is useful to prepare models for tetrahedralization, now handles difficult topologies more robustly, and produces better optimized polygons.
+
+== Other changes and improvements ==
+
+=== Easy geometry visualization ===
+#display: pull left
+
+:new:
+    [Visualize Geometry DOP|Node:dop/visualizegeometry] helps visualize geometry data in different nodes in the network. Any visualizations you attach to this node will be applied to the Geometry data in the node it's wired from. You can hover over a DOP node and press ((X)) to rewire a visualize node onto that node.
+    
+    This can be very useful with the [volume visualizer|/visualizers/volume] to inspect clouds, pyro fields, and so on.
+    
+    The intention is to later replace this somewhat inefficent method with something more integrated with the [visualization editor|/basics/visualizers].
+
+=== Static/deforming objects ===
+#display: pull left
+
+:new:
+    The [SOP Geometry node|Node:dop/sopgeo] has a new __Transform time__ parameter to fetch the transform from a different time than the geometry. This allows the [Static Object node|Node:dop/staticobject] to have to have proper collision velocities when __Use deforming geometry__ and __Use object transform__ are both on.
+
+:changed:
+    Added a parameter to the [Object Position|Node:dop/objpos] and [Static Object|Node:dop/staticobject] nodes, to use the geometry translation as the pivot. Turn this on to get more accurate off-origin velocities when __Use object transform__ is on.
+
+:changed:
+    The [Deforming Object shelf tool|/shelf/deformingobject] now turns off __Use object transform__ when the collision object has no object-level scaling.
+
+:fixed:
+    The [Collision Source geometry node|Node:sop/collisionsource] is now not time dependent if its input isn't time dependent. This makes the [Deforming Object shelf tool|/shelf/deformingobject] faster for static geometry.
+
+:fixed:
+    Volume sample mode for importing collision SDFs in the [Static Object DOP|Node:dop/staticobject] when __Use object transform__ is off is now faster.
+    
+:fixed:
+    The Deforming Object shelf tool now automatically unpacks packed geometry.
+
+=== Constraints ===
+#display: pull left
+
+:fixed:
+    The [Constraint Network node|Node:dop/constraintnetwork] now generates warnings if any required attributes are missing, instead of silently failing.
+
+:fixed:
+    Constraint networks now support the `anchor_id` attribute when attaching constraints to RBD Packed objects.
+
+=== Pyro ===
+#display: pull left
+
+See [what's new in Pyro shading|rendering#pyro].
+
+:fixed:
+    You can now distribute resizing pyro simulations.
+
+=== Gas micronodes ===
+#display: pull left
+
+:new:
+    [Gas Attribute Swap|Node:dop/gasattribswap] microsolver efficiently swaps around geometry attributes. This is useful for stashing and restoring attribute values.
+
+:new:
+    [Gas Field VOP DOP|Node:dop/gasfieldvop] and [Gas Field Wrangle|Node:dop/gasfieldwrangle] now have the ability to bind geometry, DOP data, and contexts as extra inputs. The node computes the inputs prior to running the VOPs/VEX.
+
+:fixed:
+    [Gas Curve Force|Node:dop/gascurveforce] now uses force scale parameter, and shows trail guide length option.
+
+=== Node changes ===
+#display: pull left
+
+:new:
+    The [Impact Analysis|Node:dop/impactanalysis] node now has a checkbox to visualize the impact points in the viewport.
+
+:fixed:
+    The solid object's __Initial state__ tab now has linear and angular velocities like other object types.
+
+=== Misc ===
+#display: pull left
+
+:changed:
+    The [File Cache SOP|Node:sop/filecache] created by the [Deforming Object shelf tool|/shelf/deformingobject] now uses the solver's maximum substeps.
+
+:changed:
+    The [ROP dynamics node|Node:dop/rop_dop] and [DOP render node|Node:out/dop] are now available in Houdini Indie and Houdini Apprentice.
+
+:fixed:
+    Some distributed simulation network traffic is now compressed to improve performance.
+
+:fixed:
+    Optimized particle/SDF collisions give improved performance and less memory usage for particles, grains, whitewater, and FLIP solvers.
+
+:fixed:
+    Reduced memory usage of the [RBD Packed Object DOP|Node:dop/rbdpackedobject].
+
+:fixed:
+    The Impact Analysis shelf tool now works with Bullet RBD Solver nodes.
+
+:fixed:
+    The __Emission attribute__ parameter on the [POP Source|Node:dop/popsource] node now works.
+
+:fixed:
+    The [POP Group DOP|Node:dop/popgroup] can now use a DOP Geometry object as a bounding object.

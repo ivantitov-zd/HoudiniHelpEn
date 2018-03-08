@@ -1,0 +1,122 @@
+= Bake Volume =
+
+#type: node
+#context: sop
+#internal: bakevolume
+#tags: volumes, baking
+
+"""Computes lighting values within volume primitives"""
+
+Given a point light, this operator computes lighting values for all input
+volume primitives and outputs them as volume triples representing Red, Green
+and Blue values.  
+
+The light transfer properties of the volumes can be modified to change their 
+appearance when lit. 
+
+The optional second input can specify the points to bake the light values onto.
+These points are only used in the Gather stage.  The resulting point cloud can
+be used in a shader using the point cloud functions.
+
+@parameters
+
+Group:
+    The primitive group to compute lighting values for.
+Lightfield Name:
+    The generated lightfield volumes will use this name as a
+    prefix to .x, .y, and .z for their own names.  This allows the
+    light field to override shading attributes in Mantra.
+Light Position:
+    The position in world space of the light used to compute the volume
+    lighting values.
+Radiance:
+    The intensity of the light being used to compute volume lighting values.
+Light Color:
+    An RGB scale to the light intensity.
+Absorption Coefficient:
+    Determines how much of the light's radiance is absorbed by the volume
+    per unit density.
+Absorption Color:
+    An RGB scale to the absorption coefficient.
+Scattering Coefficient:
+    Determines the amount of light that is scattered (redirected) per unit
+    density of the volume.
+Scattering Color:
+    An RGB scale to the scattering coefficient.  This affects the color of
+    the scattered light, but the actual scattering events are controlled by
+    the average value to ensure chromacity is preserved without excessive
+    samples.
+Emission Coefficient:
+    Determines the amount of light per unit density that is released by 
+    the volume when struck by a light ray.
+Emission Color:
+    An RGB scale to the emission coefficient.
+Isotropic Ratio:
+    The proportion of light that is assumed to be isotropically
+    scattered (redirected in all directions evenly) whenever scattering
+    occurs within the volume.
+Compute Step Size:
+    When set, the step size will be automatically computed from the voxel
+    size rather than using a fixed value.
+Step Size Scale:
+    The number of voxels to step when __Compute Step Size__ is set.  
+Step Size:
+    The step size is used when simulating the behavior of light rays 
+    within the volume.  A smaller step size will produce better results,
+    but take longer to compute.  
+Density Scale:
+    Scales the density of the volume being baked.
+Do Gathering:
+    After the initial rays are sent through the field, a light field is
+    constructed.  Then it us usually gathered to get the final result.
+    Turning this off skips the gather stage, leaving the raw light field.
+Do Multiple Scattering:
+    Whether or not multiple scattering effects will be calculated.
+Multiple Scatter Boost:
+    A constant multiple to the multiple scattering contribution to
+    the final light levels.
+Secondary Rays Only:
+    The resulting light field will only consist of the multiple
+    scattered components, not the direct illumination.
+Chromatic Scattering:
+    If set, the initial rays will adjust their color when scattering to
+    reflect the scatter color.
+Number of Rays:
+    The number of light rays used to simulate multiple scattering effects.
+    Using more rays can improve the appearance of rendered volumes, but at
+    the cost of longer computation times.  Insufficient rays will result in
+    artifact streaks along the ray direction.  Turn off __Gather Rays__ to see
+    the raw light fields and determine if this is an issue.
+Gather Rays:
+    The number of rays that are sent out when integrating the effects of the multi-scatter. This is independent of __Number of Rays__ as it applies
+    to the gather step, not the Scatter Rays step.
+K:
+    Coefficient defining the directional tendencies of scattering within 
+    the volume.  K ranges from -1, indicating perfect backward scattering,
+    to 1, which is perfect forward scattering.  A value of 0 will cause
+    unbiased, fully random scattering.
+Optimize Light Transfer:
+    When enabled, the operation will use previously computed light values
+    wherever possible in order to reduce computation times.  
+    
+    The results of an optimized pass will not be as accurate as those of a 
+    non-optimized one.
+Optimized Ray Depth:
+    How deeply into the volume an optimized pass will cast its light rays
+    before using previously computed values.  
+    
+    Lower values result in faster, less accurate calculations, while 
+    higher values cause longer computation times with more accurate results.
+
+    NOTE:
+        Values less than 2 are not recommended, because the validity of 
+        previously computed values cannot be guaranteed with rays that
+        short.
+        
+        Conversely, values greater than the voxel resolution of the volume
+        being baked have no advantage over a non-optimized pass.  The 
+        __Optimize Light Transfer__ option should be disabled instead.
+Opacity Cutoff:
+    At what level of transmission the gather rays should be terminated.
+
+

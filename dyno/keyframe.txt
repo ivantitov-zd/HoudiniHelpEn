@@ -1,0 +1,66 @@
+= Mixing keyframe animation and simulation =
+
+== Activating and deactivating RBD objects ==
+
+You can use the [Activate objects|/shelf/activateobjects] and [Deactivate objects|/shelf/deactivateobjects] tools on the Drive simulation tab to keyframe switching an object between _active_ (simulated) and _inactive_ (manually keyframe animated). This lets you take manual control of a simulated object for a certain number of frames, then put it back under the control of the simulation.
+
+These shelf tools add an [RBD Keyframe Active node|Node:dop/rbdkeyactive] to the dynamics system. This node has an __Active__ parameter that controls whether the object uses its simulated position and rotation (Active = 1) or its keyframed position and rotation (Active = 0).
+
+When the object is inactive (Active = 0), keyframe the RBD Keyframe Active node's __Position__ and __Rotation__ parameters to move and rotate the object manually, *not* the object-level transforms.
+
+NOTE:
+    When you're keyframing the __Active__ value yourself, remember to use a `constant` animation curve on the channel instead of the default. See [how to use the animation editor|/ref/panes/changraph].
+
+== Switching between an object's animated position and simulated position ==
+
+# Keyframe the object at the object level.
+
+# Select the object and use [RBD Object|/shelf/rbdobject] on the __RBD__ shelf tab to make it a simulated object.
+
+# Double-click the dynamics network node to go inside.
+
+# Select the RBD Object node for the object. In the parameter editor turn on __Create active object__ and turn off __Use object transform__.
+
+# Use the RBD Object's __Position__ and __Rotation__ parameters to position the simulated object.
+
+# Add an [Active Value node|Node:dop/activevalue] after the RBD Object and set its __Default operation__ to "Set always" (so Houdini re-evaluates whether the object is active at each frame).
+
+    The __Active__ parameter of this node controls whether the object is _active_ (controlled by the simulation) or not.
+    
+# Add an [OBJ Position DOP|Node:dop/objpos] after the Active Value node and set its __Object path__ parameter to the same object imported by the RBD Object node. Set the __Default operation__ to "Set always" (so Houdini fetches the position at each frame).
+
+    OBJ Position gets the position of the object from the object (OBJ) level, overriding the position computed by the simulation.
+
+# Next you will set up a parameter reference to link the states of the Active Value and OBJ Position nodes to each other.
+
+    When the object is _active_ (that is, being simulated), the __Active__ parameter on the Active Value node should be 1, and the __Activation__ parameter of the OBJ Position node should be 0 (because you want to simulate the object's motion, not copy it from the keyframe animation). Conversely, when the object is being controlled by its keyframe animation, the __Active__ parameter on the Active Value node should be 0, and the __Activation__ parameter of the OBJ Position node should be 1 (because you want to copy 
+
+    Press ((RMB)) on the __Active__ parameter of the Active Value node and choose __Copy Parameter__, then press ((RMB)) on the __Activation__ parameter of the OBJ Position node and choose __Paste Copied References__. Edit the pasted expression to put a `!` (logical not) in front of the [Exp:ch] function.
+
+    This makes the __Activation__ parameter of the OBJ Position node always be the logical opposite of the __Active__ parameter of the Active Value node.
+    
+# Now you can keyframe the value of the Active Value node's __Active__ parameter to switch between the keyframed position and the simulated position.
+
+== Blending between an object's keyframed position and simulated position ==
+
+The [Blend solver|Node:dop/blendsolver] runs objects through multiple solvers and blends the results.
+
+The [Copy solver|Node:dop/copysolver] copies a piece of data to a new name. You can have position data named `KeyFrame` (from an [OBJ Position DOP|Node:dop/objpos]), which stores keyframed positions. You can have the `KeyFrame` data exist at all times, but only copy it over the `Position` data (which controls object position) at certain frames.
+
+To blend smoothly between keyframe animation and simulation, you can use the Blend solver to blend between the results of, for example, an RBD solver and a Copy solver which copies the `KeyFrame` data over the `Position` data.
+
+To see an example of this setup, see the `SimpleBlend` example file in the [Blend solver online help|Node:dop/blendsolver].
+
+== Animating goals ==
+
+You can keyframe the position of a hard or soft constraint to gain some manual control over a simulation.
+
+== Keyframing parts at the geometry (SOP) level ==
+
+- You can "cheat" animation on top of the simulated motion by using the [Transform surface node|Node:sop/xform] to keyframe moving and rotating the object's geometry around "inside" the object.
+
+    You can combine this with deactivating the object in the simulation to keep the simulation from moving the object while you keyframe the geometry inside.
+
+- If you have some rigid motion at the geometry (SOP) level and want to hand that off to the simulation, use the [Trail SOP|Node:sop/trail] to calculate point velocity attributes, then in the dynamics network add an [RBD State DOP|Node:dop/rbdstate] and turn on the __Inherit velocity__ option to set up the velocities at the hand-off frame.
+
+    It doesn't make much sense to do this for a single object. However, you can use this if you have a glued-together object whose sub-pieces are traveling at different speeds (because of capture/deform). The [RBD Glue Object|Node:dop/rbdglueobject] and [RBD Fracture Object|Node:dop/rbdfracturedobject] DOPs include the __Inherit velocity__ parameter to make this easier.

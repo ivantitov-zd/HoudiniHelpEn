@@ -1,0 +1,184 @@
+= Rendering workflow tips =
+
+"""Tips on how to integrate Houdini and Mantra into a production pipeline efficiently."""
+
+== Overview ==
+
+Houdini has several features, workflows, and best practices that allow a production pipeline to work with and render large, complex scenes efficiently. For example, sharing Alembic geometry can allow multiple steps in the pipeline to work in parallel.
+
+Before Houdini 13, the most efficient rendering workflow was to work interactively with proxy geometry in Houdini, and replace the geometry at render time using a geometry shader such as the [Delayed Load Procedural|Node:shop/vm_geo_file] or point instancing. Houdini 13 added support for _packed primitives_ and deep integration of the _Alembic file format_. These features let you work with very large geometry directly, and easily share files between departments.
+
+The tips below relate to a typical production pipeline of
+[Models|#geometry]
+-> [Look development|#look]
+-> [Scene assembly|#scene]
+-> [Visual Effects|#vfx]
+-> [Lighting|#lights]
+-> [Rendering|#render]
+
+== Models == (geometry)
+
+* For efficiency, convert final geometry into [packed primitives|/model/packed] or [poly soups|/model/primitives#polysoup] before rendering, unless you need per-face materials or attributes (since Houdini sees a polysoup or packed geometry as a single primitive).
+
+* Export models as [Alembic files|/io/alembic] for maximum flexibility and efficiency. Alembic files allow the different stages of the pipeline to work with the same proxy and/or final geometry files. Shader writers, scene assemblers, FX artists, and lighters can reference the same files using the sub-setting and level of detail controls of the [object appearance editor|/ref/panes/datatree].
+
+* Note that Alembic only supports a subset of all Houdini's [primitive types|primitives]. If you need these primitive types, you can save the geometry as a `.bgeo` file and import the geometry as an on-disk packed primitive.
+
+* Houdini imports Alembic geometry as [packed primitives|/model/packed]. Packed primitives are much faster and memory-efficient for Houdini to work with than regular "editable" geometry. For example, packed Alembic primitives are "streamed" from the file on disk directly to the graphics card for display, instead of being retained in main memory.
+
+== Look development == (look)
+
+* Import models from shared [Alembic files|/io/alembic].
+
+* Save final models as digital assets with their materials, or as a scene file with materials on Alembic primitives.
+
+== Scene assembly == (scene)
+
+* Import models from shared [Alembic files|/io/alembic].
+
+* Set up [cameras|cameras].
+
+* Use the [object appearance editor|/ref/panes/datatree#appearance] to turn down the level of detail on heavy objects to make them easier to work with.
+
+* Use the [object appearance editor|/ref/panes/datatree#appearance] to hide objects outside the camera view to make loading and rendering faster.
+
+* Save final work as a scene file with transforms on Alembic primitives.
+
+== Visual effects == (vfx)
+
+* Most solvers support Alembic/packed primitives directly. Use them whenever possible (when the solver supports them and the geometry is non-deforming).
+
+    When you use regular geometry to represent multiple objects in a simulation (for example, shattered pieces or a large number of colliding RBD objects), the simulation represents each object as a separate DOP object. Packed primitives can have any number of separate pieces of geometry inside (see [shattering|/dyno/shatter]) and still be represented by a _single DOP object_. This is _much_ faster to simulate since Houdini doesn't have the overhead of managing hundreds or thousands of DOP objects.
+
+* For simulations that only transform non-deforming models (for example, rigid bodies), you can output only the transforms on the points representing the Alembic/packed primitives. This means it's possible for lighting to begin work on the static models and then apply the simulated transforms on top when they're available.
+
+== Lighting == (lights)
+
+* Use assets with materials created by look development, object transforms from scene assembly, and animated data from effects.
+
+* Houdini works in a linear color space internally and converts to 2.2 gamma for display by default. See [linear lighting and compositing|linear] for more information.
+
+* You optimize lighting by "baking" static lighting setups into a high dynamic range (HDR) image and then light the scene with the image using an [environment light|Node:obj/envlight].
+
+== Rendering == (render)
+
+* Try to finalize camera positions/movement before you start rendering. When you know what's on-camera, you can optimize for what's visible and what's out of frame.
+
+    Several tools in Houdini let you optimize the scene based on the camera frustum. For example, you can create volume boxes in the shape of the frustum, and cull geometry outside the frustum.
+
+* Try lighting a volume using three separate red, green, and blue lights above, in front, and to the side. Then you can adjust the lighting by converting the image to gray and scaling the red, green, and blue channel contributions in the compositor.
+
+* Rendering for VFX:
+
+    * Use an HDR image taken on set for base lighting, then add additional CG lights as necessary.
+    
+    * Render transparent objects in separate render passes as [deep camera maps|dcm] for compositing flexibility.
+    
+    * You will need to match [motion blur and depth of field|cameras] with the live action camera. The PF Track motion tracking package can generate a Houdini from its tracking data.
+    
+    * Use [procedural rendering|batch].
+
+* Rendering for integrating CG objects with live action:
+
+    * You will need to match [motion blur and depth of field|cameras] with the live action camera. The PF Track motion tracking package can generate a Houdini from its tracking data.
+    
+    * To cut out an image of the object/terrain/character, use the [Trace SOP|Node:sop/trace] to generate UVs in camera space.
+
+* Rendering for full feature CG:
+
+    * Full feature CG usually involves handling _huge_ data sets, scene complexity, and number of shaders. You should have an asset tracking and versioning workflow.
+    
+    * Use [procedural and distributed rendering|batch].
+    
+    * Use Alembic or Houdini geometry procedural shaders (which load geometry only at render time) to keep scene files light.
+    
+        Houdini can load Alembic geometry as a special primitive type using the [Alembic surface node|Node:sop/alembic]. You can also import the contents of an Alembic file as a node hierarchy using the __File > Import > Alembic__ menu item.
+        
+        You can even transform elements of the Alembic primitive using a [Transform node|Node:sop/xform] with the group type set to primitives. Similarly you can assign mantra materials to elements of the Alembic file using the [Material node|Node:sop/material]. You cannot edit the actual geometry, for example modify points or subdivide.
+
+* Procedural shaders call a program to replace the object they are shading with their own data. These shaders begin with __Mantra__ in the SHOP list. For information on specific procedural shaders, see the individual node documentation:
+
+    * [Mantra: Delayed Load|Node:shop/vm_geo_file]
+    * [Mantra: Fur Procedural|Node:shop/vm_geo_fur]
+    * [Mantra: HScript Procedural|Node:shop/vm_geo_hscript]
+    * [Mantra: Image3D Procedural|Node:shop/vm_geo_image3d]
+    * [Mantra: Image3D Volume Procedural|Node:shop/vm_geo_image3dvolume]
+    * [Mantra: Sprite Procedural|Node:shop/vm_geo_sprite]
+    * [Mantra: Program Procedural|Node:shop/vm_geo_program]
+    * [Mantra: VEX Volume Procedural|Node:shop/vm_geo_vexvolume]
+
+== General tips ==
+
+* Use the interactive [render view|/ref/views/ipr] to view live-updating renders as you change parameters/materials.
+
+* Use the [Render region tool|renderregion] to select a piece of the 3D viewport to view as rendered. You can continue to work in the viewport and the rendered region will update automatically.
+
+* Use [view snapshots|/basics/memorytoolbar] in the render view to capture the result of different settings so you can flip back and forth between them to compare.
+
+* You can use [takes|/basics/takes] to organize render explorations and quality variations.
+
+* Houdini uses [linear color space|linear] internally. 
+
+* Render volumes as a separate render pass.
+
+* The compositor can pull images from a render node instead of a file. The [Composite render node|Node:out/comp] can "render" the results of a compositing network. This lets you integrate Houdini's compositor into rendering, for example to modify rendered images before saving.
+
+* See [expressions in file names|expressions] for how to embed the frame number and other useful information in the output file name.
+
+* In general, you should set your job up so that all paths are relative to the `$HIP` directory (the directory containing the `.hip` file). Larger facilities might want to use other conventional variables to share resources on the network such as `$JOB` and `$SITE`.
+
+    A good setup is to have all of your `.bgeo` files in a `$HIP/geo` subdirectory and set your render nodes to write into a `$HIP/pic` subdirectory.
+
+* Double check where your image output is going. You don't want to send a job out to the render farm with the output picture set to `ip` (which means interactive display in MPlay).
+
+* On Windows, you should specify resources on the network (such as shared texture maps) using UNC paths.
+
+* The `temp:` file handler uses operating system calls to create temporary files.  These files persistent only while the process that created them is active and are automatically cleaned up afterward. This can be convenient for generated files such as textures and shadow maps that you don't need to cache between renders.
+
+    For example:
+    
+    {{{
+    temp:shadow_$F.rat
+    }}}
+    
+    NOTE:
+        Depending on the operating system, `temp:` files may not show up in any directory listing or file search, or be flushed to disk at all.
+    
+    Note that a `temp:` file is useless for _sharing_ files between processes, because it can't be used by any process other than the one that created it.
+    
+    For example, you can't use `temp:` files for photon mapping since pre-filtering requires a separate process to read/write the raw photons.
+    
+    Houdini asks the operating system to open temporary files in `$HOUDINI_TEMP_DIR`. On Windows, Houdini opens the files with the flags `w+bTD`.
+
+== Efficiently rendering points and particles ==
+
+In mantra, you can efficiently render the points in a model directly using "point primitives" without having to create a particle system. Point rendering will render the points in a model as disks, oriented toward the camera with only a single shader evaluation per point.
+
+# On a geometry object, click the __Geometry__ sub-tab of the __Render__ tab.
+
+# Turn on the __Render As Points__ checkbox.
+
+# Render using a [Icon:ROP/mantra][mantra output driver|Node:out/ifd].
+
+The following attributes can be used in SOPs to adjust rendering of particles or points.
+
+`pscale` or `width`:
+    Can be used to change the size of the particles for rendering. The parameter overrides the original particle size from POPs. You can add this attribute at the vertex, point, primitive, and detail levels.
+    
+`orient`:
+    The orient attribute controls how disks are oriented for point rendering. Orientation is specified as a normal vector. You can add this attribute at the vertex and point levels.
+    
+`v`:
+    The velocity point attribute controls the length of lines or tubes for particle rendering.  
+
+== Additional tips pages ==
+
+The following pages also contain valuable tips for rendering with mantra.
+
+* [Speed vs. quality|quality] -- how to set up mantra for speed vs. quality.
+
+* [Rendering many polygons|renderingmanypolys] -- how to set up mantra to render extremely complex scenes.
+
+* [Copying and instancing|/copy/].
+
+

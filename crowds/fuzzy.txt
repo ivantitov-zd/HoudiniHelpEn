@@ -1,0 +1,188 @@
+= Fuzzy Logic =
+
+#bestbet: fuzzy
+
+== Overview ==
+
+You might want an agent to...
+
+* Move forward as long as it is unimpeded.
+* If it approaches an obstacle, turn left or right if there is room.
+* If there is no room, slow down to a stop.
+
+If you try to define this behavior using boolean logic, you will soon have to come up with hard definitions for "how blocked a path is", "how much is enough room", "how much to turn", and so on. If you say "blocked" is when an obstacle is `distance <= 20m`, then the agent will not react to the obstacle at 20.1m.
+
+With fuzzy logic, we can say that a distance of 20m has a "blocked" value of 1, and a distance of 40m has a blocked value of 0. The distances between 40m and 20m would have an increasing gradient of "blocked-ness", instead of a hard flip from "not blocked" to "blocked" at 20m.
+
+== Fuzzy logic basics ==
+
+[Fuzzy logic|Wp:Fuzzy_logic] is a useful tool for building complex crowd behaviors. Unlike boolean logic where each variable is either false or true, fuzzy logic allows a range of possible truth values between 0 (totally false) and 1 (totally true). It allows you to specify behaviors such as how to react to an obstacle relatively informally.
+
+=== Fuzzy sets ===
+
+:col:
+    In boolean logic, a statement is either true or false. For example, the statement "X is tall" is either true or false... X is either tall or not tall. To make the statement testable, we can set a cutoff, say 180cm, and only say greater than or equal to 180cm is "tall".
+    
+    However, this doesn't capture how we really think about the world. It leads to unintuitive situations like two people who are extremely close in height (say 179cm and 180cm) being called "short" and "tall". We consider people to be "tall" to varying degrees (for example, "not tall", "almost tall", "somewhat tall", "very tall") without clear lines between them. Our concept of "tall" is _fuzzy_.
+
+:col:
+    :chart:
+        #left: truth
+        #bottom: height
+        #options:
+            {
+                "xaxis": {"ticks": [0, 50, 100, 150, 180, 200, 250]},
+                "yaxis": {"ticks": [0, 0.5, 1]}
+            }
+        #data: [ {"data": [ [0, 0], [179, 0], [180, 1], [250, 1] ]} ]
+~~
+:col:
+    In fuzzy logic, a statement can have _degrees of truth_. We can express this as a function that takes an input value (such as height) and outputs a _truth value_ that expresses _how true_ the statement "X is tall" is for a given height. For example, a height of 1.6m is a bit "tall", but less so than 1.8m.
+    
+    We can also think of this as _the degree to which X is a member of the "tall" set_.
+
+:col:
+    :chart:
+        #left: truth
+        #bottom: height
+        #options:
+            {
+                "xaxis": {"ticks": [0, 50, 100, 150, 200, 250]},
+                "yaxis": {"ticks": [0, 0.5, 1]}
+            }
+        #data: [ {"data": [ [0, 0], [150, 0], [200, 1], [250, 1] ]} ]
+~~
+:col:
+    A single input value can be a member of multiple sets to different degrees. For example, we might establish three sets: "short", "medium", and "tall", with three functions for determining the membership of a given value.
+    
+    Membership can overlap. For example, X might be "0.1 short and 0.9 medium" at the same time. (To make things easier to think about, the truth values of the different sets should always add up to 1.) 
+
+:col:
+    :chart:
+        #left: truth
+        #bottom: height
+        #options:
+            {
+                "xaxis": {"ticks": [0, 50, 100, 150, 200, 250]},
+                "yaxis": {"ticks": [0, 0.5, 1]}
+            }
+        #data:
+            [
+                {"data": [ [0, 1], [50, 1], [100, 0] ], "label": "short"},
+                {"data": [ [50, 0], [100, 1], [150, 1], [200, 0] ], "label": "medium"},
+                {"data": [ [150, 0], [200, 1], [250, 1] ], "label": "tall"}
+            ]
+
+Converting an input value into these truth values for each set is called [fuzzifying the input|Node:vop/fuzzyinput].
+
+=== Rules === (rules)
+
+We can derive other set memberships from initial memberships using _if...then_ rules. For example, imagine we are building a control system for a train. We want a smooth ride for passengers, so we make the braking acceleration of the train dependent on the distance from the train to the next train in front, and the current speed of the train.
+
+We have the two _input_ fuzzy variables: _distance_ and _speed_.
+
+* Distance is the train's distance from the next train. The fuzzy sets for distance are _near_, _medium_, and _far_.
+* Speed is the current speed of the train. The fuzzy sets for speed are _slow_, _normal_, and _fast_.
+
+We have a _derived_ fuzzy variable: _braking_. Braking will be calculated from the distance and speed. Braking can be a member of the fuzzy sets _none_, _low_, _medium_, and _high_.
+
+The following rules translate speed and distance into braking:
+
+If... ||
+    Then ||
+`speed` is `fast` and `distance` is `close` |
+    `braking` is `high`
+`speed` is not `slow` and `distance` is `far` |
+    `braking` is `low`
+`speed` is `normal` and (`distance` is `close` or `distance` is `medium`) |
+    `braking` is `medium`
+_else_ |
+    `braking` is `none`
+
+Just like boolean logic can combine true/false values using And, Or, and Not, fuzzy logic has equivalent [Fuzzy And|Node:vop/fuzzyand], [Fuzzy Or|Node:vop/fuzzyor], and [Fuzzy Not|Node:vop/fuzzynot] operations. Combining fuzzy inputs with fuzzy operators outputs fuzzy sets. For example, the output of the above rules for a given speed and distance might be that the braking variable is "0 none, 0.1 low, 0.7 medium, 0.2 high".
+
+=== De-fuzzifying outputs === (defuzz)
+
+In most cases, knowing the set memberships are not useful for directing behavior. Instead we want a hard number we can then use somewhere else. In the train braking example above, we need to translate the fuzzy braking sets into a single number for how much force to apply to the brakes (for example, in a range of 0-100).
+
+[De-fuzzifying|Node:vop/fuzzydefuzz] is the process to take fuzzy set memberships and translate them into a _crisp_ value. For example, a fuzzy `braking` variable might be `0 low, 0.2 medium, 0.7 high`, which might translate to a crisp output of `braking = 60`.
+
+Defuzzifying involves aggregating the fuzzy sets. In Houdini there are two methods to do this: use the function with the strongest truth value (maximum), or add the membership functions together (sum).
+
+:fig:[Image:/images/crowds/membership_aggregated.svg]
+    Before aggregation, each membership function is clipped by the truth value for that fuzzy set. Any value greater than the truth value is clamped to the truth value.
+
+    This means the aggregated fuzzy set is a function of both the system (the membership functions that are defined) and the input (the variables that infer the truth of each set).
+
+    The aggregate set forms as polygon, as seen in this graph. Houdini takes the centroid of the graph to get the crisp output value.
+
+== Fuzzy logic in Houdini ==
+
+In Houdini, you can create fuzzy logic networks using VOPs. For example, you can use fuzzy logic nodes inside a [POP VOP DOP|Node:dop/popvop] to control attributes on agents in a crowd simulation.
+
+For directing crowd state transitions, you can also use a [Crowd Fuzzy Logic DOP|Node:dop/crowdfuzzylogic] which wraps a [POP VOP DOP|Node:dop/popvop] to automatically create [Bind VOP|Node:vop/bind]s when a [Crowd Trigger|Node:dop/crowdtrigger] is wired into it.
+
+* Create [Fuzzy Input|Node:vop/fuzzyinput] VOPs to fuzzify the crisp input variables. The inputs are usually agent attributes such as speed, proximity, or distance to target that you import using [Bind VOP|Node:vop/bind]s. The Fuzzy Input nodes convert each attribute into a fuzzy set.
+
+    You can set the fuzzy set's membership function using a ramp parameter on the Fuzzy Input node. The node has several ramp presets for commonly used functions.
+
+* The output of Fuzzy Input is a float for the fuzzy value (the set membership strength), and a `FuzzySet` struct that has both the membership function and the strength.
+
+    Wire the fuzzy value through a network of [Fuzzy And|Node:vop/fuzzyand], [Fuzzy Or|Node:vop/fuzzyor], and [Fuzzy Not|Node:vop/fuzzynot] VOPs representing the "if" part of a rule. For example, "if `fast` and `near`...".
+
+* Wire the output of the logic network into a [Fuzzy Inference VOP|Node:vop/fuzzyinference]. This node generates a new set based on its inputs. It represents the "then" part of a rule.
+
+    In the train braking example, you would wire the "if `fast` and `near`..." part of the network into an inference node that infers the strength of the fuzzy braking variable `high`. That is, the strength of `fast` and `near` implies the strength of `high` braking.
+    
+    You would wire other logic to create other fuzzy output variables. For example, `normal` speed and `near` or `mid` proximity imply `medium` braking.
+    
+    Keep in mind that this is part of the network is not deciding that, for example, braking will be _either_ `high`, `low`, or `medium`. It's computing how strong the current input's membership is in the `high`, `medium`, and `low` sets.
+
+* To de-fuzz the fuzzy sets into a crisp value, wire the inferred FuzzySet structs into a [Fuzzy Defuzz VOP|Node:vop/fuzzydefuzz]. You will have a Fuzzy Defuzz for each crisp variable you want to compute from the fuzzy network.
+
+    Fuzzy Defuzz has an __Aggregation method__ parameter to control _how_ it translates the fuzzy inputs into a crisp value.
+
+[Image:/images/crowds/fuzzy_network.png]
+
+=== Fuzzy VOPs ===
+
+The following VOPs let you implement fuzzy logic networks.
+
+[Icon:VOP/fuzzyinput][Fuzzy Input VOP|Node:vop/fuzzyinput] |
+    #width: 33%
+    Fuzzifies crisp inputs into a truth value for a single fuzzy set. This node lets you choose from a set of preset membership functions for the new set, or you can draw a custom curve using a ramp parameter.
+        
+    Fuzzy Input outputs a truth value (a floating point number from 0-1) and a `FuzzySet` struct containing information about the fuzzy set (including the range, the membership function, and the truth value).
+
+[Icon:VOP/fuzzyand][Fuzzy And|Node:vop/fuzzyand]
+[Icon:VOP/fuzzyor][Fuzzy Or|Node:vop/fuzzyor]
+[Icon:VOP/fuzzynot][Fuzzy Not|Node:vop/fuzzynot] |
+    Combine fuzzy variables. A network of these operations corresponds to the "If" part of a [rule|#rules]. The output is the _strength of the rule_. 
+
+[Icon:VOP/fuzzyinf][Fuzzy Inference VOP|Node:vop/fuzzyinference] |
+    Derives new fuzzy sets. This node corresponds to the "Then" part of a [rule|#rules].
+    
+    Fuzzy Inference can aggregates multiple rule strengths using a function (maximum or sum).
+
+    It then uses the rule strength and a membership function to derive a truth value in a new fuzzy set. The node outputs a truth value and a `FuzzySet` struct containing information about the new fuzzy set.
+
+[Icon:VOP/fuzzyinfmirror][Fuzzy Inference Mirror|Node:vop/fuzzyinferencemirror] | 
+    Like Fuzzy Inference but it creates _two_ new fuzzy sets: the one created by Fuzzy Inference and its inverse. This is useful when you want some behaviors to be based on how true something is, and other behaviors based on how untrue it is.
+
+[Icon:VOP/fuzzydefuzz][Fuzzy Defuzz|Node:vop/fuzzydefuzz] |
+    De-fuzzifies a `FuzzySet` input into a crisp output.
+
+== Using senses as fuzzy inputs ==
+
+:fig:[Image:/images/crowds/sensor_distance_array.svg]
+    The [Fuzzy Obstacle Sense VOP|Node:vop/fuzzysenseobs] sends out a number of rays within a view cone in front of an agent, out to a maximum distance. This produces an [array|/vex/arrays] of distances.
+    
+    For convenience, the hit distance is subtracted from the maximum, so closer hits are higher numbers, and misses are `0`.
+    
+    In this example, three rays hit nearby agents and two miss, producing an array `{20, 60, 0, 0, 30}`.
+
+:fig:[Image:/images/crowds/sensor_fuzzy_ramp.svg]
+    You can wire the array produced by Fuzzy Blah Blah Sense into the [Fuzzy Input VOP|Node:vop/fuzzyinput]. The Fuzzy Input node uses a function or ramp parameter to weight the values in the array and convert them to a single truth value and fuzzy set.
+    
+    In this example, the red bars are the array of "closeness" values from a sensor node. To create a "Left Side is Blocked" fuzzy set, we draw a ramp that weights angles on the left higher than angles on the right. The Fuzzy Input node essentially divides the area of the bars by the remaining area under the curve to get a single truth value.
+

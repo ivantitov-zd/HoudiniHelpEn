@@ -1,0 +1,263 @@
+= Environment Light =
+
+#type: node
+#context: obj
+#internal: envlight
+#icon: OBJ/light_environment
+#tags: lights
+
+"""Environment Lights provide background illumination from outside the scene."""
+
+Environment lights illuminate the scene from a virtual hemisphere (or
+sphere) that is beyond that farthest geometry objects in the scene.
+Environment lights can be rotated to orient directional illumination, but
+they cannot be translated.
+
+An environment light may use a texture map to provide HDRI illumination from an environment map. With no rotation, the environment map is oriented so that the top face aligns with the positive Y axis.
+            
+See [how to create an environment/reflection map|/render/envmaps].
+
+@parameters
+
+== Transform ==
+
+[Include:common#xord]
+
+[Include:common#r]
+
+=== Viewing Options ===
+
+[Include:common#display]
+
+[IncludeProp:iconscale]
+
+[Include:common#cachedata]
+
+[Include:misc_parms#picking]
+
+[Include:misc_parms#pickscript]
+
+=== Lookat Options ===
+
+[Include:common#lookat]
+
+[Include:common#lookatup]
+
+== Light ==
+
+Light Color:
+    The environment color or environment map tint if a map is used.
+
+Light Intensity:
+    A scale on the color. If the intensity is 0, the light is disabled. The light will only be sent to the renderer if the object is included in the __Force Lights__ parameter of the output driver.
+
+Environment Map:
+    Environment map to control the color and intensity of light arriving
+    from different directions.  The color from the environment map will be
+    tinted by the light color.
+    
+    This parameter will be disabled if __Enable Sky Environment Map__
+    (on the __Sky Environment Map__ tab) is on.
+
+Light Enabled:
+    Turning this toggle off is equivalent to setting the light intensity to 0.
+
+Enable Light In Viewport:
+    Turning this off removes the light from consideration in the
+    viewport.  This is useful for lights which only make sense at
+    render time.
+
+Diffuse contribution:
+    The light will contribute to diffuse illumination when illuminating a surface.
+
+Specular contribution:
+    The light will provide specular highlights on the surface when illuminating a surface.
+
+Light Contributions:
+    Provides more detailed control over which shading components the light affects. To disable contribution to a named comopnent, specify the component name and disable the toggle.
+
+Render Light Geometry:
+    Display the light as a geometry object in the render.  Environment
+    lights will appear as a background image in the render when this toggle
+    is enabled.
+
+Clip To Positive Y Hemisphere:
+    Forces the environment lighting to only emit light from the +Y
+    hemisphere.  When lighting a scene that occludes most illumination in
+    the -Y hemisphere (eg. a scene with a large ground plane), turning on
+    this toggle can improve rendering quality.
+    
+[Include:common#categories]
+
+=== Render Options ===
+
+Options that affect how light is produced by the environment light.
+
+Rendering Mode:
+    The sampling style for environment illumination.  Environment
+    lighting is computed with raytracing by sending rays out into the
+    hemisphere above the shaded surface to analyze the amount of light
+    arriving at the surface from different directions.
+
+    Which rendering mode you choose to use will depend on the type of
+    environment illumination as well as the geometry in your scene.
+
+    Direct Lighting:   
+        The environment will be treated as a large area light enclosing the
+        scene.  If an environment map is used, mantra will send more
+        samples toward bright portions of the environment.  If you want the
+        environment to contribute to specular or reflective surfaces, you
+        should use this option.
+        
+        Direct lighting enables support for variance antialiasing when
+        rendering with PBR or when using the [Node:vop/surfacemodel] VOP.
+        Variance antialiasing makes use of the min/max ray samples to
+        automatically detect and reduce noise in the lighting.
+
+        TIP:
+            Normally "Direct Lighting" should be preferred in the following scenarios:
+            * When the environment map contains directional illumination (eg. parts of the map are much brighter than others)
+            * When you require a specular contribution from the environment
+            * When you require per-light exports
+
+    Ambient Occlusion:
+        The environment will be computed using ambient occlusion.  Ambient
+        occlusion is computed using the [VEX Global
+        Illumination|Node:shop/v_gilight] shader, and will send evenly
+        distributed rays in the hemisphere to check for blocking surfaces.
+        Ambient occlusion works best when computing lighting without an
+        environment map or with a map that has little variation in color
+        over the hemisphere.  Occlusion will only contribute to diffuse
+        lighting.
+
+        TIP:
+            Use ambient occlusion in the following scenarios:
+            
+            * When rendering without an environment map or when the environment lighting is uniform and not very intense.
+            * When using irradiance caching.
+
+    Ray Tracing Background:
+        The environment will contribute to the scene indirectly for shaders
+        that trace rays that exit the scene.  This mode is supported
+        through the [Vex:resolvemissedray] VEX function, which can be used
+        in shaders to query the background illumination for a given ray.
+        Ray Tracing Background mode is supported for the following
+        scenarios:
+        * PBR rendering (either micropolygon or raytracing)
+        * Non-PBR rendering when using the [Node:vop/surfacemodel] VOP
+
+        In this mode, deep rasters from the environment light will appear
+        in the "indirect_emission" export plane rather than the per-light
+        diffuse/reflect/refract planes.  This will occur because the light
+        is treated like an emissive background object rather than as a true
+        light source.
+
+        TIP:
+            Normally "Ray Tracing Background" should be preferred in the
+            following scenarios:
+            * When rendering without an environment map or when the environment lighting is uniform and not very intense
+            * When you are using PBR or a shader that performs ray tracing to calculate most indirect lighting
+            * When using an [Node:obj/indirectlight] to calculate irradiance, to speed up lighting for secondary rays
+            
+
+Sampling Quality:
+    The sampling quality multiplier for the light.  A value of 1 will use
+    the ray sampling parameters (__Min Ray Samples__) from the output
+    driver directly.  Other values will proportionally increase or decrease
+    the sampling quality.
+
+Glossy Filter Amount:
+    When set to a non-zero value, this parameter enables
+    renderer-controlled filtering of the environment map to filter out high
+    frequency noise in glossy reflections of the environment light. The
+    amount of filtering is determined by the surface bsdf - with glossy
+    surfaces receiving more filtering. Filtering is automatically disabled
+    for diffuse surfaces and for mirror reflections to preserve accuracy in
+    the render for these components.  Using a non-zero value for this
+    setting may change the average brightness of the glossy highlights,
+    introducing some bias in the render.
+
+Portal Geometry:
+    Specifies a geometry object that can be used to optimize sampling of
+    environment lights in enclosed scenes.  The portal geometry describes
+    to the renderer where light can enter the enclosed scene, so that the
+    sampling algorithm can concentrate on the parts of the environment that
+    actually contribute lighting to a pixel.  Normally, the portal geometry
+    should be a geometry object that is not rendered, so that it does not
+    cast shadows on the scene, and that has only a single layer of surface
+    visible from any point in the scene - so that illumination is not
+    multiply counted.
+
+    A correctly configured portal should produce the same rendered result
+    as when the portal is disabled, but with much less noise.  Portals
+    should normally not be used in outdoor scenes where the environment map
+    is fully visible, or when the environment map contains sharp variations
+    in intensity - since in these cases the standard direct lighting
+    algorithm may produce better results.
+
+    Using an environment light with a portal is equivalent to creating a
+    standard [geometry light|Node:obj/hlight] with physically correct
+    attenuation, no intensity normalization, and transform into this object
+    enabled.
+
+Ray Distance:
+    Maximum distance from the sample point to consider geometry for
+    irradiance/occlusion.
+
+Sampling Angle:
+    Half-angle over which to send rays for irradiance/occlusion.  90
+    degrees is a full hemisphere.
+
+Adaptive Sampling:
+    Turns on an automatic optimization that will reduce the number of
+    samples when there is little variation in occlusion above the
+    sample point. This can improve performance at the expense of some
+    possible flickering or additional noise.  Adaptive sampling will
+    only take effect with more than 64 samples.
+
+=== Sky Environment Map ===
+
+Options to automatically create a "sky and ground" environment map
+for the light.
+
+Enable Sky Environment Map:
+    Automatically create a "sky and ground" environment map. When this
+    parameter is on, the __Environment Map__ parameter (on the
+    __Environment__ tab) will be disabled.
+
+Resolution:
+    The resolution (in pixels per cube side) of the environment map.
+    
+The other parameters on this tab are identical to the parameters of
+the [Sky Environment Map compositing node|Node:cop2/skyenvmap].
+
+Direction: 
+    The type of direction to calculate. Either __Away from Sun__ or __Towards the Sun__.
+
+Calculated Vector:
+    The direction vector for the sun.
+
+Calculated Rotate:
+    The Euler rotation angles to align -Z axis with the __Calculated Vector__.
+
+== Shadow ==
+
+Shadow Type:
+    None:
+        No shadows will be cast by this light.
+    
+    Ray-Traced Shadows:
+        Ray-tracing will be used to compute shadows from this light source.
+
+Shadow Mask:
+    A mask of objects which will be considered occluders for the light source. When ray-traced shadows are used, only these objects will be intersected by shadow rays. When depth map shadows are used, only these objects will appear in the depth map.
+
+    NOTE:
+        It is possible to use categories by adding the shadowcategories rendering parameter.
+
+Shadow Intensity:
+    A scale on how much light is blocked by occluders. By decreasing the shadow intensity, the occluders will not block all the light, allowing some illumination through.
+
+Transparent Shadows:
+    When this option is turned on, the surface shader of occluders will be evaluated to determine the opacity. Turning this option on will cause deep shadow maps to be used when shadowing using Depth Map Shadows.
+

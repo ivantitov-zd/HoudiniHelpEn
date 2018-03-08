@@ -1,0 +1,30 @@
+= Caches =
+
+"""Tips for efficiently caching and loading crowd sims."""
+
+=== Reducing File Size ===
+
+When saving a set of agent primitives to disk, their [shared agent definition(s)|/crowds/agents#agentdefinition] are also embedded in the geometry file so that the agents can be reconstructed when the file is loaded.
+
+Each component of the agent definition can be marked as an _external reference_ to a file on disk.
+This occurs when, for example, when the [Agent SOP's|Node:sop/agent] __Input__ parameter is set to __Disk__, or when using the [Agent Clip SOP|Node:sop/agentclip] to load animation clips from disk.
+In such cases, only the path to that file will be stored in the geometry file when saving out the agent definition (similar to a [packed disk primitive|/model/packed#disk]), which significantly reduces the size of the geometry files when saving a sequence of frames.
+Otherwise, the contents of that component (such as the clip or shape library) will be embedded in the geometry file in the same manner as a [packed geometry primitive|/model/packed#memory].
+
+TIP:
+    Set the [Agent ROP's|Node:out/agent] __Source__ parameter to __Agent Primitive__ to write out the agent definition of an existing agent primitive to disk.
+
+=== Loading File Caches ===
+
+When loading agents from a geometry file, the agent definition and any of its externally referenced files will also be read from disk.
+
+If the agent definition does not contain external references, this may reduce performance when loading a sequence of files.
+In addition to having to load larger files, having a separate copy of the agent definition in each file may cause slower viewport performance since the agent definition will appear to change each frame.
+
+If the agent definition components are external references, Houdini is able to avoid reloading the agent definition files on each frame to improve performance.
+Houdini maintains a reference-counted cache of agent definition files, so entries will be removed when no agent primitive in memory references those files.
+This means that it is recommended to set the [File SOP's|Node:sop/file] __Cache Frames__ parameter to __at least 1__.
+Otherwise, there can be unnecessary flushing and reloading of the agent definition files when the File SOP's geometry is cleared before loading the next file in the sequence.
+
+TIP:
+    For equivalent performance to viewing a cached sim from a DOP network, set the [File SOP's|Node:sop/file] __Cache Frames__ parameter to the number of simulation frames.

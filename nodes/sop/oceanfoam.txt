@@ -1,0 +1,145 @@
+= Ocean Foam =
+
+#type: node
+#context: sop
+#icon: SHELF/wave
+#internal: oceanfoam
+
+"""Generates particle-based foam"""
+
+This node creates foam particles that can be used to enhance rendering of an ocean surface.  The input is a
+one or more merged [Ocean Spectrum|Node:sop/oceanspectrum] layers that comprise the ocean.
+
+There are two modes for this SOP:
+
+`Emitter`:
+    Particles are created within a specified region based on various emission criteria from the input ocean layers.  These particles could then be fed into any custom particle simulation for emission.
+
+`Solver`:
+    Foam particles are created according to the various emission criteria then run through a 2-D particle simulation that incorporates the ocean velocity and neighboring particle proximity to give realistic foam behavior.  The output of this mode can be used directly for rendering foam with the [Ocean Surface|/gallery/shop/vopmaterial/oceansurface] shader.
+
+@parameters
+
+Mode:
+    `Emitter` will create particles according to emission criteria.  `Solver` will also run those particles through a 2-d foam simulation.
+
+== Emission ==
+
+This section controls foam particle emission.
+
+Particle Density:
+    The density of particles to emit per unit of area, before culling by the emission criteria.  Increasing this value will give more detailed foam renders at the expense of a higher particle count.
+
+=== Region ===
+Type:
+    The type of region used for the emission area.
+
+    Grid:
+        Emit particles over the specified grid.
+
+    Camera:
+        Emit particles within the frustum of the specified camera.
+
+Size:
+    The world space size of the emission grid.
+
+Center:
+    The world space center of the emission grid.
+
+Camera:
+    Restrict emission to the specified camera's frustum.
+
+Z Near:
+    The distance from the camera to start emitting foam.
+
+Z Far:
+    The distance from the camera to stop emitting foam.
+
+Window X/Y:
+    The min/max portions of the camera's view for emission. This allows you to add padding to ensure good boundary conditions or focus into a key area of the scene.
+
+Z Density Falloff:
+    Areas that are farther from the camera along the z-axis will emit fewer particles with a larger radius for less expensive simulation and rendering at a distance.  When set to 0, the distance from camera will have no effect on particle density.
+
+=== Conditions ===
+
+This section controls the emission criteria.  All enabled criteria must be met for emission.
+
+Min Cusp:
+    Emit foam where the ocean waves are above this cusp level.    
+
+Min Velocity:
+    Emit foam where the ocean waves are moving faster than this speed.    
+
+Min Height:
+    Emit foam where the ocean waves are above this height.
+
+=== Ocean Evaluation ===
+
+This section controls how the input ocean layers are evaluated when generating and simulating foam.
+
+Time:
+    The time at which to evaluate the ocean surface.
+
+Downsample:
+    Downsample the incoming ocean spectra before evaluating any ocean values.  This parameter specifies the number of powers of two to remove from the resolution of the incoming ocean spectrum. For example, if the spectrum was originally specified at resolution 10 to generate a 1024 x 1024 volume, downsampling by 2 will evaluate ocean volumes at resolution 8, a 256 x 256 volume.
+
+Displace Particles:
+    By default the particles are output in 2-d "rest" space, as expected by the [Ocean Surface|/gallery/shop/vopmaterial/oceansurface] shader.  Enabling this option will output the particles displaced by the ocean waves, usually for custom simulation or later processing.
+
+== Solver ==
+
+This section controls the foam simulation.
+
+=== Foam ===
+
+Life Expectancy:
+    How long the foam particles will live (in seconds).
+
+Life Variance:
+    Foam particles will live the number of seconds in __Life Expectancy__, plus or minus this number of seconds. Use 0 for no variance. 
+
+Drift Rate:
+    The amount of _horizontal_ ocean velocity to impart to the foam particles.  Increasing this value will increase the amount of squashing and stretching of the foam on the surface.
+
+Preserve Foam:
+    Increase or decrease the lifespan of foam particles based on the local density of particles, which can help create clumps and streaks of foam on the ocean surface over time.
+
+Min Foam Density:
+    When the number of particles surrounding a foam particle lies in the range of this value down to zero, proportionally reduce its lifespan each timestep by the __Reduction Rate__.
+
+Max Foam Density:
+    When the number of particles surrounding a foam particle lies in the range of  __Min Foam Density__ up to this value, proportionally increase its lifespan each timestep by the __Preservation Rate__.
+
+Preservation Rate:
+    The proportional amount to increase the lifespan of a foam particle with sufficiently high local foam density.  This value is the number of seconds to add per second, so if greater than one can effectively preserve high density foam clumps from ever being killed.
+
+Reduction Rate:
+    The proportional amount to decrease the lifespan of a foam particle with sufficiently low local foam density.  This value is the number of seconds to reduce the lifespan per second.
+
+Keep Attributes:
+    The list of attributes to keep from the foam simulation.  The defaults of `pscale`, `rest`, `age`, and `life` are required for proper rendering with the [Ocean Surface|/gallery/shop/vopmaterial/oceansurface] shader.  Set this parameter to `*` to keep all attributes.
+
+== Simulation ==
+Reset Simulation:
+    Clears the entire simulation cache.
+
+Start Frame:
+    The starting frame for the simulation.  Set this parameter earlier than your initial render frame to pre-populate the ocean with foam.
+
+Substeps:
+    The number of substeps to take in the simulation.
+
+Cache Simulation:
+    Enables the simulation cache.
+
+Cache Memory (MB):
+    Specifies how much memory in megabytes can be consumed by the cache for
+    the foam simulation.
+
+@related
+
+* [Ocean Spectrum|Node:sop/oceanspectrum]
+* [Ocean Evaluate|Node:sop/oceanevaluate]
+* [Ocean Surface|/gallery/shop/vopmaterial/oceansurface
+]

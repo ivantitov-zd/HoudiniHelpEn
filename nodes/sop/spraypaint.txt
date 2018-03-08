@@ -1,0 +1,340 @@
+﻿= Spray Paint =
+
+#type: node
+#context: sop
+#internal: spraypaint
+#icon: SOP/spraypaint
+
+#tags: paint, points, random
+
+"""Spray paints random points onto a surface."""
+
+== Overview ==
+
+This node allows users to spray paint random points onto a surface, with options for random scales and orientations.
+It is useful for creating points on a surface and then [copying geometry onto them|Node:sop/copy].  For example, people in a crowd, trees on a hill, or boats on water.
+
+Turn on the __Visualize as Spheres__ toggle to preview the random point scales as spheres.
+Turn that option off and put geometry into the second input to copy that geometry onto the points,
+scaled and oriented as specified in the __Radii__ and __Orientation__ tabs.
+
+To procedurally generate random points on a surface, instead of spray painting, use the [Scatter node|Node:sop/scatter], instead.
+
+NOTE:
+    There must be geometry in the first input to spray onto.  If there isn't, you can add geometry after painting,
+    and points will be generated as if it had been there before, but until then, no points will be generated.
+
+[Include:/shelf/spraypaint#includeme]
+
+@parameters
+
+Target Primitives:
+    #id: group
+
+    The subset of surface primitives to spray paint onto.
+
+Spray Rate:
+    #id: rate
+
+    The average number of points per unit area to spray in each click or movement of the brush.
+
+Relax Iterations:
+    #id: relaxiterations
+
+    The number of iterations of pushing the points away from each other, like in the [Point Relax node|Node:sop/relax].
+    The radii used for the relaxation of the points are generated based on the parameters in the __Radii__ tab,
+    not based on the size of any geometry to copy from the second input, so geometry to copy should be similar in scale to a sphere with radius 1.
+
+Random Seed:
+    #id: seed
+
+    All generated point positions depend (psuedo)randomly on this value.  This should always be different from __Radius Random Seed__, __Quaternion Random Seed__, __Y Axis Random Seed__, and __Z Axis Random Seed__.
+
+Max Points:
+    #id: emergencylimit
+
+    This is an optional strict limit on the number of points to generate, to avoid fatal accidents.  If the number of points that would have been generated
+    exceeds this, a number of points less than or equal to this limit will be generated, in a roughly similar distribution.
+
+Visualize as Spheres:
+    #id: visspheres
+
+    When enabled, spheres will be copied to the points to help visualize the point scales, or to temporarily avoid viewing heavy geometry to be copied from the second input while painting.
+
+Point Radius Scale:
+    #id: radius
+
+    Scales the radii randomly generated based on the parameters below.  This avoids the need to change all of the settings for the random distribution just to uniformly scale all radii.
+
+Distribution of Radii:
+    #id: distribution
+
+    Overall type of probability distribution from which radii are generated.  Set this to __Constant Value__ to have no randomness.
+
+    Constant Value:
+        The radii will all be __Middle Radius__, instead of being random.
+    Two Values:
+        The radii will either be __Min Radius Limit__ or __Max Radius Limit__, depending on __Probability of Max__.
+    Uniform:
+        The radii will be between __Min Radius Limit__ and __Max Radius Limit__, with equal probability for all values in that range.
+
+    Normal (Gaussian):
+        The radii will be drawn from the normal distribution whose mean/median is given by __Middle Radius__,
+        and whose standard deviation is given by __Spread of Radii__, limited by __Min Radius Limit__ and __Max Radius Limit__.
+
+        [Image:/images/nodes/sop/attribrandomize/normal_distrib.jpg]
+
+    Exponential:
+        The radii will be drawn from the exponential distribution whose median is given by __Middle Radius__,
+        limited by __Min Radius Limit__ and __Max Radius Limit__.
+
+        [Image:/images/nodes/sop/attribrandomize/exponential_distrib.jpg]
+
+    Log-Normal:
+        The radii will be drawn from the log-normal distribution whose median is given by __Middle Radius__,
+        and whose standard deviation is given by __Spread of Radii__, limited by __Min Radius Limit__ and __Max Radius Limit__.
+        This distribution is useful for generating random scales, because it tapers
+        off toward zero, helping avoid scales that are too small.
+
+        [Image:/images/nodes/sop/attribrandomize/lognormal_distrib.jpg]
+
+    Cauchy-Lorentz:
+        The radii will be drawn from the Cauchy distribution whose median is given by __Middle Radius__, and whose scale parameter, γ, is given by __Spread of Radii__.
+        This distribution has larger tails than the normal distribution, so it has more outliers, meaning that __Min Radius Limit__ and __Max Radius Limit__ will probably
+        be useful for preventing problematic outliers.
+
+        [Image:/images/nodes/sop/attribrandomize/cauchy_distrib.jpg]
+
+    Custom Ramp:
+        The custom ramp will be sampled as the inverse cumulative distribution function (inverse CDF) of a probability distribution.
+
+Radius Random Seed:
+    #id: radiusseed
+
+    All generated radii depend (psuedo)randomly on this value, unless __Distribution of Radii__ is __Constant Value__.
+    This should always be different from __Random Seed__, __Quaternion Random Seed__, __Y Axis Random Seed__, and __Z Axis Random Seed__.
+
+Middle Radius:
+    #id: medianradius
+
+    The median radius, before being limited by __Min Radius Limit__ and __Max Radius Limit__, which is also before being scaled by __Point Radius Scale__.
+    See the help for [Distribution of Radii|Node:sop/spraypaint#distribution].
+
+Spread of Radii:
+    #id: stddevradius
+
+    Roughly the amount that radii vary from __Middle Radius__ on average, before being limited by __Min Radius Limit__ and __Max Radius Limit__,
+    which is also before being scaled by __Point Radius Scale__.
+    See the help for [Distribution of Radii|Node:sop/spraypaint#distribution].
+
+Min Radius Limit:
+    #id: minradius
+
+    A lower limit on the radii that can be randomly generated.
+
+Max Radius Limit:
+    #id: maxradius
+
+    An upper limit on the radii that can be randomly generated.
+
+Probability of Max:
+    #id: probmaxradius
+
+    When __Distribution of Radii__ is __Two Values__, this is the probability that any given point's radius will be __Max Radius Limit__.
+    Every other point will have radius __Min Radius Limit__, so its probability is 1 - __Probability of Max__.
+
+Quaternion Attribute:
+    #id: quatattrib
+
+    When enabled, a quaternion attribute with the specified name will be created to represent orientations generated for the points.
+
+Based on Y and Z Axes (below):
+    #id: quatyz
+
+    When enabled, the orientations represented by the quaternion attribute will be computed based on the parameters for generating Y and Z
+    axis directions, which can be easier to control than basing the orientations on the parameters for directly controlling the quaternions.
+    For example, with this enabled, the default behavior is for Y be normal to the surface and Z be a random direction perpendicular to Y.
+
+Max Angle from Center:
+    #id: quatconeangle
+
+    When enabled, all orientations will be within this angle (in degrees) of __Central Orientation__ or the values taken from
+    __Central Orientation Attribute__, if specified.  If __Bias Toward Center__ is disabled, the cone of orientations within
+    this angle will be sampled uniformly.  When both are disabled, all possible orientations are equally likely.
+
+    [Image:/images/nodes/sop/attribrandomize/orientation_cone.jpg]
+
+Bias Toward Center:
+    #id: quatpowerbias
+
+    When enabled and greater than zero, orientations will be smoothly biased toward __Central Orientation__ or the values taken from
+    __Central Orientation Attribute__, if specified.
+
+Central Orientation:
+    #id: quatcenter
+
+    When __Max Angle from Center__ or __Bias Toward Center__ are enabled, and __Central Orientation Attribute__ is not given,
+    this specifies the orientation at the center of the cone or toward which orientations are biased.
+
+Central Orientation Attribute:
+    #id: quatcenterattrib
+
+    When __Max Angle from Center__ or __Bias Toward Center__ are enabled, this optionally specifies a quaternion attribute on the
+    surface geometry that will be interpolated for each generated point, to be used in place of __Central Orientation__.
+    This can be a point, vertex, primitive, or detail attribute.
+
+Quaternion Random Seed:
+    #id: quatseed
+
+    All generated orientations depend (psuedo)randomly on this value, unless __Max Angle from Center__ is 0.
+    This should always be different from __Random Seed__ and __Radius Random Seed__.
+
+Y Axis Attribute:
+    #id: yattrib
+
+    When enabled, a vector attribute with the specified name will be created to represent the generated direction for each point
+    that the Y axis of geometry copied to it should face.
+
+Max Angle from Center:
+    #id: yconeangle
+
+    When enabled, all Y axis directions will be within this angle (in degrees) of __Central Direction__ or the values taken from
+    __Central Direction Attribute__, if specified.  If __Bias Toward Center__ is disabled, the cone of directions within
+    this angle will be sampled uniformly.  When both are disabled, all possible directions are equally likely.
+
+    [Image:/images/nodes/sop/attribrandomize/direction_cone.jpg]
+
+Bias Toward Center:
+    #id: ypowerbias
+
+    When enabled and greater than zero, Y axis directions will be smoothly biased toward __Central Direction__ or the values taken from
+    __Central Direction Attribute__, if specified.
+
+Central Direction:
+    #id: ycenter
+
+    When __Max Angle from Center__ or __Bias Toward Center__ are enabled, and __Central Direction Attribute__ is not given,
+    this specifies the direction at the center of the cone or toward which Y axis directions are biased.
+
+Central Direction Attribute:
+    #id: ycenterattrib
+
+    When __Max Angle from Center__ or __Bias Toward Center__ are enabled, this optionally specifies a vector attribute on the
+    surface geometry that will be interpolated for each generated point, to be used in place of __Central Direction__.
+    This can be a point, vertex, primitive, or detail attribute.
+
+Y Axis Random Seed:
+    #id: yseed
+
+    All generated Y axis directions depend (psuedo)randomly on this value, unless __Max Angle from Center__ is 0.
+    This should always be different from __Random Seed__, __Radius Random Seed__, and __Z Axis Random Seed__.
+
+Z Axis Attribute:
+    #id: zattrib
+
+    When enabled, a vector attribute with the specified name will be created to represent the generated direction for each point
+    that the Z axis of geometry copied to it should face.
+
+Max Angle from Center:
+    #id: zconeangle
+
+    When enabled, all Z axis directions will be within this angle (in degrees) of __Central Direction__ or the values taken from
+    __Central Direction Attribute__, if specified.  If __Bias Toward Center__ is disabled, the cone of directions within
+    this angle will be sampled uniformly.  When both are disabled, all possible directions are equally likely.
+
+    See cone angle image for Y axis above.
+
+Bias Toward Center:
+    #id: zpowerbias
+
+    When enabled and greater than zero, Z axis directions will be smoothly biased toward __Central Direction__ or the values taken from
+    __Central Direction Attribute__, if specified.
+
+Central Direction:
+    #id: zcenter
+
+    When __Max Angle from Center__ or __Bias Toward Center__ are enabled, and __Central Direction Attribute__ is not given,
+    this specifies the direction at the center of the cone or toward which Z axis directions are biased.
+
+Central Direction Attribute:
+    #id: zcenterattrib
+
+    When __Max Angle from Center__ or __Bias Toward Center__ are enabled, this optionally specifies a vector attribute on the
+    surface geometry that will be interpolated for each generated point, to be used in place of __Central Direction__.
+    This can be a point, vertex, primitive, or detail attribute.
+
+Z Axis Random Seed:
+    #id: zseed
+
+    All generated Z axis directions depend (psuedo)randomly on this value, unless __Max Angle from Center__ is 0.
+    This should always be different from __Random Seed__, __Radius Random Seed__, and __Y Axis Random Seed__.
+
+Prim Num Attribute:
+    #id: primnumattrib
+
+    An integer point attribute with this name will be created, containing the number of the surface primitive hit by each sprayed point.
+    It can be used with __Prim UVW Attribute__ and the [Attribute Interpolate node|Node:sop/attribinterpolate] to have the points stick
+    on deforming geometry.
+
+Prim UVW Attribute:
+    #id: primuvwattrib
+
+    A vector point attribute with this name will be created, containing the location within the surface primitive hit by each sprayed point,
+    in primitive parametric coordinates.  It can be used with __Prim Num Attribute__ and the [Attribute Interpolate node|Node:sop/attribinterpolate]
+    to have the points stick on deforming geometry.
+
+Import Attributes from Surface:
+    #id: importattribs
+
+    When enabled, the attributes (including groups) specified below will be transferred from the surface geometry to the sprayed points as point attributes.
+
+Point Attributes:
+    #id: pointattribs
+
+    These point attributes (including groups) from the surface geometry will be interpolated and transferred to the sprayed points.
+
+Vertex Attributes:
+    #id: vertattribs
+
+    These vertex attributes (including groups) from the surface geometry will be interpolated and transferred to the sprayed points as point attributes.
+
+Primitive Attributes:
+    #id: primattribs
+
+    These primitive attributes (including groups) from the surface geometry will be transferred to the sprayed points as point attributes.
+
+Detail Attributes:
+    #id: detailattribs
+
+    These detail attributes from the surface geometry will be transferred to the sprayed points as point attributes.
+
+Radius:
+    #id: stroke_radius
+
+    The brush radius for the next stroke to be drawn.
+
+Tool:
+    #id: stroke_tool
+
+    Reserved for future use.
+
+Color:
+    #id: stroke_color
+
+    When enabled, stroke colors (Cd attribute) will be added to the points, and this parameter is the color for the next stroke to be drawn.
+    The colors for strokes already drawn can be modified under the __Stroke__ tab.
+
+Opacity:
+    #id: stroke_opacity
+
+    When enabled, stroke opacity (Alpha attribute) will be added to the points, and this parameter is the opacity for the next stroke to be drawn.
+    The opacities for strokes already drawn can be modified under the __Stroke__ tab.
+
+Stroke:
+    This tab allows changing general properties of strokes that have already been drawn.
+
+@related
+
+- [Node:sop/scatter]
+- [Node:sop/attribrandomize]
+

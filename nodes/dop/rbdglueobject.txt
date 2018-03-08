@@ -1,0 +1,204 @@
+#type: node
+#context: dop
+#internal: rbdglueobject
+#icon: DOP/rbdglueobject
+
+= RBD Glue Object =
+
+""" Creates a number of RBD Objects from SOP Geometry. These individual
+RBD Objects are created from the geometry primitive groups, and are
+glued to each other. """
+
+The RBD Glue Object DOP creates multiple [RBD Objects|Node:dop/rbdobject] inside the DOP
+simulation. Like the [RBD Fractured Object
+DOP|Node:dop/rbdfracturedobject], it takes the geometry from the given
+SOP Path and breaks it into pieces according to the Group Mask. Each
+piece is an independent [RBD Object|Node:dop/rbdobject]. An additional RBD Object (with name
+Object Name) is also created, and each piece is glued to that object.
+
+NOTE:
+    The [RBD Fractured Object|Node:dop/rbdfracturedobject] and RBD Glue Object will make one object for each group. If you have meta groups such as inside and outside, try using `piece*` instead of `*`. 
+
+[Include:/shelf/rbdglueobject#includeme]
+
+== Attributes ==
+
+    You can  [create attributes|/model/attributes]  on the RBD object's
+    geometry to influence its behavior. Most of these attributes allow
+    fine-tuning of the RBD by overriding default values set in this
+    node.
+
+    [Include:standard_rbdphysparms_attribs]
+
+
+@parameters
+    Creation Frame Specifies Simulation Frame:
+        Determines if the creation frame refers to global Houdini
+        frames (`$F`) or to simulation specific frames (`$SF`).  The
+        latter is affected by the offset time and scale time at the
+        DOP network level.
+    Creation Frame:
+        The frame number on which the object will be created. The
+        object is created only when the current frame number is equal to
+        this parameter value. This means the DOP Network must evaluate a
+        timestep at the specified frame, or the object will not be
+        created. 
+
+	For example, if this value is set to 3.5, the
+        __Timestep__ parameter of the DOP Network must be changed to
+        `1/(2*$FPS)` to ensure the DOP Network has a timestep at frame
+        3.5.
+    Object Name:
+        The name for the created object.  This is the name that shows up
+        in the details view and is used to reference this particular
+        object externally.  
+
+	NOTE:
+		While it is possible to have many objects with the same name, this complicates writing references, so it is recommended to use something like `$OBJID` in the name.
+    SOP Path:
+        The path to a SOP (or an Object, in which case the display SOP
+        is used) which will be the geometry for this object.
+    Fracture By Name:
+        The SOP's geometry is divided into one or more sub-objects. For
+        every unique value of the name attribute, a sub-object will be created
+        with only the primitives that have that attribute value.
+    Group Mask:
+        The SOP's geometry is divided into one or more sub-objects. For
+        every group that matches this mask, a sub-object will be created
+        with only the primitives that belong to that group.
+    Use Deforming Geometry:
+        #channels: /animategeo
+
+        Causes the geometry for the object to be pulled from the chosen
+        SOP at each timestep. If the SOP contains animated geometry, the
+        RBD object's geometry will also animate. 
+
+	If this option is used,
+        the __Use Point Velocity__ parameter of the [RBD Solver|Node:dop/rbdsolver] should also
+        be turned on to take into account the deformations when
+        calculating collision responses.
+    Use Object Transform:
+        The transform of the object containing the chosen SOP is
+        applied to the geometry. This is useful if the initial location
+        of the geometry is defined by an object transform. 
+
+	If you want
+        to transfer an object whose movement is defined at the object
+        level, you should use the Object Position DOP instead.
+    Create Active Objects:
+        #channels: /active
+
+        Sets the initial active state of the objects. An inactive
+        object doesn't react to other objects in the simulation.
+
+    Display Geometry:
+        Controls if the geometry is displayed in the viewport.  Does
+        not reset the simulation when it is changed.
+
+    == Initial State ==
+
+        Position:
+            Initial position in world space of the object.
+        Rotation:
+            Initial orientation of the object. This is in RX/RY/RZ
+            format.
+        Velocity:
+            Initial velocity of the object.
+        Angular Velocity:
+            Initial angular velocity of the object. This is the axis of
+            rotation times the rate of rotation. Speed of rotation is
+            measured in degrees per second, so a value of 360 will cause
+            the object to rotate once per second.
+        Inherit Velocity:
+            When one brings in a moving piece of geometry from an
+            external source one does not always know the precise
+            velocity and angular velocity. 
+            
+            If this toggle is set, the
+            point velocity attribute of the geometry will be used to
+            calculate the estimated velocity and angular velocity of the
+            object. If the geometry does not have velocity point attributes, you can add them with a [Trail surface node|Node:sop/trail].
+            
+            This allows one to effect a smooth hand off even if
+            the source geometry came from a sequence of geometries
+            rather than a simulation.
+
+    == Glue ==
+
+        Glue to Object:
+            The name of an object to glue to. If this is blank, the
+            object is glued to no other object and acts normally. If it
+            is the name of another RBD Object which it mutually affects,
+            this object becomes glued to the other object. Its relative
+            position to the other object is maintained by the solver.
+        Glue Strength:
+            The amount of accumulated force required to break a glue
+            bond. A value of -1 will prevent the bond from ever
+            breaking. A value of 0 will cause the bond to break with the
+            first external force. When the bond breaks, the glue impulse is reset and the frame is resimmed.
+
+            TIP:
+                To find the maximum glue impulse, run it at -1 and see what it peaks at. 
+
+            NOTE:
+                The impact value is determined by the Mass of each sub piece by its velocity. Both can be found in the Position sub-data for each object. You can create a SOP solver that adds a detail attribute to each RBD object and set that to Mass x Velocity. If mass*vel is greater than impact force, then you have a release. 
+
+        Glue Impulse HalfLife:
+            The number of seconds for the glue impulse to decay by one
+            half. Whenever a glued object gets hit, it accumulates a
+            glue impulse force. This controls how fast that force
+            decays.
+
+    == Internal Glue ==
+
+        Glue Strength:
+            The amount of accumulated force required to break an
+            internal glue bond. 
+
+	    A value of -1 will prevent the bond from
+            ever breaking. A value of 0 will cause the bond to break
+            with the first external force.
+        Glue Impulse HalfLife:
+            The number of seconds for the glue impulse to decay by one
+            half. Whenever a glued sub-object gets hit, it accumulates a
+            glue impulse force. This controls how fast that force
+            decays.
+    [Include:standard_rbdvolume_parms]
+
+    [Include:standard_bulletdata_parm]
+
+    == Physical ==
+
+        Compute Mass:
+            Determines if the mass will be calculated automatically
+            from the object's volumetric representation and glued
+            sub-objects.
+        Density:
+            The mass of an object is its volume times its density.
+        Mass:
+            The absolute mass of the object.
+        Rotational Stiffness:
+            When an object receives a glancing blow, it will often
+            acquire a spin. The amount of spin acquired depends on the
+            shape and mass distribution of the object, known as the
+            _inertial tensor_. 
+
+	    The Rotational Stiffness is a scale
+            factor applied to this. A higher stiffness will make the
+            object less liable to spinning, a lower value will make it
+            more ready to spin.
+        [Include:standard_physparms]
+
+@outputs
+    First:
+        The RBD objects created by this node are sent through the
+        single output.
+@locals
+    [Include:standard_locals]
+
+
+@related
+    - [Node:dop/rbdfracturedobject]
+    - [Node:dop/rbdkeyactive]
+    - [Node:dop/rbdobject]
+

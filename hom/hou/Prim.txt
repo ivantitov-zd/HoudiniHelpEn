@@ -1,0 +1,263 @@
+= hou.Prim =
+#type: homclass
+#cppname: HOM_Prim
+#group: geo
+
+"""Each Prim resides inside a Geometry object and stores some sort of 3D
+geometric primitive, like a polygon, a NURBS curve, or a volume.  Each
+primitive usually contains a set of Vertex objects, each of which references a
+Point object."""
+
+This class has a number of subclasses for the different primitive types,
+such as [Hom:hou.Polygon] and [Hom:hou.Volume].
+
+@methods
+
+::`attribValue(self, name_or_attrib)` -> `int`, `float`, `str` or `tuple`:
+    #cppname: HOM_Prim::attribValue
+    #replaces: Exp:prim, Exp:prims
+    Return the value stored in this primitive for a particular attribute.  The
+    attribute may be specified by name or by [Hom:hou.Attrib] object.
+
+    Looking an attribute value using a [Hom:hou.Attrib] object is slightly
+    faster than looking it up by name.  When looking up attribute values inside
+    a loop, look up the [Hom:hou.Attrib] object outside the loop, and pass it
+    into this method.
+
+    When looking up the attribute values of all primitives, it is faster to
+    call [Hom:hou.Geometry#primFloatAttribValues] or
+    [Hom:hou.Geometry#primFloatAttribValuesAsString] than to call this method
+    for each primitive in the geometry.
+
+    Raises [Hom:hou.OperationFailed] if no attribute exists with this name.
+
+::`floatAttribValue(self, attrib)` -> `float`:
+    #cppname: HOM_Prim::floatAttribValue
+    Return the primitive attribute value for a particular floating point
+    attribute.  The attribute may be specified by name or by [Hom:hou.Attrib]
+    object.
+
+    Raises [Hom:hou.OperationFailed] if no attribute exists with this name
+    or the attribute is not float of size 1.
+
+    In most cases, you'll just use [Hom:hou.Prim#attribValue] to access
+    attribute values.  Houdini uses this method internally to implement
+    attribValue.
+
+::`floatListAttribValue(self, name_or_attrib)` -> `tuple` of `float`:
+    #cppname: HOM_Prim::floatListAttribValue
+    Return the primitive attribute value for a particular floating point
+    attribute.  The attribute may be specified by name or by
+    [Hom:hou.Attrib] object.  The return value is a tuple of floats.
+
+    It is valid to call this method when the attribute's size is 1.  In this
+    case, a tuple with one element is returned.
+
+    See also [Hom:hou.Prim#attribValue].
+
+::`intAttribValue(self, name_or_attrib)` -> `int`:
+    #cppname: HOM_Prim::intAttribValue
+    Return the primitive attribute value for a particular integer
+    attribute of size 1.  The attribute may be specified by name or by
+    [Hom:hou.Attrib] object.  See [Hom:hou.Point#floatAttribValue] for more
+    information.
+
+::`intListAttribValue(self, name_or_attrib)` -> `tuple` of `int`:
+    #cppname: HOM_Prim::intListAttribValue
+    Return the primitive attribute value for a particular integer attribute.
+    The attribute may be specified by name or by [Hom:hou.Attrib] object.  The
+    return value is a tuple of ints.  See [Hom:hou.Prim#floatListAttribValue]
+    for more information.
+
+::`stringAttribValue(self, name_or_attrib)` -> `str`:
+    #cppname: HOM_Prim::stringAttribValue
+    Return the primitive attribute value for a particular string attribute.  The
+    attribute may be specified by name or by [Hom:hou.Attrib] object.  See
+    [Hom:hou.Prim#floatAttribValue] for more information.
+
+::`stringListAttribValue(self, name_or_attrib)` -> `tuple` of `str`:
+    #cppname: HOM_Prim::stringListAttribValue
+    Return the primitive attribute value for a particular string attribute.
+    The attribute may be specified by name or by [Hom:hou.Attrib] object.  The
+    return value is a tuple of strings.
+
+    It is valid to call this method when the attribute's size is 1.  In this
+    case, a tuple with one element is returned.
+
+    See also [Hom:hou.Prim#attribValue].
+
+::`setAttribValue(self, name_or_attrib, attrib_value)`:
+    #cppname: HOM_Prim::setAttribValue
+    Store an attribute value in this primitive.  The attribute may be specified
+    by name or by [Hom:hou.Attrib] object, and must be an existing primitive
+    attribute in the geometry.  You would typically call this method from the
+    code of a Python-defined SOP.
+
+    Raises [Hom:hou.OperationFailed] if no attribute exists with this name
+    or if the attribute's data type does not match the value passed in.  If the
+    attribute's size is more than 1, the attribute value must be a sequence of
+    integers/floats, and the size of the sequence must match the attribute's
+    size.
+
+    Raises [Hom:hou.GeometryPermissionError] if this geometry is not modifiable.
+
+    {{{
+    #!python
+    # Create a float primitive attribute of size 3 named "Cd", and assign
+    # each primitive a unique color.  This code will work from inside a Python
+    # SOP, but not from the Python shell.
+    geo = hou.pwd().geometry()
+    color_attrib = geo.addAttrib(hou.attribType.Prim, "Cd", (1.0, 1.0, 1.0))
+    num_prims = len(geo.prims())
+    color = hou.Color()
+    for prim in geo.prims():
+	fraction = float(prim.number()) / num_prims
+	# Give each primitive a different hue, but full saturation and value.
+	# Store the RGB value in the attribute.
+        color.setHSV((fraction * 255, 1, 1))
+	prim.setAttribValue(color_attrib, color.rgb())
+    }}}
+
+::`attribType(self)` -> [Hom:hou.attribType] enum value:
+    #cppname: HOM_Prim::attribType
+    Return the enumerated value [Hom:hou.attribType#Prim].  Points, primitives,
+    vertices, and geometry support the same set of methods for querying
+    their attributes, and this method is one of them.
+
+    See also:
+    - [Hom:hou.Point#attribType]
+    - [Hom:hou.Vertex#attribType]
+    - [Hom:hou.Geometry#attribType]
+    - [Hom:hou.attribType]
+
+::`intrinsicValueDict(self)` -> `dict` of `str` to `value`:
+    #cppname: HOM_Prim::intrinsicValueDict
+    Returns a dictionary mapping intrinsic names to their values.
+
+::`intrinsicValue(self, intrinsic_name)` -> `int`, `float`, `str`, or `tuple`:
+    #cppname: HOM_Prim::intrinsicValue
+    #status: nd
+
+::`intrinsicNames(self)` -> `tuple` of `str`:
+    #cppname: HOM_Prim::intrinsicNames
+    #status: nd
+
+::`setIntrinsicValue(self, intrinsic_name, value)`:
+    #cppname: HOM_Prim::setIntrinsicValue
+    #status: nd
+
+::`intrinsicReadOnly(self, intrinsic_name)` -> `bool`:
+    #cppname: HOM_Prim::intrinsicReadOnly
+    #status: nd
+    Returns whether the intrinsic is read-only or can be modified with
+    `setIntrinsicValue()`
+ 
+::`intrinsicSize(self, intrinsic_name)` -> `int`:
+    #cppname: HOM_Prim::intrinsicSize
+    #status: nd
+    Returns the intrinsic value tuple size.
+ 
+::`positionAtInterior(self, u, v, w=0.0)` -> [Hom:hou.Vector3]:
+    #cppname: HOM_Prim::positionAtInterior
+    #replaces: Exp:primuv
+    Given normalized (i.e. from 0 to 1) u, v, w values, return the interior
+    position of the primitive at that parametric location.
+
+    Use [Hom:hou.Face#positionAt] for querying positions along the perimeter.
+
+::`attribValueAtInterior(self, attrib_or_name, u, v, w=0.0)` -> `int`, `float`, `str` or `tuple`:
+    #cppname: HOM_Prim::attribValueAtInterior
+    #replaces: Exp:primuv
+    Return an attribute value at the normalized u, v, w parametric position in
+    the interior of the primitive.
+
+    Raises [Hom:hou.OperationFailed] if the attribute is not a point or vertex
+    attribute.  If you want a primitive attribute value, it doesn't vary across
+    the surface, so use [Hom:hou.Prim#attribValue].
+
+    Use [Hom:hou.Face#attribValueAt] for querying attributes along the
+    perimeter.
+
+
+::`geometry(self)` -> [Hom:hou.Geometry]:
+    #cppname: HOM_Prim::geometry
+    Return the [Hom:hou.Geometry] object containing this primitive.
+
+::`number(self)` -> `int`:
+    #cppname: HOM_Prim::number
+    #replaces: Exp:pointlist, Exp:primlist
+    Return the number of this primitive.  Primitives are numbered sequentially
+    starting from 0, and the primitives returned by [Hom:hou.Geometry#prims]
+    are in order by their number.
+
+::`type(self)` -> [Hom:hou.primType] enum value:
+    #cppname: HOM_Prim::type
+    Return a [Hom:hou.primType] value containing the type of this primitive
+    (e.g. polygon, NURBS curve, metaball, etc).
+
+::`vertices(self)` -> generator of [Hom:hou.Vertex]:
+    #cppname: HOM_Prim::vertices
+    Return a sequence of the vertices contained in this primitive.
+
+    If the primitive is a face (e.g. a polygon or NURBS curve), the result
+    corresponds to the order of the vertices in that face.  If it is a surface
+    (e.g. a NURBS mesh), however, the primitive has a 2D array of vertices, and
+    this method returns all vertices in the 2D array, ordered by the rows.
+
+    See [Hom:hou.Surface#vertex] for more information about the relationship
+    between the 2D vertex array and the sequential vertex index, and for more
+    ways to access the vertices in a surface.
+
+::`numVertices(self)` -> `int`:
+    #cppname: HOM_Prim::numVertices
+    A shortcut for `len(self.vertices())`.  You probably don't need to call
+    this method.
+
+::`vertex(self, index)` -> [Hom:hou.Vertex]:
+    #cppname: HOM_Prim::vertex
+    A shortcut for `self.vertices()[index]`.  You probably don't need to
+    call this method.
+
+    This method supports negative indices to index from the end, just like
+    `self.vertices()[index]` would.  Also, like Python's indexing operator,
+    it will raise IndexError when the index is out of range.
+
+::`isSplineType(self)` -> `bool`:
+    #cppname: HOM_Prim::isSplineType
+    #replaces: Exp:isspline
+    #status: ni
+
+::`boundingBox(self)` -> [Hom:hou.BoundingBox]:
+    #cppname: HOM_Prim::boundingBox
+    Return an axis-aligned 3D bounding box that is sized and positioned to be
+    large enough to hold this primitive.
+
+::`nearestToPosition(self, pos3)`:
+    #cppname: HOM_Prim::nearestToPosition
+    #replaces: Exp:xyzdist
+    Given a sequence of three floats containing a position, find the location
+    on this primitive that is closest to that position.  Returns a tuple
+    containing the u value on this primitive, the v value on this primitive,
+    and the distance to this primitive.
+
+::`closestPrim(self)` -> [Hom:hou.Prim] or `None`:
+    #cppname: HOM_Prim::closestPrim
+    #status: ni
+
+::`minDistanceToPrim(self, prim)`:
+    #cppname: HOM_Prim::minDistanceToPrim
+    #replaces: Exp:primdist
+    #status: ni
+
+::`primsSharingPoints(self, num_points)` -> `tuple` of [Hom:hou.Prim]:
+    #cppname: HOM_Prim::primsSharingPoints
+    #replaces: Exp:primneighbours
+    #status: ni
+
+::`ourUVAtClosestLocationToPrim(self, prim)`:
+    #cppname: HOM_Prim::ourUVAtClosestLocationToPrim
+    #status: ni
+ 
+::`groups(self)` -> `tuple` of [Hom:hou.PrimGroup]:
+    #cppname: HOM_Prim::groups
+    Return a tuple of the primitive groups that contain this primitive.

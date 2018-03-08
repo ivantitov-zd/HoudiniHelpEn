@@ -1,0 +1,220 @@
+#type: node
+#context: sop
+#internal: skin
+#icon: SOP/skin
+
+#tags: model, curveup, core
+
+= Skin =
+
+"""Builds a skin surface between any number of shape curves."""
+
+Normally you use Skin by drawing curves the define the shape of
+the surface, then skinning between them. However, you can also
+skin between two surfaces: Skin will skin four surfaces between
+the edges of the two surfaces.
+
+All face and surface types are valid as long as the input(s) contain
+only faces or only surfaces. Different face types can be skinned
+together into one surface. For example, it is possible to skin a cubic
+open NURBS curve with a polygon and a quintic closed Bezier curve even
+if the three faces have a different number of control vertices.
+Similarly, this op can skin the boundary curves of surfaces of different
+types, number of rows, columns, etc.
+
+When face types are input, the number of input ops and the number of
+faces in each input establish the skinning method. If only one input
+exists, a "linear-skinning" operation is performed by running a skin
+across the cross-sections. The result is the classic ruled or skinned
+surface. If a second input exists, a "bi-linear skinning" is performed
+which computes a cross-skin between the faces in the first input (U
+cross-sections) and the faces in the second input (V cross-sections).
+The result is a surface whose name derives from the number of
+cross-sections in each direction: triangular, square, or multiple
+boundary surface, as well as a special case of swept surfaces and
+N-rails. When possible, cross-sections are interpolated as isoparms.
+
+If you need more control over tangency in the skin, try using the
+[Bridge node|Node:sop/bridge] instead.
+
+steps>>
+    # Make sure the cross-section curves you want to use are all
+      visible.
+
+    # In the viewer, use the  [tab menu|/basics/tabmenu]  to choose the
+      [Skin operator|Node:sop/skin].
+
+    # Select the cross-section curves for the U direction, then click
+      ((RMB)) to finish the selection.
+
+    # Select the cross-section curves for the V direction (if any), then
+      click ((RMB)).
+
+
+TIP:
+    You can skin between cross-section curves of any geometry type.
+
+TIP:
+    In the parameter editor, you can turn on __Preserve shape__ to make
+    the skinned surface match the cross-section curves more closely, at
+    the possible expense of surface smoothness.
+
+TIP:
+    If you have problems with the results being skinned in the wrong
+    order, try inserting a [Sort SOP|Node:sop/sort] ahead of the Skin
+    op, and Sort by Normals.
+
+[Include:/shelf/loft#includeme]
+
+[Include:/shelf/skin#includeme]
+    
+== Types of Surfaces ==
+
+    == Single Boundary Surface ==
+
+        [Image:../images/Houdini-03-1-071.jpg]
+
+        One face, open or closed, is converted into a surface whose
+        boundaries match the shape of the face exactly. Basically, this
+        operation builds an interior area for the face. The surface type
+        will be similar to the type of the face. For example, a NURBS
+        curve yields a NURBS surface. If the curve is highly concave,
+        the result may look less satisfactory than expected.
+
+    == Patch ==
+
+        [Image:../images/Houdini-03-1-072.jpg]
+
+        Two boundary faces define a ruled surface. The arrows on the two
+        faces indicate the required parametric direction, which must be
+        the same for both faces to avoid a bad twist in the surface. Use
+        the [Primitive SOP|Node:sop/primitive] or the [Reverse
+        SOP|Node:sop/reverse] to correct the problem. The surface type
+        will be similar to the most complex type between the two
+        cross-sections. For example, if a polygon and a NURBS curve are
+        skinned together, the surface type will be NURBS. The surface
+        always contains the two faces as two of its boundaries.
+
+    == Linear Ruled/Skinned Surface ==
+
+        [Image:../images/Houdini-03-1-073.jpg]
+
+        Two or more faces are skinned linearly into a single surface.
+        The arrows on the faces indicate the required parametric
+        direction of each face, which must be the same for all faces to
+        avoid bad twists or flips in the surface. Use the [Primitive
+        SOP|Node:sop/primitive] or the [Reverse SOP|Node:sop/reverse] to
+        correct the problem. The surface type will be similar to the
+        most complex type among all cross-sections. For example, if a
+        polygon, a Bezier and a NURBS curve are skinned together, the
+        surface type will be NURBS. The surface goes through each
+        cross-section unless "Preserve Shape" if OFF (see parameters
+        below). If the cross-sections have repeated points, or share
+        points between them, the result might not look good when shape
+        preservation is enabled.
+
+    == A Special Swept Surface ==
+
+        [Image:../images/Houdini-03-1-074.jpg]
+
+        This case does a bilinear skin and requires two inputs. The U
+        face (1st input) is swept along the V face (second input). The
+        two faces do not need to touch at their endpoints. If their
+        endpoints coincide, though, the two of the surface's boundaries
+        will match the two faces exactly. The surface type will be
+        similar to the most complex type of the two faces. For example,
+        if a polygon and a Bezier curve are skinned together, the
+        surface type will be Bezier.
+
+    == Triangular surface ==
+
+        [Image:../images/Houdini-03-1-075.jpg]
+
+        This case requires two inputs for the bilinear skin. One input
+        has two faces; the other input, just one. The endpoints of the
+        faces need not coincide, but if they do, the surface boundaries
+        will match the face shapes exactly. Basically, the three faces
+        define an interior area to be filled by a surface. The surface
+        type will be similar to the most complex type among the three
+        boundary faces. For example, if the faces are Bezier and NURBS
+        curves, the surface will be a NURBS primitive.
+
+    == Square Surface ==
+
+        [Image:../images/Houdini-03-1-076.jpg]
+
+        Four faces define the outer boundaries of a surface. This case
+        requires two inputs for the bilinear skin: the two U boundaries
+        (1st input) are cross-skinned with the V boundaries (the 2nd
+        input). The endpoints of the faces need not coincide, but if
+        they do, the surface boundaries will match the face shapes
+        exactly. Basically, the four faces define an interior area to be
+        filled by a surface. The surface type will be similar to the
+        most complex type among the four boundary faces. For example, if
+        the faces are polygons and NURBS curves, the surface will be a
+        NURBS primitive.
+
+    == A Special Case of M-rails ==
+
+        [Image:../images/Houdini-03-1-077.jpg]
+
+        One input contains the rails, and the other input the
+        cross-section. The cross-section is swept along the rails to
+        form a surface. The arrows on the faces indicate the required
+        parametric direction of each face, which must be the same for
+        all faces to avoid bad twists or flips in the surface. Use the
+        [Primitive SOP|Node:sop/primitive] or the [Reverse
+        SOP|Node:sop/reverse] to correct the problem. The surface type
+        will be similar to the most complex type among both rails and
+        cross-section. For example, if the faces are polygons and NURBS
+        curves, the surface will be a NURBS primitive.
+
+    == Multiple-Boundary Surface ==
+
+        [Image:../images/Houdini-03-1-078.jpg]
+
+        Not to be confused with N-ary patches. This case generalizes the
+        square surface concept by allowing more interior cross-sections
+        both in U and V. If no interior cross-sections exist, this case
+        reduces to a square surface. The surface interpolates all the
+        boundaries and the interior cross-sections. The result improves
+        when the faces intersect. The arrows on the faces indicate the
+        required parametric direction of each face, which must be the
+        same for all faces to avoid bad twists or flips in the surface.
+        Use the [Primitive SOP|Node:sop/primitive] or the [Reverse
+        SOP|Node:sop/reverse] to correct the problem. The surface type
+        will be similar to the most complex type among all faces. For
+        example, if the faces are polygons and NURBS curves, the surface
+        will be a NURBS primitive.
+
+@parameters
+    U Cross-sections:
+        Selects a group to use for U cross-sections.
+    V Cross-sections:
+        Selects a group to use for V cross-sections.
+    Connectivity:
+        How the skinned surface should be constructed.
+    Preserve Shape:
+        Attempts to preserve the shape of the boundary curves.
+    V Wrap:
+        Wraps the surface in the v direction.
+    Use V Order:
+        Specifies order of splines along the v direction.
+    V Order:
+        #channels: /orderv
+
+        order of splines along v direction.
+    Skin:
+        How boundary curves are ignored.
+    N:
+        #channels: /inc
+
+        Specifies which boundary curves are ignored.
+    Keep Primitives:
+        Retains the input geometry.
+    Output Polygons:
+        Converts all mesh geometry to polygons.
+
+@related
+    - [Node:sop/bridge]
+

@@ -1,0 +1,156 @@
+= Attribute VOP =
+
+#type: node
+#context: sop
+#internal: attribvop
+#icon: SOP/attribvop
+#tags: attrs, vops
+
+"""Runs a VOP network to modify geometry attributes."""
+
+Double-click this node to build a VOP network inside.
+(Alternatively, you can specify a SHOP node containing the VOP network,
+or specify a `.vfl` file containing the CVEX program.)
+
+NOTE:
+    The VOP network runs in the CVEX context, not the SOP context.
+    This means SOP specific VOPs and VEX operations are not available.
+    Instead use the From File variants and the provided operator input strings.
+
+This node modifies geometry attributes.
+
+Create [Parameter VOPs|Node:vop/parameter] with the names of attributes to specify inputs.
+Set a parameter as "exported" to allow writing to/creating the corresponding attribute.
+
+
+@parameters
+
+== Vex Setup ==
+
+VEX Source:
+    Where to get the program to modify attributes.
+
+    Myself:
+        Use a VOP network inside this node.
+
+    SHOP:
+        Use SHOP node containing a CVEX VOP network.
+        Specify the node in the __SHOP path__ parameter.
+
+        This can also point to any node that contains a CVEX VOP Network.
+
+        NOTE:
+            Referenced nodes parameters will be used.
+
+    Script:
+        Use a file containing a CVEX program.
+        Specify the file path in the __Script__ parameter.
+
+SHOP Path:
+    A SHOP node containing a CVEX VOP network,
+    when __VEX source__ is __SHOP__.
+
+Script:
+    A path to a file containing a CVEX script,
+    when __VEX source__ is __Script__.
+
+Re-load VEX Functions:
+    When __VEX source__ is __Script__, reloads any `.vex` files to
+    account for changes made outside of Houdini.
+
+Compiler:
+    When __VEX source__ is __Myself__, the command line Houdini uses
+    to compile the VOP network inside this node.
+
+Force Compile:
+    When __VEX source__ is __Myself__, recompiles the VOP network
+    inside this node.
+
+Evaluation Node Path:
+    VEX functions like `ch()` usually evaluate with respect to this node.
+    Enter a node path here to override where the path search starts from.
+    This is useful for embedding in a digital asset, where you want searches
+    to start from the asset root.
+
+Export Parameters:
+    When a VEX parameter is exported, the bound attribute will be
+    created if it doesn't exist.  This pattern can be used to override
+    the export option on the VEX shader to avoid writing to or creating
+    certain attributes.  The pattern matches the VEX parameter, not
+    the bound attribute.  The attribute will still be bound for
+    reading.
+
+Enable Multithreading:
+    There should be no threading issues with VEX.  In the unlikely
+    event that there are, this will allow you to determine which
+    node is guilty, and work around it without turning off threading
+    on a global scale.
+
+== Data Bindings ==
+
+Group:
+    Only run the VOP network on this group in the input geometry.
+    Leave this blank to modify all the input geometry.
+
+Group Type:
+    What the group is made of.
+
+Run Over:
+    What class of geometry attributes to modify.
+    No attributes will be bound, except read-only detail attributes, when set to __Numbers__.
+
+Number Count:
+    #id: vex_numcount
+
+    Iteration count when __Run Over__ is set to __Numbers__.
+    `@elemnum` will be the iteration number from 0 (inclusive), to this number (exclusive),
+    and `@numelem` will be this number.
+    No attributes will be bound when in this mode, except read-only detail attributes.
+
+Thread Job Size:
+    #id: vex_threadjobsize
+
+    Maximum number of iterations run at a time in any thread when __Run Over__ is set to __Numbers__. If this is greater than or equal to __Number Count__, the VEX code will run single-threaded. If each iteration will take a very large amount of time, set this to 1. However, there is quite often a significant advantage to making this value larger, especially if each iteration will take a small amount of time, and if any work can avoid being duplicated by running multiple iterations at a time.
+
+Autobind by Name:
+    Automatically bind attributes to parameters by name.
+    If for some reason you need CVEX parameters to have different names
+    than the corresponding attributes, turn this off and use the __Number of bindings__ parameter to set up mappings between __Attribute name__ and __VEX parameter__.
+
+    Integer attributes will bind to integer parameters.
+    Float attributes will bind to float, vector, point, matrix, or matrix4 depending on their tuple size. String attributes will bind to strings.
+
+Autobind Groups by Name:
+    Automatically bind any groups to the integer parameter prefixed with `group_`.
+
+Update Normals If Displaced:
+    If points are being run over, and the `P` attribute is written to,
+    but the `N` attribute is not written to, any incoming normals will
+    become out of date.  When this option is set, vertex and point
+    normals will be updated when this occurs.
+
+Attribute to Match:
+    #id: vex_matchattrib
+    
+    The `@opinput<<inputnum>>_<<name>>` syntax lets you get the value of an attribute from the corresponding element on another input. If this parameter is blank, the "corresponding" element is the element with the same index (e.g. point number) as the element the node is currently processing. If you specify the name of an attribute, the "corresponding" element is the element that has the same value in the named attribute as the current element. See [accessing attributes from other inputs|/vex/snippets#other_inputs] on the VEX snippets page for more information.
+    
+    For example, if you used `id` as the "attribute to match", and you were processing a point with attribute `id` set to `12`, then `@opinput1_P` would give you the `P` attribute on the point in the second input that also has `id` set to `12`.
+
+Compute Results In Place:
+    When compiled the Attribute VOP is able to work on the incoming
+    geometry in place without making a copy of it.  This can speed
+    up processing as one less copy is made, but requires that the
+    VEX code doesn't bind for writing any attributes that are
+    read from the first input.
+
+Output Selection Group:
+    The name of a group to use as the output selection.  When the highlight flag is enabled for this node, this group will be the output selection used by later modeling tools (if it exists).
+
+
+@related
+
+- [Node:sop/attribcreate]
+- [Node:sop/attribexpression]
+- [Node:sop/attribwrangle]
+- [Node:sop/point]
+- [Node:sop/pointwrangle]

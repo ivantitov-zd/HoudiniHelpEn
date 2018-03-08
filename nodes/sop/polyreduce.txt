@@ -1,0 +1,291 @@
+= PolyReduce =
+
+#type: node
+#context: sop
+#internal: polyreduce
+#version: 2.0
+#icon: SOP/polyreduce
+#tags: polygons, delete, cleanup, model
+
+"""Reduces the number of polygons in a model while retaining its shape. This node preserves features, attributes, textures, and quads during reduction."""
+
+== Overview ==
+
+:col:
+    :box: 100%
+        [Image:/images/nodes/sop/polyreduce_tommy_100.jpg]
+:col:
+    :box: 50%
+        [Image:/images/nodes/sop/polyreduce_tommy_50.jpg]
+:col:
+    :box: 10%
+        [Image:/images/nodes/sop/polyreduce_tommy_10.jpg]
+
+This version of PolyReduce gives very fast, highly accurate reduction while preserving the shape, textures, attributes, and quad topology of the input as much as possible.
+
+This node has multiple features to let you guide where the node reduces and reshapes:
+
+* You can prevent the node from moving unshared edges in [3D|#boundaryweight] and [UV|#vattribseamweight] space.
+
+* You can specify [points and/or edges to preserve.
+
+* You can paint an attribute in areas where you want to retain more density.
+
+* You can retain polygons based on visibility from certain view points.
+
+:vimeo:Poly Reduce
+    #id: 116797694
+
+
+== How to ==
+            
+# Select the object whose polygons you want to reduce.
+        
+# Click the [Icon:SOP/polyreduce] PolyReduce tool on the __Polygon__ tab.
+
+# Use the [parameters|#parameters] to control the percent or number of polygons to keep.
+
+
+== Tips and tricks ==
+
+* If you have a baked texture on your model, as in a game asset, you can use the controls under __Make reduction sensitive to attributes__ with the color attribute (`Cd`) to retain polygons where necessary to maintain the texture.
+
+    :col:
+        [Image:/images/nodes/sop/polyreduce_softshadow1.jpg]
+    :col:
+        [Image:/images/nodes/sop/polyreduce_softshadow2.jpg]
+
+* The more reduction you ask for, the more likely it gets that PolyReduce will output long, skinny triangles or quads. Producing these types of polygons is sometimes exactly how PolyReduce is able to reach the target (long skinny polygons are the ideal way to represent a surface with high curvature in one direction and low curvature in the other, such as a tube shape, with fewer polygons). And by default, PolyReduce emphasizes preserving the shape of the original rather than producing equilateral triangles/quads.
+
+    You can increase the __Equalize lengths__ weight to influence the node to produce more equilateral triangles/quads, at the expense of lower overall quality.
+    
+    Using a high __Equalize lengths__ weight and a reasonable reduction target can make PolyReduce act more like a Re-mesh function.
+
+* This node has several weight parameters to control how much importance the node gives various criteria, such as preserving boundaries. These numbers are not within a certain range (such as 0-1). The scale of the weights (for example, 1 or 10 or 100) may also vary based on the number of polygons in the input and the reduction target. In general, you should just check the output and keep increasing the weight for a certain criterion if you want it to have more influence, re-checking the output after each change.
+
+
+@parameters
+
+Group:
+    #id: group
+    
+    The primitive numbers of the polygons this node should operate on. Leave this field blank (the default) to operate on all polygons in the input.
+
+
+~~~ Reduction amount ~~~
+
+Target:
+    #id: target
+    
+    How the node computes how many polygons to keep: reduce to a percentage of the input polygons/points, or reduce to a fixed number of polygons/points. Note that final polygon/point count may be less than the exact target.
+
+Percent to keep:
+    #id: percentage
+    
+    When __Reduce to__ is "Percentage of polygon count" or "Percentage of point count", this specifies what percentage of the original polygons/points to keep.
+
+Number to keep:
+    #id: finalcount
+    
+    When __Reduce to__ is "Output polygon count" or "Output point count", this specifies the number of polygons/points to keep.
+
+Continue reducing within quality tolerance:
+    #id: reducepassedtarget
+    
+    When this is on, PolyReduce will opportunistically reduce _beyond_ the target as long as it can do so while matching the original shape within a certain quality tolerance. Turn this on if the target is your goal but you would happy to get fewer polygons in the result.
+    
+Tolerance:
+    #id: qualitytolerance
+    
+    When __Continue reducing within quality tolerance__ is on, after PolyReduce reaches the target, it will continue to remove polygons as long as the difference in quality measurement within this tolerance. The default (`1e-05` or `0.00001`) is very small, so it will usually only make imperceptible reductions. You can try increasing this number to get more opportunistic reduction.
+
+
+~~~ Output geometry ~~~
+
+Only use original point positions:
+    #id: originalpoints
+    
+    When this is on, the node is not allowed to move the intersections between polygons while reducing. This can reduce the node's effectiveness, but is useful if you're using the point positions for some other purpose in the network and can't change them. Note you can use the __Points__ parameter to preserve individual points.
+
+Preserve quads:
+    #id: preservequads
+    
+    If the input geometry has quads, the node will remember which polygons were quads (even though the internal algorithm works on triangles) and output corresponding quads on the reduced model. An all-quad input should produce an all-quad output.
+    
+Equalize lengths:
+    #id: equalizelengths
+    
+    The more reduction you ask for, the more likely it gets that PolyReduce will output long, skinny triangles or quads. This is a weight for how much PolyReduce will try to produce equilateral triangles/quads. The default is very low (1e-10 or 0.0000000001), meaning the node will emphasize matching the shape of the original over individual polygon quality.
+    
+    The following example shows a simple tube, reduced with a very aggressive target and large increase in __Equalize lengths__ between the two snapshots to emphasize the difference.
+
+    :col:
+        :box: Equalize lengths = 1e-10 (0.0000000001, default)
+            [Image:/images/nodes/sop/polyreduce_equalize_1e10.png]
+        
+            With the default setting, PolyReduce reaches the target with excellent quality, but uses long, skinny triangles.
+    :col:
+        :box: Equalize lengths = 1e-03 (0.001)
+            [Image:/images/nodes/sop/polyreduce_equalize_1e03.png]
+        
+            Increasing __Equalize lengths__ by a large amount gives much better triangles, but creates a much bigger difference in the overall shape compared to the original.
+
+
+~~~ Stiffen ~~~
+
+Boundaries:
+    #id: boundaryweight
+    
+    A weight specifying how much the node should try to preserve the shape of boundary (unshared) edges. This number is not within a range. You can try to influence the algorithm more by increasing this number without limit.
+
+Vertex attribute seams:
+    #id: vattribseamweight
+    
+    A weight specifying how much the node should try to preserve the shape of edges with discontinuous vertex attribute values on either side of the edge (usually this represents the boundaries of UV islands). This number is not within a range. You can try to influence the algorithm more by increasing this number without limit.
+
+Attributes:
+    #id: seamattribs
+    
+    Vertex attributes matching this pattern are checked for discontinuities when __Vertex attribute seams__ is greater than `0`. The default checks all vertex attributes except the vertex normal (`N`). (Vertex normals being discontinuous, such as when you cusp an edge, don't usually contribute useful information for reduction.) If you have multiple UV attributes but only want to reduce based on one, you can replace the contents of this field with the name of the attribute you want to use.
+
+
+~~~ Preserve features ~~~
+
+Hard points:
+    #id: hardfeaturepoints
+    
+    A list of points that PolyReduce will not move in the reduced output. This is useful, for example, if you must preserve certain point positions so the model still lines up with some other object.
+    
+    Click the [Icon:BUTTONS/reselect] Reselect button next to the field to select the points interactively in the viewer.
+
+Hard edges:
+    #id: hardfeatureedges
+    
+    A list of edges that PolyReduce will not move in the reduced output. This is useful, for example, if you must preserve certain edges so the model still lines up with some other object.
+    
+    Click the [Icon:BUTTONS/reselect] Reselect button next to the field to select the edges interactively in the viewer.
+
+Soft points:
+    #id: softfeaturepoints
+    
+    A list of points that PolyReduce will _try_ not to move in the output, but may move if necessary to reach the target. You can specify how hard the node tries to maintain these points using the __Weight__ below.
+    
+    Click the [Icon:BUTTONS/reselect] Reselect button next to the field to select the edges interactively in the viewer.
+
+Weight:
+    #id: softfeaturepointweight
+    
+    How important it is for PolyReduce to maintain the position of the points in the __Soft points__ group. The more you increase this weight, the more the node will decrease quality elsewhere to maintain those points.
+
+Soft edges:
+    #id: softfeatureedges
+    
+    A list of edges that PolyReduce will _try_ not to move in the output, but may move if necessary to reach the target. You can specify how hard the node tries to maintain these edges using the __Weight__ below.
+    
+    Click the [Icon:BUTTONS/reselect] Reselect button next to the field to select the edges interactively in the viewer.
+
+Weight:
+    #id: softfeatureedgeweight
+    
+    How important it is for PolyReduce to maintain the position of the points in the __Soft edges__ group. The more you increase this weight, the more the node will decrease quality elsewhere to maintain those edges.
+
+
+~~~ Retain density by attribute ~~~
+
+Attribute:
+    #id: retainattrib
+    
+    The name of an attribute to use to control reduction. The node will try to preserve more polygons in areas where the attribute value is high. This lets let you paint an attribute onto the model (for example with the [Paint SOP|Node:sop/paint]) to control where you want to preserve more polygons.
+    
+    :col:
+        [Image:/images/nodes/sop/polyreduce_mask_attribute.jpg]
+    :col:
+        [Image:/images/nodes/sop/polyreduce_mask_output.jpg]
+
+Weight:
+    #id: retainattribweight
+    
+    A multiplier on the painted value. This number is not within a range. You can try to influence the algorithm more by increasing this number without limit.
+
+
+~~~ Retain density by view ~~~
+
+Silhouette:
+    #id: silhouetteweight
+    
+    When you connect [geometry representing view points|#third_input] to the third input, this weight controls how much the node tries to preserve the model's silhouette(s) as seen from the view point(s). This number is not within a range. You can try to influence the algorithm more by increasing this number without limit.
+
+Front facing:
+    #id: frontfacingweight
+    
+    When you connect [geometry representing view points|#third_input] to the third input, this weight controls how much the node tries to preserve the polygons visible from the view point(s). This number is not within a range. You can try to influence the algorithm more by increasing this number without limit.
+
+
+~~~ Make reduction sensitive to attributes ~~~
+
+You can use this multi-parm to set up influence the reduction based on the derivative of an attribute value. This is less generally useful than just [pointing an attribute to control preservation directly|#retainattrib].
+
+Attribute:
+    #id: attribname#
+    
+    The node will attempt to preserve more polygons in areas where the values of this attribute change, and reduce more in areas where the attribute's values are constant.
+    
+    For example, if your model has point colors, you could use the `Cd` attribute to preserve polygons along color edges. This is especially useful for game assets with baked on textures.
+    
+    :col:
+        [Image:/images/nodes/sop/polyreduce_attr_shadow1.jpg]
+    :col:
+        [Image:/images/nodes/sop/polyreduce_attr_shadow2.jpg]
+
+Weight:
+    #id: attribweight#
+    
+    How much the node will try to preserve edges corresponding to changes in the attribute values. This number is not within a range. You can try to influence the algorithm more by increasing this number without limit.
+    
+
+@inputs
+
+Geometry to reduce:
+    #id: first_input
+    
+    This first input is the polygonal geometry you want to reduce.
+
+Rest geometry:
+    #id: second_input
+    
+    If you are both deforming and reducing geometry across multiple frames, you can connect the original, undeformed "rest" geometry to the second input to prevent sizzling topology changes across frames.
+
+View geometry:
+    #id: third_input
+    
+    Any geometry connected to this input as represents _view points_. Poly Reduce will try to preserve the model's silhouette and/or visible polygons as seen from these view points. See the [Silhouette|#silhouetteweight] and [Front facing|#frontfacingweight] parameters.
+    
+    Different geometry types are interpreted as follows:
+
+    Individual points:
+        Try to preserve features visible from these points.
+    
+    Curves:
+        Try to preserve features visible from any point along these curves.
+        
+    Closed surface:
+        Try to preserve features visible from anywhere inside this 3D shape.
+        
+        For example, you might have a game level with an area in the center where players can roam, and terrain surrounding it. You might polyreduce the terrain and set a box enclosing the player area as the view geometry, so any polygons in the terrain that are visible from anywhere in the player are preserved more.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

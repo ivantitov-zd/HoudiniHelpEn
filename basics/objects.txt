@@ -1,0 +1,182 @@
+= Working with objects =
+
+== Overview ==
+
+:vimeo:Creating objects
+    #id: 113102751
+
+:vimeo:Transforming objects
+    #id: 113103062
+
+Objects are the top level representations of things in the scene. They have location, rotation, and scale in world space.
+
+== Geometry containers and surface nodes ==
+
+Models in Houdini are represented by [Geometry objects|Node:obj/geo] at the scene level. Inside a geometry container object, [geometry nodes|/nodes/sop/] define the geometry of the object. The geometry container object lets you translate (move, rotate, and/or scale) and shade the entire object, as opposed to individual surfaces inside the object.
+
+When you use the [shelf tools|/shelf] Houdini will create geometry containers with surface nodes inside for you. For example, clicking the _Sphere_ tool on the shelf creates a new container named `object_sphere1`, with a [sphere surface node|Node:sop/sphere] inside named `sphere1` that defines the sphere geometry.
+
+[Image:/images/object_sop.png]
+
+Note that the object container and the surface nodes inside each have their own parameters. In some cases, the functionality of the parameters might seem to overlap at first. With only one sphere inside the sphere node's __Center__ parameter, which sets the sphere's location, has the same effect as the container object's
+__Translate__ parameter, which moves the entire object. Similarly, the container object's __Scale__ parameter sets the size of the entire object, while the sphere node's __Radius__ parameter sets the size of the sphere inside.
+
+=== Moving between the container object and the surface nodes inside ===
+
+Houdini provides several methods for navigation between the geometry container object (and its parameters) and the surface nodes and their parameters.
+
+Selection mode:
+    Switching between [Icon:TOOLS/select_objects] object mode and [Icon:TOOLS/select_points] [Icon:TOOLS/select_edges] [Icon:TOOLS/select_faces] Component mode, either by clicking the mode icons in the toolbox on the left or by pressing ((F8)), switches the [network|/ref/panes/network] and [parameter|/ref/panes/parms] panes between the Scene (object) level and the geometry (component) level.
+    
+Jump icon in the operation controls toolbar:
+    When you select a geometry container object at the scene level, the operation controls toolbar (at the top of the viewer) displays controls for the last surface node in the geometry network inside the container (technically, the surface node with the [display flag|/nodes/sop]).
+    
+    You can click the [Icon:BUTTONS/jump] Jump button on the toolbar to jump down to the geometry level inside the container.
+    
+    [Image:/images/ui/opbar.png]
+
+Object "Jump to" context menu:
+    Right-click a geometry object in the viewer. In the context menu, open the __Jump to__ sub-menu. This menu shows a list of nodes related to the object. Choose __Contained geometry__ to jump down to the surface node with the [display flag|/nodes/sop] inside the object.
+
+In the network editor:
+    In the [network editor|/ref/panes/network], double-click a [Icon:OBJ/geo] geometry container node to go inside. You can also select the node and press ((I)) or ((Enter)). Or right-click the node and choose __Edit network__.
+    
+    Press ((U)) in the network editor or use the path gadget to jump back up to the container network.
+    
+Path gadget:
+    Click [Icon:NETWORKS/scene] `obj` in the path gadget of a pane to jump back up to the Scene (object) level.
+
+Back and forward buttons:
+    Once you've visited the geometry level inside an object, you can use the [Icon:BUTTONS/back] back and [Icon:BUTTONS/forward] forward buttons next to the path gadget in a pane to go back and forth between the Scene (object) level and the Geometry level.
+    
+See the section on the [network editor|/ref/panes/network] for more information on navigating networks.
+
+
+== Transforming objects vs. surfaces ==
+
+Keep in mind that the normal unit of transformation (moving, rotating, and scaling) is the _object_. Transforming surfaces at the Geometry level (for example, using the [Transform surface node|Node:sop/xform]) is more accurately _deformation_, and can potentially take much longer for Houdini to calculate than just transforming static object geometry at the scene level.
+
+This is not to say that transforming at the geometry level is bad: often you _need_ an object's shape to deform over time. However, you should remember to look for opportunities to accomplish your goals by transforming objects before you look at transforming surfaces, because the former is more efficient.
+
+== Parenting == (parenting)
+#index: document
+
+"""Parenting makes a child object's transformations (moves, rotations, and scales) relative to those of a parent object."""
+
+Connecting the output of object A to the input of object B makes object A the _parent_ of object B. For example, to view the scene from the point of view of a particular object, you can parent the camera to the POV object so the camera transforms with the object.
+
+NOTE:
+    In computer graphics, we say that we "parented" B to A. This might seem backwards, but that's the way it is.
+
+An object which is _parented to_ (that is, the child of) another object inherits the transformations of the parent object. Moving or rotating the parent moves/rotates the child as well.
+
+You can also put objects inside an object subnetwork (use the [tab menu|/basics/tabmenu] to create a Subnet node at the object level). All objects inside the subnetwork inherit the transform of the subnet's parent, if any.
+
+Some other information is inherited from parent objects besides transformations. For example, motion blur can be inherited from a parent object. If the rendering parameters are not enabled for an object, they will be inherited from the parent object.
+
+Each object can have only one parent, however the [Blend object|Node:obj/blend] lets you blend between the transforms of multiple parents.
+
+=== How to ===
+
+:task:Parent an object in the network editor:
+    [Connect the output|/network/wire]  of the parent object to the input of the child object.
+    
+    [Image:/images/ui/wiring.gif]
+
+:task:Parent an object in the 3D viewport:
+    # Select the child object in the viewer.
+    
+    # Click [Icon:SHELF/parent] [Parent|/shelf/parent] in the Modify shelf.
+        
+    # Select the parent object and press ((Enter)).
+
+:task:Unparent an object in the network editor:
+    [Disconnect|/network/wire] the parent from the child.
+
+:task:Unparent an object in the 3D viewport:
+    # Click the [Parent tool|/shelf/parent] on the __Modify__ shelf tab.
+        
+    # Select the child object(s) and press ((Enter)).
+        
+    # Select nothing and press ((Enter)).
+
+=== Keep position and child compensation ===
+
+When you parent an object, its transforms become relative to the parent. This means the object might jump to a new position/rotation in the scene. From then on, changes to the parent will affect the position of the child, and changes to the child's transforms will be relative to the parent.
+
+There are two settings that can change these behaviors.
+
+Keep position when parenting:
+    If you turn this on, when you parent an object, Houdini automatically modifies its transforms so it maintains its old position and rotation.
+
+Child compensation:
+    If you turn this on, when you move a parent object, Houdini automatically modifies the transforms of its children so they keep their positions (instead of moving relative to the parent).
+
+You can change both settings on individual objects, or turn them on or off globally in the "Objects and Geometry" page of the main preferences.
+
+== Object origin/pivot == (pivot)
+
+All transformations are relative to an object's _pivot point_. An object scales toward/away from the pivot point and rotates around the pivot point.
+
+:task:Set an object's pivot point in the viewport:
+    * Press ((Ins)) or ((")), use the handle to move the pivot point, then press ((Ins)) or ((")) again.
+        
+    * You can temporarily move the handle, which scaling and rotating is relative to, by pressing ((')), using the handles, and pressing ((')) again. This does _not_ move the actual pivot point.
+
+:task:Set an object's pivot point numerically:
+    # In the  [parameter editor|/ref/panes/parms], click the __Transform__ tab.
+
+    # Use the __Pivot__ text fields to set the pivot point's X, Y, and Z relative to the object's origin.
+      
+:task:Center an object's pivot point:
+    # Select the object.
+    
+    # On the __Modify__ shelf tab, click the [Icon:SHELF/center_pivot] [Move Pivot to Center|/shelf/centerpivot] tool.
+
+:task:Move the center of an object to it's pivot point:
+    # Select the object.
+    
+    # On the __Modify__ shelf tab, click the [Icon:SHELF/movetopivot] [Move Pivot to Center|/shelf/movetopivot] tool.
+
+== Pre-transform == (pretransform)
+
+The pre-transform is like an invisible parent Null inside each object. The position, scale, and rotation values in the object's parameters are relative to the (normally hidden) values in the pre-transform.
+
+The pre-transform can be useful, especially in [character rigging|/character], for setting a certain position, rotation, and/or scale as the "rest" or "zero" state for that object. After that, values you enter are relative to the pre-transform values.
+
+The pre-transform uses a _fixed, non-configurable_ transform order. If you try to copy a non-uniform scale into the pre-transform, you can get shearing.
+
+:task:See the values in an object's pre-transform:
+    Press ((MMB)) on the object's tile in the network editor.
+
+:task:Make the object's current transform the "zero" state:
+    In the object's parameters, click the __Transform__ tab
+    and choose __Pre-transform > Clean transforms__.
+
+    This moves the object's current transformation into the
+    pre-transform and resets the transformation parameters to the
+    "identity" (position and rotation = 0, scale = 1).
+
+    The opposite action is __Extract pretransform__ (see below).
+
+:task:Make only the object's current position, rotation, or scale the "zero" state:
+    In the object's parameters, click the __Transform__ tab.
+    Open the __Pre-transform__ pop-up menu and choose __Clean
+    translates__, __Clean rotates__, or __Clean scales__.
+
+:task:Delete the pre-transform:
+    In the object's parameters, click the __Transform__ tab
+    and choose __Pre-transform > Reset pretransform__.
+
+    _This will probably change the position, rotation, and or
+    scale of the object_ because the current values in the
+    parameters will no longer be relative to the pre-transform.
+
+:task:Move the pre-transform values into the parameters:
+    In the object's parameters, click the __Transform__ tab
+    and choose __Pretransform > Extract pretransform__.
+
+    This moves the object's current pre-transform values into the
+    parameters and resets the pre-transform.
+
+    The opposite action is __Clean transforms__ (see above).

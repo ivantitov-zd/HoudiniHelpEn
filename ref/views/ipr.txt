@@ -1,0 +1,214 @@
+﻿= Render viewer pane =
+
+#helpid: h.pane.ipr
+#action_context: h.pane.ipr
+
+The Render viewer pane renders the scene and can automatically preview changes quickly as you edit parameters.
+
+This pane's viewing interface is nearly identical to the [standard image viewer|imgview] , except that the render viewer cannot show multiple viewports at once. See [how to use the image viewer|imgview]  for information on how to work with images in the render viewer.
+
+== How to ==
+
+:task: Zoom and pan around the rendered image:
+    Hold ((MMB)) and drag to pan.
+    
+    Hold ((RMB)) and drag, or use ((mouse_wheel)) to zoom.
+
+:task: Only update a sub-region of the image:
+    Hold ((Shift)) and drag a box around the area you want to render. The render view will only update this area.
+    
+    Shift-click outside the image to clear the region. Shift-click on the image to move the region.
+
+:task: Inspect a pixel in the rendered image:
+    Ctrl-click the pixel in the render view.
+
+    By default, Houdini will print information about the pixel and open the associated object's shader palette. You can override this behavior by [overriding the "pick pixel" script|#pickscript].
+
+:task: Edit the material affecting a pixel:
+    Hold ((Shift + Ctrl)) and click the pixel in the render view. If the corresponding object has a material assigned, the parameter editor for the material will pop up in a floating pane.
+
+:task: Edit the [stylesheet|/shade/stylesheets] rules affecting a pixel:
+    Turn on [Icon:IMAGE/inspect_styles] Inspect Material Style Sheets in the top render toolbar. This tells mantra to include stylesheet metadata in the render, so turning it on will cause a re-render.
+
+    Hold ((Shift + Ctrl)) and click the pixel in the render view. A floating pane will pop up with tabs containing the parameter editor for the material and a data tree with the corresponding stylesheet rows selected.
+
+:task: Save the current image to the image history:
+    Click the [Icon:BUTTONS/capture] snapshot button in the render history toolbar at the bottom of the render view.
+        
+    To give the image a unique name in history, enter it in the text box to the right of the [Icon:BUTTONS/capture] snapshot button before you click it.
+
+:task: Review saved images in the render history:
+    Use the slider in the render history toolbar at the bottom of the render view. Alternatively, you can choose an image by name in the pop-up at the left end of the toolbar, or click the [Icon:BUTTONS/minus] previous and [Icon:BUTTONS/plus] next buttons to move through the image history.
+        
+    To delete an image from the history, go to an image in the history and click the [Icon:BUTTONS/delete] Remove button next to the pop-up menu.
+
+:task: Compare the current image to an image from the render history:
+    # Right-click the [Icon:IMAGE/diff_off] Comparison method button near the right end of the toolbar and choose the image to compare to from the bottom of the menu.
+        
+    # Right-click the [Icon:IMAGE/diff_off] Comparison method button again and choose a method for comparing the images, for example [Icon:IMAGE/diff_split_h] Split horizontal.
+        
+    # Use the slider to control the comparison.
+
+
+== Saving the rendered image == (save)
+
+You can manually save the current contents of the render view to a series of images, or set up auto-save to save the contents at intervals during rendering.
+
+:task: Set the save location:
+    Edit the file path next to the [Icon:IMAGE/render_save] save icon in the snapshot toolbar the bottom of the render view.
+    
+:task: Manually save the image:
+    Click the [Icon:IMAGE/render_save] icon in the snapshot toolbar at the bottom of the render view.
+
+:task: Auto-save every <<n>> seconds:
+    # Turn on the [Icon:IMAGE/auto_save] Auto Save icon button in the snapshot toolbar at the bottom of the render view.
+    
+    # Set the number of seconds between saves in the field next to the Auto Save button.
+    
+    When this is on, Houdini will periodically save the current view contents during rendering.
+
+TIP:
+    The default image file path includes the `$SAVENUM` variable. This integer increases with every save, ensuring each time you save it creates a new file. You should be careful about filling up available disk space if you use auto-save.
+    
+    If you remove the `$SAVENUM` variable from the path, each save will overwrite the previous save (the default path also includes `$F` so separate frames would still save in separate files).
+
+
+== Render controls toolbar ==
+
+Render:
+    #action: render
+    
+    Regenerates shadow maps and renders the scene again. Any time you move a light that uses shadow maps, or change the geometry, click __Render__ to recompute depth and shadow maps.
+
+    This is disabled if you have not selected an output node to render.
+
+[Smallicon:BUTTONS/cook] Restart rendering:
+    #action: rerender
+    
+    Restarts the current render. This will usually have no effect other than to recreate the exact same image.
+
+[Smallicon:BUTTONS/pause]:
+    Pauses rendering. Click again to resume.
+
+[Smallicon:BUTTONS/stop] Stop rendering:
+    #action: killrender
+    
+    Stops rendering the scene. This is disabled if the view is not currently rendering.
+
+Output node pop-up menu:
+    Choose the output node you want to render.
+
+[Smallicon:BUTTONS/chooser] Render node parameters:
+    #action: showrop
+    
+    Opens a floating parameter editor for the selected render node.
+
+Camera pop-up menu:
+    Choose the camera you want to render through. You can set this to "ROP Camera" to use the camera specified on the render node, or "Scene View" to use the perspective from the Scene View.
+
+[Smallicon:BUTTONS/chooser] Camera parameters:
+    #action: showcamera
+    
+    Opens a floating parameter editor for the selected camera node.
+
+[Icon:IMAGE/auto_update]:
+    When this option is on, any parameter changes make the render view re-render. This lets you make changes in a node's parameter interface and see the results in the render view interactively.
+
+    If you turn this option off, use the __Render__ button at the left end of the toolbar when you want to update the render view manually.
+
+[Icon:IMAGE/preview_render]:
+    When this option is on, the view will show progressively more detailed previews of the scene as it renders. This makes the final output take a little longer but lets you get a sense of what the image will look like much faster.
+
+[Icon:IMAGE/relighting_buffer]:
+    #id: relightingbuffer
+
+    Whether to use the relighting buffer in the preview.
+
+    When this is on, mantra keeps a copy of the previous render.
+    When a new pixel is rendered, mantra compares the new value to the value in the previous render.
+    It uses the difference to influence the _preview_ of nearby pixels,
+    on the theory that neighboring pixels will generally update similarly.
+    Mantra also uses the buffer to concentrate on sampling areas that have changed the most.
+
+    The buffer can be very helpful when you're changing lights and shaders.
+    It is less helpful when you make a large change such as moving objects or the camera.
+    In that case the previous render shows as a ghost image until the image is fully rendered.
+
+    NOTE:
+        The relighting buffer does not affect the final render. It only attempts to improve the accuracy of the preview.
+
+    The relighting buffer exists only in memory, so killing a render will also delete the relighting buffer.
+
+    You'll get the most accurate results if you let a render complete and then make lighting and shading changes, so the buffer contains the most possible samples. 
+
+[Icon:IMAGE/inspect_styles]
+    Enables inspection of Material Style Sheets in the IPR viewer. Mantra will generate extra data to track which style sheets are applied at each pixel. The full evaluated style sheet can be found by ((Ctrl + LMB)) clicking on a pixel in the rendered result. ((Shift + Ctrl + LMB)) click will open the style sheet in a Data Tree pane tab.
+    
+Blur/Sharp popup menu:
+    "Blur" shows large anti-aliased pixels that are refined in each pass. "Sharp" shows a grainy, aliased image that becomes less grainy in each pass.
+
+Update time:
+    Time (in seconds) between preview passes. Mantra estimates the number of shading samples to use for the preview based on the speed of previous previews. So, if you have a faster machine, mantra will use more shading samples to generate a better preview in the given time.
+
+Delay:
+    Time (in seconds) between a parameter change and the auto-update. Increasing this time lets you combine small parameter changes when updating is slow.
+
+[Smallicon:BUTTONS/help]:
+    Opens this help page.
+
+
+== Render history toolbar ==
+
+This toolbar lets you keep a history of rendered images from the render view. This is useful when you are playing with a parameter and want to compare the variations.
+
+Pop-up menu:
+    The pop-up menu at the left end of the toolbar controls which image is shown in the render view. Choose "Active Render" to show the active rendered image, or choose an image from the render history.
+    
+[Icon:BUTTONS/delete] Remove Image from History:
+    #action: removeimage
+    
+    Delete the currently shown image from the render history. This button is disabled when the pop-up menu is set to "Active Render".
+    
+Slider:
+    Use the slider or click the [Icon:BUTTONS/minus] previous and [Icon:BUTTONS/plus] next buttons to move through the history of saved images.
+    
+[Icon:BUTTONS/take] Add Image to History:
+    #action: snapshot
+    
+    Save the active rendered image to the render history. To give the image a unique name in the history list, enter it in the text box to the right of the button before you click it.
+
+Comparison method button:
+    Click ((RMB)) to choose a comparison method. Click the button to turn comparison on or off.
+    
+Compare to menu:
+    Click to choose the image to compare the current image to.
+    
+Comparison slider:
+    Use the slider to control the comparison. This is disabled when the Comparison method pop-up menu is set to [Icon:IMAGE/diff_off] Off.
+
+[Icon:IMAGE/render_save]:
+    Saves the current IPR render to a file. If the __Active Render__ entry is selected from the snapshot menu, the render progress is saved. Otherwise, the selected snap shot is written out. It is possible to save an in-progress render.
+
+Auto Save Path:
+    The file path used to write auto save images. The file path extension is used to determine the image format. Enabled when the Auto Save button is toggled on.
+
+[Icon:IMAGE/auto_save]:
+    When this option is on IPR render progress is periodically saved to disk. The image is written to the auto save path. 
+
+Auto Save Time:
+    Time (in seconds) between automatic image saves. Enabled when the Auto Save button is toggled on.
+
+
+== Add custom functionality to the render viewer == (scripts)
+
+Use the [Cmd:iprview] command to set the options of an IPR viewer pane.
+
+TIP:
+    The [Exp:iprquery] and [Exp:iprquerys] expression functions let you query information about the rendered image, such as which shader contributed the pixel at the given coordinates. These functions can be very useful for creating custom scripts.
+
+
+== Scripts == (pickscript)
+
+The scripts in `HOUDINIPATH/scripts/ipr` control the behavior of drag-and-drop onto the IPR viewer (`dragdrop.py`), and ((Ctrl)) click (`pickpixel.py`) in the IPR viewer.
+
+You can override the default behavior by inserting your own script(s) earlier in the path.

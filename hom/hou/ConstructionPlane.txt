@@ -1,0 +1,137 @@
+= hou.ConstructionPlane =
+#type: homclass
+#cppname: HOM_ConstructionPlane
+#group: view
+
+"""The grid (a.k.a. construction plane) in the scene viewer pane tab."""
+
+@methods
+
+::`sceneViewer(self)` -> [Hom:hou.SceneViewer]:
+    #cppname: HOM_ConstructionPlane::sceneViewer
+    Return the scene viewer containing this plane.
+
+::`isVisible(self)` -> `bool`:
+    #cppname: HOM_ConstructionPlane::isVisible
+    Return whether the grid is visible in the viewer.
+
+::`setIsVisible(self, on)`:
+    #cppname: HOM_ConstructionPlane::setIsVisible
+    Make this grid visible or invisible in the viewer.
+
+::`transform(self)` -> [Hom:hou.Matrix4]:
+    #cppname: HOM_ConstructionPlane::transform
+    Return the transformation matrix for this plane.
+
+    When the transformation matrix is the identity matrix, the plane's
+    bottom-left corner is at the origin and it sits in the XY plane.  In this
+    orientation, increasing the number of cells in x or the size of a cell in x
+    grows the plane outward from the origin along the x-axis.  Similarly,
+    increasing the number of cells or size of a cell in y grows the plane along
+    the y-axis.
+
+    Note that the transformation matrix does not contain any scale information.
+    Use the [cellSize|Hom:hou.ConstructionPlane#cellSize] and
+    [numberOfCells|Hom:hou.ConstructionPlane#numberOfCells] methods to get the
+    size of the plane.
+
+    The following function will return the position of the lower-left corner of
+    the plane:
+    {{{
+    #!python
+    def origin(construction_plane):
+        return hou.Vector3(0, 0, 0) * construction_plane.transform()
+    }}}
+
+    The following function will return the normal of the plane:
+    {{{
+    #!python
+    def normal(construction_plane):
+        return hou.Vector3(0, 0, 1) * construction_plane.transform().inverted().transposed()
+    }}}
+
+::`setTransform(self, matrix)`:
+    #cppname: HOM_ConstructionPlane::setTransform
+    Set the transformation matrix for this plane to a [Hom:hou.Matrix4].
+
+    This matrix is used to translate and rotate the plane.  See the
+    [transform|Hom:hou.ConstructionPlane#transform] method for more information.
+
+    Note that scale information inside the transformation matrix is ignored.
+    Use the [setCellSize|Hom:hou.ConstructionPlane#setCellSize] and
+    [setNumberOfCells|Hom:hou.ConstructionPlane#setNumberOfCells] methods to
+    adjust the size of the plane.
+
+    The following function will change the position of the lower-left corner
+    of the plane:
+    {{{
+    #!python
+    def set_origin(construction_plane, new_origin):
+        translation = hou.hmath.buildTranslate(hou.Vector3(new_origin) - origin(construction_plane))
+        construction_plane.setTransform(construction_plane.transform() * translation)
+
+    def origin(construction_plane):
+        return hou.Vector3(0, 0, 0) * construction_plane.transform()
+    }}}
+
+    The following function will change the normal of the plane:
+    {{{
+    #!python
+    def set_normal(construction_plane, normal_vector):
+        existing_rotation = hou.Matrix4(construction_plane.transform().extractRotationMatrix3())
+        rotation = existing_rotation * normal(construction_plane).matrixToRotateTo(normal_vector)
+        translation = hou.hmath.buildTranslate(origin(construction_plane))
+        construction_plane.setTransform(rotation * translation)
+
+    def normal(construction_plane):
+        return hou.Vector3(0, 0, 1) * construction_plane.transform().inverted().transposed()
+
+    def origin(construction_plane):
+        return hou.Vector3(0, 0, 0) * construction_plane.transform()
+    }}}
+
+::`cellSize(self)` -> `tuple` of `float`:
+    #cppname: HOM_ConstructionPlane::cellSize
+    Return the x and y sizes (width and height) of one cell in the grid of
+    cells.  The return value is a tuple of two floats.
+
+::`setCellSize(self, size)`:
+    #cppname: HOM_ConstructionPlane::setCellSize
+    Change the x and y sizes (width and height) of each cell in the grid of
+    cells.  `size` is a sequence of two floats.
+
+    Changing the size of each cell will change the total size of the grid.
+
+::`numberOfCells(self)` -> `tuple` of `int`:
+    #cppname: HOM_ConstructionPlane::numberOfCells
+    Return the number of cells in the x and y directions of the grid.
+    In other words, return the number of columns and rows.
+
+::`setNumberOfCells(self, number)`:
+    #cppname: HOM_ConstructionPlane::setnumberOfCells
+    Change the number of cells in the x and y directions of the grid.
+    `number` is a sequence of two integers.
+
+    Changing the number of cells will not change the size of each cell, so
+    it will change the size of the grid.
+
+::`numberOfCellsPerRulerLine(self)` -> `tuple` of `int`:
+    #cppname: HOM_ConstructionPlane::numberOfCellsPerRulerLine
+    Return the number of cells in the x and y directions between ruler lines.
+    Ruler lines are darker than the normal lines drawn between grid cells.
+
+::`setNumberOfCellsPerRulerLine(self, number)`:
+    #cppname: HOM_ConstructionPlane::setnumberOfCellsPerRulerLine
+    Set the number of cells in the x and y directions between ruler lines.
+    `number` is a sequence of two integers.
+
+    For example if `number` is `(1, 1)`, Houdini will draw ruler lines
+    between every cell in the grid.
+
+    To turn off ruler lines entirely, call this method with values greater
+    than or equal to the number of cells in the grid.
+
+@replaces
+
+- [Cmd:cplane]
+

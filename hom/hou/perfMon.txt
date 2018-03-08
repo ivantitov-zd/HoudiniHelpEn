@@ -1,0 +1,127 @@
+﻿= hou.perfMon =
+#type: hommodule
+#cppname: HOM_perfMon
+#group: performance
+
+"""Module containing performance monitor related functions."""
+
+@functions
+
+::`isRecording()` -> `bool`:
+    #cppname: HOM_perfMon::isRecording
+
+    Return True if the performance monitor is recording Houdini events.
+
+::`loadProfile(file_path)` -> [Hom:hou.PerfMonProfile]:
+    #cppname: HOM_perfMon::loadProfile
+
+    Load a profile from disk and return the loaded profile.
+
+    Raises [Hom:hou.OperationFailed] if `file_path` points to a file that does not exist or is not a valid Houdini performance monitor profile file.
+
+::`activeProfile()` -> [Hom:hou.PerfMonProfile] or `None`:
+    #cppname: HOM_perfMon::activeProfile
+
+    Return the profile currently visible in the performance monitor pane, or
+`None` if no profile is active.
+
+::`startCookEvent(description, node)` -> [Hom:hou.PerfMonEvent]:
+    #cppname: HOM_perfMon::startCookEvent
+
+    Create an event that is related to node cooking and start it.  When the event is stopped, it will be logged by the performance monitor and added to any profiles that are recording cook or memory statistics.
+
+    Use this function to time code blocks and measure memory growth in the Code section of Python operators.
+
+    Return the cook event.
+
+    `description`:
+	The description of the event that you are timing.  For example, this can be a function name or a description of a code block.
+
+    `node`:
+	The node that the timed event applies to.  This must be a [Hom:hou.Node] object.  When calling startCookEvent() from within the Code section of a Python operator, set `node` to the current node (i.e. `hou.pwd()`).
+
+    Raises [Hom:hou.OperationFailed] if `description` is an empty string or if `node` does not exist.
+
+::`startEvent(description, auto_nest_events=True)` -> [Hom:hou.PerfMonEvent]:
+    #cppname: HOM_perfMon::startEvent
+
+    Create a generic event and start it.  When the event is stopped, it will be logged by the performance monitor and added to any profiles that are recording script or memory statistics.
+
+    Use this function to time and measure memory growth in generic scripts, functions or code blocks.
+
+    Return the new event.
+
+    `description`:
+	The description of the event that you are starting.  For example, this can be a function name or a script name or a description of a code block.
+
+    `auto_nest_events`:
+	If set to True, the event will automatically 'nest' other events that are started and stopped while this event is running.  When the event is stopped, it will decrement the times and memory of its nested events from its total time and memory.  That way, the event's total time and memory will reflect the work performed in the event itself and not in any of its nested events.
+
+    Raises [Hom:hou.OperationFailed] if `description` is an empty string.
+
+::`startProfile(title, options=None)` -> [Hom:hou.PerfMonProfile]:
+    #cppname: HOM_perfMon::startProfile
+
+    Create a new profile and start it so that it can record events.  When the profile is stopped, it will generate statistics for the events that it recorded.
+
+    `options`:
+	A [Hom:hou.PerfMonRecordOptions] object that specifies the types of Houdini events and statistics to record.  If None is passed in or if the `options` argument is not specified, then the profile will record all events and statistics.
+
+::`startTimedCookEvent(description, node)` -> [Hom:hou.PerfMonEvent]:
+    #cppname: HOM_perfMon::startTimedCookEvent
+
+    This method is deprecated in favor of `startCookEvent`.
+
+::`startTimedEvent(description, auto_nest_events=True)` -> [Hom:hou.PerfMonEvent]:
+    #cppname: HOM_perfMon::startTimedEvent
+
+    This method is deprecated in favor of `startEvent`.
+
+== Example ==
+
+Here is a simple example for starting a new profile, recording a couple of timed events and generating statistics for the events:
+
+{{{
+#!python
+
+import hou
+
+# Start a new profile.
+# The profile automatically starts recording.
+profile = hou.perfMon.startProfile("My Profile")
+
+# Start an event.
+event = hou.perfMon.startEvent("Code Block 1")
+
+# PERFORM WORK FOR 'Code Block 1' HERE...
+
+# Stop the event.
+event.stop()
+
+# Start another event.
+another_event = hou.perfMon.startEvent("Code Block 2")
+
+# PERFORM WORK FOR 'Code Block 2' HERE...
+
+# Stop the event.
+another_event.stop()
+
+# Stop the profile.
+# The profile automatically generates statistics for the recorded events.
+# You can now view the profile statistics in the Performance Monitor panetab.
+profile.stop()
+
+# Print the profile statistics in JSON format.
+print profile.stats()
+
+# Save the profile to disk.
+profile.save("myProfile.hperf")
+
+}}}
+
+@related
+
+    - [Hom:hou.PerfMonProfile]
+    - [Hom:hou.PerfMonEvent]
+    - [Hom:hou.PerfMonRecordOptions]
+    - [Performance monitor pane|/ref/panes/perfmon]

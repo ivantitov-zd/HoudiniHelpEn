@@ -1,0 +1,288 @@
+#type: node
+#context: dop
+#internal: particlefluidsolver
+#icon: DOP/particlefluidsolver
+
+= Particle Fluid Solver =
+
+"""Evolves an object as a particle fluid object."""
+
+The Particle Fluid Solver DOP evolves an object dynamically as a particle fluid.
+
+== Changing from Metre Kilogram Second(MKS) to Centimetre Kilogram Second(CKS) ==
+    
+MKS is a physical system of units that expresses any given measurement using fundamental units of the metre, kilogram, and/or second. Unfortunately, the particle fluid object/solver does not expose the
+correct units to update its defaults so it does not change
+automatically. Going from MKS to CKS, you need to manually adjust the
+offending parms.  The value given is the result of converting to CKS,
+the value in the parentheses is the scale factor used:
+
+[Particle Fluid Object|particlefluidobject]:
+    * Particle Separation: `10` (* 100)
+    * Rest Density: `1e-3` (/ 100<sup>3</sup>)
+
+[Particle Fluid Emitter|particlefluidemitter]:
+    * Size: `100 x 100`
+    * Velocity: `100,0,0`
+
+[Particle Fluid Solver|particlefluidsolver]:
+    * Gas Constant: `0.025` (* 100 and / 100<sup>3</sup>)
+    * Viscosity: `0` (*10)
+
+[Gravity|gravity]:
+    * `981` (* 100)
+        When converted to CKS, all new gravity nodes will have this proper value
+
+The `* 100` makes the meter measures become centimetre measures.
+
+The `/ (100*100*100)` is necessary because density measures kg/m<sup>3</sup> and we are now measuring the denominator in centimetres.
+
+Gas Constant is a force, so like Gravity, is `* 100`. However, the particle fluid solver applies forces to the density, not to the mass, so while our mass is the same (since kg == kg), our density isn't, so the 100<sup>3</sup> factor shows up again.
+
+If you want CGS (centimetre grams seconds), rest density should be 1,
+the gas constant 25, and viscosity increased by a factor of 100
+compared to the MKS system.
+
+@parameters
+
+    == Substeps ==
+
+        Min Substeps:
+            The Particle Fluid solver will always enforce this minimum
+            number of substeps. 
+		
+            This should only rarely need to be changed.
+        Max Substeps:
+            The Particle Fluid solver will not break the simulation
+            down in to more substeps than this. 
+
+            It is a very good idea to always have a maximum to ensure frames will be finished regardless of their complexity. Lowering the ceiling can ensure a maximum computation time at the expense of accuracy.
+        CFL Condition:
+            The CFL condition is a factor used to automatically
+            determine what size substep the scene requires. The idea is
+            to control the distance that a particle in the particle
+            fluid object can travel in a given substep. 
+
+            When this
+            parameter is set to 0.5, for instance, the solver will set
+            the length of each substep such that no particle travels
+            more than 50% of its particle separation in a given substep.
+
+    == Internal Forces ==
+
+        TIP:
+	    Use the point attribute "fluid_forcescale" to control the
+	    magnitude of internal fluid forces acting on each particle
+	    individually.  
+
+            This is useful when attempting to control the
+	    behavior of fluid particles using POPs, as the internal forces
+	    can be scaled back to allow for better control of the particles.
+
+        Enable Pressure Force:
+            Enables or disables pressure forces within the particle
+            fluid object being evolved. 
+
+            Pressure forces act to push
+            particles apart or pull them together to bring them closer
+            to the rest density stored in the particle fluid object.
+        Pressure Type:
+            The type of pressure force to apply to the system.
+
+            Gas Pressure:
+                Applies a fairly simple pressure force which tends to
+                allow for a fairly high degree of compressibility in the
+                evolving fluid.
+            Liquid Pressure:
+                Applies a somewhat more complicated pressure force
+                which ensures a more liquid-like particle distribution
+                with less compressibility.
+        Gas Constant:
+            Controls the magnitude of pressure forces applied between
+            pairs of particles.  
+
+            This parameter effectively controls
+            the compressibility of the fluid.  The default value has
+            been chosen because it responds well when settling under
+            standard gravity forces.  
+
+            If the fluid is required to settle under a
+            gravity force different from the default gravity force,
+            this parameter should be adjusted accordingly.  For instance,
+            if the magnitude of the gravity force is scaled up five times,
+            then this parameter should also be scaled up five times.
+        Enable Viscosity Force:
+            Enables or disables viscosity forces acting between pairs
+            of particles. 
+
+            Viscosity has the effect of smoothing the
+            particle velocity field, and a highly viscous fluid will
+            appear thicker and less willing to flow than a fluid with
+            low viscosity.
+        Enable Surface Tension Force:
+            Enables or disables surface tension forces acting between
+            pairs of particles. 
+
+            Surface tension has the effect of
+            pulling in particles close to the fluid surface. This tends
+            to round out the particle field.
+        Enable Elastic Force:
+            Enables or disables elastic forces acting between pairs of
+            particles. 
+
+            Elastic forces act as spring-like bonds between
+            pairs of particles that push particles apart when they get
+            too close together, and pull them together when they get too
+            far apart.
+        Elasticity Constant:
+            Controls the magnitude of elastic forces acting between
+            pairs of particles.
+        Plasticity Constant:
+            As the fluid evolves the rest lengths of bonds between
+            pairs of particles is allowed to change as the fluid is
+            stretched or compressed. 
+
+            This parameter controls the
+            magnitude of changes to these elastic rest lengths. A larger
+            plasticity constant results in a larger deformation of
+            pairwise elastic bonds when the particle set is stretched or
+            compressed.
+        Plastic Yield Ratio:
+            Controls the amount of deformation that can be resisted by
+            an elastic bond between a pair of particles. 
+
+            For instance,
+            if this parameter is set to 0.3, then an elastic bond can be
+            stretched or compressed by 30% of its rest length before it
+            begins to deform.
+    
+	Clamp Number of Springs:
+	    Limits the number of particle to particle springs that are
+	    created.  Since all particles need to have the same size
+	    attribute, without clamping many particles close together
+	    might result in significant memory usage.
+	Max Springs:
+	    The maximum number of springs that can attach to any one
+	    particle.  If a particle has more close neighbors than this,
+	    they are connected in a closest-first basis.
+	Use Particle IDs:
+	    Determines if the particle springs should store particle
+	    id numbers or point numbers.  Point numbers are faster to
+	    work with, but if points are deleted the springs become
+	    invalid.
+
+    == Advanced ==
+        
+        This tab controls details related to the numerical simulation
+        algorithms used to solve the fluid.
+
+        Simulation Method:
+            The numerical simulation method used to control the fluid
+            simulation.  See the helpcard for the Gas Integrator DOP
+            for more information on these methods.
+
+        Error Tolerance:
+            Tolerance for error in certain simulation methods.  See
+            the helpcard for the Gas Integrator DOP for more information
+            on these methods.
+
+        Substep Repetition Tolerance:
+            Tolerance for substep repetition, which is performed by
+            certain simulation methods.  See the helpcard for the Gas
+            Integrator DOP for more information on these methods.
+
+        Advection Method:
+            The technique used to update particle positions.
+            Standard:
+                Particle positions are updated directly using the current
+                particle velocity and time step length.
+
+            XSPH:
+                Particle positions are updated using a velocity which is
+                blended between each particle's current velocity and the
+                average velocity of its neighbors.
+
+        XSPH Constant:
+            When __Advection Method__ is set to "XSPH", this constant
+            controls the degree of blending between a particle's velocity
+            and the velocity of its neighbors.  A value of zero ignores
+            neighbor velocities entirely, while larger values increasingly
+            make use of neighbor velocities.
+
+	Build Neighbour List:
+	    To accelerate repeated searches for close particles, a per-particle
+	    list of close particles can be built.  This consumes a fair bit of
+	    memory, however.
+		Never:
+		    Do not build any acceleration lists for the least memory
+		    use.  Normalized time cost is 1.0.
+		Integrate:
+		    Build the acceleration list at the start of each force
+		    computation in the integration stage.  This will produce
+		    accurate results if the force computations don't move the
+		    particles, but require approximately 50% more memory for
+		    the particle lists.  Normalized time cost is 0.8.
+		Substep:
+		    Only rebuild the acceleration list at each substep, not
+		    within the integration stage.  This is less accurate as the
+		    particles may join or separate during the integration
+		    process.  Requires the same memory as the Integrate option.
+		    Normalized time cost is 0.5 for Euler 2(1).
+
+        Integrate Orientation:
+	    When this toggle is disabled, the integrator only affects
+	    the position and velocity attributes of particles in
+	    response to values set in the force attribute by the
+	    node's input solvers.  
+
+	    When this toggle is enabled, the integrator also affects
+	    the orientation and angular velocity attributes of
+	    particles in response to values set in the torque
+	    attribute by the node's input solvers.
+
+	Enable Collision Detection:
+            Enables collision detection/response between particles in the
+            system and rigid body objects.
+
+    == Distribution ==
+
+	When distributing a particle fluid simulation it is important
+	that each machine uses the same number of substeps.  These
+	distribution parameters will synchronize the substeps.
+
+	[Include:standard_distribution]
+
+    [Include:standard_solver_parms]
+    
+@inputs
+    Fluid to Solve:
+        The simulation object to evolve as a particle fluid.
+    Prequel Solvers:
+        NOTE:
+            This input has be deprecated.  Solvers connected to this input are now
+            run at the same time as solvers connected to the __Sequel Solvers__
+            input (the __Prequel Solvers__ input is processed first).
+    Sequel Solvers:
+        Additional solvers to apply at the end of each substep in the
+        simulation that do not directly affect the particle fluid object
+        itself.  
+
+        Solvers such as the [Particle Fluid Emitter|Node:dop/particlefluidemitter] or
+        [Particle Fluid Sink|Node:dop/particlefluidsink] should be connected here.
+    Additional Force Solvers:
+        Additional solvers that apply forces to the particle fluid
+        object; that is, solvers that modify the force point attribute
+        of particles in the object. An example of such a solver is the
+        [Gas Vorticle Forces|Node:dop/gasvorticleforces] node.
+        
+@outputs
+    [Include:standard_data_outputs]
+
+
+@related
+    - [Node:dop/particlefluidobject]
+    - [Node:dop/particlefluidemitter]
+    - [Node:dop/particlefluidsink]
+    - [Node:dop/gasintegrator]
+    - [Node:sop/particlefluidsurface]
+

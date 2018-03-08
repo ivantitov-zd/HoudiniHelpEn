@@ -1,0 +1,120 @@
+= hou.HDASection =
+#type: homclass
+#cppname: HOM_HDASection
+#group: assets
+
+"""Represents a "section" of data stored along with a digital asset."""
+
+A digital asset stores its contents in a number of different pieces of data
+called sections.  Each section is named and contains an arbitrarily sized
+piece of data, often textual.  Each section is like a file embedded inside
+the definition, and Houdini uses specially named sections to store the node
+contents, list of parameters, etc.  You can embed your own data into a digital
+asset by putting it inside a section.
+
+Any parameter in Houdini that references a file can also reference a section
+inside a digital asset.  For example, if `car` is an object-level digital
+asset and the section is named `"texture.jpg"`, you can reference
+that texture with `opdef:/Object/car?texture.jpg`.  Note that [Hom:hou.readFile]
+also supports this `opdef:` syntax.
+
+By moving files into digital asset sections, you can build self-contained
+digital assets that can be distributed via a single hda file.
+
+Note that section names may contain '/'.
+
+@methods
+
+::`name(self)` -> `str`:
+    #cppname: HOM_HDASection::name
+    Return the name of this section.
+
+    Note that is is not possible to rename a section, but the following
+    function will emulate renaming:
+    {{{
+    #!python
+    def renameSection(section):
+	'''Rename a section by removing it and creating a new one.  Return the new section.'''
+	new_section = section.definition().addSection(new_name, section.contents())
+	section.destroy()
+	return new_section
+    }}}
+
+::`definition(self)` -> [Hom:hou.HDADefinition]:
+    #cppname: HOM_HDASection::definition
+    Return the digital asset definition containing this section.
+
+::`contents(self, compressionType=hou.compressionType.NoCompression)` -> `str`:
+    #cppname: HOM_HDASection::contents
+    #replaces: Cmd:otcontentsave
+    Return a string containing the contents of this section.
+
+    You can optionally specify a compression type, [Hom:hou.compressionType],
+    to decompress the contents.
+
+    Raises [Hom:hou.OperationFailed] if a compression type is specified and the
+    contents are not compressed by that type.
+
+    {{{
+    #!python
+    def saveSectionToFile(section, file_name):
+	'''Given a section, save it to a file.'''
+	section_file = file(file_name, "w")
+	section_file.write(section.contents())
+	section_file.close()
+    }}}
+
+::`size(self)` -> `int`:
+    #cppname: HOM_HDASection::size
+    #replaces: Cmd:otcontentls
+    Return the number of bytes in the contents.  This method is a shortcut
+    for `len(self.contents())`.
+
+::`setContents(self, contents, compressionType=hou.compressionType.NoCompression)`:
+    #cppname: HOM_HDASection::setContents
+    Set the contents of this section to the given string.  A section may
+    contain binary information, like bgeo files, images, etc.
+
+    You can optionally specify a compression type, [Hom:hou.compressionType],
+    to compress the contents.  Note that you must specify the same compression
+    type when reading the contents back to decompress them.
+
+    See [Hom:hou.HDADefinition#addSection] for an example of how to create
+    a section from a file on disk.
+
+::`destroy(self)`:
+    #cppname: HOM_HDASection::destroy
+    #replaces: Cmd:otcontentdelete
+    Remove this section from the HDA definition.  You can also remove a section
+    with [Hom:hou.HDADefinition#removeSection], and this method is equivalent
+    to `self.definition().removeSection(self.name())`.
+
+    Only remove sections that you explicitly added.  Do not remove the special
+    sections that Houdini uses to store the contents of the digital asset
+    definition, or Houdini will generate errors or strange side effects.
+
+    To add a section, use [Hom:hou.HDADefinition#addSection].
+
+::`modificationTime(self)` -> int:
+    #cppname: HOM_HDASection::modificationTime
+    #replaces: Cmd:otcontentls
+    Return the time when the section was last modified.  This time is returned
+    as a POSIX timestamp, such as is returned by `time.time()`.
+
+    {{{
+    #!pycon
+    >>> hou.nodeType(hou.cop2NodeTypeCategory(), "colorwheel").definition()
+    <hou.HDADefinition of Cop2 colorwheel in /opt/hfs9.5/houdini/hda/OPlibCop2.hda>
+    >>> definition = hou.nodeType(hou.cop2NodeTypeCategory(), "colorwheel").definition()
+    >>> definition.sections().keys()
+    ['VflCode', 'DialogScript', 'VexCode']
+    >>> section = definition.sections()['VflCode']
+    >>> section.modificationTime()
+    1177535169
+    >>> import datetime, time
+    >>> datetime.datetime.fromtimestamp(section.modificationTime())
+    datetime.datetime(2007, 4, 25, 17, 6, 9)
+    >>> time.ctime(section.modificationTime())
+    'Wed Apr 25 17:06:09 2007'
+    }}}
+

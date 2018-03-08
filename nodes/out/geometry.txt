@@ -1,0 +1,120 @@
+= Geometry =
+
+#type: node
+#context: out
+#internal: geometry
+#icon: OBJ/geo
+
+"""Generates geometry files from a SOP or DOP network."""
+
+@parameters
+
+Save to Disk:
+    #id: execute
+
+    Saves the geometry to disk with the last control settings.
+
+Save to Disk in Background:
+    #id: executebackground
+
+    Starts another copy of Houdini in the background and instructs that
+    copy to cook and save the geometry.  This allows one to continue working
+    and load the .bgeo files as they complete.
+
+Controls...:
+    #id: renderdialog
+
+    Opens the control dialog to allow adjustments of the render parameters
+    before rendering.
+
+[Include:standard#valid_frame_range]
+
+Start/End/Inc:
+    Specifies the range of frames to render (start frame, end frame, and increment). All values may be floating point values. The range is inclusive. 
+
+    These parameters determine the values of the local variables for the output driver.
+
+	`$NRENDER`:
+	    The number of frames to be rendered by the output driver.
+	`$N`:
+	    The current frame being rendered (starting at 1 and going to `$NRENDER`).
+
+Render with Take:
+    #id: take
+
+    Uses the settings in a particular take while rendering. Choose
+    __Current__ to use the current take when rendering.
+
+parameters id="render_buttons_only">>
+Save to Disk:
+    #id: execute
+SOP Path:
+    The SOP node, object, or SOP subnet to render from.
+    
+Output File:
+    The file to save the geometry to (should end in `.geo` or
+    `.bgeo`). Make sure to  [include $F in the
+    filename|/render/expressions]  to write out separate
+    files for each frame.
+    
+Transform:
+    Specifies whether the geometry should be transformed into world space
+    before written out.
+    
+[Include:standard#mkpath]
+
+Initialize Simulation OPs:
+    Forces all simulation OPs to be reset. This includes DOP
+    Networks, POP SOPs, and other OPs that cache their results.
+
+    This is the safest way to render out a simulation, because it
+    starts the simulation from scratch and discards any partial
+    simulations you might have done with different parameters.
+
+Alfred Style Progress:
+    A percentage complete value is printed out as files are
+    written. This is in the style expected by Pixar's Alfred
+    render queue.
+
+Report Network Use:
+    The number of bytes sent or received by the distributed simulation
+    primitives during the cooks triggered by this geometry output is
+    printed.
+    
+    This does not track use by, for example, saving a file to an NFS mount.
+    It only tracks the network communication of nodes such as the Gas Net
+    Exchange Border DOP.
+
+Save Retries:
+    If saving the geometry to disk fails due to a disk writing error,
+    Houdini will usually error the output node immediately.  This
+    is desirable for most cases where a failure to save means an
+    illegal path, which is not recoverable.  However, sometimes files
+    fail to save due to network issues.  If the number of save retries
+    is non-zero, Houdini will re-attempt to save this number of times.
+    Each time will be accompanied with an output to the console of the
+    failure to save and a five second wait in the hopes that the network will
+    clear up.
+
+Save in Background:
+    When saving more than one frame, save in a background thread. This can
+    make saving faster for large file sizes, but may use more memory since it
+    will retain the output geometry until the save completes.
+
+[Include:standard#scripts_tab]
+    Post-Write Script:
+        Run this HScript after each frame's data has finished
+	writing to disk.  This is always after the corresponding Post-Frame
+	Script and always before teh Post-Render script, but the order
+	otherwise is undefined.  When Save in Background is enabled
+	this allows delaying script actions until the file has finished
+	saving.
+
+@locals
+
+N:
+    Frame being rendered.
+
+NRENDER:
+    Total number of frames being rendered.
+

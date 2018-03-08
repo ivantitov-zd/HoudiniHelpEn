@@ -1,0 +1,409 @@
+#type: node
+#context: dop
+#internal: smokesolver::2.0
+#icon: DOP/smokesolver
+#version: 2.0
+
+= Smoke Solver =
+
+"""Sets and configures a Smoke solver. This is a slightly lower-level solver that is the basis for the Pyro solver."""
+
+See [Pyro look development|/pyro/pyro_look] for information on using the parameters to achieve different flame and smoke looks.
+
+The smoke solver provides the basics of smoke simulation, whereas the [Pyro Solver|Node:dop/pyrosolver] adds flame simulation and extra shaping controls. If you just want to generate smoke, the smoke solver is useful since it is simpler and expert users can build their own extensions on it. However, the [Pyro Solver|Node:dop/pyrosolver] is more flexible.
+
+See [how to use the Pyro tools|/pyro/pyro] for information on creating simulations using the shelf tools.
+
+== Setting up == (setup)
+
+If you [use the shelf tools|/pyro/pyro] to create Pyro effects, they will set up the sourcing, solver, and output object for you automatically.
+
+If you are setting up a pyro network from scratch, you can use the [Smoke Object node|Node:dop/smokeobject] to create a DOP object with the data required by the Pyro solver already attached. If you already have a DOP object, you can use the the [Smoke Configure Object node|Node:dop/smokeconfigureobject] to add the necessary data to it.
+
+This solver makes use of various field subdata on the object.
+
+* The object should have a scalar field `density` for the density of the smoke.
+
+* The object should have a vector field `vel` for the velocity at each voxel.
+
+* Optionally, the object can have a scalar field `temperature` for internal buoyancy calculations.
+
+@inputs
+
+Object:
+    #id: object_input
+    
+    A [Smoke object|Node:dop/smokeobject] to work on. Note that a smoke
+    object can contain multiple containers.
+
+Pre-solve:
+    #id: presolve_input
+    
+    Run the network branch attached to this input before each solving
+    step. In the standard [pyro setup|/pyro/pyro], the attached node ([Gas Resize Fluid Dynamic|Node:dop/gasresizefluiddynamic]) automatically resizes the fluid containers at each step.
+
+Velocity update:
+    #id: velupdate_input
+    
+    Nodes attached to this input can edit the simulation network's velocity fields, for example to apply custom forces, _before_ the "project gas non-divergent" step (see also the "Sourcing (post-solve)" input below).
+
+Advection:
+    #id: advection_input
+    
+    Connect a [Gas Advect node|Node:dop/gasadvect] to this input to allow the it to advect the points of geometry data attached to the container based on the fields in this solver.
+    
+
+Sourcing (post-solve):
+    #id: sourcing_input
+    
+    The main use for this input is to add volumes attached to this input as fuel sources, density sources, sinks, collision fields, pumps, etc. These volumes will usually be created by a [Source Volume node|Node:dop/sourcevolume] that imports volumes from a geometry network. See [pyro sourcing|/dyno/fluid_sourcing] for more information.
+    
+    Nodes attached to this input can also edit the simulation network's velocity fields, for example to apply custom forces, _after_ the "project gas non-divergent" step.
+
+@parameters
+
+== Simulation == (simtab)
+
+These parameters control how the simulation develops over time. See [how pyro simulations work|/pyro/pyro] for information on how the temperature and velocity fields drive the simulation to a great extent.
+
+Timescale:
+    #id: timescale
+
+    A scaling factor for time inside this solver. `1` is normal speed, greater than `1` makes the pyro sim appear speeded up, less than `1` makes the pyro sim appear to be in slow motion.
+
+    You can use expression functions such as [Exp:doptime], [Exp:dopframe],[Exp:dopsttot], and [Exp:dopttost] to convert between global times and simulation times.
+
+    NOTE:
+        Changing the __Timescale__ only affects the timestep of the simulation. If adding velocities calculated in SOPs to the simulation for collisions or pumps with the [Source Volume DOP|Node:dop/sourcevolume], scale the incoming velocities by `1 / Timescale` to match the timestep of the simulation.
+	
+Temperature Diffusion:
+    A Gaussian blur factor on the temperature field. Higher values spread the temperature out more and create a less sharply defined effect and more cooling. For example, a value of `2 `will blur the temperature field by a radius of 2 every second.
+    
+    (The real-world motivation for this parameter is to simulate turbulence at a finer scale than the sim's resolution, which spreads the field out.)
+
+Cooling Rate:
+    How fast the temperature field cools to zero. A value of 0.9 will decrease
+    the temperature of hot gas by 90% (to 10% of its original value) every
+    second.
+    
+    WARNING:
+        This is the inverse of the __Cooling Rate__ parameter in Houdini 11 and lower versions.
+
+Viscosity:
+    The "fluid-ness" of the velocity field. Higher values make neighboring voxels have the same velocity, creating a more flowing look. A value of `0` allows adjacent voxels to move any direction without resistance, creating a more chaotic, turbulent look.
+    
+    (Inside the solver, higher viscosity values introduce a penalty when a voxel's velocity varies from that of its neighbors. This is currently implemented by applying a diffusive term to the velocity field.)
+
+Buoyancy Lift:
+    An upward force at each voxel scaled by the difference between the ambient temperature and voxel's temperature, so hotter areas will get more lift and cooler areas will sink. Increasing this makes the effect rise faster and go higher.
+
+Buoyancy Dir:
+    The direction in which buoyancy is applied.  This is usually the Up direction of your simulation, but often can be altered to quickly tweak the look of a sim.
+
+== Relationships == (relationships)
+
+[Include:old_relationships]
+
+=== Sources ===
+
+TIP:
+	When using a source relationship, make sure the source object is emitting temperature. You can set this up on the object's physical properties tab.
+
+Enable Source Relationship:
+	Use DOP objects with a "source" relationship to the solver.
+	
+Add Source To:
+	The field to add the source to. The default is `density`, which will create smoke. To create flame, you could change this to `fuel` and set the temperature physical property of the source object.
+	
+Source Merge:
+	How the source object's volume will be added to the simulation.
+	Scale controls the addition amount.
+	
+Velocity Merge:
+    How the source object's velocity will affect the
+    container's velocity field. Scale controls the amount to add.   
+
+Temperature Merge:
+    How the source object's temperature physical
+    parameter will affect the container's temperature field. Scale controls the amount of temperature to add.
+    
+Velocity Type:
+    #id: veltype
+    
+    How to measure velocity on the source object. If the source geometry does not deform (change shape) over time, use "Rigid velocity". If the source deforms but does not change topology over time, use "Point velocity".
+
+    Rigid Velocity:
+        Treat the source object as non-deforming.
+        
+    Point Velocity:
+        Use point history to allow deforming geometry. This only
+        works if the topology of the source geometry doesn't change.
+        
+    Volume Velocity:
+        Use the SDF representation of the object. Allows deforming geometry and does not require a fixed topology over time, but cannot detect tangential velocities.
+
+=== Pumps ===
+
+Enable Pump Relationship:
+	Use DOP objects with a "pump" relationship to the solver.
+	
+Velocity Merge:
+    How the source object's velocity will affect the
+    container's velocity field. Scale controls the amount of velocity to add.
+
+Velocity Type:
+    #id: pumpveltype
+    #contentfromt: #veltype
+
+Temperature Merge:
+    #id: pumptemperaturemerge
+    
+    Whether the object's temperature property affects the temperature field of the container. If you choose "Set interior", the part of the temperature field corresponding to the inside the object will be set to the object's temperature.
+
+=== Collisions ===
+
+Enable Collide Relationship:
+	Use DOP objects with a "collision" relationship to the solver.
+
+Temperature Merge:
+    #id: collisiontemperaturemerge
+    
+    Whether the object's temperature property affects the temperature field of the container. If you choose "Collision interior", the part of the temperature field corresponding to the inside the object will be set to the object's temperature.
+
+Restrict Mask to Bandwidth:
+    Normally the collision mask SDF is only calculated up to a certain distance from the original collision geometry. Turn this off to compute the full range of the mask if you need it for some special effect, such as having things react before they reach the object.
+    
+Use Point Velocity for Collisions:
+    Turn this on if the collision geometry is deforming (changing shape) over time, but has consistent topology (e.g. number of points). If the topology changes over time, turn on __Use volume velocity for collisions__.
+
+Use Volume Velocity for Collisions:
+    Turn this on if the collision geometry is deforming (changing shape) and topology (e.g. number of points) over time.
+
+Collide with Non-SDF:
+    Allows the fluid to collide with objects that don't have
+    Geometry/SDF, such as other fluids.
+
+Extrapolate into Collisions:
+    Copies the density and fuel fields into the collision field. This causes the smoke to become "sticky" to avoid an air gap between the smoke and the collision field. This also prevents smoke from passing through moving collision fields.
+
+=== Sink ===
+
+Enable Sink Relationship:
+    Use DOP objects with a "sink" relationship to the solver.
+
+== Advanced ==
+
+You should generally not need to change these parameters.
+
+Use OpenCL:
+    #id: opencl
+    
+	Enable GPU acceleration on certain microsolvers. This may not work on all
+	graphics cards or operating systems. Check the System Requirements
+	information in the Support section of the Side Effects Software website.
+	
+	You should have a fairly recent graphics card and fully updated drivers. 
+	Try starting with low resolution test simulation (for example, a 
+	64<sup>3</sup> grid) to verify it runs with OpenCL, then try increasing 
+	the resolution. The additional memory-transfer overhead of using OpenCL 
+	will only become worth it at high resolutions, around 256<sup>3</sup>.
+	
+	With the plain smoke solver, simulation after the first frame sourcing 
+	will use the  GPU. If you add a microsolver that isn't GPU enabled, 
+	Houdini does the GPU required CPU  copying instead of raising an error.
+	
+	For fastest speeds, the system needs to minimize copying to and from the video card. The example file demonstrates several methods for minimizing copying. See the
+	[OpenCL smoke example file|/examples/nodes/dop/smokeobject/OpenCL] for 
+	an explanation of how to set up a fast simulation using GPU acceleration.
+	
+	A very high-resolution plain smoke solver simulation should be faster with OpenCL, however default Pyro effects will not automatically simulate faster.
+	
+	* They tend to be very low resolution for fast initial playback, so they don't have enough voxels for the GPU acceleration to greatly exceed the overhead.
+	
+	* They have a lot of non-GPU shaping nodes. While many nodes are GPU enabled (such as vortex confinement), quite a few Pyro nodes are based on VOPs and are not GPU-enabled.
+	
+    * Caching is enabled by default in DOPs.
+    
+    * Resizing is enabled by default. Resizing has to go through the CPU to manage the field changes. It can also fragment the GPU memory resulting in out-of-memory errors.
+
+Min Substeps:
+    #id: minimumsubsteps
+    
+    Forces the solver to run a minimum number of substeps. Normally the pyro solver works best with no substeps. If you have smoke and unusual forces you may want to increase this parameter for better stability. Increasing this will usually make the simulation much slower.
+
+Max Substeps:
+    #id: substeps
+    
+    Forces the solver to not run more substeps than this maximum. Normally the pyro solver works best with no substeps. If you have smoke and unusual forces you may want to increase this parameter for better stability. Increasing this will usually make the simulation much slower.
+
+CFL Condition:
+    #id: cflcond
+    
+    When __Max Substeps__ is greater than `1`, the solver uses this parameter to decide the number of substeps. The "condition" is that no substep can allow objects to interpenetrate by more than this many voxels. Higher values allow a substep to move smoke by more voxels, possibly letting it pass through collision objects.
+
+Quantize to Max Substeps:
+    #id: quantize
+    
+    Alway use substeps that divide up the frame by __Max Substeps__.  For example,
+    if __Max Substeps__ is set to 4, but the __CFL Condition__ only requires 3 substeps,
+    the solver will take frame steps of 0.25, 0.5, and 0.25.  This option can be useful for
+    re-using input geometry that has been cached to file at increments of 1/__Max Substeps__.
+
+Frames Before Solve:
+    #id: frames_before_solve
+    
+    Delays the actual simulation this many frames after the object creation.
+    Sourcing will still occur in these frames.  This may be needed if
+    some solve nodes can't be processed before certain initial conditions
+    have been met.
+
+=== External Forces === (adv_externaltab)
+
+Scaled Forces:
+    A list of forces to scale by the value of the `forcescale` field at each voxel. The default is all forces except gravity.
+
+Absolute Forces:
+    A list of forces to apply uniformly to all voxels, ignoring the `forcescale` field.
+
+=== Rest Field === (adv_restfieldtab)
+
+Enable Rest:
+    Creates rest fields, which can be used to track the position of the fluid over time. Turn this on to correctly map noise or textures in the volume shader.
+
+Dual Rest Fields:
+    Creates a `rest2` field that is one back from the the main `rest` field, allowing you to run long simulations without popping.
+    
+Frames Between Solve:
+    Number of frames before resetting the rest field.
+
+Frame Offset:
+    Which frame the rest field will be reset on. If you are prerolling the simulation, delaying the rest field initialization until after the preroll will usually give a better result.
+    
+Time Scale:
+    #id: timescale
+    
+    How fast the rest field moves in response to the velocity field. A value of `1` would make the rest field match the fluid exactly, however that would quickly smear the rest field out in streaks. Values lower than `1` move the rest field slower than the actual fluid, decreasing streaking.
+
+=== Projection === (adv_projectiontab)
+
+The "project non-divergent" step of the simulation removes the divergence components in the velocity field.
+
+Projection Method:
+    The project non-divergence algorithm. "PCG" has more accurate boundary conditions and avoids computation inside collision objects. Multigrid is significantly faster, especially on large or high resolution containers.
+
+Multigrid Iterations:
+    The multigrid project non-divergence method has inaccurate boundary enforcement. You can increase this number to run the enforcement/projection multiple times, making it more accurate. You should not have to set this higher than `5`.
+
+=== Advection === (adv_advectiontab)
+
+Advection Type:
+    The algorithm to use for advecting the fields.
+    
+    Single stage:
+        Equivalent to the [Gas Advect DOP|Node:dop/gasadvect], where each point is back traced through the velocity field once to find the new voxel value.
+
+    BFECC and Modified MacCormack:
+        Run a second basic advection stage, resulting in a sharper fluid that doesn't disperse as much.
+
+Clamp Values:
+    The error correction of the BFECC and Modified MacCormack advection types can move voxel values outside the container, leading to strange effects such as negative density values. This parameter lets you choose a method to avoid this problem. The default is "Revert".
+    
+    None:
+        Do not attempt to prevent error correction from moving values outside the container.
+        
+    Clamp:
+        Restrict each voxel to the range of values possible given its eight original values.
+
+    Revert:
+        If the error-corrected voxel is out of range, return it to the single-stage value.
+        
+    Reverting can avoid checker artifacts where the error correction breaks down.
+
+Blend:
+    Apply a smooth blend between non-clamped and clamped values as the advected field
+    approaches the clamping limit. Particularly with the __Revert__ option, applying a small
+    amount of __Blend__ (e.g. 0.05 - 0.1) can reduce grid artifacts in the advected field
+    at the cost of some additional smoothing of the field.
+
+Vel Advection Type:
+    The algorithm to use for advecting the velocity field. Higher types in the list will reduce the apparent viscosity of the field, but may add energy or cause chatter.
+
+Advection Method:
+    Controls particle tracing.
+    
+    Single step:
+        Takes the velocity at each voxel and makes a single step in
+        that direction for the time step. This is fastest and is
+        independent of the speed of the velocity field, but will start
+        to break up for large time steps.
+        
+    Trace:
+        Ensures the backtracking does not move more than a single
+        voxel before its velocity is updated, allowing for larger
+        time steps.
+        
+    Trace Midpoint:
+        Like __Trace__ but uses second order advection for more accuracy
+        but slower simulation.
+        
+    HJWENO:
+	A non-lagrangian integrator, this allows for theoretically more
+	accurate advection of divergent fields.  Unfortunately, if too large
+	substeps are taken, it will explode.
+        
+    Upwind:
+	A faster but less accurate non-lagrangian integrator.
+
+    Trace RK3:
+        Like __Trace__ but uses third order advection for more accuracy
+        but slower simulation.
+
+    Trace RK4:
+        Like __Trace__ but uses fourth order advection for more accuracy
+        but slower simulation.
+
+Advection CFL:
+    When tracing the particles, this controls how many voxels the particles can move in a single iterations. Higher values give faster tracing and faster advection, but more errors.
+
+=== Collisions === (adv_collisionstab)
+
+Correct Collisions:
+    Sets density and fuel fields to `0` inside collision objects. This helps prevent fuel and density from leaking through moving objects.
+
+Feedback Scale:
+    A scale factor for applying feedback forces to other objects. Setting this to `0` will prevent any feedback.
+    
+=== Clear === (adv_cleartab)
+
+Fields to Clear:
+	Zeros out the specified types of fields after the solve step. This ensures the `.sim` files, which store the complete state of the simulation, do not have extra information, reducing their size and saving time.
+	
+    None:
+    	Do not clear fields.
+    
+    Hidden:
+        Clear fields not needed for the next time step that do not have guide parameters.
+    
+    Static:
+        Clear fields not needed for next time step. Some of these fields will have guides and the guides will start showing zero values since the underlying field was cleared.
+    
+Additional:
+	A space separated list of fields to clear after each solve.
+
+@outputs
+
+[Include:standard_data_outputs]
+
+@locals
+
+[Include:standard_data_locals]
+
+[Include:standard_locals]
+
+@related
+
+- [Pyro Effects|/pyro/pyro]
+- [Node:dop/smokeobject]
+- [Node:sop/fluidsource]
+- [Node:dop/pyrosolver]
+

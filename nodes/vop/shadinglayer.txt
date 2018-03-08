@@ -1,0 +1,97 @@
+#type: node
+#context: vop
+#internal: shadinglayer
+#icon: VOP/shadinglayer
+
+= Shading Layer Parameter =
+
+"""Creates a parameter to appear in the signature of the VEX function
+defined by the VOP network (VOPNET)."""
+
+This operator creates a parameter to appear in the signature of the VEX
+function defined by the VOP network (VOPNET). The new parameter is named
+according to the chosen geometry attribute and the specified layer.
+
+Unlike the Parameter operator, which creates parameters of any name and
+type, Shading Layer computes the parameter name from the name of the
+geometry attribute and the specified layer. For example, choosing __UV
+Coordinates__ from the attribute menu will generate `uv`, `uv2`, `uv3`
+when the layer is 1 and respectively 2 and 3. The parameter type matches
+the type of the selected geometry attribute.
+
+This operator always checks if the geometry attribute is bound and, if
+so, assigns its value to the new parameter. Thus, the new parameter will
+be hidden in the operator type defined by the VOP network.
+
+One of the most common uses of this operator is the creation of layered
+textures, which requires different sets of texture coordinates for each
+Texture operator. To accomplish this task, choose __UV Coordinates__ from
+this operator's attribute menu and set the appropriate layer. Pipe the
+`uv` output into a [Vector To Float|Node:vop/vectofloat] operator to extract the `s` and `t`
+as individual float values, then wire `s` and `t` into the [Texture|Node:vop/texture]
+operator. Repeat this operation for all the layers, then add or multiply
+the all Texture outputs using the [Add|Node:vop/add] or [Multiply|Node:vop/multiply] operator
+respectively.
+
+@parameters
+    Geometry Attribute:
+        The attribute to be searched for in the given layer. The
+        following attributes are available in this operator:
+
+        {{{
+        Label          | Name  | Type     | Default If Not Bound
+        ---------------+-------+----------+---------------------------
+        UV Coordinates | uv    | 3 floats | { global s, global t, .5 }
+        RGB Color      | Cd    | 3 floats | { 1, 1, 1} (i.e. white)
+        Alpha          | Alpha | 1 float  | 1          (i.e. opaque)
+        }}}
+        Geometry attributes are created in the Geometry module using a
+        variety of SOP operators such as: AttribCreate, Attribute,
+        Point, UV Project, UV Texture, UV Unwrap, etc.
+
+    Use This Node to Set Parameter Attributes:
+        When several Shading Layer VOPs have the same Geometry Attribute
+        chosen, only one of the nodes is used to control the settings of
+        the attribute. Houdini decides which node to use for this by
+        searching all the nodes according to the user defined order,
+        then traversing inside subnets. If none of them have this
+        parameter turned on, the first one found is used to set the
+        parameter attributes. If one or more do have this option turned
+        on, the first one with this option is used, even if another node
+        (with this option turned off) is found first.
+    Attribute Layer:
+        Attribute layer where to search for the geo attribute. Layer 1
+        is the default layer. Attributes in this layer do not have a
+        suffix. Layers are created in the Geometry module using the
+        Layer SOP.
+    Export:
+        Specifies whether the new parameter can be exported to other
+        contexts (written to as well as read from). If set to __Always__ or
+        __When Input is Connected__, this operator gets an input.  The value
+        wired into this input is then assigned to the exported parameter.
+        In a Surface network, exported parameters can be used to create
+        deep rasters.
+
+        Never:
+            The parameter will not be exported.
+        Always:
+            The parameter will be exported.
+        When Input is Connected:
+            The parameter will only be exported if the node's input is
+            ultimately connected to another VOP.
+@inputs
+    Export Value:
+        The value assigned to the new parameter if the __Export
+        Parameter__ toggle is checked.
+@outputs
+    Output Parameter:
+        The value of this VEX function parameter.
+    Is Parameter Bound:
+        True is the new parameter is bound to an attribute.
+
+@related
+    - [Node:vop/constant]
+    - [Node:vop/global]
+    - [Node:vop/parameter]
+    - [Node:vop/uvspacechg]
+

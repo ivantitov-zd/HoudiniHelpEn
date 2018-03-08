@@ -1,0 +1,461 @@
+= Boolean =
+
+#type: node
+#context: sop
+#internal: boolean
+#icon: SOP/boolean
+#version: 2.0
+#tags: polygons, boolean, seams, merge, model
+
+"""Combines two polygonal objects with boolean operators, or finds the intersection lines between two polygonal objects."""
+
+
+== Overview ==
+
+This node can perform several different functions according to the __Operation__ parameter.
+
+The common operations are:
+
+* *Boolean* operations (union, intersect, subtract) between two "solid" models:
+
+    [Image:/images/nodes/sop/boolean_subtract.jpg]
+
+* *Shattering* a solid model using cutting surfaces:
+
+    :col:
+        [Image:/images/nodes/sop/boolean_shatter1.jpg]
+    :col:
+        [Image:/images/nodes/sop/boolean_shatter2.jpg]
+    
+    You can shatter with any number of complex cutting surfaces, allowing natural-looking, artistically controlled destruction.
+    
+    // [Image:/images/nodes/sop/boolean_shatter_dragon.jpg]
+
+* Generating polylines along the *seams* where two models intersect.
+
+* *Detecting* intersections and putting intersecting polygons into groups.
+
+You can specify the input models as "solid" (treat the model surface as if it encloses a solid filled space) or "surface" (treat the model surfaces like flat planes).
+
+:vimeo: Boolean shattering
+    #id: 204607962
+
+
+== Boolean operations == (ops)
+
+In the images below, the "shatter" examples use an [Exploded View node|Node:sop/explodedview] to make the separate pieces clear.
+
+
+=== Solid/Solid boolean operations ===
+
+Before |
+    :fig:[Image:/images/nodes/sop/boolean_solsol_before.png]
+        To illustrate boolean operations between solids, we'll use two simple offset boxes.
+
+Union |
+    :fig:[Image:/images/nodes/sop/boolean_solsol_union.png]
+        Creates a new solid which encloses the combined volume of the two inputs.
+
+Intersect |
+    :fig:[Image:/images/nodes/sop/boolean_solsol_intersect.png]
+        Creates a new solid which encloses any shared volume(s) between the two inputs.
+
+Subtract |
+    :fig:[Image:/images/nodes/sop/boolean_solsol_subtract.png]
+        Removes the shared volume(s) from one or both inputs.
+
+Shatter |
+    :fig:[Image:/images/nodes/sop/boolean_solsol_shatter.png]
+        Like a combination of Intersect and Subtract: cuts along the intersections between the surfaces of the solids to carve out new shapes.
+
+Seam |
+    :fig:[Image:/images/nodes/sop/boolean_solsol_seam.png]
+        Outputs polyline(s) where the surfaces of the two solids intersect.
+
+
+=== Solid/Surface boolean operations ===
+
+Before |
+    :fig:[Image:/images/nodes/sop/boolean_solsurf_before.png]
+        To illustrate boolean operations between a solid and a surface, we'll use a simple box and a corner.
+
+Union |
+    :fig:[Image:/images/nodes/sop/boolean_solsurf_union.png]
+        Combines the solid with _double walls_ around parts of the surface outside the solid's volume.
+        
+        Note that the open surfaces become double-walled, or what you might think of as "solids with zero volume" and overlapping points. In the image on the right, the parts of the "corner" outside the cube are now double-walled with double points at each corner (see the schematic views below).
+        
+        This is a logically consistent outcome given how the node sees the interaction between solids and surfaces, but it can be surprising if you don't expect it. You might be able to use this geometry for what you want, but in general this operation is not very useful.
+
+Intersect |
+    :fig:[Image:/images/nodes/sop/boolean_solsurf_intersect.png]
+        Trims away any parts of the surface that are exterior to the solid.
+
+Subtract |
+    :fig:[Image:/images/nodes/sop/boolean_solsurf_subtract_aminusb.png]
+        Subtracting a surface from a solid creates _double-walled_ cuts in the solid where it intersects the surface.
+        
+        If the surface goes "all the way through" the solid, this is like shattering, where the surface cuts the solid into disconnected pieces. However, if (as on the right) the surface doesn't fully intersect the solid, it "cuts out" a zero-width shape from the solid, leaving double walls with double points at the corners (see the schematic views below).
+        
+    :fig:[Image:/images/nodes/sop/boolean_solsurf_subtract_bminusa.png]
+        Subtracting a solid from a surface trims any parts of the surface that are inside the solid.
+
+Shatter |
+    :fig:[Image:/images/nodes/sop/boolean_solsurf_shatter.png]
+        Like a combination of Intersect and Subtract: carves out the intersections into new shapes.
+        
+        If the surface goes "all the way through" the solid, the surface cuts the solid into disconnected pieces. However, if the surface doesn't fully intersect the solid, it "cuts out" a zero-width shape from the solid, leaving double walls with double points at the corners (see the schematic views below).
+
+Seam |
+    :fig:[Image:/images/nodes/sop/boolean_solsurf_seam.png]
+        Outputs polyline(s) where the surface intersects the solid.
+
+
+=== Surface/Surface boolean operations ===
+
+Before |
+    :fig:[Image:/images/nodes/sop/boolean_surfsurf_before.png]
+        To illustrate boolean operations between surfaces, we'll use two corner shape. The two shapes have an overlapping surface (in the top right) as well as an intersection (bottom).
+
+Union |
+    :fig:[Image:/images/nodes/sop/boolean_surfsurf_union.png]
+        Combines coincident surfaces, and combines intersecting parts of the two surfaces.
+
+Intersect |
+    :fig:[Image:/images/nodes/sop/boolean_surfsurf_intersect.png]
+        Only retains coincident surfaces.
+
+Subtract |
+    :fig:[Image:/images/nodes/sop/boolean_surfsurf_subtract_aminusb.png]
+        Removes coincident surfaces, and creates double-sided cuts along intersections.
+
+Shatter |
+    :fig:[Image:/images/nodes/sop/boolean_surfsurf_shatter.png]
+        Like a combination of Intersect and Subtract: carves out intersections, and retains coincident surfaces as new shapes.
+
+Seam |
+    :fig:[Image:/images/nodes/sop/boolean_surfsurf_seam.png]
+        Outputs polygons for coincident surfaces, and polylines where the surfaces intersect.
+
+
+=== Schematic views ===
+
+This table shows more schematic illustrations of the various operations, which attempts to clarify some aspects of the various outputs that are invisible in the viewport. Double-walls are represented as having thickness, and multiply-connected points are represented as dots.
+
+||
+    Solid/Solid ||
+        Surface/Surface ||
+            Solid/Surface ||
+
+Union ||
+    [Image:/images/nodes/sop/boolean_ss_union.png] |
+        [Image:/images/nodes/sop/boolean_oo_union.png] |
+            [Image:/images/nodes/sop/boolean_so_union.png]
+
+Intersect ||
+    [Image:/images/nodes/sop/boolean_ss_intersect.png] |
+        [Image:/images/nodes/sop/boolean_oo_intersect.png] |
+            [Image:/images/nodes/sop/boolean_so_intersect.png]
+
+A - B ||
+    [Image:/images/nodes/sop/boolean_ss_aminusb.png] |
+        [Image:/images/nodes/sop/boolean_oo_aminusb.png] |
+            [Image:/images/nodes/sop/boolean_so_aminusb.png]
+
+B - A ||
+    [Image:/images/nodes/sop/boolean_ss_bminusa.png] |
+        [Image:/images/nodes/sop/boolean_oo_bminusa.png] |
+            [Image:/images/nodes/sop/boolean_so_bminusa.png]
+
+Shatter ||
+    [Image:/images/nodes/sop/boolean_ss_shatter.png] |
+        [Image:/images/nodes/sop/boolean_oo_shatter.png] |
+            [Image:/images/nodes/sop/boolean_so_shatter.png]
+
+
+== Custom == (custom)
+
+For solid models with "overlapping" or "concentric" surfaces (for example, boxes within boxes, or geometry with self-intersections), you can use the "Custom" operation to extract only the solid area at a certain "depth" (with respect to either or both inputs).
+
+The "depth" of any point inside the solid is measured as the minimum number of surfaces you'd have to cross to get outside the model.
+
+:fig: [Image:/images/nodes/sop/boolean_depth.svg]
+    In this illustration, a model with three concentric boxes (gray) is combined with a single-level box (green). The numbers in the illustration show the "depth" of each volume. So, if you set the custom range to `4-9999`, the output would only contain the dark-gray square in the center.
+
+:fig: [Image:/images/nodes/sop/boolean_custom2.svg]
+    #display: left
+    
+    In this illustration, a single model has a two self-intersections, creating a nested space inside. Setting the custom range to `2-9999` would delete the light grey parts and leave the dark grey box. The Custom operation can be useful for removing the "outer layers" to get at these kinds of spaces inside.
+
+
+== Detect == (detect)
+
+This mode passes through the first input geometry, but adds optional [groups|/model/groups] and/or [attributes|/model/attributes] containing the intersecting polygons. This lets you create effects using the intersecting polygons.
+
+
+== Resolve == (resolve)
+
+This mode is used for internal testing and is probably not generally useful, except possibly as a quick tetrahedralize. It outputs the raw triangulated mesh from an intermediate step in the node's algorithm, equivalent to the union of all polygons as surfaces. The polygons may have inconsistent orientations.
+
+
+== Tips and notes == (tips)
+
+* In the parameters you specify whether an input is a "solid" or "surface" (zero-width). If you specify that an input is "solid", you need to make sure it's a _good_ solid.
+
+    * In general solids should be closed and airtight (but see below).
+    
+    * Solids should have _all normals pointing outward_ (consistent polygon winding directions). You can turn on display of normals in the viewport to check for inverted or double-layered polygons.
+
+        [Image:/images/nodes/sop/boolean_orig_ghost.png]
+
+    * Solids should not have _non-manifold_ edges (that is, they should have no edges shared by more than two polygons, like a T junction).
+
+    If the node encounters non-manifold edges or inconsistent normals, it _will_ do _something_ with the geometry, but it might not be what you wanted (the problems can give the algorithm the wrong idea of what's "inside" and "outside"). In these cases the node will show a warning explaining what created the ambiguity. You can read the warning in the [node info window|/network/nodes#info]. The warning includes a group spec specifying the problem polygons.
+
+* It is possible to use open surfaces as solids as long as this does not create logical contradictions. For example, no unshared edge of a mesh treated as solid can cross the interior of that or any other solid.
+
+    If you try to use an open surface as a solid and it creates inconsistencies, the node will highlight the problem boundary edges in red.
+
+* You can turn off visualization guides when the node is active. Right-click in the viewport or click the Boolean icon on the left side of the operation toolbar (at the top of the viewer), and turn off visualization options in the menu.
+
+* There are different ways to visualize connectivity after the boolean operation:
+
+    * Use the [group list|/basics/select#groups] with the Select tool in the viewport to highlight disconnected parts as you move the mouse over them. This doesn't require modifying the network.
+
+    * Use an [Assemble node|Node:sop/assemble] to give the polygons of each disconnected piece a common `name` attribute value, then use a [Color node|Node:sop/color] or [color visualizer|/visualizers/color] with the "Random color by attribute" option to color the polygons based on the `name` value:
+
+        [Image:/images/nodes/sop/boolean_color_pieces.png]
+    
+    * Use an [Exploded View node|Node:sop/explodedview] to move the parts away from each other.
+
+* You can connect two polygonal geometries to the node's two inputs, or connect one input and operate on different groups using the Set A __Group__ and Set B __Group__ parameters.
+
+    If you connect only one input and leave Set A and Set B groups blank, the boolean operation applies to the model _with itself_. You can use this with Shatter to separate the model along its self-intersections. The other boolean operations are logically consistent (union and intersect pass everything through, subtract deletes everything) but not very useful.
+
+* This node _interpolates_ point/vertex attributes and _copies_ primitive attributes.
+
+* It's usually not worth trying to align edges on the two models for aesthetic purposes. For example, trying to put a cutting plane _exactly_ on the equator of a sphere. Due to tiny numeric precision errors, the two edges can look lined up even zoomed in but technically have a gap between them according to the computer. Boolean will [automatically clean up|#collapsetinyedges] tiny polygons created by this kind of mis-alignment.
+
+* Red dots in the node's visualization show problem areas, such as microscopically tiny polygons in the output.
+
+* If you're doing highly complicated procedural booleans, for example with extremely fine details/differences between surfaces (as opposed to using booleans for visual modeling), it's possible to get unintended results if you follow a boolean with another boolean, because [precision issues|Fold:1] can cause microscopic self-intersections in Boolean's output.
+
+    You can try turning off __Assume seam polygons are flat__ on the upstream Boolean node. If that doesn't work, set __Detriangulate__ to "Only unchanged polygons". These settings leave more triangles in the output but might fix the self-intersection.
+
+:box: Precision issues
+    #fold: 1
+    
+    Because of floating point precision issues, non-triangular polygons are almost always technically non-planar (unless they lie on an axis), so this node first triangulates the input geometry so it can reason with perfectly-flat polygons. Then at the end it "de-triangulates" the polygons it divided (unless you set __Detriangulate__ to "No polygons").
+    
+    This triangulation introduces a crease in the middle of what is for practical purposes a "flat" polygon, and even after de-triangulating the output, the polygon will an extra point where the crease was. This can be annoying to work with. So when __Assume seam polygons are flat__ is on, the node removes the extra point as well.
+    
+    The issue is that Boolean works internally at arbitrary precision, when it generates output it has to "snap" the points of the arbitrary precision geometry to the lower precision of hardware floating-point numbers. This might cause points that were separate at arbitrary precision to overlap at floating-point precision, creating incredibly tiny self-intersections. This is especially true when the node removes points on "practically flat" polygons because __Assume seam polygons are flat__ is on.
+
+
+@parameters
+
+~~~ Set A ~~~
+
+Group:
+    #id: agroup
+    
+    Use a subset of the first input as the "A" object.
+
+Treat As:
+    #id: asurface
+
+    Whether to treat this geometry like the boundary of a solid object, or as a flat surface with no interior or exterior.
+
+Remove self-intersections:
+    #id: resolvea
+    
+    Automatically fix the model if it has any crossing or overlapping surfaces. Some operations require non-intersecting geometry and so will ignore this setting and always resolve.
+
+
+~~~ Set B ~~~
+
+Group:
+    #id: bgroup
+    
+    Use a subset of the second input as the "B" object. If only one input is connected, this refers to a group from the first input instead. This lets you operate on two groups from the same geometry.
+    
+Treat As:
+    #id: bsurface
+    #contentfrom: #asurface
+
+Remove self-intersections:
+    #id: resolveb
+    #contentfrom: #resolvea
+
+
+~~~ Output geometry ~~~
+
+Operation:
+    How to combine/modify the inputs. See [Operations|#ops] above.
+
+The following parameters appear when __Operation__ is a boolean operation (Union, Intersect, Subtract, or Shatter).
+
+Detriangulate:
+    #id: detriangulate
+    
+    Internally, this node converts the input geometry to triangles. This controls whether to convert the triangulated geometry back to N-gons matching the originals for output.
+
+    All Polygons:
+        Merge neighbouring triangles originating from the same input polygon back together.
+    
+    Only Unchanged Polygons:
+        If an input polygon is cut as part of the operation, keep it as triangles. Otherwise put triangulated polygons back together.
+
+    No polygons: 
+        Output the triangulated geometry.
+
+Assume seam polygons are flat:
+    #id: removeinlinepoints
+    
+    Most "flat" polygons are not technically flat because of floating-point precision issues. This ignores those kinds of differences when de-triangulating the output. The default (on) is fine in almost all cases, but you may want to turn this off if you are doing procedural booleans on geometry with extremely fine detail/separation between surfaces. Turning this off will result in more triangles in the output.
+    
+    See the [tips and notes|#tips] above for more information.
+    
+Unique Points Along Seams:
+    #id: uniqueseams
+    
+    Cut the output surface into separate polygons along the seams, with each polygon on either side of the seam having its own copy of each seam point. You can use this to prevent blending point attributes across seams in the output.
+
+Collapse tiny seam-adjacent edges:
+    #id: collapsetinyedges
+    
+    Even if you try very hard to align edges on the two models you are combining, tiny numeric precision errors can (and usually will) cause the edges to be microscopically mis-aligned, creating extra edges in the output. When this option is on, the node intelligently fuses these tiny edges away. You should not turn this off unless you really know that you want microscopically thin polygons for some reason.
+    
+    [Image:/images/nodes/sop/boolean_tinyedges.svg]
+
+Edge length threshold:
+    #id: lengththreshold
+    
+    When __Collapse tiny seam-adjacent edges__ is on, edges this length or smaller are automatically fused in the output.
+
+The following parameters appear when __Operation__ is "Custom".
+
+A Depth Min/Max:
+    #id: adepth1
+    
+    Range of depths in A for the generated result. For example you
+    can use range 1..1000 to cover the interior of A (1000 being
+    just a large upper bound), or use -1000..0 to cover the
+    exterior of A, or use 1..1 to cover the interior of A but
+    excluding any regions that is multiple levels deep. 
+
+B Depth Min/Max:
+    #id: bdepth1
+    
+    Similar to A depth but measured relative to B. 
+
+Output Pieces Matching:
+    #id: windingop
+    
+    Specifies whether the range requirement for the generated pieces
+    must conform to the given range for A, B, both, or exactly one 
+    of the two.
+
+Merge Adjacent Pieces:
+    #id: mergenbrs
+    
+    If toggled on, the generated solid pieces that share a wall, 
+    across which, for example, the A depth changes by one within the
+    given range, are merged into a single solid result, as opposed to
+    being generated as separate solids. 
+
+The following parameters appear when __Operation__ is "Seam".
+
+Generate A-A seams:
+    #id: generateaaseams
+    
+    Output polylines representing the seams where A intersects itself.
+
+Generate B-B seams:
+    #id: generatebbseams
+    
+    Output polylines representing the seams where B intersects itself.
+
+Generate A-B seams:
+    #id: generateabseams
+    
+    Output polylines representing the seams where A intersects B.
+
+The following parameters appear when __Operation__ is "Detect".
+
+AxA Polygons:
+    #id: axapolys
+    
+    Creates a group in the output containing polygons involved in self-intersections in A.
+
+AxB Polygons:
+    #id: axbpolys
+    
+    Creates a group in the output containing polygons from A that intersect B.
+
+AxA List:
+    #id: axalist
+    
+    Creates an _attribute_ on A polygons containing an array of primitive numbers from A that intersect the polygon.
+
+AxB List:
+    #id: axblist
+    
+    Creates an _attribute_ on A polygons containing an array of primitive numbers from B that intersect the polygon.
+
+
+~~~ Output Primitive Groups ~~~
+
+Turn on the checkbox next to a group to have the node create that group in the output geometry.
+
+The node only creates these groups for the boolean operations (Union, Intersect, Subtract, Shatter, and Custom).
+
+A inside B:
+    #id: ainsideb
+    
+    Create a group containing polygons from A that are enclosed by B.
+
+A outside B:
+    #id: aoutsideb
+    
+    Create a group containing polygons from A that are exterior to B.
+
+B inside A:
+    #id: binsidea
+    
+    Create a group containing polygons from B that are enclosed by A.
+
+B outside A:
+    #id: boutsidea
+    
+    Create a group containing polygons from B that are exterior to A.
+
+
+~~~ Output Edge Groups ~~~
+
+Turn on the checkbox next to a group to have the node create that group in the output geometry.
+
+The node does not output edge groups when __Operation__ is "Detect" or "Resolve".
+
+A-A seams:
+    #id: aaseamedges
+    
+    Create a group containing edges representing the seams where A intersects itself.
+
+B-B seams:
+    #id: bbseamedges
+    
+    Create a group containing edges representing the seams where B intersects itself.
+
+A-B seams:
+    #id: abseamedges
+    
+    Create a group containing edges representing the seams where A intersects B.
+
+
+@related
+
+- [Node:sop/clip]
+- [Node:sop/surfsect]
+- [Node:sop/break]
+

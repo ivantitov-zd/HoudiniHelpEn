@@ -1,0 +1,129 @@
+#type: node
+#context: dop
+#internal: gaswavelets
+#icon: DOP/gas
+
+= Gas Wavelets =
+
+"""A microsolver that performs a wavelet decomposition of a field."""
+
+The Gas Wavelets DOP is a microsolver used in building larger fluid
+simulations. The [Fluid Solver|Node:dop/fluidsolver] and [Smoke Solver|Node:dop/smokesolver] DOPs that allow
+microsolvers to be added before or after the main solver step to extend
+or tweak the simulation. Alternatively, enterprising people may attempt
+to build an entire new solver out of microsolvers.
+
+The Gas Wavelets DOP performs a wavelet transform on a field. 
+
+One pass of a 1D wavelet transform takes a waveform of N samples and
+turns it into two waveforms of N/2 samples.  The first waveform
+represents a coarser view of the original waveform.  The second
+waveform stores the detail lost in the coarse representation.  This
+process can then be repeated on the coarse samples to construct a
+pyramid of detail waveforms.
+
+One pass of a 3d wavelet transform is very similar.  A volume with
+NxNxN voxels is turned into an average volume of N/2xN/2xN/2 samples
+and seven detail volumes of N/2xN/2xN/2 samples.
+
+Rather than output the resulting pyramid of volumes as separate
+fields, they are all packed into the original field.
+
+The Gas Wavelets DOP can take a packed field and perform the inverse
+transform to turn it back into the original field. 
+
+@parameters
+    Dest Field:
+	The field to store the result into.  Must be the same type
+	(scalar, vector, matrix) as the source field.
+
+    Source Field:
+	The field to apply the wavelet operation to.  Can be any of
+	scalar, vector, or matrix fields.
+
+    Mode:
+	The type of wavelet transform to perform.
+
+	    Transform:
+		The source field is the original field.  The
+		destination field becomes a packed representation of
+		the wavelet pyramid for this field.
+
+	    Invert:
+		The source field is a packed wavelet pyramid.  This is
+		then transformed back into the same type as the
+		original field.
+
+	    Compute Power:
+		The sum of squares of the detail coefficents on the
+		given level of the packed wavelet pyramid is computed
+		and stored into the destination field.  The
+		destination field will be resized so a spatial
+		sampling of the field will give an estimate of the
+		energy in that octave of the power spectrum.
+
+	    Extract Component:
+		Extracts one of the wavelet vectors from the packed
+		represenation and unpacks it into the destination
+		field.  The destination field will be resized
+		so a spatial sampling of the result should compare
+		with the original volume.
+
+    Wavelet:
+	The type of wavelet transform to perform.  This controls how
+	the waveform is split into average and detail components.
+
+	    Haar:
+		The average components are 1/sqrt(2) of the average of
+		pairs of the source signals.  The detail are 1/sqrt(2)
+		of the difference of the same pairs.  If the signal
+		isn't a multiple of two, the missing detail vector is
+		assumed to be zero.  The packed representation will
+		have ceil(N/2) entries in the averages and floor(N/2)
+		in the detail components with the zero detail
+		component omitted.
+
+    Limit Passes:
+	Normally the entire wavelet pyramid is built by repeatedly
+	applying the transform until reduced to a 1x1x1 volume.
+	For a minor efficiency improvement you can limit the transform
+	to those levels you are interestd in.  More importantly, the
+	average detail vector of a given level is replaced by the next
+	level's decomposition, so if one wants to extract this
+	component one must limit the pyramid accordingly.
+
+    Max Passes:
+	How many wavelet passes to perform.  Only used in Transform
+	and Invert modes.  To perform a proper inversion of a wavelet
+	pyramid, the number of passes must match that which it was
+	constructed with.
+
+    Level:
+	When Computing the Power or Extracting a Component, the level
+	controls which level of the pyramid will be computed or
+	extracted.  0 refers to the first level which has the resultof
+	the first pass of the wavelet transform.
+
+    Component:
+	Which of the eight wavelet coefficients to extract in Extract
+	Components mode.  0 corresponds to the average vectors which
+	only will be valid of the transform was limited to the given
+	level.  One through Seven correspond to the tensor products of
+	the X, Y, and Z wavelet functions with the bit field of one to
+	seven used to determine which products are used.  X is bit 0,
+	Y bit 1, and Z bit 2.
+
+    [Include:standard_solver_parms]
+
+@inputs
+    [Include:standard_data_inputs]
+
+@outputs
+    [Include:standard_data_outputs]
+
+@locals
+    [Include:standard_data_locals]
+
+    [Include:standard_locals]
+
+

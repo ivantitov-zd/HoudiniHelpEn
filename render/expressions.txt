@@ -1,0 +1,73 @@
+= Expressions in file names =
+#bestbet: filename
+
+"""How to use variables and expressions in file path fields to generate numbered and unique filenames."""
+
+== Overview ==
+
+You can insert expressions into file name parameters that Houdini will evaluate when it goes to read or write the file. The most common use for this is to include `$F` in the render output filename so each frame's output file is numbered and the output files don't overwrite each other.
+
+For example, `mine$F.pic` produces filenames `mine1.pic`, `mine2.pic`, `mine3.pic`, and so on.
+
+Note that if you need to "protect" the variable from surrounding letters, you can use the form `${F}`. For example, if you want an `F` after the frame number, you can't use `frame$FF.pic`, because `$FF` is a variable name. In this case, you would use `frame${F}F.pic`, which would give you `frame1F.pic`, `frame2F.pic`, and so on.
+
+== Useful variables ==
+
+`$F` |
+    Current frame number.
+`$FF` |
+    Current fractional frame number. This comes into play when Houdini is calculating sub-frame motion for motion blur.
+`$N` |
+    Number of input/output files counter. This is not related to the frame number. It's the number of frames Houdini has read/written/rendered so far, when it processes multiple files.
+    
+    For example, if you render frames 10-15, `$N` will be 1, 2, 3, 4, 5.
+`$T` |
+    Current time.
+`$SF` |
+    Current simulation timestep number. For saving files in dynamics simulations, such as simulation state, use `$SF` instead of `$F`. For each value of `$F`, a simulation may calculate several substeps, so if you use `$F` you may have several sub-frames overwrite the same file. `$SF` is equal to $ST (simulation time) divided by $TIMESTEP (simulation time step size).
+`$ST` |
+    Current simulation time.
+`$OS` |
+    Current node name.
+
+When rendering *fields*, the integer frame number ($F) for both frame 5.0 and 5.5 will 5. Therefore, to have unique filenames, use $N or $FF instead. The disadvantage of using $FF is possible binary-to-decimal arithmetic errors causing $FF to have a value like 31.99999. The disadvantage of using $N is that it not related to frame numbers, it only counts the number of frames rendered. So if you render frames 1-10, and then render 11-20, the second batch would overwrite the first.
+
+== Leading zeros ==
+
+To generate leading zeros before the frame number, put a non-zero digit after $F. This will generate frame numbers with that many digits. For example, `mine$F3.pic` produces filenames `mine001.pic`, `mine002.pic`, `mine003.pic`, and so on.
+
+You can also use the `padzero` expression function, see below.
+
+== Advanced expressions ==
+
+For anything beyond simple variable substitution, you can enclose a full expression inside backticks.
+
+For example, you may want the filename to increment with the frame number, but be offset by a certain number. You can use a filename with an embedded expression inside backticks like
+
+{{{
+MyImage`$F+12`.pic.
+}}}
+
+This will number the files by the current frame number + 12. This produces filenames `MyImage13.pic`, `MyImage14.pic`, `MyImage15.pic`, ...
+
+You can use expression functions within the backquoted expression, such as [Exp:padzero].
+
+{{{
+frame`padzero(5, $F)`.pic
+}}}
+
+...giving you filenames `frame00001.pic`, `frame00002.pic`, `frame00003.pic`, and so on.
+
+== Tips ==
+
+- To store images in directories based on image resolution, use a path like `Pics${W}x${H}/$F.pic`.
+
+- To include the name of the current operator in a filename (for example, in the name of a Z-depth map you want to include the name of the light in the filename), use `$OS`. For example, `$OS_$F.pic` produces filenames `light1_1.pic`, `light1_2.pic`, `light1_3.pic`, ...
+
+- Do not use a hyphen to separate the frame number from the name (for example `frame-$F.pic`). MPlay will interpret the resulting filenames (`frame-1.pic`, `frame-2.pic`, `frame-3.pic`, and so on) as containing _negative frame numbers_ (-1, -2, -3, ...).
+
+- Avoid using spaces in filenames. Although most operating systems support them, many software packages (including Houdini!) sometimes assume that filenames don't have spaces, and this can cause a lot of trouble. Use CamelCase or under_scores instead.
+
+
+
+

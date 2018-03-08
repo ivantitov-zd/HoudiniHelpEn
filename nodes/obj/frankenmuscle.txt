@@ -1,0 +1,158 @@
+#type: node
+#context: obj
+#internal: frankenmuscle
+#icon: OBJ/frankenmuscle
+
+
+= Franken Muscle =
+
+"""Creates a custom muscle by combining any number of geometry objects, muscle rigs, and muscle pins."""
+
+The Franken Muscle object, like a common Muscle object, is made of two primary components: the muscle geometry and the muscle rig.
+
+The muscle geometry can be derived from any geometry operator in Houdini. Optionally, multiple geometry sources can be incorporated into this single muscle.  Any and all geometry surfaces included as sources will be first converted to a volume, merged, re-surfaced, and made solid to form the franken muscle geometry component.
+
+The rig component is made up of a merged collection of external [Icon:OBJ/musclerig][Muscle Rigs|/nodes/obj/musclerig] and [Icon:OBJ/musclepin][Muscle Pins|/nodes/obj/musclepin]. 
+
+While the geometry components of a franken muscle are internalized and modified somewhat, the rig components remain as distinct entities.  
+Interacting with handles, or tension parameters, or Jiggle qualities, etc. is all accomplished via the sourced muscle rigs and muscle pins directly.  The franken muscle only serves to bring all the components together to produce a valid muscle within the muscle system.
+
+Existing muscles can be used both as sources for geometry and as rigs.  For example, you can merge together multiple existing muscles to create a single new muscle with this tool.  A more typical scenario, however, is where you will provide a custom model and that you will want to control with muscle rigs and muscle pins.
+
+NOTE:
+    The geometry used to build your franken muscle should be derived from a non-animated source.  The geometry and any of its attributes must be static and unchanging over time.  If a time-dependent model is referenced, this will cause the franken muscle to rebuild itself every time it is cooked.
+
+
+For viewport tool information see: [Icon:OBJ/frankenmuscle][Franken Muscle|/shelf/muscle_frankenmuscle].
+
+@parameters
+
+
+Muscle ID:
+[Include:/nodes/obj/riggedmuscle#muscleid]
+    
+== Geometry ==
+
+These parameters affect the construction of the geometry component of the franken muscle. 
+A franken muscle can be used in either FEM dynamics workflows, where a solid tetrahedral mesh is required, or in non-FEM deformer workflows where only surface geometry is required. Therefore, a franken muscle can produce both a tetrahedral solid and surface geometry.
+
+Bypass Solid Embedding:
+    This parameter bypasses the conversion of the muscle geometry into a solid tetrahedral mesh.  In non-FEM workflows, where the [Icon:OBJ/muscledeform][Muscle Displace|/shelf/muscle_displace] tool is used, only the muscle surface geometry is required.  By enabling this toggle, the extra processing required to create a solid will be avoided.
+    If this franken muscle is used in an FEM workflow, the [Icon:OBJ/tissuesolver][tissue solver|/shelf/tissue_solver] will disregard the state of this toggle and fetch the tetrahedral solid regardless.
+    
+Cap Open Meshes:
+    If polygonal surfaces are are not water-tight, this toggle can be used to ensure a Poly Cap step is performed prior to solidifying.
+    
+Remove Stray Pieces:
+    In the conversion process of your surface geometry into a solid, situations may arise where some finer details of your geometry are not large enough to be fully resolved by the solidification parameters below.  This can lead to the creation disconnected fragments of franken muscle geometry.  If this occurs, you have the option to reduce the __Initial Voxel Size__ or __Iso Divisions__ to attempt to capture finer details in your source geometry.  This, of course, may come with a greater expense in processing time and memory.  Or, by use of this toggle, fragments with smaller surface area will be discarded.
+    
+Reverse Normals:
+    In order for the [Icon:OBJ/muscledeform][Muscle Displace|/shelf/muscle_displace] tool to function properly, surface normals on the sourced geometry must be oriented correctly (ie, outwards relative to the muscle center).  Use this toggle in situations where the surface normals of your geometry sources are pointing inwards towards the muscle centers.
+    
+==== Tet Mesh ====
+
+These parameters set the resolution and scaling options for the __Solid Embedding__ step within this muscle asset.
+For detailed help on these individual parameters, see the [Solid Conform SOP|Node:sop/solidconform].
+
+== Geometry Sources ==
+
+These parameters specify the Houdini objects and SOPs that provide the franken muscle with its surface geometry.
+
+==== Stashed Source Geometry ====
+
+Use Stashed Geometry:
+    Use the local internal copy of the source surface geometry if it was previously stashed (stored).
+    
+Stash Geometry:
+    Activate this button to store a local internal copy of the referenced source geometry.   Once a stashed copy has been created, the franken muscle can be made independent of the original source geometry.
+    
+Clear Stashed Geometry:
+    The internal local copy of the surface geometry can be cleared using this button.  Once cleared, the franken muscle asset will then resort to using the path specifications below to find its sources.  
+    
+==== Live Source Geometry ====
+
+The following parameters are promoted from the [Object Merge SOP|Node:/sop/object_merge] contained within the franken muscle.  For additional detailed help, please see [Object Merge|Node:/sop/object_merge].
+
+
+Number of Objects:
+    The number of source surface operators to include in this franken muscle.
+    
+Enable Merge:
+    The parameter path directly below this toggle can be included or disregarded using this switch.
+    
+Geometry Path:
+    Specify the path to a surface operator (SOP) to supply the franken muscle with a geometry source.
+
+Group:
+    The optional primitive group to extract from the __Geometry Path__ specified above.
+    
+Expand Group:
+    Adds neighboring primitives to the selected __Group__.
+    
+== Rig Sources ==
+
+These parameters specify the __Muscle Rigs__ and __Muscle Pins__ to include in this franken muscle.  Control of the rig behavior remains with the referenced muscle rigs. 
+
+Display All Rig Sources:
+    Convenience toggle that will turn on or turn off the display of all the referenced rig components.
+    
+Add or Remove Rigs:
+    Use this button to enter the viewport into a selection state where you can include or exclude muscle rigs to form the reference list below.
+    
+Number of Rigs:
+    The number of rig paths you would like to include.
+    
+Muscle Rig Path:
+    The path to the __Muscle Rig__ or __Muscle Pin__ that you would like to include as a controller rig for this franken muscle.  The path may be absolute or relative, but must point to the object level muscle asset.
+    TIP:
+        A __Muscle__ object can also be referenced as a valid source for a __Muscle Rig__. 
+        
+== Capture/Deform ==
+
+Whether a Franken Muscle is constructed as a solid or as a surface, the geometry undergoes a Capture and Deform series of steps to take the constructed muscle from it's static pose into the animated or live position as dictated by the referenced muscle rigs.
+The capture pose is subsequently an important aspect of a franken muscle's configuration as it establishes the relationship between the geometry and rig components.  The capture pose is comprised of the geometry in it's initial static referenced position, and each of the rig components in their respective capture pose.
+
+Edit Capture Pose (All Rig Sources):
+    When active, the franken muscle will be displayed in its __Capture Pose__.  All component geometry and muscle rigs will be displayed in their respective capture pose or setup positions.  
+    When franken muscle are displayed in the __Capture Pose__, they can easily be distinguished from their "live" state by their appearance. The muscle geometry will be displayed as its merged constituent parts, the coloring will turn blue, and the rig handles will change from the being "round" to being "boxy". 
+    
+    Handles can be manipulated in the viewport when this mode is active, and thus the __Capture Pose__ can be modified.  
+    
+==== Biharmonic Capture Mesh ====
+
+Capture weighting applied to the geometry is computed via biharmonic capturing.  For additional help on biharmonic weighting see [Bone Capture Biharmonic|Node:/sop/bonecapturebiharmonic] and [Bone Capture Lines|Node:/sop/bonecapturelines].
+
+Display Guide:
+    Enabling this toggle will display a guide geometry that represents the resolution and shape of the tetrahedralized capture mesh.
+    
+Capture Triangle Size:
+    The construction of the capture mesh is reliant on this size parameter.  This size parameter is expressed as a relative scale proportional to the overall enclosing volume surrounding the franken muscle geometry.  Use smaller values to preserve more capture weight detail when muscle rigs are situated closer to each other. Coarse capture triangle sizing can produce adequate results in most cases at a reduced computational expense.
+    
+Capture Smoothing:
+    Specifies the smoothing strength applied to the capture weight data prior to deforming the muscle geometry.
+    
+Capture Display Color:
+    The color applied to this franken muscle when displaying the capture pose.
+    
+
+== Dynamics ==
+
+Every muscle asset contains a local dynamics solver for the purpose of previewing the simulation effects of the physical properties.
+For detailed help on the simulation parameters, see the [Tissue Solver SOP|Node:sop/tissuesolver].
+
+Use Physical Simulation:
+    Enables the "preview" dynamics simulation of this muscle.  Activating this toggle will simulate the muscle using its physical properties.
+    The muscle build type is automatically set to Built-in Tet Mesh when this toggle is activated.  Dynamics simulation requires that the muscle be constructed as a tetrahedral mesh.
+    
+    NOTE:
+        This toggle will not affect how this muscle might be incorporated into an external Tissue Solver.  However, for more efficient run time performance, it is advised to leave this toggle "off" to avoid simulating a muscle independently as a preview at the same time as simulating the muscle as part of the larger tissue solve.
+
+
+== Display ==
+
+Display:
+    Use this toggle to control the display visibility of this muscle asset in the viewport and/or renderings.
+
+Color:
+    The color ramp applied to the franken muscle geometry from end to end (ie mapped from muscle pin and end anchor positions along the lengths of the individual muscle rigs).
+    

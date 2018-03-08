@@ -1,0 +1,198 @@
+#type: node
+#context: dop
+#internal: volume
+#icon: DOP/volume
+
+= SDF Representation =
+
+""" Creates a signed distance field representation of a piece of
+geometry that can be used for collision detection. """
+
+The SDF Representation DOP creates a signed distanced field from
+a piece of geometry. A signed distance field (SDF) is a function over
+space which evaluates to the distance to the surface of the object. 
+
+If the point is outside the object, the distance is positive, if inside, it
+is negative. This allows fast inside/outside testing at the expense of
+initial precomputation and memory usage.
+
+This data must be attached to a piece of geometry data for Houdini to
+use it for collision detection. Houdini uses the parent geometry data to
+create the SDF.
+
+If a Geometry data is attached as subdata to this, it will be used
+rather than the parent data for the geometry creation.  This can be
+useful to override the behaviour with proxy geometry, or in the case
+of Volume Sample, specifying an explicit external volume file.
+
+@parameters
+
+    == Data Options ==
+
+        Mode:
+	    Ray Intersect:
+		Use ray intersection with the geometry to create an
+		accurate volumetric representation of the geometry.
+	    Meta Balls:
+		Instead of using rays to determine if points are inside or
+		outside, evaluate the metaball field.  
+		
+		This should be used
+		with __Laser Scanning__ turned off on geometry that consists
+		solely of metaballs.
+	    Implicit Box:
+		Calculate the bounding box for the geometry, and create a
+		volumetric representation that precisely fills that bounding
+		box.
+	    Implicit Sphere:
+		Calculate the bounding sphere for the geometry, and create
+		a volumetric representation that precisely fills that
+		bounding sphere.
+	    Implicit Plane:
+		Calculate the bounding box for the geometry, and create a
+		volumetric representation that divides that box along its
+		smallest axis. Everything below that plane is considered
+		inside, and everything above is outside. 
+		
+		This mode is primarily useful for creating ground planes or immovable
+		walls.
+
+	    Minimum:
+		Use the distance to the surface or curve.  If the Offset
+		Surface is 0, no volume will be made.  A positive offset
+		surface will create just that - an offset volume around
+		the object's surface.  This is useful for turning thin
+		objects or wires into actual solids.
+	    Volume Sample:
+		The divisions are ignored in this mode, instead they are
+		computed from the first volume or VDB primitive in the geometry.
+		The computed divisions are chosen to match the voxel
+		size of the source volume.
+		The volume primitive is sampled raw and treated as a
+		signed distance field.  The assumption is that the source
+		is the output of an [Iso Offset|Node:sop/isooffset] or
+		[VDB From Polygons|Node:sop/vdbfrompolygons] SOP.  If it isn't a true
+		signed distance fields, unusual things may happen with RBD
+		collisions.
+	    Height Field:
+		The volume primitive is treated as a 2d heightfield
+		storing the world-distance heights above the center
+		of the volume in each voxel.  Distances are always
+		computed orthographically, so are fast but are
+		not true distances.  Likewise, normal computation
+		will give the height direction, not the local
+		slope.
+        Divisions:
+            #channels: /div
+
+            Defines the resolution of the grid used to compute the SDF.
+            The SDF is computed within a bounding box slightly larger
+            than the geometry. The minimum feature size of the geometry
+            should thus be larger than the grid spacing or detail will
+            be lost.
+        Laser Scan:
+            In laser scan mode the SDF is built by sending rays along
+            the primary axes. Only the closest and farthest
+            intersections are used. The space between these two points
+            is classified as inside, and the rest outside.
+
+            The laser scan mode will work even with geometry which has
+            poorly defined normals, has a self-intersecting surface, or
+            isn't watertight. The disadvantage is that interior features
+            can't be represented as they are not detected.
+
+            When laser scanning is turned off, the SDF is still built
+            by sending rays along the primary axes. All intersections
+            are found, however. Each pair of intersections is tested to
+            see if the segment is inside or outside. This relies on the
+            normal of the geometry being well defined (ie: manifold, no
+            self-intersections), and the geometry being watertight.
+            Complicated shapes with holes can be accurately represented,
+            however.
+
+        Fix Signs:
+            Numerical imprecision can result in incorrect sign choices
+            even with the best made geometry. This option will cause the
+            SDF to be post-processed to look for inconsistent signs.
+            These are then made consistent, usually plugging leaks and
+            filling holes.
+
+            Turning off this option will reduce the time required to
+            construct an SDF but should only be done for cases where the
+            generated SDF is known to be problem free.
+
+        Force Bounds:
+            The Fix Signs method alone will smooth out, and usually
+            eliminate, sign inversions. However, it is possible for
+            regions with inverted signs to stabilize at the boundary of
+            the SDF. 
+            
+            This option will make Fix Signs less likely to
+            stabilize incorrectly by forcing all voxels on the boundary
+            to be marked as exterior.
+        Invert Sign:
+            This option will reverse the sense of inside and outside.
+            If one wants a hollow box, one method is to build one box
+            inside the other and not use Laser Scanning. 
+            
+            A more robust method is to just specify the inner box and use sign
+            inversion. This treats everything outside of the box as
+            inside, allowing the more robust Laser Scanning method to be
+            used.
+        Offset:
+            The offset parameter allows the volume to be expanded with
+            a positive value, or shrunk with a negative value. If the
+            volume is expanded, an object can be treated as if it were
+            slightly bigger during collisions.
+        Tolerance:
+            This specifies the tolerance used for ray intersections
+            when computing the SDF. This value is multiplied by the size
+            of the geometry and is scale invariant.
+	Sign Sweep Threshold:
+	    After the fix signs process is complete there can still be
+	    inconsistent areas in the SDF.  Large blocks can become
+	    stabilized and stick out of the SDF.  A second sign sweep pass
+	    can be performed to try to eliminate these blocks.
+
+	    The sign sweep threshold governs how big of a jump has to
+	    occur for a sign transition to be considered inconsistent.  If
+	    the values of the sdf change by more than this threshold times
+	    the width of the cell, it is considered an invalid sign
+	    transition.  The original geometry is then ray intersected to
+	    determine inside/outside and the result used to determine
+	    which sign is correct.  The correct sign is then propagated
+	    forward through the model.
+	Max Sign Sweep Count:
+	    The sign sweeps are repeated until no signs are flipped (ie,
+	    all transitions are within the threshold) or this maximum is
+	    reached.  Too low of a sign sweep threshold may prevent the
+	    process from converging.  Otherwise, it tends to converge very
+	    quickly.
+
+    == Guide Options ==
+
+        Show Guide Geometry:
+            Turn on this parameter to present a visual representation
+            of the SDF in the viewport. This can be very useful to help
+            find collision problems, as often they may be the result of
+            an insufficiently detailed SDF.
+        Color:
+            Use this parameter to select the color of the volume in the
+            viewport.
+    [Include:standard_data_parms]
+
+@inputs
+    [Include:standard_data_inputs]
+
+@outputs
+@locals
+    [Include:standard_data_locals]
+
+    [Include:standard_locals]
+
+
+@related
+    - [Node:dop/clothvolumecollider]
+    - [Node:dop/volumecollider]
+    - [Node:dop/wirevolumecollider]
+

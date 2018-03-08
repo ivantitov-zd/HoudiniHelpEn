@@ -1,0 +1,300 @@
+= Lights and shadows =
+
+
+== Overview ==
+
+In Houdini, if you don't have any lights in the scene, To be able to see anything in a render, you need to light the scene.
+
+Physically based rendering (PBR) realistically simulates light bouncing around the scene. Because it only lights surfaces that get hit by the bouncing light, it renders shadows "automatically". That is, you don't have to do anything to enable shadows -- they are a "free" byproduct of physically based rendering.
+
+With the older rendering engines (ray tracing and micropolygon rendering), shadows must be simulated as "extra work" by the renderer. With these engines you speed up rendering by turning off shadows wherever possible, and use "tricks" such as [shadow maps|#shadowmaps].
+
+See [how to use the light bank|lightbank] to control which objects cast shadows from various lights.
+
+While PBR rendering gives you shadows, reflections, irradiance, and so on "for free", the drawback of its stochastic nature is _noise_. See the [quality settings|quality#noise] page for how to decrease/mitigate noise in PBR renders.
+
+
+== Lights ==
+
+:task:Place lights in a specific location in the scene view:
+    # Click a light type on the __Lights and Cameras__ tab.
+        
+    # Move the cursor into the [scene view|/ref/views/3dview]. 
+        
+        You can hold ((Alt)) to detach the shape from the construction plane.
+            
+    # Click ((LMB)) to place the light anywhere in the [scene view|/ref/views/3dview]. 
+
+:task:Create a light based on the current view:
+    # Set up the view to look at what you want the light to "see" (cast light on).
+
+    # ((Ctrl)) click a light type on the __Lights and Cameras__ tab.
+        
+    # Use the handles or edit the values in the [parameter editor|/ref/panes/parms] to move the light to the desired location in the [scene view|/ref/views/3dview].
+        
+    [Image:/images/shelf/lightsandcameras_view.png]
+
+:task:Add environment lighting:
+    On the __Lights and cameras__ shelf tab, click the [Icon:OBJ/light_environment] Environment Light tool.
+    
+    You can use the [node's parameters|Node:obj/envlight] to specify a lighting map image.
+    
+    See [environmental lighting|#env] for more information.
+
+:task:Change light position and orientation:
+    You can select lights using the [Icon:TOOLS/select] object select tool and use the handles around the light to change its position and orientation.
+
+:task:Make a light follow an object:
+    # Create an object.
+
+    # Create a light.
+    
+    # Click __Look At__ on the [Modify shelf|/shelf/modify].
+    
+    # Select the object to look at and press ((Enter)).
+    
+    You can also make a light look at an object by setting it on the __Lookat Options__ tab on the __Transform tab__ of the [parameter editor|/ref/panes/parms].
+
+:task:Edit a spotlight's light cone:
+    Use the ((RMB)) right-click context menu to choose additional [light-specific handles|/basics/handles_camlights]: the _cone handle_ and the _frustum handle_.
+    
+    The cone handle changes the angle and spread of a spotlight's light cone. The frustum handle lets you set the near and far clipping planes and focal length of the light (for when the light performs like a camera, such as caching shadow information).
+
+:task:Use the view keys to quickly edit a light's viewpoint:
+    # Look through a light as described above. You can also choose a light to look through once it is created by choosing it in the [camera menu|/basics/view].
+        [Image:../images/ui/viewport_menus_anno.png]
+    
+    # Lock the light to the view by clicking the [Icon:VIEW/display_lock_camera] Lock camera/light to the view button, which is located on the toolbar on the right side of the view. You can also lock the light to view by by turning on __Tie Camera (or Light) to View__ in the camera menu.
+    
+    # Use the [tumble, track, and dolly|/basics/view] keys to move the light.
+    
+    # Unlock the light.
+
+:task:Emit light from objects:
+    Use [Geometry lights|/shelf/geolight] and [Volume lights|/shelf/volumelight] or materials with emission to make objects in the scene seem to emit light.
+
+== Enabling and disabling shadows ==
+
+:task:Make an object not cast shadows:
+    Use [shadow linking|lightbank] to control which objects cast shadows from which lights.
+    
+:task:Make an object cast shadows but not appear in the render (phantom object):
+    Turn on the __Phantom__ checkbox on the object's __Render__ tab.
+
+:task:Show shadow previews in the viewport:
+    Turn on the [Icon:VIEW/shadow_quality_high] Display shadows button in the display toolbar on the right side of the viewer.
+    
+    [Image:/images/light/viewportshadows.png]
+    
+    Shadow previews will introduce delays as Houdini calculates shadow maps for each light behind the scenes.
+    
+    You can also turn on __Projected Textures__ in the [display options|/ref/windows/displayopts_3d] for better quality.
+
+    You can also use the [Icon:TOOLS/render_region] Render Region tool and interactive render view pane to interactively see actual render shadows. The OpenGL shadows are approximations but are much faster to work with interactively.
+
+
+== Tips ==
+
+* Area lights (such as rectangles and spheres) and environment lights are very efficient to use with physically based rendering.
+
+* A typical lighting setup will have a key area light, a bounce area light, a fill light, and an environment light for reflections.
+
+* Area lights are the workhorses.
+
+* Because the renderer is simulating light physics, it's possible to set up intuitive interactions of light and geometry, reusing many techniques from real-world film lighting, such as colored light gels, [cucoloris|Wp:Cucoloris] or [gobo|Wp:Gobo_(lighting)] geometry, and bounce cards (though it's easier to just set up another area light), rather than trying to "trick" the renderer.
+
+* In ye olden tymes one might have tried to fake a street light through fog or God rays using shader tricks. However, with PBR it's much easier to actually set up a very powerful light and blast it through a very low resolution, very low density, brightly colored volume.
+
+* You may want to decide whether you're lighting for physically correct light conservation, or using linear "artistic" light. For absolutely physically correct light, you should turn __Normalize light intensity__ off, and set __Attenuation__ to "Physically correct".
+
+* You can also add texture maps to shape or color lights.
+
+* To get global illumination/irradiance, add an [Indirect light|Node:obj/indirectlight] and increase increase __Properties > Shading > Diffuse limit__ on the mantra node to let more light bounce into dark areas.
+
+* Secondary lighting can make a big difference to the appearance of a scene. 
+
+    The following image was rendered only using direct lighting:
+    
+    [Image:/images/render/pbr_direct.jpg]
+    
+    The following image was rendered using direct and indirect lighting:
+    
+    [Image:/images/render/pbr_indirect.jpg]
+    
+    There are two approaches to achieve indirect lighting using physically based rendering. You can either render long light paths using path tracing or cache indirect light to a photon map and then perform a final gather from the map.
+
+* If contact shadows are very problematic (too dark/noisy), you can try cheating by placing a dim area light under the object.
+
+* Always use the `.rat` format for Z-depth shadows and deep shadows generated for [mantra|Node:out/ifd]. The `.rat` format supports higher quality texture filtering and more efficient memory management than `.pic` files.
+
+* If you want a surface to avoid having shadows _cast upon it_ ("catching" shadows), you must write its surface shader with this in mind. Use the [isShadowRay|Vex:isshadowray] VEX function in the shader to tell when the renderer is calculating shadows.
+    
+* There are a few ways you can make opaque objects cast colored
+  shadows:
+
+  * Create two light sources parented to each other. Make one light cast shadows and other cast no shadows. Set the non-shadowing light to the shadow color, and the shadowing light to the shadow color's _complement_.
+
+    For example, to make a green shadow, set the non-shading light color to `0, 1, 0`, and the shadowing light color to `1, 0, 1`. The non-shadowing light will pass through the object.
+
+  * Create a custom shadow shader in VEX. You can query the color of the light before shadows are cast, compute the shadows, then blend between the original color and the shadow color.
+
+  * Modify the [surface shader|/shade] so the object becomes transparent only for shadows. This means the light passing through the surface will be _added_ to the shadow. So, it will appear the object is transmitting light.
+
+
+== Light types ==
+
+The following are brief descriptions of the different buttons on the __Lights and Cameras__ tab. Each light tool puts down the same [light|Node:obj/light] node, but with different specifications. However, the Ambient Light puts down an [Icon:OBJ/ambient][Ambient Light|/nodes/obj/ambient] node since its unique from the other five.
+
+[Icon:OBJ/light_point] |
+    *Point Light* |
+        Emits light from a point in all directions and is similar to a light bulb.
+        
+[Icon:OBJ/light_spot] |
+    *Spot Light* |
+        Radiates a cone shaped beam of light from a point in a certain direction.
+        
+[Icon:OBJ/light_area] |
+    *Area Light* |
+        Automatically distributes a number of light sources over a specified area. There are five area light shapes to choose from.
+
+        Line/Tube:
+            Lights are distributed along the length of a straight
+            line.
+    
+            [Image:/images/line_type.jpg]
+    
+        Grid:
+            Lights are distributed over the area of a plane. This is the default shape created by the area light.
+    
+            [Image:/images/grid_type.jpg]
+    
+        Disk:
+            Lights are distributed over the area of a disk.
+    
+            [Image:/images/disc_type.jpg]
+    
+        Sphere:
+            Lights are distributed along the outside surface of a
+            sphere.
+    
+            You can put objects inside this shape for an overall soft shadow look that is similar to global illumination irradiance.
+    
+            [Image:/images/sphere_type.jpg]
+
+[Icon:OBJ/light_directional]  |
+    *Distant Light* |
+        Emits parallel rays of light, which are similar to the rays of the sun.
+
+[Icon:OBJ/light_environment]   |
+    *Environment Light* |
+        Casts light into the scene as if from a surrounding hemisphere or sphere. The default environment light is a hemisphere; however, you can make it a full sphere by turning on the __Use full sphere for environment__ checkbox on the __Area Light Options__ sub-tab of the __Light__ tab in the parameter editor. You can also change the sampling density in the __Area Samples__ parameter on the __Area Light Options__ sub-tab of the __Light__ tab in the [parameter editor|/ref/panes/parms].
+        
+        The position of the light does not matter. You can rotate the light object to orient the light source. With no rotation, hemisphere lights are oriented to cover the region above the XZ plane. 
+        
+        An environment light may use a texture map to provide illumination from an environment map. With no rotation, the environment map is oriented so that the top face aligns with the positive Y axis.
+        
+[Icon:OBJ/light]  |
+    *Ambient Light* |
+        Emits light from all directions to illuminate the scene (source-less light). For specific parameter information, see the [Ambient Light|/nodes/obj/ambient] node help.
+
+For specific parameter help see the [Icon:OBJ/light] [light node help|Node:obj/hlight].
+
+
+== Light categories == (categories)
+
+#index: document
+
+Categories and masks both provide ways to specify a set of objects or lights.
+
+_Masks_ use the object name to determine membership and use the same semantics as object globbing in Houdini, for example `/obj/geo*,^/obj/geo1`. The light linker works by modifying masks in object parameters.
+
+For very large scenes and when instancing, tagging things with categories can be easier and more efficient.
+
+You can specify _categories_ on an object using the [parameter editor|/ref/panes/parms] (__Render__ tab, __Shading__ sub-tab, __Categories__ parameter). Objects can belong to more than one category -- separate multiple categories with commas and/or spaces. Categories are similar to _tags_ in Web applications; you can "tag" lights and objects, and use the unions and intersections of tags to control light linking.
+
+(If you specify both a mask and categories, mantra uses the _intersection_ -- the objects which are in _both_ sets.)
+
+For example, a light might have __Categories__ set to `keylight, shadower, distant`. This makes the light part of the `keylight` set, the `shadower` set, and the `distant` set. You can then use these categories.
+
+NOTE:
+    Categories will probably supplant masks as the preferred method for light/shadow/reflection linking in a future version of Houdini, but support for categories in the UI is currently limited.
+    
+    You must manually add the __Mantra/Shading/Light selection__, __Mantra/Shading/Shadow selection__, and/or __Mantra/Shading/Reflection selection__ [properties|/props/] to an object to use categories for linking.
+    
+    You can also use categories as an optional argument in an [illuminance loop|/vex/functions/illuminance] in VEX to loop over the lights based on categories.
+
+Category expressions are one or more category names. When specifying multiple name, join them with the `&` (and) or `|` (or) symbols. For example, `keylight|distant` would specify all objects which have either the `keylight` _or_ `distant` categories, while `keylight&distant` would specify only objects that have both `keylight` _and_ `distant` categories.
+
+Category expressions currently do not support grouping with parentheses. Category expressions are processed left to right with `&` (and) at a higher precedence than `|` (or). So:
+
+{{{
+a & b & c | d & e | f | g & h
+}}}
+
+...is equivalent to:
+
+{{{
+(a & b & c) | (d & e) | f | (g & h)
+}}}
+
+Symbol ||
+    Meaning ||
+`<<name>>` |
+    Matches objects tagged with the <<name>> category.
+`-<<name>>` |
+    Matches objects which _are not_ tagged with the <<name>> category.
+`*` |
+    Matches all objects.
+`-*` |
+    Matches no objects.
+`+` |
+    Matches objects which have any categories defined.
+`-` |
+    Matches objects which don't have any categories defined.
+`<<a>>|<<b>>` |
+    Matches objects which match `<<a>>` *or* `<<b>>`.
+`<<a>>&<<b>>` |
+    Matches objects which match `<<a>>` *and* `<<b>>`.
+
+For example, the category pattern `- | foo` will match any objects tagged with category `foo`, _or_ any uncategorized objects.
+
+
+== Light contributions == (contributions)
+
+[Light|Node:obj/hlight] and [Environment light|Node:obj/envlight] objects have a __Lighting contribution__ parameter. This is a space-separated list of component names.
+
+* Components are named in the shader using the __Label__ parameter on VOPs that generate BSDFs. The shaders included with Houdini use component names such as `diffuse`, `reflect`, `coat`, `refract`, and `volume`.
+
+* You can also use the virtual labels `direct` and `indirect` to control the light's contribution based on whether a sample is from a [direct or indirect ray|bsdf].
+
+This can be useful in non-realistic lighting setups, for example if you have a large number of fill lights in the scene and don't want them to show up as highlights on shiny objects, you can set them to not contribute to reflectance.
+
+The parameter can use [category syntax|#categories] to match, combine, and remove names, for example `diffuse|volume` or `-diffuse & -volume`.
+
+== Light portals ==
+
+The [environment light|Node:obj/envlight] lets you specify certain scene geometry as "light portals", treating them as windows streaming in outside light.
+
+The [portal light tool|/shelf/portallight] lets you select geometry and creates an environment light with the geometry set as a portal.
+
+== Advanced: light shaders ==
+
+Instead of the standard cone and point lights you can use a light shader, a custom coded light. Houdini ships with several special lights, most of them coded in [VEX|/vex/].
+
+# Create a light shader in the [network editor|/ref/panes/network] at the Shader level using the [tab menu|/basics/tabmenu].
+
+  Shaders, including light shaders, are specific to the renderer you will use. Shaders whose names start with `VEX` will render in the Houdini's standard [mantra|Node:out/ifd] renderer. Other shaders work
+  in other renderers. For example, [RenderMan|Node:out/rib] shaders start with `RMan`.
+
+# Create a [Icon:OBJ/light] [Light Template|/nodes/obj/light] in the [network editor|/ref/panes/network] at the Object level using the [tab menu|/basics/tabmenu].
+
+# In the [parameter editor|/ref/panes/parms] of the Light Template, enter the path of the light shader you just created in the __Render > Shaders > Light Shader__ parameter.
+
+
+@related
+
+- [Physically based rendering|pbr]
+- [Shadows|shadows]
+- [Environment maps and reflection maps|envmaps]
+- [Look At|/shelf/lookat]
+

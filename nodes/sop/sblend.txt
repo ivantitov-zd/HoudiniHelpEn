@@ -1,0 +1,79 @@
+= Sequence Blend =
+
+#type: node
+#context: sop
+#internal: sblend
+#version: 2.0
+#icon: SOP/sblend
+#tags: reshape, blend, morph
+
+"""Morphs though a sequence of 3D shapes, interpolating geometry and attributes."""
+
+* If inputs have different numbers of points/primitives, the "extra" geometry will remain stationary during the blend and then disappear when the whole part of the __Input blend__ number changes.
+
+* Inputs are numbered from 0, so in the __Input blend__ parameter the first input is 0, second input is 1, and so on.
+
+* If an input is not polygonal, instead of blending, the geometry will instantly change when the whole part of the __Input blend__ number changes.
+
+* __Input blend__ values higher than the number of inputs (minus 1) simply output the highest input. For example, if you have 3 inputs, any value of `2.0` or higher outputs the geometry from the third input.
+
+* This node only interpolates attributes that match the pattern(s) in the __Attributes__ parameter. Other attributes maintain their values and switch when the whole part input number changes (for example, it uses the value of un-interpolated attributes from input 0 when the __Input blend__ value is `0.9`, and switches to the values from input 1 when __Input blend__ is `1.0`). All attributes are interpolated by default.
+
+
+@parameters
+
+Input Blend:
+    #id: blend
+    
+    Specifies from which input to get the output geometry. Fractional values blend between adjacent inputs. For example, `0.5` blends between the first input (input 0) and the second input (input 1). Keyframe this value or enter an expression to blend the inputs over time.
+
+Attributes:
+    #id: attribs
+
+    A space-separated list of names/patterns for attributes to interpolate. Attributes that don't match here are switched instantly when the whole part of the input number changes, rather than smoothly interpolated. The default is `*`, meaning interpolate all attributes.
+
+Point ID Attribute:
+    #id: ptidattr
+    
+    If you enter the name of a (string or integer) point attribute here, the node will use the value of this attribute to match up points between the different inputs. For example, using `id` will match particle points even if some particles are deleted. If this field is blank (or the attribute doesn't exist), the node uses point numbers to match up points.
+
+Primitive ID Attribute:
+    #id: primidattr
+
+    If you enter the name of a (string or integer) primitive attribute here, the node will use the value of this attribute to match up primitives (for example, volumes) between the different inputs. For example, using `name` will match volumes in a fluid system even if volumes are reordered. If this field is blank (or the attribute doesn't exist), the node uses primitive numbers to match up points.
+
+Voxel Blend:
+    #id: voxelblend
+
+    None:
+        Do not blend volume data.
+    
+    By Grid Index:
+        Blend voxel data between volumes. The voxels are matched by absolute voxel number (not spatial position) so matching volumes should have the exact same dimensions.
+
+Smoothly Interpolate Normals, Quaternions, and Transforms:
+    #id: doslerp
+    
+    Use spherical linear interpolation for smoother transitions of attributes marked as normals, quaternions, and transforms, and for primitive transforms. When this is off, all blends are linear, meaning the transition can be abrupt when the input changes.
+
+Use Velocity When Interpolating Position:
+    #id: usevforpinterp
+    
+    If points have a `v` (velocity) attribute (for example, computed with the [Trail SOP|Node:sop/trail]), this cubically interpolates the point position (`P` attribute) using the velocity (`v`), and quadratically interpolates the velocity using the point position. When this is on you need to set __Timestep__ to the duration of each blend in seconds.
+
+Timestep:
+    #id: timestep
+
+    When __Use Velocity when Interpolating Position__ is on, set this to the duration of the blend between any two adjacent inputs in seconds.
+
+
+@inputs
+
+Connect the geometries you want to blend between to this node's multi-input in order. You can reorder the inputs in the parameter editor using the input table below this node's parameters.
+
+
+@related
+
+- [Node:sop/blendshapes]
+- [Node:sop/timeblend]
+

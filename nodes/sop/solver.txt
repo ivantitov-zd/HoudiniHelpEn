@@ -1,0 +1,101 @@
+#type: node
+#context: sop
+#internal: solver
+#icon: SOP/solver
+#tags: tech, anim
+#replaces: Node:sop/foreach
+
+= Solver =
+
+"""Allows running a SOP network iteratively over some input geometry, with the output of the network from the previous frame serving as the input for the network at the current frame."""
+
+== Overview ==
+
+Normally in geometry networks each frame is self-contained: it works out what the geometry should look like based on the nodes in the geometry network, possibly using variables like `$F` (the current frame) to modify their behavior, using the animated position of points at the current frame, and so on.
+
+This node lets you create effects where a surface network _modifies_ the previous frame's geometry, allowing you to create iterative feedback, automata, and simulation-like effects.
+
+For example, if you create a [Grid|Node:sop/grid] and connect a [Point Jitter|Node:sop/pointjitter] to it, and set the __Seed__ on the point jitter to `$F`...
+
+* In a normal geometry network, the points will jitter to random locations at each frame, creating a look where each frame seems completely independent, with points "teleporting" between random positions.
+
+* If you put the jitter in a Solver node network, the jitter is applied to each point's position _from the previous frame_, creating a "random walk", with points wandering around.
+
+== How to ==
+
+# In a geometry network, use the ((Tab)) menu to create a [Solver surface node|Node:sop/solver].
+
+# Connect the geometry you want the solver to modify to the _first_ input of the solver node.
+
+# Double-click the solver node to dive inside.
+
+    The network editor jumps to a geometry network containing several nodes representing the inputs to the solver, and a node labeled `Prev_Frame`.
+
+    
+    The `Input_1` node in the solver network contains the _original_ geometry you connected to the first input. This is sometimes useful, for example for nodes that take a rest position. The solver's second, third, and fourth inputs allow you pass extra bits of geometry down to the solver's SOP network if needed.
+
+# Start building surface nodes from the output of the `Prev_Frame` node. This network will be cooked every frame, with the output of the `Prev_Frame` node containing the geometry from the previous frame. Set the [display flag|/nodes/sop] on the node containing the "output" geometry of the 
+
+    For example, if you connected a [Transform node|Node:sop/xform] to the output of the `Last_Frame` and set the transform node's __Translate__ parameter to `0, 1, 0`, the geometry you connected to the solver's first input would rise one unit every frame.
+
+# To get from the solver's geometry network back up to the original geometry network, press ((U)) or click the original network in the path bar at the top of the network editor.
+
+# Click [Icon:PLAYBAR/play_forward] Play in the play bar at the bottom of the main window to see the effects of the solver.
+
+NOTE:
+    If you press play inside the _solver's_ network, you will not see the feedback effect. The playback will simply show what the network would look like if it ran on the original input geometry at the current frame.
+
+TIP:
+    You may want to [create and pin a new network editor tab|/basics/panes] with the solver's network so you can refer to it more quickly.
+
+== How it works ==
+
+You can use the Solver node to create iterative feedback effects without reading this section, however for advanced users or if you're having a problem, this section may be useful.
+
+The Solver node contains a simple DOP network with a [SOP Solver DOP|Node:dop/sopsolver]. When you double-click the Solver surface node, a bit of magic jumps not into the actual contents of the node (the DOP network), but down one more level into the contents of the SOP Solver DOP (the network for specifying the solver step SOPs).
+
+If you want to modify the DOP network for some reason, you can jump to it by clicking it in the path bar at the top of the network editor.
+
+TIP:
+    If you play back the animation while viewing the contents of the Solver SOP, you will be saving un-feedback frames to the cache, which will look like they aren't doing anything when replayed. You can fix this by resetting the simulations.
+
+@parameters
+
+
+Reset Simulation:
+    Resets the simulation.
+
+Initial State:
+    Normally the first input is the initial state.  However, this toggle, lets you explicitly specify another SOP to be the initial state, freeing up that input.
+
+Start Frame:
+    Which frame to start solving on.  The geometry is empty prior
+    to this frame.
+
+Sub Steps:
+    How many substeps to break each frame into.
+
+Cache Simulation:
+    Pure SOP simulations do not require a cache, but it is useful for scrubbing.
+
+Allow Caching To Disk:
+    If the maximum size of the cache in memory is reached, the
+    DOP Network can either delete old cache entries to make room
+    for new entries, or old entries can be saved to disk. If
+    this option is turned on, the old cache entries are saved to disk
+    and will be reloaded from disk if needed. This mode will be
+    slower than simply throwing away the old cache entries, but
+    it ensures that the entire simulation history is always
+    available regardless of the in-memory cache size.
+
+Cache Memory (MB):
+    Specifies how much memory in megabytes can be consumed by the cache for
+    this simulation. Once this limit is exceeded, old cache entries are
+    either deleted or saved to disk to make more room, depending on the
+    state of the __Allow Caching To Disk__ parameter above.
+
+@related
+
+- [Node:sop/timeshift]
+- [Node:sop/foreach]
+

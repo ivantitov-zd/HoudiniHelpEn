@@ -1,0 +1,179 @@
+= Muscle Deform =
+
+#type: node
+#context: sop
+#internal: muscledeform
+#icon: SOP/muscledeform
+#tags: muscle, deform, displace, reshape, model, rigging
+#version: 1.0
+
+"""Deforms a surface mesh representing skin to envelop or drape over geometry representing muscles"""
+
+In a character workflow with muscles and skin, this tool allows you to push skin
+geometry outward until it encapsulates all the given muscles. 
+
+Although this tool is designed for skin and muscles, it may be used in other
+contexts where a quick draping effect or a somewhat more sophisticated ray cast
+is desired.
+
+
+== Using Muscle Deform ==
+
+Select the skin geometry you would like to deform or displace.  This will be set
+in the __Group__ parameter. Select the muscles you would like to affect the
+deformation in the __Muscle Group__ parameter.
+The given skin geometry will be projected away from any points provided in the
+input muscle geometry belonging to the __Muscle Center Group__ until they hit
+the surface of the muscle. This projection can be controlled with a number of
+parameters given below.
+
+Sometimes you may want to project the skin geometry to the muscles using the
+normal direction on the skin geometry (these normals will be computed
+inside __Muscle Deform__ so no need to pre-compute them ahead of time). To
+achieve this, simply turn off the __Project from Muscle Centers__ toggle, or
+alternatively slide the __Normal Projection Mixing__ to 1 if you still prefer to
+use the __Center Projection Control__ options.
+
+Performance may be improved at the cost of quality and limited control.  Turning
+off the __Project from Muscle Centers__ toggle will improve performance
+significantly, although it may not produce desirable results for non-convex skin
+geometries.  Setting __Blend Radius__ to zero will achieve a similar performance
+increase however the quality of the projection will heavily rely on the
+placement and frequency of muscle centers throughout the animation. If some
+center points fall outside of the skin geometry, disturbing artifacts will
+dominate the resulting mesh.  Increasing __Blend Radius__ will help
+eliminate these artifacts by considering neighboring point centers when
+computing the position to project the skin from.  Furthermore, the __Min Surf
+Distance__ parameter will project muscle centers back into the skin geometry if
+they happen to come within the specified distance or if they protrude through
+the skin. However these tools are often non sufficient for providing truly
+artifact free result, so care must always be taken when placing muscle center
+points, ensuring they fall well inside the simulated skin.
+
+In cases where the skin geometry is concave, as is the case with most character
+models, extra care must be taken when using this tool.  More specifically, the
+projection rays used to place the skin geometry over the given muscles may hit a
+muscle belonging to a different part of the character resulting in disturbing
+artifacts. To avoid these issues you must group different muscle groups under a
+unique ID attribute and specify this attribute in the __Muscle ID Attribute__
+parameter. Note that this attribute must exist on muscle primitives as well as
+muscle centers. This allows __Muscle Deform__ to consider each muscle group
+individually, and combine the results of each projection at a later stage.  To
+control displacement where different muscle groups overlap, use the __Overlap
+Exponent__ parameter.
+
+This SOP may also be used with the [Muscle Capture SOP|Node:sop/musclecapture],
+which assigns weights to individual muscle groups (specified by the unique
+__Muscle ID Attribute__ you provide).  Muscle capture weights can be used to
+control where the displacement should occur. If __Attenuate with Weights__ is
+turned on, the capture weights will act as a multiplier for the resulting
+displacement.  For more details see the documentation for [Muscle
+Capture|Node:sop/musclecapture].
+
+
+
+@parameters
+
+Group:
+    Subset of points to be deformed.
+
+Muscle Group:
+    Subset of muscles to be considered for deformation.
+
+Muscle Center Group:
+    Subset of points at the second (or third if specified) input to be considered as projection sources. Points on the skin will be the projected away from these center points if the __Project from Muscle Centers__ option is on.
+
+Muscle ID Attribute:
+    Name of the attribute specifying unique groups of muscles. Skin points being projected from centers of one muscle group will only be projected to the muscle primitives in the same group. This avoids different muscle groups affecting each other in non-convex areas of the model.
+
+Falloff Attribute:
+    Weight attribute which acts as a global multiplier for displacements produced by this tool.
+
+Pin Border Points:
+    Fix the positions of points adjacent to unshared edges on the input skin geometry.
+
+Bulge to Max Weight:
+    Use the input capture weights to determine which muscle to project to in areas of overlap between different muscle groups. Otherwise the skin will be projected to the farthest muscle.
+
+Attenuate with Weights:
+    Scale the displacement of points for each muscle group by the corresponding capture weights (if any).  
+
+Cutoff Weight:
+    Only consider points with weights greater than this cutoff when computing the point displacement.
+
+Cache Time Independent Topology:
+    Turn this on if the geometry in the input remains topologically the same throughout the animation, for a minor performance boost.
+
+Cache Frame:
+	When __Cache Time Independent Topolgy__ is enabled, this parameter specifies the time (frame) to generate the cache.  Use this parameter if you have a geometry sequence to deform that has a start frame other than frame 1.
+	
+Project from Muscle Centers:
+    When enabled, skin points will be projected away from the Muscle Center points given on the second (or third if provided) input. This option also enables all __Center Projection Control__ options.
+
+
+== Smoothing ==
+
+This set of controls allows the user to smooth out any harsh projection artifacts making the result look more organic.
+Since this node does not compute output normals, ensure that normals are computed when visualizing the output (with the [Normal SOP|Node:sop/normal] for instance) before making a judgment on how the surface looks.
+    
+Smoothing Method:
+    Set the method for weighing neighbor contributions on position and normal smoothing options.
+    
+    Uniform:
+	Smooth evenly regardless of their distance from one another.
+
+    Edge Length:
+	Smooth accounting for the fact that some points may be closer than others.
+	This option preserves relative distances between points, which is especially useful when points on the input are unevenly distributed.
+
+
+Global Iterations:
+    The number of times the input geometry is smoothed. This works as in __Delta Mush__ where only the displacement is smoothed, preserving initial detail in the skin mesh.
+
+Falloff Iterations:
+    Smooth the area of skin where the skin drapes away from the peak displacement. In contrast to __Global Iterations__ this type of smoothing will not reduce the amount of displacement.
+
+Normal Iterations:
+    Smooth the point normals used for projection. Note that this will have no effect if displacement is computed purely from muscle centers (when __Normal Projection Mixing__ is set to 0).
+
+Step Size:
+    This controls the size of each smoothing step for all types of smoothing iterations.
+
+== Thickness Control ==
+
+Thickness:
+    A constant point offset amount along the point normal.
+
+Thickness Falloff:
+    Reduces the amount of offset amount in areas of maximum displacement.
+
+Maximum Bulge:
+    The maximum distance to which the skin geometry will be projected.
+
+
+== Center Projection Control ==
+
+Tightness:
+    Determines how closely the skin drapes around the muscle. Higher values make the skin drape tighter around the muscle.
+
+Normal Projection Mixing:
+    Mix projection direction between the normal direction (at 1) and the direction from muscle centers (at 0).
+
+Blend Radius:
+    The radius away from the closest muscle center, which includes all muscle centers to be considered when picking a point to project from.
+
+Blend Exponent:
+    This slider controls how much distant muscle centers contribute to the computation of the point to project from. Note that only muscle centers within the __Blend Radius__ from the closest muscle center are considered. The higher the value, the more weight is given to points closest to the closest muscle center.
+
+Min Surf Distance:
+    When enabled, projects all muscle centers that fall outside of the skin geometry (as determined by the normal of the closest primitive) to the interior of the skin. If a center is inside the skin but closer than the allowed distance, it will also be pushed further away from the skin.
+  
+Overlap Exponent:
+    This parameter controls how the displacements from different muscle groups are combined to produce the final displacement. When disabled, each consecutive muscle group will displace the skin geometry one after the other in some arbitrary order.  When enabled, the displacement magnitudes are raised to the given exponent, added and then raised to the reciprocal of the given exponent.  In effect, an exponent of 1 will simply add all the magnitudes, while a larger exponent will pick the largest of all magnitudes. This is only a heuristic to combine contributions from different muscle groups.
+
+
+@related
+
+- [Node:sop/musclecapture]
+- [Node:sop/deltamush]
+

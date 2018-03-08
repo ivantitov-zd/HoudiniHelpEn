@@ -1,0 +1,283 @@
+= hou.BoundingRect =
+#type: homclass
+#cppname: HOM_BoundingRect
+#group: utility
+
+"""An axis-aligned 2D rectangular region."""
+
+A bounding rectangle can describe the size and location of a node in a
+network, or the visible area or a network editor pane.
+
+@methods
+
+::`__init__(self, x1, y1, x2, y2)`:
+    #cppname: HOM_BoundingRect::HOM_BoundingRect
+    Construct a new bounding rectangle with the specified bounds expressed
+    as floating point numbers.
+
+::`__init__(self, p1, p2)`:
+    #cppname: HOM_BoundingRect::HOM_BoundingRect
+    Construct a new bounding rectangle with the specified bounds expressed
+    as two [Hom:hou.Vector2]s.
+
+::`setTo(self, bounds_sequence)`:
+    #cppname: HOM_BoundingRect::setTo
+    Given a sequence of (xmin, ymin, xmax, ymax) values, set the
+    position of the bounding rectangle.
+
+    Raises [Hom:hou.InvalidSize] if the tuple does not contain four elements.
+
+::`isValid(self)` -> `bool`:
+    #cppname: HOM_BoundingRect::isValid
+    Returns whether this bounding rectangle is valid, indicating it has been
+    initialized in any way.
+    {{{
+    #!python
+    >>> hou.BoundingRect().isValid()
+    False
+    >>> hou.BoundingRect(0, 0, 0, 0).isValid()
+    True
+    >>> hou.BoundingRect(0, 0, 0, 0).isValid()
+    True
+    }}}
+
+::`isAlmostEqual(self, rect, tolerance=0.00001)` -> `bool`:
+    #cppname: HOM_BoundingRect::isAlmostEqual
+    Returns whether this bounding rectangle is equal to another, subject
+    to numerical tolerances.
+    {{{
+    #!python
+    >>> unitrect = hou.BoundingRect(0, 0, 1, 1)
+    >>> subrect = hou.BoundingRect(0.001, 0.001, 0.999, 1.001)
+    >>> unitrect.isAlmostEqual(subrect)
+    False
+    >>> unitrect.isAlmostEqual(subrect, 0.01)
+    True
+    }}}
+
+::`min(self)` -> [Hom:hou.Vector2]:
+    #cppname: HOM_BoundingRect::min
+    Return a vector describing the corner of the rectangle with the smallest
+    `x` and `y` values.
+
+::`max(self)` -> [Hom:hou.Vector2]:
+    #cppname: HOM_BoundingRect::max
+    Return a vector describing the corner of the rectangle with the largest
+    `x` and `y` values.
+
+::`size(self)` -> [Hom:hou.Vector2]:
+    #cppname: HOM_BoundingRect::size
+    Return a vector describing the size of the rectangle in each of the
+    `x` and `y` axes.
+
+    This method can be implemented as follows:
+    {{{
+    #!python
+    def size(self):
+	return self.max() - self.min()
+    }}}
+
+::`center(self)` -> [Hom:hou.Vector2]:
+    #cppname: HOM_BoundingRect::center
+    Return the position of the center of the bounding rectangle.
+
+    This method can be implemented as follows:
+    {{{
+    #!python
+    def center(self):
+	return (self.min() + self.max()) * 0.5
+    }}}
+
+::`contains(self, point)` -> bool:
+    #cppname: HOM_BoundingRect::contains
+    Given a sequence of 2 floats (such as a [Hom:hou.Vector2]) describing a
+    position, return whether the position is inside the rectangle.
+    {{{
+    #!python
+    >>> unitrect = hou.BoundingRect(0, 0, 1, 1)
+    >>> unitrect.contains((0.5, 0.5))
+    True
+    >>> unitrect.contains((1, 1))
+    True
+    >>> unitrect.contains((0, 0))
+    True
+    >>> unitrect.contains((1.01, 0.5))
+    False
+    }}}
+
+::`contains(self, rect)` -> bool:
+    #cppname: HOM_BoundingRect::contains
+    Given a hou.BoundingRect object, return whether that rectangle is inside
+    the one described by this object.
+    {{{
+    #!python
+    >>> unitrect = hou.BoundingRect(0, 0, 1, 1)
+    >>> unitrect.contains(hou.BoundingRect(0.5, 0.5, 1.0, 1.0))
+    True
+    >>> unitrect.contains(hou.BoundingRect(0.5, 0.5, 1.5, 1.5))
+    False
+    }}}
+
+::`intersects(self, point0, point1)` -> bool:
+    #cppname: HOM_BoundingRect::intersects
+    Given a line defined by two end points (each of which is specified as a
+    sequence of two floats), return True if the line intersects this rectangle.
+    {{{
+    #!python
+    >>> unitrect = hou.BoundingRect(0, 0, 1, 1)
+    >>> unitrect.intersects((0.5, 1.5), (0.5, -0.5))
+    True
+    >>> unitrect.intersects((0.5, 1.5), (-0.5, 1.5))
+    False
+    }}}
+
+::`intersects(self, point0, point1, point2)` -> bool:
+    #cppname: HOM_BoundingRect::intersects
+    Given a triangle defined by three points (each of which is specified as a
+    sequence of two floats), return True if the triangle partially or fully
+    overlaps this rectangle.
+    {{{
+    #!python
+    >>> unitrect = hou.BoundingRect(0, 0, 1, 1)
+    >>> unitrect.intersects((-1.0, -1.0), (4.0, -1.0), (-1.0, 4.0))
+    True
+    >>> unitrect.intersects((0.5, 2.0), (2.0, 0.5), (2.0, 2.0))
+    False
+    }}}
+
+::`intersects(self, rect)` -> bool:
+    #cppname: HOM_BoundingRect::intersects
+    Given a hou.BoundingRect object, return whether that rectangle partially
+    or fully overlaps the one described by this object.
+    {{{
+    #!python
+    >>> unitrect = hou.BoundingRect(0, 0, 1, 1)
+    >>> unitrect.intersects(hou.BoundingRect(0.5, 0.5, 1.0, 1.0))
+    True
+    >>> unitrect.intersects(hou.BoundingRect(0.5, 0.5, 1.5, 1.5))
+    True
+    >>> unitrect.intersects(hou.BoundingRect(1.5, 1.5, 2.5, 2.5))
+    False
+    }}}
+
+::`closestPoint(self, point)` -> [Hom:hou.Vector2]:
+    #cppname: HOM_BoundingRect::closestPoint
+    Given a sequence of 2 floats (such as a [Hom:hou.Vector2]) describing a
+    position, return the position inside the rectangle that is closest to
+    the provided point.
+    {{{
+    #!python
+    >>> unitrect = hou.BoundingRect(0, 0, 1, 1)
+    >>> unitrect.closestPoint((0.5, 0.5))
+    <hou.Vector2 [0.5, 0.5]>
+    >>> unitrect.closestPoint((100, 0.5))
+    <hou.Vector2 [1.0, 0.5]>
+    >>> unitrect.closestPoint((-10, -5))
+    <hou.Vector2 [0, 0]>
+    }}}
+
+::`getOffsetToAvoid(self, bounds, direction = None)` -> [Hom:hou.Vector2]:
+    #cppname: HOM_BoundingRect::getOffsetToAvoid
+    Return a vector describing the minimum distance this rectangle must be
+    translated to avoid any overlap with the `bounds` rectangle. If
+    `direction` is provided as a [Hom:hou.Vector2], it indicates the specific
+    direction the returned offset should be. If the rectangles do not overlap,
+    the result will be `hou.Vector2(0.0, 0.0)`.
+    {{{
+    #!python
+    >>> unitrect = hou.BoundingRect(0, 0, 1, 1)
+    >>> subrect = hou.BoundingRect(0.2, 0.4, 0.8, 0.6)
+    >>> unitrect.getOffsetToAvoid(subrect)
+    <hou.Vector2 [0, 0.6]>
+    >>> unitrect.getOffsetToAvoid(subrect, hou.Vector2(1.0, 0.0))
+    <hou.Vector2 [0.8, 0]>
+    >>> unitrect.getOffsetToAvoid(subrect, hou.Vector2(1.0, 1.0))
+    <hou.Vector2 [0.6, 0.6]>
+    }}}
+
+::`translate(self, offset)`:
+    #cppname: HOM_BoundingRect::translate
+    Moves this rectangle by the amount specified in the two float tuple or
+    [Hom:hou.Vector2] passed as the offset parameter.
+    {{{
+    #!python
+    >>> rect = hou.BoundingRect(1, 1, 2, 2)
+    >>> rect.translate(hou.Vector2(1, -1))
+    >>> rect
+    <hou.BoundingRect [2, 0, 3, 1]>
+    }}}
+
+::`scale(self, scale)`:
+    #cppname: HOM_BoundingRect::scale
+    Scales this rectangle by the amount specified in the two float tuple or
+    [Hom:hou.Vector2] passed as the scale parameter. Note that scaling the
+    rectangle by a negative value will result in an invlalid rectangle where
+    the lower left corner is above or to the right of the upper right corner.
+    {{{
+    #!python
+    >>> rect = hou.BoundingRect(1, 1, 2, 2)
+    >>> rect.scale(hou.Vector2(2, 3))
+    >>> rect
+    <hou.BoundingRect [2, 3, 4, 6]>
+    >>> rect.scale((-1, -1))
+    >>> rect
+    <hou.BoundingRect [-2, -3, -4, -6]>
+    >>> rect.isValid()
+    False
+    }}}
+
+::`expand(self, offset)`:
+    #cppname: HOM_BoundingRect::expand
+    Moves the edges of the rectangle away from its center by the distances
+    specified in the two float tuple or [Hom:hou.Vector2] passed as the
+    offset parameter. The offset is applied to both sides of the rectangle so
+    actually changes the width and height of the rectangle by twice the passed
+    in values.
+
+    Negative values can be passed into the offset to shrink the rectangle, but
+    shrinking the rectangle by more than its current size will result in an
+    invliad rectangle.
+    {{{
+    #!python
+    >>> rect = hou.BoundingRect(1, 1, 2, 2)
+    >>> rect.expand((1, 1))
+    >>> rect
+    <hou.BoundingRect [0, 0, 3, 3]>
+    >>> rect.expand((0, -2))
+    >>> rect
+    <hou.BoundingRect [0, 2, 3, 1]>
+    >>> rect.isValid()
+    False
+    }}}
+
+::`enlargeToContain(self, point_or_rect)`:
+    #cppname: HOM_BoundingRect::enlargeToContain
+    Enlarge the bounding rectangle to contain the given element.  The element
+    may be a sequence of 2 floats (such as a [Hom:hou.Vector2]) describing a
+    position or another bounding rectangle.  If this rectangle does not need
+    to grow because it already completely contains the element, it won't be
+    modified.
+    {{{
+    #!python
+    >>> unitrect = hou.BoundingRect(0, 0, 1, 1)
+    >>> unitrect.enlargeToContain((2, 0.5))
+    >>> unitrect
+    <hou.BoundingRect [0, 0, 2, 1]>
+    >>> unitrect = hou.BoundingRect(0, 0, 1, 1)
+    >>> unitrect.enlargeToContain(hou.BoundingRect(0.5, 0.5, 2, 1.5))
+    >>> unitrect
+    <hou.BoundingRect [0, 0, 2, 1.5]>
+    }}}
+
+::`intersect(self, rect)`:
+    #cppname: HOM_BoundingRect::intersect
+    Given a hou.BoundingRect object, updates the rectangle in this object to
+    be the region where the two rectangles overlap.
+    {{{
+    #!python
+    >>> rect = hou.BoundingRect(0, 0, 1, 1)
+    >>> rect.intersect(hou.BoundingRect(0.5, 0.5, 1.5, 1.5))
+    >>> rect
+    <hou.BoundingRect [0.5, 0.5, 1, 1]>
+    }}}
+

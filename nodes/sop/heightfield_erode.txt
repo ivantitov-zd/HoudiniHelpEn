@@ -1,0 +1,308 @@
+= HeightField Erode =
+
+#type:     node
+#context:  sop
+#internal: heightfield_erode
+#icon:     SOP/heightfield_erode
+
+"""Calculates thermal and hydraulic erosion over time (frames) to create more realistic terrain."""
+
+This node uses rainfall, the erodibility of the soil, and entrainment rates as variables to simulate erosion and deposit buildup.
+
+This node works iteratively during playback. It will appear to have no effect on the first frame. You need to play the animation to see the effects of the node. Once the simulation converges to something that looks good, you can export the volumes from that frame to a file (using [Height Field Output|Node:sop/heightfield_output]).
+
+For an example of erosion, create the Mountain preset from the __Terrain FX__ shelf tab and press Play.
+
+[Image:/images/nodes/sop/heightfield_erode.png]
+
+
+@parameters
+
+== Erosion ==
+
+Mask:
+    #id: maskerodelayer
+    
+    The name of a mask layer to use as the erodibility value for each point on the terrain. A value of `0` allows no erosion (use this to represent something like granite). A value of `1` means easy erosion (use this to represent loose dirt).  This is read from the second input.
+
+Amount:
+    #id: erode_amount
+    
+    A scale on the effect of the erosion at each frame. The default value of `1` represents a realistic amount. A value of `3` would do 3 times a realistic amount. You can increase or decrease this number to do more or less erosion overall.
+    
+Noise:
+    #id: erode_variability
+    
+    Scatters the location of erosion. Some noise is desirable to simulate natural variations.
+    
+Max Debris Depth:
+    #id: erode_maxdepth
+    
+    Stop erosion when the debris layer reaches this depth.
+
+~~~ Hydro ~~~
+
+These options control erosion from rainfall, where the flow of water downhill weathers the terrain. You can control the amount of rainfall using the controls on the __Precipitation__ tab and the water flow using the controls on the __Water flow__ tab.
+
+Hydro:
+    #id: contrib_hydro
+    
+    Scale on the __Amount__ value for water flow.
+    
+Dissolution Rate:
+    #id: dissolve_hydro
+    
+    Rate at which soil breaks down and flows down the terrain.
+
+
+~~~ Thermal ~~~
+
+Thermal weathering is caused by frozen rocks thawing and breaking, causing features to wear down and smooth out, and material to pile up on the bottom of inclines.
+
+Thermal erosion is computed by comparing the height field (including debris) against a blurred version of the height field. If the current height is greater than the blurred height, it is considered exposed and subject to erosion. Thermal erosion is a relaxation process.
+
+Thermal:
+    #id: contrib_thermal
+    
+    Scale on the __Amount__ value for thermal weathering.
+    
+Wind Removal Rate:
+    #id: dissolve_thermal
+    
+    Proportion of debris from thermal erosion that is deleted. This simulates wind carrying away a certain amount of debris rather than it all accumulating. The default is `0` (no deletion).
+
+Thermal Feature Size:
+    #id: thermalsize
+    
+    Controls the amount of blur used when computing which areas get weathering. This essentially controls the amount of weathering.
+
+
+== Precipitation ==
+
+Mask:
+    #id: maskpreciplayer
+    
+    The name of a mask layer controlling rainfall. The values in the layer are a scale on the __Amount__ parameter.  This is read from the second input.
+
+Amount:
+    #id: rain_amount
+    
+    The amount of rainfall simulated in each frame. If you use very large amounts you will not see much erosion since essentially the entire terrain would be under water.
+
+Density:
+    #id: rain_density
+    
+    How closely packed rain drops are. Smaller densities give more erosion lines. Larger densities create erosion cracks that are father apart and wider.
+
+Evaporation Rate:
+    #id: rain_evaporation
+    
+    The rate of evaporation. A higher rate will leave less pooled water in each frame. If you want more water to pool you can increase __Amount__ and/or decrease the evaporation rate.
+
+
+=== Water Flow ===
+
+Spread Iterations:
+    #id: rainflow_spreaditers
+    
+    The number of iterations of water spreading simulation to do. More iterations give more realistic results but are slower.
+    
+Spread Rate:
+    #id: rainflow_spreadrate
+    
+    How quickly water spreads over the terrain with each iteration.
+    
+Smooth Iterations: 
+    #id: rainflow_smoothiters
+    
+    Run this many iterations of the waterflow algorithm each frame.
+    
+Smooth Rate:
+    #id: rainflow_smoothrate
+    
+    Higher values smooth out the water flow more.
+
+    
+== Debris ==
+
+Entrainment is the process of debris lifting by an erosion agent (water, wind, or slumping).
+
+Entrainment Rate:
+    #id: entrainment
+    
+    The proportion of entrained material that is dragged along with slumping material.
+
+~~~ Settle ~~~
+
+Iterations:
+    #id: settle_iterations
+    
+    How many iterations of the spread algorithm to run for each frame.
+    
+Spread Rate:
+    #id: settle_rate
+    
+    How quickly debris spreads over the terrain with each iteration.
+    
+Repose Angle:
+    #id: settle_repose
+    
+    The maximum slope (measured in degrees from the horizontal) at which loose solid material will remain in place without sliding.
+
+
+== Bedrock ==
+
+Bedrock Override:
+    Each frame of simulation the bedrock layer will be replaced with
+    this layer in the second input.  If not present, no replacement is
+    done.
+
+Adjust Height by Bedrock Change:
+    When the bedrock is changed, also adjust the terrain height.  This
+    allows for mountain building where the second input has an animated
+    mountain growing, the net new height is added each frame while
+    erosion occurs.
+
+~~~ Strata ~~~
+
+Adjust Erodability by Strata:
+    Adjusts how erodable rock is by how far it is away from the reference
+    bedrock layer.
+
+Strata Depth:
+    The depth for the strata.  The Strata Erodability ramp uses this depth
+    to control how deep it represents.   A positive values means the strata
+    represents hardness below the bedrock layer.  Negative values mean
+    the strata represents hardness above the bedrock layer.
+
+Clamp at Strata Bounds:
+    Depths outside of the strata range will be clamped to the ends of the
+    ramp.  If clamping is off, they will repeat forming a periodic pattern.
+
+Strata Erodability:
+    How erodable rocks are at different strata depths.  The left most
+    is at the bedrock reference layer, the right most at the extreme
+    strata depth.  Values of 1 are fully erodable, such as loose dirt,
+    and values of 0 prevent erosion, like granite.
+
+== Layers ==
+
+The options on this tab control what the node does if the input contains layers this node normally generates from scratch.
+
+Remove Debris Layer from Input Height Layer:
+    #id: debris_removefromheight
+    
+    If the input already has a debris layer (for example from a previous erode node, or painted manually), keep it as debris but ignore it in this node's erosion calculations.
+    
+Remove Water Layer from Input Height Layer:
+    #id: water_removefromheight
+    
+    If the input already has a water layer (for example from a previous erode node, or painted manually), keep it as water but ignore it in this node's erosion calculations.
+    
+Reset Water Layer:
+    #id: clearwater
+    
+    If the input already has a water layer, delete it.
+    
+Reset Debris Layer:
+    #id: cleardebris
+    
+    If the input already has a debris layer, delete it.
+    
+Add Debris Layer to Final Height Layer:
+    #id: debris_addtoheight
+    
+    Use the values in the debris layer to add to the height layer. You might turn this off, for example, if you plan to represent the debris layer some other way, such as a separately shaded volume, or instanced rock geometry.
+
+Add Water Layer to Final Height Layer:
+    #id: water_addtoheight
+    
+    Use the values in the water elevation layer to add to the height layer. The default is off. This will "bake" the water level into the height values, so for example pooled water will become flat terrain. This might be useful if you just want a very simple output where you will just color the "water" areas with a flat color.
+
+
+== Bindings ==
+
+The controls on this tab let you change the default names of the layers the node looks for/creates.
+
+[Include:_heightfield_common#heightlayer]
+    
+Water Layer:
+    #id: waterlayer
+    
+    The name of the layer containing the water elevation (default `water`).
+
+Material Layer:
+    #id: materiallayer
+    
+    The name of the layer containing the debris elevation (default `debris`).
+
+Bedrock Layer:
+    #id: bedrocklayer
+
+    The reference layer for determining how far the current height
+    has eroded.  If not present on the input, is set to the original
+    height of the terrain.
+    
+Flow Layer:
+    #id: flowlayer
+    
+    The node outputs a `flow` layer representing the _cumulative_ water flow. This layer has two signed components (x and y) representing the flow direction in voxel space. Because this is cumulative, if water flows left, then flows right, those two motions will cancel and the x component would be 0.
+
+Flow Dir Layer:
+    #id: flowdirlayer
+    
+    The node outputs a `flowdir` layer containing vectors showing the average direction of flow at each voxel.
+
+
+== Simulation ==
+
+Reset Simulation:
+    #id: resimulate
+    
+    Click to clear the simulation cache. Be careful clicking this if you are not viewing the first frame. Houdini will have to re-simulate every frame up to the one you are viewing, which can be slow if you are on a high frame number.
+    
+Start Frame:
+    #id: startframe
+    
+    The node does not start simulation erosion until this frame. The default is `1` (the first frame).
+
+Sub Steps:
+    #id: substep
+    
+    The number of simulation substeps to run at each frame. Higher numbers give better results but are slower.
+
+Cache Simulation:
+    #id: cacheenabled
+    
+    Caches completed simulation frames in memory, for interactive scrubbing. For very large erosions, turning this option off is the best way to save memory.
+    
+Allow Caching To Disk:
+    #id: cachetodisk
+    
+    When __Cache simulation__ is on and this option is on, the simulation will start caching frames to disk when it reaches the __Cache memory__ limit. Frames on disk will be slower to load than frames in memory, but still faster than re-simulating. When this option is off and the simulation reaches the limit, it simply starts deleting the oldest frames from the cache.
+
+Cache Memory (MB):
+    #id: cachemaxsize
+    
+    The maximum amount of memory (in megabytes) to use to cache simulated frames.
+
+
+== Visualization ==
+
+This tab contains options for visualizing the height and other layers. These are the same options as on the [Height Field Visualize|Node:sop/heightfield_visualize] node.
+
+Visualize:
+    #id: dovisualize
+    
+    Applies a visualization material so you can see an elevation color ramp on the height field and see the water and debris layers as different colors.
+
+[Include:heightfield_visualize#vis_computerange]
+
+[Include:heightfield_visualize#vis_minelevation]
+
+[Include:heightfield_visualize#vis_maxelevation]
+
+[Include:heightfield_visualize#vis_heightramp]
+
+[Include:heightfield_visualize#vis_layer3]
+

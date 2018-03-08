@@ -1,0 +1,108 @@
+= hou.Face =
+#type: homclass
+#cppname: HOM_Face
+#superclass: hou.Prim
+#group: geo
+"""A Face is a kind of geometry primitive (Prim object) that contains a
+sequence of vertices (Vertex objects).  How these vertices are used depends on
+the type of face; polygons, for example, use the vertices to define the
+edges of the polygon, while NURBS curves use them as control points."""
+
+A [Hom:hou.Surface], on the other hand, stores a two dimension grid of
+vertices, and might be a NURBS surface, Bezier surface, or quadrilateral mesh.
+
+@methods
+
+::`addVertex(self, point)` -> [Hom:hou.Vertex]:
+    #cppname: HOM_Face::addVertex
+    Create a new vertex inside this face, adding it to the end of the vertex
+    list.  You would typically call this method from the code of a
+    Python-defined SOP.
+
+    `point` is a [Hom:hou.Point] object that the new vertex will refer to.  See
+    [Hom:hou.Vertex] for information on the relationship between points and
+    vertices.
+
+    Raises [Hom:hou.GeometryPermissionError] if this geometry is not modifiable.
+
+    {{{
+    #!python
+    # These arrays define point positions and a set of polygons composed
+    # of those points.  Note that the point positions could also be floating
+    # point values.
+    point_positions = ((0,0,0), (1,0,0), (1,1,0), (0,1,0))
+    poly_point_indices = ((0,1,2), (2,3,0))
+
+    geo = hou.pwd().geometry()
+
+    # Create all the points.
+    points = []
+    for position in point_positions:
+	points.append(geo.createPoint())
+	points[-1].setPosition(position)
+
+    # Now create the polygons, adding vertices that refer to the points.
+    for point_indices in poly_point_indices:
+	poly = geo.createPolygon()
+	for point_index in point_indices:
+	    poly.addVertex(points[point_index])
+    }}}
+
+    See also:
+    - [Hom:hou.Geometry#createPoint]
+    - [Hom:hou.Geometry#createPolygon]
+
+::`isClosed(self) -> bool`:
+    #cppname: HOM_Face::isClosed
+    #replaces: Exp:isclosed
+    Return whether the first and last vertex are connected.
+
+    An open face forms a multi-segment line or curve, since the first and last
+    vertices are not connected.  A closed face forms a very thin surface.
+
+::`setIsClosed(self, on)`:
+    #cppname: HOM_Face::setIsClosed
+    Set whether the face is open or closed.  See [Hom:hou.Face#isClosed] for
+    more information.  You would typically call this method from the code of a
+    Python-defined SOP.
+
+    Note that this method will raise [Hom:hou.OperationFailed] on a Bezier
+    curve.  See [Hom:hou.Geometry#createBezierCurve] for more information.
+
+    Raises [Hom:hou.GeometryPermissionError] if this geometry is not modifiable.
+
+::`setOpen(self, on)`:
+    #cppname: HOM_Face::setOpen
+    #status: ni
+
+::`normal(self)` -> [Hom:hou.Vector3]:
+    #cppname: HOM_Face::normal
+    Return the vector that's perpendicular to the face.
+
+::`positionAt(self, u)` -> [Hom:hou.Vector3]:
+    #cppname: HOM_Face::positionAt
+    #replaces: Exp:primuv
+    Given a normalized (i.e. from 0 to 1) u value, return the position
+    of the curve at that parametric location.
+
+::`attribValueAt(self, attrib_or_name, u, du=0)` -> `int`, `float`, `str` or `tuple`:
+    #cppname: HOM_Face::attribValueAt
+    #replaces: Exp:primuv
+    Return an attribute value at a normalized u parametric position on
+    the curve.  If du is 0, returns the interpolated attribute value;
+    otherwise, returns the derivative of the attribute value.
+
+    Raises [Hom:hou.OperationFailed] if the attribute is not a point or vertex
+    attribute.  If you want a primitive attribute value, it doesn't vary across
+    the surface, so use [Hom:hou.Prim#attribValue].
+
+::`degree(self)`:
+    #cppname: HOM_Face::degree
+    #replaces: Exp:degree
+    #status: ni
+
+::`arcLength(self, u_start, u_stop)`:
+    #cppname: HOM_Face::arcLength
+    #replaces: Exp:arclen
+    #status: ni
+

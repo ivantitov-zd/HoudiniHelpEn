@@ -1,0 +1,417 @@
+= Organizing, customizing, and annotating <| nodes and networks =
+
+#action_context: h.pane.wsheet
+
+"""How to keep your networks neat and well documented."""
+
+:vimeo: Stickies, network boxes, and background images
+    #id: 204582216
+
+
+== Routing wires with dots ==
+
+You can use [dots|wire#dots] to make wires follow a specific route instead of just going straight from output to input. This can be useful for preventing long wires from overlapping other nodes, or to make organization of the network clearer.
+
+See [how to create and edit dots|wire#dots] for more information.
+
+
+== Switching in networks ==
+
+Often when you're creating networks you want to check the effect of a change, or switch back and forth between different versions of the network, to find problems or explore different looks.
+
+Houdini includes several tools for switching parts of the network on or off:
+
+Switch node:
+    Most network types have a [Switch node|Node:sop/switch] type that lets you choose which upstream branch of a network cooks. Often you switch based on the result of an expression, but you can also use a Switch and manually change the active input to quickly switch between different branches.
+
+Bypass flag:
+    Some network types let you turn on a [Bypass flag|flags] on a node to make the node have no effect. For example, in a geometry network, a bypassed node passes the geometry through without modifying it.
+
+Display or Output flag:
+    A geometry network only cooks the nodes necessary to generate the node with the [display flag|flags#display]. You can have a multiple branches of the network generating different outputs (for example, to allow to check the effect of different node combinations or settings), and switch between them by moving the display flag to the end of the different branches.
+
+Rewriting:
+    You can leave sections of the network disconnected and [rewire|wire#rewire] into them to switch to them. This might be useful, for example, to keep an abandoned implementation around in case you want to refer to it later. However, if you're switching back and forth frequently, inserting a Switch node is more convenient than rewiring.
+
+
+== Customizing node shape and color == (custom)
+#index: document
+
+:vimeo: Colors, shapes, and navigator
+    #id: 204999971
+
+You can customize the shapes and colors of individual nodes to help make them stand out in the crowd, allowing you to locate them visually, especially when you're zoomed out.
+
+:task: Change a node's shape or color:
+    # In the network editor, choose __Tools > Show Palette: Shapes__ or __Colors__. (You can also press [Z|Key:h.pane.wsheet.shape_palette] or [C|Key:h.pane.wsheet.color_palette] to show/hide the palettes.)
+    
+    # Drag a shape/color from the palette onto a node, or select one or more nodes and click a shape/color in the palette.
+    
+    You can resize the palette by dragging the corner.
+    
+    [Image:/images/nodes/node_shapes.png]
+
+:task: Change the default shape/color for all nodes of a certain type:
+    Hold ((Ctrl)) when drag a shape or color onto a node (see above).
+    
+    Note that this any nodes of the same type that already have their own individual custom shape or color will keep them.
+
+:task: Customize the color palette:
+    Right click a color in the palette to add, edit, or remove colors.
+    
+    Changes are saved only for that pane on the current [desktop|/basics/panes]. To make the current palette the new default, right click the palette and choose __Save as defaults__.
+
+:task: Turn off display of custom shapes:
+    In the network editor, turn off __View > Show custom node shapes__.
+    
+    (You can also set the __Use simplified shape when node shapes off__ option in __Edit > Preferences > Network editor__. This makes the network editor use a simplified rectangle shape when __Show custom node shapes__ is off. This may speed up the display of extremely dense networks.) 
+
+
+=== Themes === (themes)
+
+You can create themes with customized node shapes and colors, and switch between themes.
+
+:task: Show the Themes tab:
+    # In the network editor, click the [Icon:BUTTONS/displayoptions] Display Options button in the toolbar to open the Display Options window.
+    
+    # Click the __Themes__ tab.
+
+:task: Switch to a different theme:
+    On the __Themes__ tab of the display options, click __Default node colors__ or __Default node shapes__ and choose a theme.
+    
+    For example, there is a No Color color theme, or a Flair shape theme that has more interesting shapes for Bone and Light objects.
+
+:task: Start a new color or shape theme:    
+    # On the __Themes__ tab of the display options, click __Default node colors__ or __Default node shapes__ and choose "Duplicate current theme".
+    
+    # Enter a name for the new theme.
+
+:task: Delete a custom theme:
+    # On the __Themes__ tab of the display options, click __Default node colors__ or __Default node shapes__ and switch to the theme you want to delete.
+    
+    # Click the menu again and choose "Delete current theme".
+
+
+=== Bulk changes ===
+
+* You can set the color or shape of multiple nodes at once by selecting the nodes and then clicking in the color or shape palette.
+
+* Default color and shape assignments are set for various node types in the `OPcustomize` file. You can put your own `OPcustomize` file in the `HOUDINIPATH` (for example, in `$HOUDINI_USER_PREF_DIR`) to override the defaults using the [Cmd:opdefaultshape] and [Cmd:opdefaultcolor] commands.
+
+* You can get or change custom node colors using the [Hom:hou.Node#color] and [Hom:hou.Node#setColor] methods with the [Hom:hou.Color] class:
+
+    {{{
+    #!pycon
+    >>> n = hou.node("/obj/geo1/box1")
+    >>> n.setColor(hou.Color(0.996, 0.682, 0.682))
+    >>> n.color()
+    <hou.Color r=0.996, g=0.682, b=0.682)
+    }}}
+
+* Custom shapes are stored as "user data" on the node. You can get or change the node shape programmatically using the [Hom:hou.Node#userData] and [Hom:hou.Node#setUserData] methods:
+
+    {{{
+    #!pycon
+    >>> n = hou.node("/obj/geo1/box1")
+    >>> n.setUserData("nodeshape", "tilted")
+    >>> n.userData("nodeshape")
+    "tilted"
+    }}}
+    
+    When the `nodeshape` user data is empty, or does not contain a valid shape name, the node uses the default shape for its type (set in the `OPcustomize` file, see above).
+    
+    An easy way to reset any node to its default shape is:
+    
+    {{{
+    #!python
+    node.setUserData("nodeshape", None)
+    }}}
+
+* The [Hom:NodeType#defaultShape] method returns the name of the default shape for a given node type. (If the default has not been customized, the method will return the empty string).
+
+* To programmatically get a list of available shape names, get a reference to a network pane tab and call [Hom:hou.NetworkEditor#nodeShapes].
+
+    {{{
+    #!python
+    >>> editor = hou.ui.paneTabOfType(hou.paneTabType.NetworkEditor)
+    >>> editor.nodeShapes()
+    ('rect', 'bone', 'bulge', ... )
+    }}}
+
+
+== Network boxes == (netbox)
+#index: document
+
+Network boxes let you group nodes together. This is useful when you can't or don't want to collapse the nodes into a subnetwork but you want to distinguish them from other nodes.
+
+* Moving the box moves the nodes inside with it.
+
+* You can use a network box to highlight a group of nodes.
+
+* You can minimize the box to hide parts of the network, or keep the network tidy by only expanding the parts you're working on.
+
+For example you could group the nodes representing different limbs of a character rig in different boxes. Or you could put different distinct "stages" of a geometry pipeline in different boxes.
+
+TIP:
+    You can embed network boxes inside other network boxes, as well as [sticky notes#notes] and [images|#images].
+
+:task: Create a network box:
+    # Select the nodes you want inside the new box.
+    
+    # In the network editor menus, choose __Add > Network box__.
+
+:task: Give a network box a title:
+    Double click in the top bar of the box to edit the network box title. This can be useful to annotate the box's contents.
+
+:task: Add or remove items to/from a box:
+    Drag the node onto or out of the box.
+    
+    You can drag an item slowly toward the edge of a box to expand the box, or drag quickly to remove the item from the box.
+
+:task: Move or resize a network box:
+    * Drag the bar across the top of a box to move the box.
+    
+    * To resize a box, drag one of the corners.
+    
+    * You can drag an item slowly toward the edge of a box to expand the box, or drag quickly to remove the item from the box.
+
+:task: Resize a network box to fit its contents:
+    Select the box and choose __Layout > Resize network boxes to fit__.
+
+:task: Remove a network box:
+    # Select the box.
+    
+    # Do one of the following:
+
+        * To delete just the box and leave its contents behind, choose __Edit > Delete__ or press ((Del)).
+    
+        * To delete the box _and its contents_, choose __Edit > Delete with network box contents__ or press ((Shift + Del)).
+
+:task: Minimize and restore network boxes:
+    You can collapse a box down to its top bar to save space or create a cleaner look when you are not working on the box contents.
+    
+    * Click the +(fa-minus) minus button in the sticky note's top bar to collapse it. Click the +(fa-plus) button in a collapsed sticky to restore it to regular size.
+    
+    * If you hold ((Ctrl)) and click the minimize/restore button, the editor will move other nodes around the netbox to account for its new size.
+
+:task: Assign colors to network boxes:
+    # In the network editor, choose __Tools > Show Palette: Colors__ to show the color palette.
+    
+    # Select the box and click a color, or drag a color onto the box.
+
+:task: Manipulate network boxes using Python:
+    Network boxes have an internal name you can use to script them, but it's not displayed in the network editor (the text in the netbox title bar is actually the netbox's comment string).
+    
+    * To create a network box, call [Hom:hou.Node#createNetworkBox] on the parent network.
+    
+    * To manually get a reference to an individual netbox, drag the network box from the network editor into the Python shell.
+    
+    * To get a reference to a netbox by name, call [Hom:hou.Node#findNetworkBox] on the parent network.
+    
+    * To get a list of all network boxes in a network, call [Hom:hou.Node#iterNetworkBoxes] on the network.
+    
+    * To get the selected netbox(es), call [Hom:hou.Node#selectedItems] (not `selectedChildren`, which only returns nodes) on the parent network and check the class of the items in the returned list. For example:
+    
+        {{{
+        #!python
+        network = hou.pwd()
+        selected_boxes = [item for item in network.selectedItems()
+                          if isinstance(item, hou.NetworkBox)]
+        }}}
+    
+    * See [Hom:hou.NetworkBox] for methods you can call on a netbox object.
+
+
+== Sticky notes == (notes)
+#index: document
+
+Sticky notes are boxes of text in the network. You can use them to explain parts of the network to other people working on the network (or to your future self!).
+
+:task: Create a sticky note:
+    In the network editor, choose __Add > Sticky note__, or click the [Icon:BUTTONS/network_sticky] Add sticky note button on the toolbar, or press ((Shift + P)).
+    
+    You can drag the sticky note to move it where you want in the network.
+
+:task: Edit the contents of a note:
+    Click in the body of the note to make the text editable. When you're finished editing, click outside the note.
+
+:task: Resize a sticky note:
+    Drag one of the corners of the sticky note.
+
+:task: Minimize and restore sticky notes:
+    You can collapse a sticky note down to its top bar to save space or create a cleaner look when the sticky is not needed. Click the +(fa-minus) minus button in the sticky note's top bar to collapse it. Click the +(fa-plus) button in a collapsed sticky to restore it to regular size.
+
+:task: Change the size of the text in a note:
+    # Right click the note to show the context menu.
+    
+    # Open the __Set text size__ submenu and choose a size.
+
+:task: Change the note colors:
+    * In the network editor, choose __Tools > Show Palette: Colors__ to show the color palette.
+    
+    * Select the note and click a color, or drag a color onto the sticky note's _top bar_, to set the background color.
+    
+    * Drag a color onto the sticky note's _body_ to set the foreground color.
+
+:task: Delete a sticky note:
+    Select the note and choose __Edit > Delete__ or press ((Del)).
+
+:task: Manipulate sticky notes using Python:
+    Sticky notes have an internal name you can use to script them, but it's not displayed in the network editor.
+    
+    * To create a sticky note, call [Hom:hou.Node#createStickyNote] on the parent network.
+    
+    * To manually get a reference to an individual note, drag the note from the network editor into the Python shell.
+    
+    * To get a reference to a note by name, call [Hom:hou.Node#findStickyNote] on the parent network.
+    
+    * To get a list of all notes in a network, call [Hom:hou.Node#iterStickyNotes] on the network.
+    
+    * To get the selected note(s), call [Hom:hou.Node#selectedItems] (not `selectedChildren`, which only returns nodes) on the parent network and check the class of the items in the returned list. For example:
+    
+        {{{
+        #!python
+        network = hou.pwd()
+        selected_notes = [item for item in network.selectedItems()
+                          if isinstance(item, hou.StickyNote)]
+        }}}
+    
+    * See [Hom:hou.StickyNote] for methods you can call on a netbox object.
+
+
+=== Using sticky notes as big labels ===
+
+You can turn off the background of a sticky note to create the appearance of a free-floating label. These labels can be useful to annotate large-scale sections of the network. Making the text large makes the labels visible at far zoom.
+
+[Image:images/big_labels.png]
+
+# Create a sticky note and type a (short) label in it.
+
+# Resize the note so it just fits the label inside.
+
+# Right click the note and choose __Set text size > Large__ or __Extra large__.
+
+    ~~~ or ~~~
+    
+    Hold ((Shift)) and resize the note to resize the text at the same time.
+
+# Right click the note and choose __Hide background__.
+
+
+== Collapsing node branches == (collapse)
+
+It's possible to collapse a node branch down to a small stub representing the branch on an input. Parameter nodes for promoted parameters on VOP shaders start out collapsed to keep the network cleaner. You can select the nub to select the hidden Parameter node it represents.
+
+* Selecting the stub is the same as selecting the nearest collapsed node.
+
+* Double-click a stub to expand the collapsed branch.
+
+* To collapse the inputs to a node, right-click the node and choose __Inputs > Hide inputs__.
+
+Hiding nodes can make the network harder to understand for other users if they don't notice part of the network is hidden. You might want to use other organization tools (such as collapsing [network boxes|organize#netbox]) to clean up the network instead.
+
+
+== Working with subnetworks ==
+#index: document
+
+Subnetworks let you encapsulate multiple nodes inside a single node, streamlining your network visually and conceptually. Note that putting nodes inside a subnetwork changes their path.
+
+The subnetwork node can have up to four inputs, which are passed down to special nodes inside the subnetwork.
+
+:task:Create an empty subnet:
+    * Use the [tab menu|/basics/tabmenu] to create a `Subnetwork` node.
+    
+:task:Create a subnetwork from existing nodes:
+    # Select the nodes you want to go inside the new subnet.
+
+    # Right click one of the nodes and choose __Collapse Selected into Subnet__.
+
+:task:Move one or more nodes inside a subnetwork:
+    # Select the node(s) and choose __Edit > Cut__.
+        
+    # [Go inside|navigate] the subnetwork and choose __Edit > Paste__.
+
+:task:Connect the subnet's inputs to node inputs inside the subnet:
+    # Go inside the subnet.
+
+    # The network view shows four pseudo-nodes which represent the
+      subnet's inputs. Connect the output of one of the pseudo-nodes
+      to the input of one of the real nodes in the subnet.
+
+:task:Choose the subnet's output:
+    * Set the  [display flag|/nodes/sop] of the node you want to provide
+      the subnet's output.
+
+:task:Label the subnet's inputs:
+    # View the subnet's parameters in the  [parameter
+      editor|/ref/panes/parms] and click the Subnet tab.
+
+    # Edit the __Input # Label__ text fields to control the message
+      that pops up when the user presses ((MMB)) on the inputs.
+
+
+== Node comments == (comments)
+
+You can edit the "comment" string for any node. By default this text is only visible in the [info window|nodes#info], but you can make the comment appear next to the node in the network editor. This is useful for networks that will be shared with other people, to let you explain the node's function in more detail than the name alone can express. It can be especially useful in "demo" or "example" networks.
+
+:task: Edit a node's comment field:
+    # In the network editor, [open the node's info window|nodes#info].
+
+    # Click in the comment field in the info window to edit it.
+
+:task: Show a node's comment next to the node in the network:
+    # In the network editor, [open the node's info window|nodes#info].
+
+    # Turn on __Show comment in network__ below the comment field.
+
+
+== Network background images == (images)
+#index: document
+
+:task: Add a background image:
+    In the network editor, choose __Add > Background image__, or click the [Icon:BUTTONS/add_image] Add background image button on the toolbar.
+
+:task: Edit background images:
+    In the network editor, turn on __Tools > Edit background images__.
+    
+    * Drag the image to move it, or drag the corners of an image to resize it.
+    
+    * Click an image to select it, and use the icons to delete, link, or adjust the image.
+
+        [Icon:NETVIEW/image_delete] |
+            #style: background-color: #333333
+            
+            *Delete* |
+                Delete this image.
+
+        [Icon:NETVIEW/image_link] |
+            #style: background-color: #333333
+            
+            *Link to node* |
+                Drag from this icon to a node to keep the image positioned relative to the node.
+
+        [Icon:NETVIEW/image_bright] |
+            #style: background-color: #333333
+            
+            *Brightness slider* |
+                Drag the slider to make the image more or less faded.
+    
+    * When you're done editing images, turn off __Tools > Edit background images__.
+
+:task: Link an image to a node so it moves with the node:
+    # In the network editor, turn on __Tools > Edit background images__.
+    
+    # Click the image to select it.
+    
+    # Drag from the [Icon:NETVIEW/image_link] link icon to the node you want the image to follow.
+    
+    # Turn off __Tools > Edit background images__.
+    
+    Now if you drag the node, the image will move with it.
+    
+    :video:
+        #src: videos/link_image.mp4
+
+
+
+

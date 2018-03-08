@@ -1,0 +1,284 @@
+#type: node
+#context: cop2
+#internal: file
+#icon: COP2/file
+
+= File =
+
+"""Loads image files into Houdini."""
+
+This COP loads image files into Houdini. Files without an animated time
+or frame in the filepath (i.e. _default.pic, butterfly1.pic_) are
+interpreted as single images. Otherwise, the last number in the filename
+(ignoring the extension) is considered to be the frame number of the
+image.
+
+For numbered files, the frame range is automatically computed by
+searching the directory where the files found. Missing or bad frames
+will be replaced with black or neighboring frames, depending on the
+'Missing Frames' parameter. Missing frames at the beginning or end of
+the sequence cannot be automatically detected, though bad frames can be
+replaced.
+
+== Using Proxy Images ==
+
+    Lower resolution images can be used in place of full-resolution
+    images to speed up loading or to conserve space. Proxy filenames are
+    entered in the __Proxy__ tab. The images files themselves should be an
+    integer reduction of the image (1/2, 1/3, 1/4, etc). The main files
+    do not need to exist in order to use proxy files (the largest proxy
+    files will be used).
+
+    More than one proxy file can be entered. Houdini will use the closest
+    proxy image resolution not smaller than the current cook resolution
+    (so if you were cooking at 1/3, and there were proxy images for 1/2
+    and 1/4 resolution, the 1/2 resolution images would be loaded and
+    scaled down, rather than up-scaling the 1/3 resolution images).
+
+    NOTE:
+        Currently, the proxy images should be the same image format as
+        the main images. This may change in the future.
+
+
+@parameters
+
+    == File ==
+
+        File:
+            The path of the file(s) to load. The file is searched for
+            using the HOUDINI_TEXTURE_PATH. Multiple files can be
+            specified with `$F`, `$I` or a more complicated expression for
+            frame numbers.
+        File Node Naming:
+            The File Node renames itself to match the current file
+            settings. This parameter controls how the new name is built.
+            __User Defined__ or __File Operator__ will disable this behavior.
+            Changing the name manually will automatically switch this
+            parameter to __User Defined__.
+	Detect Subframes:
+	    The character "." is treated as a decimal, and sequences of
+	    images with fractional frame numbers are loaded. Each fractional
+	    frame is placed at the next available integer frame in the
+	    sequence (1,2,3...), rather than at subframes (1, 1.25, 1.5...). 
+        File Size:
+            Specifies the size of the file to load, either by at the
+            natural resolution or a custom size.
+        Image Filter:
+            When the file size is overridden, this specifies the image
+            filter to use when scaling.
+        Pixel Aspect Ratio:
+            Specifies the pixel aspect ratio of the image.
+        Flip Image:
+            Flips the image vertically if on.
+        File Raster Depth:
+            Selects how the raster depth is determined.
+
+            Natural Depth:
+                The image file's depth is used.
+            Project Depth:
+                The depth specified in the __Composite Project__ settings
+                is used, overriding the file's natural depth.
+            Specific Depth:
+                The following Depth parameter selects the raster depth,
+                overriding the file's natural depth.
+	Linearize Non-linear Images:
+            When enabled, planes with non-linear colorspaces will be converted 
+            to linear colorspace. If the colorspace is unknown, only 8b images
+            will be assumed to be sRGB. 8b non-linear planes will always be
+            upconverted to at least 16b float, unless the __File Raster Depth__
+            explicity sets a different format.          
+	Image Color Space:
+	    When __Linearize__ is enabled, the image color space is determined
+            by looking at the image file itself. In some cases, the file may
+            contain an image in a colorspace that is different that the one
+            the format specifies (ie, an sRGB image in an OpenEXR file, which
+            the format dictates should be linear). This parameter allows you 
+            to explicitly state the color space of the loaded image, which may
+            affect if the image is linearized (sRGB) or not (Linear). This 
+            parameter is not used if __Linearize Non-linear Images__ is off.
+
+            Autodetect from File:
+                Use the image format or image file to determine the colorspace.
+            Linear:
+                Assume the image is in linear space, ignoring the file or 
+                format's colorspace. The image will not be linearized.
+            sRGB:
+                Assume the image is in sRGB space, ignoring the file or 
+                format's colorspace. The image will be run through a inverse
+                sRGB transform.
+           
+        Depth:
+            If the File Raster Depth parameter is set to Specific, this
+            parameter sets the raster depth used for the files.
+        Override Frame Range:
+            If off, the frame range is automatically determined by the
+            lowest and highest frame numbers found in the file pattern.
+            Otherwise the __File Range Start__, __File Range Length__, and
+            __Shift to Start at Frame__ parameters set the range.
+        Detect Frame Range:
+            If __Override Frame Range__ is on, you can do a one-time frame
+            range detect of the sequence by pressing this button. It
+            will put the range values into the following parameters.
+        Still Image:
+            When checked, only the first image in the file range will be
+            read and a still image will be created instead of a
+            sequence.
+        Shift to Start at Frame:
+            Specifies the frame where the sequence should start. If
+            this number is different from the file range start, the
+            sequence will be shifted appropriately.
+        File Range Start:
+            Specifies the number of the first file where the sequence
+            should start. For example, if the file name is `file$F.tiff`
+            and the file range start is 15, the first file in the
+            sequence will be `file15.tiff`. By default, this number is
+            determined from the first file found matching the file name
+            pattern, but it can be changed to create a sequence of a
+            subset of the files.
+        File Range Length:
+            Specifies the length of the sequence. By default, this
+            number is the number of files matching the pattern. It can
+            be changed to create a sequence of a subset of the files.
+        Missing Frames:
+            If a frame is missing in the sequence, this parameter
+            specifies how to handle it.
+        Missing Frames:
+            For bad or missing frames, the File COP can either use a
+            black frame or a neighboring frame.
+
+            Use Closest Frame:
+                Searches forward and backward in the frames to find a
+                substitution. The closest frame is used; in the event of
+                a tie, the previous frame is taken.
+            Use Previous Frame:
+                Searches backward from the missing frame to find a
+                replacement.
+            Use Next Frame:
+                Searches forward from the missing frame to find a
+                replacement.
+            Use Black Frame:
+                Bad and missing frames are replaced with a black frame.
+            Report Error:
+                The File node errors when a bad or missing frame is
+                found.
+        Print Warning for Missing Frames:
+            If on, a message is printed to the shell when a missing or
+            bad frame is encountered (ie, `/img/img1/file1: Missing frame 1`).
+
+    == Proxy ==
+
+        Enable Proxy Files:
+            Enables the use of proxies, which are smaller versions of
+            the full sized images. A proxy sequence should be identical
+            to the original sequence, except for the resolution. When
+            cooking the file COP at other resolutions than the proxy
+            resolutions, the closest larger proxy sequence is used.
+        1/2, 1/4, 1/8 Res Proxy:
+            Specifies the proxy sequence to use for 1/2, 1/4 and 1/8 of
+            the full resolution.
+        Custom Proxy:
+            Allows you to specify other proxy resolutions and their
+            proxy sequences.
+
+    == Mask ==
+
+        A mask can be chosen to limit the effect of the operator to
+        areas defined by the mask. The mask can be taken from the mask
+        input (bottom input) or from the first input itself.
+
+        Effect Amount:
+            #channels: /effectamount
+
+            If no mask is present, this blends the output with the input
+            by a constant amount (0 = all input, 1 = all output).
+
+            If a mask is present, this amount multiplies the mask.
+
+        Operation Mask:
+            #channels: /maskinput /maskplane
+
+            Selects the mask plane to use as a mask from the mask input.
+
+            A mask can be a component of a plane or an entire plane. If
+            a vector plane is supplied as a mask, its components are
+            multiplied by the images' components.
+
+            *Scalar Mask ('A', 'C.r')*
+
+            {{{
+            C.r = I.r * M
+            C.g = I.g * M
+            C.b = I.b * M
+            
+            }}}
+            *Vector Mask ('C')*
+
+            {{{
+            C.r = I.r * M.r
+            C.g = I.g * M.g
+            C.b = I.b * M.b
+            
+            }}}
+        Resize Mask to Fit Image:
+            If the mask image is a different resolution than the output
+            image, turning on this parameter will scale the mask to the
+            output image's resolution.
+
+            If this node is changing constantly, and the mask is not, it
+            is somewhat faster to put a [Scale COP|Node:cop2/scale] down to do the resize
+            for the mask image. Otherwise, the scale will occur every
+            time this node cooks.
+
+        Invert Mask:
+            Inverts the mask so that all fully 'masked' portions become
+            unmasked. This saves you from inserting an [Invert COP|Node:cop2/invert] after
+            the node with the mask.
+
+    == Sequence ==
+
+        This tab contains parameters which deal with the timing and
+        frame range of the generated sequence.
+
+        Pre Extend:
+            For sequences with a frame range, this determines how to
+            show frames before the start frame.
+
+            Black Frames:
+                Display black.
+            Cycle:
+                Cycle the sequence, always playing it forward.
+            Mirror:
+                Cycle the sequence, reversing the direction every
+                cycle.
+            Hold:
+                Hold the first frame indefinitely.
+            Hold N Frames:
+                Hold the first frame for a certain number of frames;
+                before that, show black frames.
+        Pre Hold:
+            #channels: /prehold
+
+            The number of frames to hold the first frame for, if __Hold
+            N Frames__ is selected.
+        Post Extend:
+            For sequences with a frame range, this determines how to
+            show frames after the last frame.
+
+            Black Frames:
+                Display black.
+            Cycle:
+                Cycle the sequence, always playing it forward.
+            Mirror:
+                Cycle the sequence, reversing the direction every
+                cycle.
+            Hold:
+                Hold the last frame indefinitely.
+            Hold N Frames:
+                Hold the last frame for a certain number of frames;
+                after that, show black frames.
+        Post Hold:
+            #channels: /posthold
+
+            The number of frames to hold the last frame for, if __Hold N
+            Frames__ is selected.
+

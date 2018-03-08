@@ -1,0 +1,159 @@
+= Triangulate 2D =
+
+#type: node
+#context: sop
+#internal: triangulate2d
+#icon: SOP/triangulate2d
+#tags: polygons, topology, cleanup, cloth
+#index: no
+
+"""Connects points to form well-shaped triangles."""
+
+Triangulate 2D connects 2D points in the input geometry to create
+"well-shaped" triangles (roughly similar sizes without acute angles). If
+the input points are not planar, Triangulate 2D will project them onto a
+plane.
+
+* To triangulate the input without adding new points, turn off
+  __Refine__ and leave __Constraint primitives__ empty.
+
+* To increase the number of points to allow better triangles, turn on
+  __Refine__. You can control the triangle quality with the __Maximum
+  Area__ (controls triangle size) and __Minimum Angle__ (larger values
+  prevent long skinny triangles with acute angles) parameters.
+
+* To make sure certain boundary edges are present in the final
+  triangulation, enter the primitive number(s) of the edge(s) in the
+  __Constraint primitives__ parameter.
+
+  Turn on __No New Points on Constraints__ to prevent Triangulate 2D
+  from adding points to the constrained primitives. Turn on __Remove
+  Edges Outside Constraints__
+
+TIP:
+    To introduce randomness into the triangulation, pipe the original
+    geometry through a [Scatter SOP|Node:sop/scatter] to add extra
+    points at random locations.
+
+Technically, Triangulate 2D produces a _constrained Delaunay
+triangulation_, and the refinement process is _Delaunay refinement_.
+
+@parameters
+    Points:
+        #channels: /points
+
+        Subset of points to use for triangulation.
+    Refine:
+        #channels: /refine
+
+        Improves the quality of the triangulation by adding new points.
+        The triangulation will include some new points beyond the ones
+        in the input, but the triangles will have better shapes.
+        Specifically, this guarantees the output triangles respect the
+        __Maximum Area__ and __Minimum Angle__ parameters.
+
+        If you start with the following points:
+
+        [Image:../images/tri2d_refine_original.png]
+
+        With __Refine__ off, Triangulate 2D will create triangles using
+        the available points, and may in the process introduce
+        undesirable long skinny triangles:
+
+        [Image:../images/tri2d_refine_off.png]
+
+        With __Refine__ on, Triangulate 2D will add points to create
+        better triangles conforming to the __Maximum Area__ and
+        __Minimum Angle__ parameters.
+
+        [Image:../images/tri2d_refine_on.png]
+
+    Maximum Area:
+        #channels: /maxarea
+
+        The maximum area for the interior of each triangle. Decrease
+        this value to get smaller and more similarly sized triangles.
+        Very small values can make the triangulation take a long time.
+    Minimum Angle:
+        #channels: /minangle
+
+        The minimum angle, in degrees, for the interior of each
+        triangle. Increasing this value to get more symmetrical
+        triangles and eliminate long skinny triangles. Values larger
+        than 30 degrees may prevent the triangulation from working.
+    Constraint Primitives:
+        #channels: /conprims
+
+        Enter the primitive numbers of primitives that should be
+        preserved in the output triangulation.
+
+        If one of the primitives is closed, you can turn on __Remove
+        edges outside constraints__ to trim away edges outside the
+        constraint primitives.
+
+        Turn on __No new points on constraints__ to prevent Triangulate
+        2D from inserting new points on the edges of constraint
+        primitives as it triangulates.
+
+    Remove Edges Outside Constraints:
+        #channels: /removeoutcons
+
+        Remove edges outside the constraint primitives after
+        triangulation is completed. This is useful if you just want to
+        triangulate the interior of the constraint.
+    No New Points on Constraints:
+        #channels: /nonewconpts
+
+        When this option is off, Triangulate 2D may satisfy some
+        constraints by adding new points on constraint edges. This gives
+        better triangulation, but you may not want to change the
+        topology of the constraint primitives.
+
+        Turn this option on to prevent Triangulate 2D from adding points
+        to the constraint primitives.
+
+        NOTE:
+            If __Refine__ is on, Triangulate 2D must be able to add
+            points to the constraint primitives, so this option is
+            disabled.
+
+    Create Group for New Constraint Points:
+        #channels: /makenewconptgrp
+
+        Create a point group containing any points Triangulate 2D
+        created on the constrained edges.
+    Group Name:
+        #channels: /newconptgrp
+
+        When __Create Group for New Constraint Points__ is on,
+        Triangulate 2D creates a group with this name to contain points
+        created on the constrained edges.
+    Maximum New Points:
+        #channels: /maxnewpts
+
+        Limits the number of new points that can be added during
+        triangulation. New points might be added to satisfy constraints
+        or during refinement, up to this limit. This is mostly useful to
+        ensure that the triangulation doesn't run forever, and should
+        usually be set to a value much larger than the number of points
+        you expect to generate.
+    Keep Primitives:
+        #channels: /keepprims
+
+        Keep all input primitives (except the constraint primitives) in
+        the output in addition to new primitives created during
+        triangulation.
+
+        When this option is off, the input primitives do not appear in
+        the output.
+
+    Recompute Point Normals:
+        #channels: /updatenmls
+
+        Recomputes point normals (if they exist).
+
+@related
+    - [Node:sop/divide]
+    - [Node:sop/polyreduce]
+    - [Node:sop/tetrahedralize]
+

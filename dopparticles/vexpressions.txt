@@ -1,0 +1,74 @@
+= Writing particle VEX expressions =
+
+== Background ==
+
+A powerful and much used feature of the pre-Houdini 13 particle workflow was _local variables_.
+Local variables allowed almost any parameter on a particle node to vary per-particle.
+
+In the new dynamics particle workflow, these kinds of expressions are replaced with _VEX expressions_.
+VEX expressions attempt to address the following problems with the old local variables:
+
+* Local variables were slow (compared to VEX).
+
+* Local variables were single-threaded. It was possible to write threadable expressions, but many of the common expression functions were not threadsafe, causing the whole system to fall back to single-threaded behavior.
+
+* The mapping of attributes to local variables was idiosyncratic and obscure (for example, using local variable `$CR` to access the attribute value `Cd.x`).
+
+* Local variables were difficult. Some things were simple, For example, `rand($ID)`. However, for more complicated expression things started to break down quickly. Also, if you wanted to set a number of parameters based on a common evaluation, you had to use spare parameters as helpers.
+
+== Using VEX in particle nodes ==
+
+In the parameter interface of nodes that support VEX expressions, each block of parameters has a __Use VEXpressions__ checkbox.
+
+* If the checkbox is off, the parameters use the normal Houdini expression language, but _those values cannot vary per-particle_.
+
+* When this checkbox is on, a multi-line editor appears where you can write a snippet of VEX code to evaluate on each particle at each time step.
+
+VEXpressions were not meant to replace VOPs, they were meant to augment it.
+
+The `@` in the VEX syntax is meant to stand for attribute. Houdini uses the `@` syntax in groups already. This was modified for VEX, because there was no way of determining the attribute was a vector, float, integer, or string. Prefixing with `v@` will define the type as a vector, `i@` will define the type as an integer, and `s@` will define the type as a string. 
+
+== Tips ==
+
+* When you're editing in the multi-line editor you can press ((Ctrl + Enter)) to "commit" the changes and update Houdini.
+
+* Each multi-line editor has a drop-down menu containing useful pre-made VEX snippets. The menu has a `Pass through` item which simply fills in the names of the parameters in the block assigned to themselves (for example `wind = wind;`). This may be useful as a starting point from writing your own code to override the parameter values. It is *not necessary* to assign the parameter values to themselves like this, it is simply meant to give you a list of values you might want to change in the snippet.
+
+== Writing VEX ==
+
+VEX expressions use a variation of the [VEX language|/vex] instead of the Houdini expression language.
+
+* Many of the commonly used expression functions have equivalent [VEX functions|/vex/functions] with the same name (for example, [Vex:ch], [chs|Vex:ch], [chramp|Vex:ch], [Vex:point], [Vex:relbbox], [Vex:rand], and so on).
+
+* You can access parameter values using the parameter's internal name (for example `windspeed`), and attributes using `@<<attribute_name>>`.
+
+* This is the same [VEX expression syntax|/vex/snippets] used in "wrangler" nodes such as the [Point Wrangle SOP|Node:sop/pointwrangle]. However, whereas wranglers affect geometry by directly setting attribute values, particle nodes _cannot change attribute values_ ([usually|#exports] below). Instead, they work by _reading parameter and attribute values_ and then modifying the parameters values accordingly. This lets you _change the values of the node's parameters for each particle_.
+
+    {{{
+    #!vex
+
+    // Randomize windresistance for each particle.
+    windresist *= rand(@id);
+    // Ramp up the wind speed as the particle ages.
+    windspeed *= @nage;
+    }}}
+
+* Instead of overwriting the parameter value (for example, `force = {0, 1, 0} * rand(@id);`), you should modify the existing parameter value (for example, `force *= float(rand(@id));`). This lets you use the parameter interface to vary the effect, which is easier than editing the VEX code.
+
+See [VEX snippets|/vex/snippets] for information about the special syntax, how VEX expressions differ from HScript expressions, how to test group membership, access global variables such as the current time, troubleshooting, and more.
+
+== Exports ==
+
+By default, particle nodes only export attributes they expect to change. This prevents you from accidentally creating attributes like `@mass` by trying to read them.
+
+However, when you're debugging it's sometimes useful to write arbitrary attributes onto particles so you can see the values in the [geometry spreadsheet|/ref/panes/geosheet].
+
+To force an attribute to be writable, [declare the attribute|/vex/snippets#declare] with the `export` keyword:
+
+{{{
+export float @mytest = 0;
+}}}
+
+@related
+
+* [Using VEX expressions|/vex/snippets]

@@ -1,0 +1,848 @@
+﻿= spy =
+
+"""Shell utility for navigating the UNIX filesystem."""
+
+== Overview ==
+
+If you are using a unix shell, spy is a fast text-based
+file-navigation utility for organizing your files. It provides
+greater speed in manipulating files than a GUI, while also providing
+direct access to scripts and unix commands, and being easier to use
+than the unix C shell.
+
+spy runs in a window shell, and provides an efficient interface to
+the unix file system via its single-keystroke commands. Anything you
+can normally do in a c-shell, you can do in spy, but more quickly.
+Using single keystroke commands, spy quickly navigates between
+directories, and selects files in order to perform actions on them.
+Once files are selected, you can use all the standard unix commands
+with them through the use of a unix meta-key.
+
+The most commonly used single-keystroke commands are listed in the
+[quick reference|#quick]. These commands are covered in
+greater detail in the following pages.
+
+== Navigation ==
+
+The current directory is always displayed at the top of the spy
+window.
+
+The current file is always highlighted in yellow within the spy
+window.
+
+The yellow high-light is also known as the _cursor_. You can move
+the cursor within the spy window with the following keys:
+
+((J))/ ((K)) Moves the cursor down or up a line.
+
+((H))/ ((L)) Moves the cursor one column to the left or
+right.
+
+The _search_ command moves the cursor move to a file that begins
+with the letters you specify.
+
+((/)) `string` ((Enter))
+
+Typing ((/)) and a string selects the file that begins with
+_string_. You can use standard unix wildcard characters to
+perform pattern searches. For example, entering:
+
+((/)) `Scene1*.pic` ((Enter))
+
+we are telling the search to find "any name starting with
+_Scene1_ and ending with _.pic_. This works because the _*_
+character is a wildcard character meaning any number or
+letters.
+
+Similarly, we could tell the search to find `*.txt`, in which
+case spy would search for any file that ends with the letters
+_.txt_.
+
+There is a spy option to control search behavior. See
+`relaxSearch`.
+
+Typing ((N)) moves the cursor to the next occurrence of a file
+or directory whose name starts with the string specified in the
+last search.
+
+If there are more files in a directory than can be displayed in the
+spy window, spy indicates it is displaying _Page x of y_. To flip
+between these pages, use the keys:
+
+* ((Ctrl + F)) displays the next page of files (forward).
+* ((Ctrl + B)) displays the previous page of files (backward).
+
+Each directory can contain files and other directories. Use the
+following keys to move down and up between directories.
+
+* ((D)) -- If the file that is currently highlighted with the cursor
+  is a directory, typing ((D)) moves down into that directory.
+  
+  For example, if you were in `$HFS/houdini` and the cursor was on the file
+  sbin, you will then be in `$HFS/houdini/sbin` after typing ((D)).
+
+* ((U)) -- Moves up one directory level, and enters the
+  _enclosing directory_.
+  
+  For example, if you were in $HFS/houdini/sbin,
+  you will be in $HFS/houdini after typing ((U)).
+
+((Shift + J)) Prompts you to jump to another directory. spy
+displays a default directory name, which is the previous directory
+you jumped from. There are now several choices. Do one of the
+following:
+
+* Typing ((Enter)) goes to the displayed default directory.
+
+* Typing a directory name followed by the ((Enter)) key jumps to
+  that directory. For example, typing: `$HFS/demo` ((Enter)), jumps
+  to the `$HFS/demo` directory.
+
+* Typing ((E)) re-displays the default directory, and allows you to
+  use the ((J)) and ((K)) keys to scroll through a list of
+  directories from which you have previously jumped. Type ((Enter))
+  to jump to the displayed directory.
+
+* Typing a question mark (((Shift + /))) displays a list of
+  directories from which you have previously jumped. Use the ((J))
+  and ((K)) keys to move down and up the list. Type ((Enter)) to
+  jump to the highlighted directory.
+
+* Type ((Backspace)) at any time to abort the jump.
+
+Jump not only allows jumping to a directory, but also to filenames
+within the current directory or in another directory (the cursor is
+moved to the file). Names differ from directories in that directory
+names are preceded with a slash ( / ).
+
+Environment variables can be used in pathnames, you may want to
+set up environment variables to lessen the amount of typing
+associated with long directory names. Instead of a directory
+path, simply type the variable name. For example when performing
+a jump (((Shift + J))), typing:
+
+{{{
+$HFS/demo
+}}}
+
+will jump to the directory containing the Houdini demo files.
+Names of directories stored in environment variables can be
+obtained by typing:
+
+`!printenv` ((Enter))
+
+In unix, each user has a special directory to store files called the
+_home directory_. This is the directory which is usually displayed
+when you first log in to your machine and start spy.
+
+Typing ((Shift + H)) takes you back to your home directory.
+
+In unix, anywhere a pathname is requested, typing "~" will specify
+your home directory. This can be used to rapidly get to any file or
+subdirectory within your home directory. For example:
+
+{{{
+~/MyFiles
+}}}
+
+...enters the directory `/MyFiles` which is in your home directory.
+This can be used in conjunction with the _jump_ command ( ((Shift +
+J))) to jump back to your home directory.
+
+To search multiple directories for a file, you need to use the unix
+`find` command. For example, typing:
+
+{{{
+!find /usr/staff/john -name "Jo*" -print 
+}}}
+
+displays all the files beginning with `Jo` that are contained within
+any subdirectory of `/usr/staff/john`. It is important to note that
+the `find` is case sensitive.
+
+== Working with files ==
+
+Within a directory, you can tag a number of files to operate on.
+Common operations include deleting files, and displaying images on
+the screen. The files that are tagged will have a *+* to the left of
+the name. This section describes how to tag and untag files. Later
+you will see how you can use the `%` character in unix commands as a
+shorthand notation for the tagged files.
+
+=== Selecting files ===
+
+((T)) Toggles the tag on the current file on/off. The second
+line of the spy window shows the number of selected file in
+brackets:
+
+{{{
+john@pisa: /n/berne/Documentation/Images/ Page 2/2 (+9) 
+}}}
+
+((Ctrl + T)) Tags or untags all files in the current
+directory.
+
+((Shift + T)) Prompts you with a file name pattern used to
+toggle the tags on the files which match the pattern:
+
+`g*` ((Enter)) :
+    tags all files starting with the letter g
+`*.pic` ((Enter)) :
+    tags all files names ending with `.pic`
+`??.pic` ((Enter)) :
+    tags all files starting with any two characters and ending
+    with `.pic`, such as 21.pic but not 121.pic.
+
+=== Copying, moving, and removing ===
+
+((C)) Copies the tagged files to a new name or a new directory.
+When invoked, it asks you for place to copy the selected file
+to. If you specify a unix directory path, it will copy the file
+there. If a filename is entered (i.e. you didn't have any `/`
+characters in what you typed), then the copy is named to
+whatever you entered.
+
+((M)) Moves the tagged files to a new name or a new directory.
+When invoked, it asks you for place to move the selected file
+to. If you specify a unix directory path, it will move the file
+there. If a filename is entered, the file is renamed.
+
+((Shift + R)) Removes the tagged files after prompting you for
+a confirmation. To delete _all_ the contents of a directory, use
+the unix command: `rm`.
+
+=== Copy buffer ===
+
+There is a directory in your home directory called spy.take. It is
+used to store copies of files which you later put elsewhere. It is
+known as the _copy buffer_.
+
+((Y)) Copies ( `y` stands for the archaic term "yank")
+tagged files into the copy buffer (`spy.take`). You can copy as
+many files, on as many occasions as you want into the copy
+buffer. Files in the copy buffer remain there, even between
+sessions.
+
+((P)) Pastes all the files from the copy buffer
+into the current directory, and empties the copy buffer.
+
+((I)) Displays an Inventory of files currently in the copy
+buffer.
+
+((Z)) Empties the copy buffer ).
+
+TIP:
+    A useful trick is to use the `XWsh` pop-up menu of the spy
+    window (click in the window with ((RMB))) to clone your
+    current window. You can then _Copy_ your files from
+    the first window, and then _Paste_ them into the
+    directory displayed in the second window.
+
+=== Creating Directories ===
+
+`mkdir` directoryName Makes a new directory with the given
+name. You can put several names separated by spaces on the same
+line. For example:
+
+`Fmkdir myDirectory anotherDirectory` ((R))
+
+You can delete the directories with the same spy command (S r)
+that you use to remove files. You will need to ensure that you
+have deleted all files from the directory before you do this.
+You can also use the unix command _rm_ with the _-r_ option.
+
+=== Showing details ===
+
+`Sl` Lists all tagged files. If none are tagged, this command lists
+information for the current file. The list shows detailed
+information about the files.
+
+`-rwxrw-r-- john prisms 265535 12:29 Mar 21 96 testFile`
+
+The permissions of a file are displayed in the first ten
+characters. 
+
+The first character tells you if it is a file, directory, or
+symbolic link. Then come three sets of three characters. These
+show the Read/Write/Executable (`rwx`) permissions of the file for
+the owner, the group to which the file belongs, and for all
+other users.
+
+If a person or group has permissions to read a file, they will
+be able to open, read, and make copies of the file. If a person
+or group has permissions to write to a file, they can also
+modify and delete the file. If they if have permissions to
+execute a file, and it is an application that can be run, they
+will be able to run the application. If it is a directory, they
+will be able to go into it.
+
+After the first ten characters, the following information is
+displayed:
+
+* The name of the owner of the file (the person who created
+  it).
+* The name of the group to which the file belongs.
+* The size of the file in bytes.
+* The time and date on which it was last modified.
+* The name of the file itself.
+
+If the file is a symbolic link, in place of the name of the
+file, it will show the pathname of the file or directory to
+which the link points.
+
+((F)) prints the type or contents of the
+file, such as: ascii, binary, etc.
+
+((Ctrl + W)) makes the currently highlighted file writable. You can
+only do this if you have owner or group permissions to write (make
+changes) to the file.
+
+((Ctrl + X)) makes the currently highlighted file executable. You
+can only do this if you have owner or group permissions to write
+(make changes) to the file.
+
+== Viewing file contents ==
+
+If the current file is not a directory, typing ((D)) displays
+the contents of a text file using `less`.
+
+When less displays a file, you can use the following single-key
+commands, which are similar to spy and vi:
+
+((J)) or ((Enter)) Scroll down one line.
+
+((K)) Scroll up one line.
+
+((F)) or ((Space)) Scroll forward one page.
+
+((B)) Scroll backward one page.
+
+((Shift + G)) Goes to the end of the file.
+
+((1)) ((G)) Goes to the beginning of the file ( _Line#_ then ((G))
+goes to that line).
+
+((/)) string Search for string in the file, and display that line.
+
+((N)) Go to next occurrence of _string_.
+
+((H)) Display help, including the commands listed here.
+
+((Q)) ((Enter)) Quit less and return to spy or unix
+
+((E)) or ((V)) Edit the current file using vi. If you do not know
+how to use vi, you can get out of it by typing ((O)) ((Q)) ((F)) ((R)).
+
+NOTE:
+    Once you are done editing in vi (i.e. you exited vi with the
+    `OwqR` command) you are returned to less, which still displays the
+    file. If you want to get back to spy, you will still need to
+    quit less by typing ((Q)) ((Enter)).
+
+== Running UNIX commands ==
+
+Although many things can be done from within spy, starting Houdini
+or other programs is often done with unix commands.
+
+While you are in spy, any time you need to execute a unix command,
+simply precede the command with the ((!)) key, and then type the
+command. For example:
+
+((!)) `df -k` ((Enter))
+
+displays the amount of free disk space in kilobytes.
+
+Unix commands often require the name of a file(s) as arguments. We
+can provide these filenames from spy by using the `%` character
+within our unix command. Anywhere this character is found, it will
+insert the name(s) of the currently tagged files.
+
+For example, if the files 1.pic, 2.pic and 3.pic are tagged, then
+the command:
+
+((!)) `iplay %` ((Enter))
+
+translates into:
+
+((!)) `iplay 1.pic 2.pic 3.pic` ((Enter))
+
+NOTE:
+    If no file(s) are tagged, a command using the % character will
+    act on the currently highlighted file only.
+
+== Quick reference == (quick)
+
+((J)) or ((K)) |
+    Move cursor down / up
+((H)) or ((L)) |
+    Move cursor left / right
+((U)) |
+    _Up a directory_
+((D)) |
+    Down a directory or Display a file (view only) using less
+((Q + Enter)) |
+    _Quit_ less _(if you entered file with_ ((D)) _)_
+((E)) or ((V)) |
+    Both of these will Edit a file (with vi) or Enter directory
+((Ctrl + B)) or ((Ctrl + F)) |
+    Back or Forward a page
+((T)) |
+    Tag file (on/off toggle)
+((Shift + T)) |
+    Pattern tag (enter _string_ to select all files that
+    match)
+((Ctrl + T)) |
+    Tag all files in directory (on/off toggle)
+((Y)) |
+    Copy (yank) file(s) to the copy buffer
+((I)) |
+    Inventory of files in the copy buffer
+((P)) |
+    Paste a file from the copy buffer (and clears the buffer)
+((Z)) |
+    Clear the copy buffer
+((Shift + R)) |
+    Remove (delete) tagged files or current file if none tagged
+((C)) |
+    Copy highlighted or tagged files to user specified directory
+((M)) |
+    Move tagged files to a new Name or Directory
+((Shift + J)) |
+    Jump to user specified directory
+((Shift + H)) |
+    Jump to Home Directory
+((Shift + L)) |
+    File info (on highlighted or tagged files)
+((Ctrl + L)) |
+    Redraw the screen
+((!)) |
+    Enter unix command (use % to refer to tagged files)
+((/)) `string` |
+    Search (move to) file whose name begins with _string_
+
+== Command history ==
+
+((!)) `cmd` ((Enter)) executes `cmd`.
+
+For example:
+
+`!df` ((Enter))
+
+displays the amount of free disk space.
+
+`!!` ((Enter)) Re-executes the last unix command.
+
+`!!` string `` ((Enter)) Re-executes the last command which started
+with the string string. For example, if a recent command was:
+
+`!hview test.pic` ((Enter))
+
+then the command
+
+`!!im` ((Enter))
+
+...re-executes it.
+
+`!?` Displays the command history - a list of the most recent unix
+commands you've executed. As in the jump history, you can move down
+and up the list with ((J)) and ((K)). Movement forward and backward
+along one line is accomplished with the ((Space)) and ((Backspace))
+keys.
+
+Once the list of command history is displayed, you can edit the
+line with the following commands, similar to the vi editor:
+
+((Enter)) Typing the Enter key executes the current command
+as-is.
+
+((/)) `string` ((Enter)) Moves the cursor to the next command
+starting with `string`.
+
+((A)) Adds text after the location of the cursor until you type
+((E)) or ((Enter)).
+
+((I)) Inserts text before the location of the cursor until you
+type the ((E)) or ((Enter)) key.
+
+((X)) Deletes the character in front of the cursor.
+
+((Shift + C)) Replaces text after the cursor with text you
+enter, until you type ((E)) or ((Enter)).
+
+((D + W)) Deletes the current word.
+
+((C + W)) Replaces current word with text you enter until you
+type the ((E)) or ((Enter)) keys.
+
+((Ctrl + C)) You can abort the jump at any time by pressing
+((Ctrl + C)) or ((Del)) depending on your setup.
+
+`!` ((E)) Displays the most recent command and allows the above
+editing commands to be used. Then, when you press ((Enter)), the
+command is executed. As above, ((Ctrl + C)) or ((Del)) aborts
+the command.
+
+== Additional commands ==
+
+((?)) Lists all single keystroke commands, as described in this
+chapter.
+
+((Ctrl + L)) Redraws the screen if it has been corrupted by other
+programs sending text to the same window shell. If you are ever
+unsure that what you see in the spy window is correct information,
+this command ensures that it is up-to-date.
+
+((Ctrl + P)) Lists the processes you are running. You can use the
+unix `kill` command to kill these processes.
+
+((Shift + Q)) Quits spy and leaves the jump history and the command
+history in the file _.spyHistory_ file your home directory.
+
+spy is set up with several default key mappings:
+
+((1)) Equivalent to: `hview %` ((Enter)) (where `%` is the
+highlighted file)
+
+((2)) Equivalent to: `houdini %` ((Enter))
+
+((3)) Show cpu system activity.
+
+((4)) Show most active cpu process.
+
+((Shift + M)) Read mail using current mail program.
+
+== Customization ==
+
+A `.spyrc` file in your home directory allows you to customize spy
+with a list of key-mappings. Each entry assigns a commonly used
+command to a single keystroke. For example, the default `.spyrc`
+file assigns `hview` to the ((1)) key, and `launch Houdini` is
+assigned to the ((2)) key.
+
+Edit the `.spyrc` file with a text editor (such as `vi`) to add
+your own commonly used commands. Do this with the `map` command. For
+example:
+
+`map 9 unix jot %` |
+    Open selected file with _jot_ when you type the
+    ((9)) key.
+`map 8 jump =$HFS` |
+    Jump to directory held by variable `$HD`.
+`map > jump :?` |
+    Show jump history.
+`map ? unix_cmd :?` |
+    Show unix command history.
+
+Be sure to map only those keys which spy does not already use, or
+you will have trouble executing certain spy commands.
+
+Use ((Ctrl + R)) to reload the `.spyrc` file after you have saved
+your changes.
+
+NOTE:
+    Keywords (such as `jump`, `unix_cmd`) must be in lowercase, and
+    must have a space after them.
+
+`relaxprompt`:
+    Stops the _Press Enter to Continue_
+    messages from appearing. It also lets the spy "Continue:" prompt
+    accept any spy command immediately after the previous command
+    finishes without having to type ((Enter)) first.
+
+`relaxSearch`:
+    Spy will find patterns in the middle of
+    filenames as well as at the beginning of the filenames. For
+    example, if you search for "12" and the directory contains:
+
+    `123.rc flame123.pic flame212.pic`
+
+    then each of these files would be found in turn.
+
+    Without `relaxsearch`, you would have to search for `*12` to get
+    the same behavior.
+
+    If you set the relaxsearch mode and want to find only filenames
+    beginning with `12` then search for `^12`. This works because
+    the leading '^' is a standard search pattern character meaning
+    "the beginning of a line".
+
+`color`:
+    You can customize the display of the file listings such that
+    files are displayed in different colors. This only works if the
+    terminal you are running spy from is an ansi terminal. To check
+    if your terminal is an ansi terminal, use the following unix
+    command:
+
+    {{{
+    echo $TERM
+    }}}
+    
+    To customize display of colors with your `.spyrc` file, use this
+    command:
+
+    {{{
+    color filenamePattern color
+    }}}
+    
+    where `filenamePattern` is the string to match (you can use
+    standard `*`, `[]` and `?` as wild-card characters), and `color` is one
+    of the colors in the list below.
+
+    For `filenamePattern` , you can also specify certain file types:
+    `-dir` for directory, `-x` for executable, `-tagged` for
+    selected files.
+
+    The color parameter must be one of
+    * white reverse_white
+    * red reverse_red
+    * yellow reverse_yellow
+    * green reverse_green
+    * cyan reverse_cyan
+    * blue reverse_blue
+    * purple reverse_purple
+    * black reverse_black
+
+
+    If you added something like:
+
+    {{{
+    color *.hip purple
+    color -dir yellow
+    color core reverse_red
+    color -tagged reverse_blue
+    color -x green
+    }}}
+    
+    to your `.spyrc` file, it would color all .hip files purple,
+    all directories yellow; all "core" files in reverse red; all
+    tagged (selected) files in blue; and all executable files
+    (as in unix permissions) green.
+
+`colortoggle`:
+    Toggles the display
+    of color. You can map this to another key, such as uppercase
+    "C", in your `.spyrc` file by using:
+
+    {{{
+    map C colortoggle 
+    }}}
+    
+    in your `.spyrc` file. The ((Shift + C)) key combination is the
+    default for turning the display of color on and off.
+
+`ignoremask`:
+    Sometimes it is desirable to exclude the display of certain file
+    types. This can be accomplished using ignore masks. To set up an
+    ignore mask, use the `.spyrc` command `ignoremask`. The syntax
+    for this command is:
+
+    {{{
+    ignoremask [mask] [group] 
+    }}}
+    
+    The mask is a pattern string which follows the same rules that
+    spy uses when searching for files within a directory. The group
+    number is optional. If no group number is specified, group 0 is
+    used.
+
+    Here is an example of an ignore mask that tells spy not to
+    display all files starting with a period ( " . " ).
+
+    {{{
+    ignoremask .* 
+    }}}
+    
+    A maximum of 256 ignore masks can be specified in the
+    `.spyrc` file. Each ignore mask command only accepts a
+    single mask string. However, masks can be accumulated by
+    using the same group number. For example:
+
+    {{{
+    ignoremask Makedepend 1 ignoremask *.o 1 
+    }}}
+    
+    This means that when group 1 is in use, all files matching
+    the patterns `*.o` and `Makedepend` will not be shown. spy has a
+    limit of 64 groups numbered from 0 to 63.
+
+`ignoretoggle`:
+    Toggles the use of the ignore groups. The syntax for this command is:
+
+    {{{
+    ignoretoggle [group] 
+    }}}
+    
+    It is possible to map a key to toggle the display of a
+    particular group by adding the following to the `.spyrc` file.
+
+    {{{
+    map [key] ignoretoggle =[group] 
+    }}}
+    
+    Here is an example which maps the ((O)) key to toggle the
+    display of all .o files in a directory:
+
+    {{{
+    ignoremask *.o 1 
+    map o ignoretoggle =1
+    }}}
+    
+`ignoredefault`:
+    Whether a group will be in
+    use on starting spy.
+
+    {{{
+    ignoredefault [group] [use] 
+    }}}
+    
+    If this command is not present in the `.spyrc` file, all groups
+    will be used. The _use_ parameter should be set to 0 if this
+    group should not be used on startup and 1 otherwise.
+
+In general, you should never need to remap the spy key functions,
+but if for some reason you would like to, you can use the `map`
+command to reassign the keys spy uses with the following list of Key
+Functions.
+
+For example, if you were using a Dvorak keyboard layout, but wanted
+to maintain the six directory navigation keys in the same physical
+location, you could add the following mappings to your `.spyrc`
+file:
+
+{{{
+map d left
+map h down
+map t up
+map n right
+map g climb
+map e display
+}}}
+
+The following special key names are available:
+
+* `<left>`
+* `<right>`
+* `<up>`
+* `<down>`
+* `<s-left>` (((Shift + Left)))
+* `<s-right>` (((Shift + Right)))
+* `<home>`
+* `<end>`
+* `<pagedown>`
+* `<pageup>`
+* `<insert>`
+* `<f1..f12>`
+            
+To get spy to use the arrow keys instead of ((J)) ((K))
+((H)) ((L)), add this into your `.spyrc`:
+
+{{{
+map <left>   left
+map <right>  right
+map <up>     up
+map <down>   down
+map <enter>  display
+map <s-left> climb
+}}}
+
+You can bind the following commands to keys:
+
+`climb` |
+    Move to parent directory
+`colortoggle` |
+    toggles the display of color
+`command` |
+    Execute spy command
+`copy` |
+    Copy file(s)
+`date` |
+    Show current date and time
+`display` |
+    Show file or enter directory
+`down` |
+    Move cursor down
+`drop` |
+    Drop taken file(s) (Paste)
+`empty` |
+    Empty taken files(s)
+`enter` |
+    Edit file or enter directory
+`experience` |
+    Toggle user experience
+`file` |
+    Determine type of file(s)
+`help` |
+    Shows Help. List commands mapped in `.spyrc`
+`helpdir` |
+    Toggle help directory
+`home` |
+    Go to home directory
+`ignoredefault` |
+    default mask to use
+`ignoremask` |
+    Set mask for filename patterns to ignore
+`ignoretoggle` |
+    Toggle ignore mask group
+`invalid` |
+    Undefined key
+`inventory` |
+    List taken file(s) (show Clipboard)
+`jump` |
+    Jump to file or directory
+`keys` |
+    List key assignments
+`left` |
+    Move cursor left
+`loadrc` |
+    Re-load `.spyrc` file
+`longlist` |
+    Long listing of file(s)
+`move` |
+    Move file(s)
+`next` |
+    Repeat previous name search
+`nextfile` |
+    Move cursor to next file
+`pagedown` |
+    Go to next page
+`pageup` |
+    Go to previous page
+`patternpick` |
+    Select (pick) files by pattern match
+`pick` |
+    Select (pick) or unselect file (toggle)
+`previous` |
+    Move cursor to previous file
+`quit` |
+    Exit spy
+`redraw` |
+    Re-draw the screen
+`remove` |
+    Remove selected file(s)
+`right` |
+    Move cursor right
+`search` |
+    Search directory for name
+`setenv` |
+    Add a new Environment variable
+`showdetail` |
+    Toggle directory detail
+`showmemory` |
+    Show memory usage
+`startshell` |
+    Start another shell
+`take` |
+    Take file(s) (Copy)
+`unix_cmd` |
+    Execute unix command
+`unpick` |
+    Turn all selection (pick) flags off
+`up` |
+    Move cursor up
+`version` |
+    Display spy Version Number
+`visibility` |
+    Toggle visibility
+`who` |
+    Lists users that are currently logged in
+

@@ -1,0 +1,171 @@
+= hou.NodeConnection =
+#type: homclass
+#cppname: HOM_NodeConnection
+#superclass: hou.NetworkItem
+#group: nodes
+
+"""Represents a connection (wire) between two Nodes."""
+
+== Overview ==
+
+You can get a list of `NodeConnection` objects from a [Hom:hou.Node] instance
+using [Hom:hou.Node#inputConnections] and [Hom:hou.Node#outputConnections].
+
+NOTE:
+    It is probably easier to use the [Hom:hou.Node.#inputs] and
+    [Hom:hou.Node#outputs] methods (which return the endpoints of a node's
+    connections) to traverse the network, rather than dealing with the
+    connections themselves.
+
+This object is "read-only". To create or edit connections, use methods on the node,
+such as
+[Hom:hou.Node#setNamedInput],
+[Hom:hou.Node#setInput],
+[Hom:hou.Node#setFirstInput],
+[Hom:hou.Node#setNextInput],
+[Hom:hou.Node#createInputNode], and
+[Hom:hou.Node#createOutputNode].
+
+== Input and Output meaning ==
+
+The [Hom:hou.NodeConnection#outputNode] and [Hom:hou.NodeConnection#inputNode] are named in relation to the _nodes_,
+*not* the "input" and "output" ends of the _connector_.
+
+[Image:../images/NodeConnection_ends.png]
+
+So, `outputNode()` returns the node whose _output_ is this connector.
+In the diagram, `outputNode()` on the highlighted connection would return
+node "A".  `inputNode()` returns the node whose `input` is this connector.
+In the diagram, `inputNode()` on the highlighted connection would return
+node "C".
+
+== Connection indexes ==
+
+Some nodes have multiple inputs and/or multiple outputs.
+For example, most VOPs have several inputs and outputs.
+The [Split DOP|Node:dop/split] has multiple outputs.
+
+A node with a multi-input, such as the [Merge SOP|Node:sop/merge],
+has multiple "inputs" for each connection, even though in the network editor
+it is drawn with one "connection point" at the top.
+
+Inputs and outputs are always addressed by their position (index).
+
+[Image:../images/NodeConnection_indexes.png]
+
+@methods
+
+::`outputNode(self)` -> [Hom:hou.Node]:
+    #cppname: HOM_NodeConnection::outputNode
+    Return the node on the output side of this connection. This is the node
+    that the connection goes to, in the direction of data flow. If this
+    connection has a network dot as its output, this method returns None.
+
+::`outputItem(self)` -> [Hom:hou.NetworkMovableItem]:
+    #cppname: HOM_NodeConnection::outputItem
+    Return the node or network dot on the output side of this connection.
+    This is the node or dot that the connection goes to, in the direction
+    of data flow. This method should never return None.
+
+::`inputNode(self)` -> [Hom:hou.Node]:
+    #cppname: HOM_NodeConnection::inputNode
+    Return the node on the input side of this connection. This is the node
+    that the connection comes from, in the direction of data flow. If this
+    connection goes through an indirect input, this will return the node
+    connected to the parent node (or `None` if nothing is connected).
+    
+::`outputIndex(self)` -> `int`:
+    #cppname: HOM_NodeConnection::outputIndex
+    Returns the index of the output connection on the node that the input
+    side of this connections connects to.  If this connection goes through an
+    indirect input, this will return the index of the output connected to the
+    parent node (or `0` if nothing is connected).
+
+::`inputIndex(self)` -> `int`:
+    #cppname: HOM_NodeConnection::inputIndex
+    Returns the index of the input connection on the node that the output
+    side of this connections connects to.
+
+::`outputName(self)` -> `str`:
+    #cppname: HOM_NodeConnection::outputName
+    Returns the name of the output connection on the node that the input
+    side of this connections connects to.
+
+::`outputLabel(self)` -> `str`:
+    #cppname: HOM_NodeConnection::outputLabel
+    Returns the label of the output connection on the node that the input
+    side of this connections connects to.
+
+::`outputDataType(self)` -> `str`:
+    #cppname: HOM_VopNode::outputDataTypes
+    Returns the data type of the output connection on the node that the input
+    side of this connections connects to.
+
+    This method only applies to VOP node connections.  Raises
+    [Hom:hou.OperationFailed] if invoked on a non VOP node connection.
+
+    The string returned by this method can be used to set the Type parameter
+    on a Parameter or Constant VOP.
+    
+::`inputName(self)` -> `str`:
+    #cppname: HOM_NodeConnection::inputName
+    Returns the name of the input connection on the node that the output
+    side of this connections connects to.
+    
+::`inputLabel(self)` -> `str`:
+    #cppname: HOM_NodeConnection::inputLabel
+    Returns the label of the input connection on the node that the output
+    side of this connections connects to.
+
+::`inputDataType(self)` -> `str`:
+    #cppname: HOM_VopNode::outputDataTypes
+    Returns the data type of the input connection on the node that the output
+    side of this connections connects to.
+
+    This method only applies to VOP node connections.  Raises
+    [Hom:hou.OperationFailed] if invoked on a non VOP node connection.
+
+    The string returned by this method can be used to set the Type parameter
+    on a Parameter or Constant VOP.
+    
+::`subnetIndirectInput(self)` -> [Hom:hou.SubnetIndirectInput]:
+    #cppname: HOM_NodeConnection::subnetIndirectInput
+    If this connection has a subnet indirect input connected to it instead of
+    a node, return the corresponding object.  Otherwise, return `None`.  See
+    [Hom:hou.SubnetIndirectInput] for information on subnet indirect inputs.
+
+::`inputItem(self)` -> [Hom:hou.NetworkMovableItem]:
+    #cppname: HOM_NodeConnection::inputItem
+    If this connection has a subnet indirect input connected to it,
+    return the corresponding [Hom:hou.SubnetIndirectInput] object.
+    If this connection has a node connected to it, return the corresponding
+    [Hom:hou.Node] object. Otherwise, return `None`. This method is
+    essentially equivalent to the following:
+
+    {{{
+    #!python
+    def getInputItem(node_connection):
+	if node_connection.subnetIndirectInput() is not None:
+	    return node_connection.subnetIndirectInput()
+	return node_connection.inputNode()
+    }}}
+
+::`inputItemOutputIndex(self)` -> `int`:
+    #cppname: HOM_NodeConnection::inputItemOutputIndex
+    Returns zero if this connection has a subnet indirect input connected to
+    it. Otherwise return the index of the output connection on the node that
+    the input side of this connections connects to. In combination with the
+    `inputItem` method, node and subnet indirect inputs can be processed
+    through a common code path for many use cases.
+
+::`isSelected(self)` -> `bool`:
+    #cppname: HOM_NodeConnection::isSelected
+    Return `True` if this connection is selected.
+
+::`setSelected(self, selected, clear_all_selected = False)`:
+    #cppname: HOM_NodeConnection::setSelected
+    Selects or de-selects this connection. If the `clear_all_selected`
+    parameter is set to `True`, all other selections (both connections,
+    and nodes, network boxes, etc.) will be cleared before this connection
+    is selected.
+

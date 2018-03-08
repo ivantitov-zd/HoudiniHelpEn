@@ -1,0 +1,157 @@
+= Grain Source =
+
+#type: node
+#context: sop
+#icon: grainsource
+#internal: grainsource
+#tags: grains, dynamics, source
+
+"""Generates particles to be used as sources in a particle-based grain simulation."""
+
+The Grain Source SOP generates emission particles suitable for the [POP Grains |Node:dop/popgrains] particle solver.
+
+@parameters
+
+Mode:
+    How to generate the particles.
+
+    Solid:
+        Fills the volume of the input with particles.
+
+    Sheet:
+        Scatters particles along the surface of the input.
+
+    Strand:
+        Scatters particles along the edges of the input.
+
+Source Type:
+    When in __Solid Mode__, this provides a hint of how to interpret the source.
+
+    Auto-Detect:
+        If the input is a single volume primitive, the Fog or SDF method will be used depending whether the volume primitive has the SDF flag set.
+
+    Geometry:
+        The input is treated as a closed manifold surface.
+
+    Fog:
+        The first volume of the input is treated as a fog volume. Voxels with a 1 value will have points, those with 0 will not have points.
+
+    Signed Distance Field:
+        The first volume of the input is treated as a signed distance field.  Voxels with negative values will have points, those with positive values will not.
+
+Construction Method:
+    The method used for generating points.
+
+    Dense Grid:
+        Creates points inside the entire bounding box of the input, then
+        removes those outside the volume.  This method is efficient for
+        inputs that are close to axis-aligned boxes, but can be slow and
+        memory inefficient for more sparse configurations. This method also
+        provides backwards compatibility for files created prior to Houdini 14.5.
+    Sparse Volume:
+        Creates points only in the active voxels of the input volume if they also lie
+        inside the bounding volume.  This method can handle very sparse configurations
+        where the input objects are distributed across space and do not fit well into
+        an axis-aligned bounding box.  Because a sparse volume is required, this method
+        creates an [OpenVDB volume|/model/volumes] of the input internally.
+
+Point Separation:
+    The smallest distance between any two of the generated points in the initial configuration.
+
+    Because `pscale` refers to a radius, the resulting `pscale` will be half of
+    this to make room for two radii between each particle.
+
+    NOTE:
+	    If you halve the point separation, you get eight times the points.
+
+Packing Density:
+    Allows for over packing of the input geometry.  This is useful if explicit
+    constraints are present as it gives more collision points and reduces the
+    ability of particles to tunnel between each other.  However, it means that
+    the particles will be packed too close together, so if breaking occurs they
+    will gain significant energy when they detach.
+
+    The density is measured along a single axis.  Thus a density of `2` with
+    Solid mode will generate 8 times the particles, in Sheet mode 4 times the
+    particles, and in Strand mode 2 times the particles.
+
+Source Offset:
+    Offsets the input surface by a multiple of pscale. Positive values dilate,
+    negative values erode. The default of -1 erodes the volume by pscale so
+    that particles and their radii end up inside the volume.
+
+Grid Offset:
+    The offset used for building the initial dense packed grid of particles.
+    This can be offset to ensure your initial particles are precisely
+    aligned with a ground plane, for example.
+
+Seed:
+    Scattering, jittering, and randomizing the sizes of the particles use
+    this as the seed.  Changing it gives different random distributions.
+
+Uniform Radius:
+    If all particles have the same size, many optimizations can be performed
+    later in the simulation.  However, it may be worth the expense to
+    break up the uniform look of the particles.  This enables the particles
+    to be non-uniform in size.
+
+Random Volume:
+    Controls the range of random particle sizes.  The randomization occurs over
+    the volume, not the radius, giving a better distribution.
+
+Jitter Scale:
+    Controls jittering of point positions.  To avoid explosions on the first
+    frame, it is important for the relaxation to be run if jittering is on.
+
+    Because relaxation can never accurately separate all particles, note
+    that the final `pscale` will be reduced to minimize overlap.
+
+Dither Surface:
+    If a uniform lattice of points is being built, then the surface layer will exhibit terracing as points cross the boundary.  This dithers the points, comparing the distance to the cut-off threshold with a random number to see if the point should be kept.  This causes points to be kept outside of the threshold, as it expands half a grid scale in both directions. Turning this on will result in a more randomized surface layer.
+
+Dither Normal:
+    Often an object has one face that is free, and the other faces are constrained by collisions.  If you don't want to dither the colliding faces (as particles may be generated outside of the collision range, or holes made that will collapse) you can use this normal and the angle to specify which regions of the source are available for dithering.  The geometric normal of the SDF built from the surface is used, not any normal attribute on the incoming geometry.
+
+Dither Angle:
+    How many degrees away from the dither normal is eligible for dithering.  Setting this value to 180 will cause all faces to be dithered.
+
+Compute Mass:
+    Adds a `mass` attribute computed from the final particle `pscale`,
+    important if the particles are varying in size.  The value is the density
+    measured as kg/m^3.  1000 corresponds to water.
+
+Relax Iterations:
+    If jittering or non-uniform sizes are chosen, the default arrangement of particles will overlap, triggering explosions.  This runs a pre-pass to try to move the particles without leaving the selected volume.
+
+    In Sheet mode, this corresponds to the Scatter SOP parameter of the same name.
+
+Error Threshold:
+    If overlap falls below this ratio, the relaxation can be terminated early.  0.05 corresponds to a 5% overlap.
+
+Adjust Radius to Avoid Overlap:
+    After relaxation is complete, there may still be overlap between particles.
+    This will cause the particles to explode outwards on the first few frames.
+    To avoid this, this option scales the particles down by their overlap
+    amount to ensure they are no longer overlapping.  If __Uniform Radius__ is turned on,
+    they are all reduced equally, otherwise each is only reduced by what is
+    required to stop it from overlapping its neighbor.  However, since this opens
+    more space, the particles probably will settle to a smaller volume.
+
+== Explicit Constraints ==
+
+Create:
+	Adds poly lines between any particles that overlap.  This can be used by the grain pop as constraints.
+    
+Strength:
+	How strong to make the constraints.  This controls the threshold at which they break if breaking is enabled.   It adds a `strength` primitive attribute that can be altered with other tools before or during the simulation.
+    
+Search Radius:
+	How far, compared to `pscale` to attach neighboring points. Because explicitly constrained points do not collide with each other, this should be at least `pscale`.
+
+Always Show Points:
+	Normal points that are part of polygons are not drawn.  This means the sprite display of the spheres for the points will not be drawn when they have constraints.  This sets a detail attribute that overrides this, causing all points to be drawn even if they are part of primitives or constraints.
+
+@related
+
+- [Points from Volume|Node:sop/pointsfromvolume]
+- [POP Grains|Node:dop/popgrains]

@@ -1,0 +1,126 @@
+#type: node
+#context: dop
+#internal: rop_dop
+
+= ROP Output Driver =
+
+"""Saves the state of a DOP network simulation into files."""
+
+The Dynamics output driver generates simulation state (`.sim`) files
+from a dynamics (DOP) network. Each file contains the complete state of
+the simulation for a certain frame. You can then read the state back
+into the network using a [File DOP|Node:dop/file].  You can also
+directly point to a sequence of these files in the __Playback Simulation__
+parameter of the [DOP Network Object|Node:obj/dopnet] or [DOP Network SOP|Node:sop/dopnet].
+
+Saved state files are a persistent cache of a simulation. You can move
+these files around to run the simulation in one place and use the
+results in another. For example, you can use the hscript standalone
+utility to run a simulation on a renderfarm and save out state files,
+then play the simulation back locally by loading the state files with a
+File DOP. This would let you run multiple versions of a simulation on
+the renderfarm overnight and compare the results the next day.
+
+
+@parameters
+
+Render:
+    #channels: /execute
+
+    Saves the simulation to disk as a sequence of .sim files.
+
+Background Render:
+    #id: executebackground
+
+    Starts another copy of Houdini in the background and instructs that
+    copy to save out the simulation as a sequence of .sim files.  This
+    allows one to continue working and load the .sim files as they
+    complete.
+
+Render Control:
+    #channels: /renderdialog
+
+    Opens the render control dialog to allow adjustments of the
+    render parameters before rendering.
+
+Valid frame range:
+    Limits the rendering of frames, when set to __Render frame range__
+    or __Render frame range only__.
+
+
+    Render any frame:
+        Allow the renderer to render any and all frames.
+    Render frame range:
+        Only render the frames in the range set below, but allow the
+        renderer to render other frames if they are referenced by
+        in-range frames.
+    Render frame range only (strict):
+        Only render the frames in the range set below, and don't
+        allow the renderer to render other frames, even if they are
+        referenced by in-range frames.
+
+Start/End/Inc:
+    Specifies the range of frames to render (start frame, end frame, and increment). All values may be floating point values. The range is inclusive. 
+
+    These parameters determine the values of the local variables for the output driver.
+
+        `$NRENDER`:
+            The number of frames to be rendered by the output driver.
+        `$N`:
+            The current frame being rendered (starting at 1 and going to `$NRENDER`).
+
+Render with Take:
+    #channels: /take
+
+    Uses the settings in a particular take while rendering. Choose
+    __Current__ to use the current take when rendering.
+
+DOP Path:
+    The DOP network to render from. (You can point to a DOP within a
+    DOP network, but Houdini saves the state of the entire
+    network.)
+Output File:
+    The file to save the simulation state to. Make sure to  [include
+    $F in the filename|/render/expressions]  to write out
+    separate files for each frame.
+Initialize Simulation OPs:
+    Force all simulation OPs to be reset. This includes DOP
+    Networks, POP SOPs, and other OPs that cache their results.
+
+    This is the safest way to render out a simulation, because it
+    starts the simulation from scratch and discards any partial
+    simulations you might have done with different parameters.
+    However, throwing away an already-cooked simulation can be
+    expensive, especially for relatively slow solvers such as
+    fluids.
+
+Compress .sim Files:
+    Determines if .sim files written to disk for caching will be compressed.  Compression can reduce the size of the disk cache significantly, but can also increase the time to cache significantly.  If loading or writing to cache seems slow, try using uncompressed .sim files, especially with fluid sims.
+
+Alfred Style Progress:
+    A percentage complete value is printed out as files are written. This is in the style expected by Pixar's Alfred render queue.
+
+Pre-Render Script:
+    Run this HScript before any rendering.
+
+Pre-Frame Script:
+    Run this HScript before each frame.
+
+Post-Frame Script:
+    Run this HScript after each frame.
+
+Post-Render Script:
+    Run this HScript after all rendering.
+
+NOTE:
+    To access the current simulation frame `$SF` from the DOP simulation, the __Output File__ should be: 
+    
+    {{{
+    baked.`dopframe(chs("./doppath"))`.sim
+    }}}
+    
+    and the frame range __Inc__ should be:
+    
+    {{{
+    ch(chs("./doppath")+"/timestep")*$FPS
+    }}}

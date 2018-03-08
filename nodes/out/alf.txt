@@ -1,0 +1,153 @@
+#type: node
+#context: out
+#internal: alfred
+#icon: ROP/alfred
+
+= Tractor =
+
+"""Tractor is a program shipped out with Pixar's distribution of RenderMan."""
+
+Tractor is a program shipped out with Pixar's distribution of RenderMan.
+It manages render tasks on a single machine or across a network. This
+output driver will generate an Tractor script and start the Tractor
+program on the script file. Tractor must be correctly configured.
+
+When rendering using RenderMan, by default, netrman is used, so the
+local host must be running the nrmserver software.
+
+When rendering using Mantra, Tractor must be configured to know about
+Mantra. Please see the read me in `$HFS/houdini/scripts/alfred`.
+
+TIP:
+    You can add the following selection criteria of mantra:
+    {{{
+    mantra hserver -h %h -l
+    }}}
+    which will check to see if there is a running successful hserver on the machine you are going to send a frame to.
+
+@parameters
+
+Submit Job:
+    Submits the job to the Tractor based farm.
+
+Render Control:
+    Opens the render control dialog to allow adjustments of the render parameters before rendering.
+    
+Valid Frame Range:
+    Controls whether this render node outputs the current frame (__Render any frame__) or the image sequence specified in the __Start/End/Inc__ parameters (__Render Frame Range__).
+    
+    __Render Frame Range (strict)__ will render frames START to END when it is rendered, but will not allow frames outside this range to be rendered at all. __Render Frame Range__ will allow outside frames to be rendered. This is used in conjunction with render dependencies. It also affects the behavior of the 'Override Frame Range' in the Render Control dialog.
+
+    Two possible cases where you'd want the strict behavior:
+        
+    - A 60 frame walk cycle written out to a geo, but part of a larger ROP net to render out a larger frame range
+    
+    - A texture loop from 1-20
+
+    Otherwise, you will usually set this to non-strict.
+    
+    Render Current Frame: 
+        Renders a single frame, based on the value in the playbar or the frame that is requested by a connected output render node.
+    
+    Render Frame Range:
+        Renders a sequence of frames. If an output render node is connected, this range is generally ignored in favor of frames requested by the output render node.
+        
+    Render Frame Range (Strict):
+        Renders a sequence of frames. If an output render node is connected, this range restricts its requested frames to this frame range.
+
+Start/End/Inc:
+    Specifies the range of frames to render (start frame, end frame, and increment). All values may be floating point values. The range is inclusive. 
+    
+    These parameters determine the values of the local variables for the output driver.
+        `$NRENDER`:
+            The number of frames to be rendered by the output driver.
+        `$N`:
+            The current frame being rendered (starting at 1 and going to `$NRENDER`).
+            
+    For example, if the parameters are set to:
+    table>>
+        tr>>
+            th>> Start
+            th>> End
+            th>> Inc
+        tr>> 
+            td>> 10.5
+            td>> 12
+            td>> 0.5
+
+    There will be 4 frames rendered (10.5, 11, 11.5, and 12), so `$NRENDER` will have a value of 4. $N will have the value:
+    table>>
+        tr>>
+            th>> Frame
+            th>> 10.5
+            th>> 11
+            th>> 11.5
+            th>> 12
+        tr>> 
+            td>> $N
+            td>> 1
+            td>> 2
+            td>> 3
+            td>> 4
+    
+Render With Take:
+    The output driver will switch to this take before rendering to restore the current take when rendering has been completed.
+    
+== Control ==
+
+Output Driver:
+        The output driver used to generate the render files.
+Temporary Directory:
+        Location to store temporary files.
+
+Generate disk file only:
+        Instead of invoking Tractor to run the job immediately, you can create an task list and save it to the disk file.
+
+Disk File:
+        Location where the task list is saved.
+
+[Include:standard#mkpath]
+
+Generate Tags:
+        Allows you to choose intensive, hscript, or hrender tags. The default is intensive, which will prevent Tractor from generating all IFD's simultaneously. See the Tractor documentation for more information.
+
+Job: At Least/Most Hosts:
+        A Job is a task list which has a hierarchy of dependent tasks. See the Tractor documentation for more information.
+
+        
+== Scripts ==
+
+Each script command refers to an hscript command which will be run, regardless of the expression language selected for the parameter. The resulting string will be run as an hscript command. 
+
+NOTE:
+    It is possible to use the python, unix or source hscript commands to perform complex processing.
+
+The commands are always run when rendering occurs. The command checks the parameters of the output driver when it is rendering a range or sending output to a command.
+
+Before the render occurs, Houdini will automatically set the current hscript directory to point to the output driver.    
+
+Pre-Render Script:
+    This command is run before any IFDs are generated. It is only run once per render.
+    
+Pre-Frame Script:
+    This command is run before each IFD is generated.
+    
+Post-Frame Script:
+    This command is run after each IFD is generated.
+    
+    NOTE:
+        Although the IFD may have been generated, this does not necessarily mean that mantra has finished rendering the image when this command is run.
+
+Post-Render Script: 
+    This command is run one time, after all IFDs have been generated.
+    
+    NOTE:
+        Although the IFD may have been generated, this does not necessarily mean that mantra has finished rendering the image when this command is run.
+
+@locals
+    N:
+        The current frame of the range specified. This always starts at
+        1.
+    NRENDER:
+        Total number of frames being rendered.
+

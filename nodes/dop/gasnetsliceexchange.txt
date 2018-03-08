@@ -1,0 +1,96 @@
+#type: node
+#context: dop
+#internal: gasnetsliceexchange
+#icon: DOP/gas
+
+= Gas Net Slice Exchange =
+
+"""A microsolver that exchanges boundary data between multiple machines."""
+
+The Gas Net Slice Exchange DOP is a microsolver used in building larger fluid
+simulations. The [Fluid Solver|Node:dop/fluidsolver] and [Smoke Solver|Node:dop/smokesolver] DOPs that allow
+microsolvers to be added before or after the main solver step to extend
+or tweak the simulation. Alternatively, enterprising people may attempt
+to build an entire new solver out of microsolvers.
+
+The Gas Net Slice Exchange DOP exchanges the particle and particle values along
+the border of a slice with the neighbouring slices in a distributed
+simulation.
+
+The topology of the slicing is determined by Slice by Plane or Slice
+Along Line DOPs.
+
+NOTE:
+    Correspondance is done with the `id` attribute so it is important
+    that particles have unique ids.  If new particles are created,
+    they need to be created the same way on all nodes to avoid
+    having mismatched ids.
+
+@parameters
+    Geometry:
+	The particle system to do the slice transfer with.
+
+    [Include:standard_distribution]
+
+    Slice Data Root:
+	The root data to build our slice topology from.
+
+    ID Attribute:
+	The particle system's unique id attribute.  This is used so
+	particles in separate machines can be recognized as the same
+	particle.
+
+    Slice Attribute:
+	The attribute that stores which slice is currently owning the
+	particle.
+
+    Attributes to Exchange:
+	When in Exchange Attribute mode, these attributes will be
+	copied across the slice boundary.  Specifically, any particle
+	in the overlap band which is owned by this slice will be
+	broadcast to the neighbouring slices.  They will then use
+	that to update their own versions of that particle.
+
+    Slice Overlap:
+	The distance in world space to extend the slices.
+
+    Particle Overlap:
+	The distance in particle radiuses to extend the slices.
+
+    Assign Slice #:
+	Creates and initializes the slice attribute to track who owns
+	each particle.
+
+    Exchange Attribs:
+	Exchanges attribute values across the slice boundaries.
+
+    Transfer Points:
+	Determines if points are now on the wrong side of their slice
+	boundaries.  If so, moves them to the correct machine.
+	This makes Exchange Attribs irrelevant.
+
+    Delete External:
+	Deletes any points that are outside of the overlap distance of
+	the current slice.
+
+    Compute Slice Distance:
+	Creates and sets a `slicedist` attribute storing the distance
+	to the slices boundary.  Negative values are interior.
+
+    Normalize Slice Distance:
+	Divides the slice distance by the overlap amount, giving
+	a resolution independent value 0 at the border and 1 at
+	the end of the overlap.
+
+    [Include:standard_solver_parms]
+@inputs
+    [Include:standard_data_inputs]
+
+@outputs
+    [Include:standard_data_outputs]
+
+@locals
+    [Include:standard_data_locals]
+
+    [Include:standard_locals]
+

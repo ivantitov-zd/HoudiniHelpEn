@@ -1,0 +1,198 @@
+= Channel/audio formats =
+
+== Available channel/audio formats ==
+
+table>>
+    tr>>
+        th>> Extensions
+        th>>
+            [Type|./]
+        th>> Notes
+    tr>>
+        td>>
+            `.chan`
+        td>> External
+        td>>
+            Houdini ASCII channel format containing raw values in rows
+            and columns.
+
+            This information is written out into the file as ascii text,
+            one row per frame of data, and one column per channel. The
+            file contains specific information regarding channel names,
+            sample rates etc. This format can be imported or exported
+            from the Houdini animation editor (and is even compatible with
+            old action channel formats).
+
+    tr>>
+        td>>
+            `.bchan`
+        td>> External
+        td>>
+            _Houdini binary channel format, equivalent to `.chan` _
+
+            This file type is the same as the `.chan` format, except
+            that the data is written in binary format. That is, the
+            information is represented in a tightly-coded short-hand
+            rather than as ascii characters you could read as text. It
+            is more compact and loads more quickly.
+
+    tr>>
+        td>>
+            `.clip`
+        td>> Internal
+        td>>
+            Houdini ASCII native CHOP Format. Contains raw values like
+            `.chan` plus all the information held by a chop. Currently
+            this format contains named channels, each with an array of
+            raw sample values. The clip also contains a start and end
+            range, a sample rate, channel extend conditions and
+            quaternion attributes.
+
+            Example source code for reading and writing Houdini clip
+            files is in $HFS/houdini/public/CPD.tar.Z.
+
+    tr>>
+        td>>
+            `.bclip`
+        td>> Internal
+        td>>
+            This is the binary version of a clip. This format is
+            recognized by the magic string `bclp` in its first four
+            characters.
+
+    tr>>
+        td>>
+            `.bclipnc`
+        td>> Internal
+        td>>
+            This is the non-commercial version of the bclip format.
+
+    tr>>
+        td>>
+            `.chn`
+        td>> External
+        td>>
+            Houdini ASCII format for a group of channels expressed as
+            keyframed segments (e.g. `bezier()`, `ease()`, etc.)
+
+            This format is used to describe channels which contain
+            segments, slopes, accelerations, interpolation types and
+            other spline based attributes. It is compatible with the
+            internal Houdini Animation Editor.
+
+    tr>>
+        td>>
+            `.bchn`
+        td>> External
+        td>>
+            Houdini binary format, equivalent to `.chn`
+
+    tr>>
+        td>>
+            `.aif .aiff`
+        td>> Internal
+        td>>
+            Common lossless audio format, descended from IFF.
+
+    tr>>
+        td>>
+            `.au`
+        td>> Internal
+        td>>
+            Old Sun/NeXT audio format.
+
+    tr>>
+        td>>
+            `.sf`
+        td>> Internal
+        td>>
+            NeXTAudio format.
+
+    tr>>
+        td>>
+            `.snd`
+        td>> Internal
+        td>>
+            Audio format
+
+    tr>>
+        td>>
+            `.wav`
+        td>> Internal
+        td>>
+            Windows lossless audio format.
+
+== Loading and saving channel data ==
+
+:task:Save channels from a CHOP:
+    * Choose __Save Data Channels__ from a chop tile's pop-up menu.
+      The format is determined by the filename extension.
+
+:task:Load Channel Files into a CHOP:
+    * Create a [File CHOP|Node:chop/file] and specify the channel
+      file in the parameters.
+
+:task:Read `.chan`/`.bchan` files into a CHOP:
+    # In the  [animation editor|/ref/panes/animeditor] ,
+      select the channel you want to load the values into.
+
+    # Choose __File > Load Active Chan/Bchan__.
+
+    # In the CHOP editor, place a [Fetch CHOP|Node:chop/fetch] and
+      specify the object and channel on the Source tab in the
+      parameter editor.
+            
+== CHOP internals ==
+
+All chop channels are made of arrays 32-bit floating point numbers,
+including chops containing audio samples.
+
+=== A CHOP is sampled when... ===
+
+    * it is needed by a downstream chop
+
+    * it is accessed through the `chop()` function by another OP
+
+    * by displaying the channel in a graph
+
+    * by connecting the channel to an audio device (speaker)
+
+    * it is linked to an OP
+
+    * chops are being output from Houdini to a file or the textport
+
+    * cooked by the [opcook|Cmd:opcook] command
+
+=== Extend Conditions ===
+
+    Extend conditions: sampling chops out of bounds: When using the
+    `chop()` function to sample a channel, the index-value may be
+    outside the interval of the chop. But a reasonable value is
+    returned. The user is able to control the value of the channel
+    outside its interval: See the Extend chop.
+
+    A chop holds it channels at a single sample rate. If other chops
+    need to get it at different sample rates, they will make their own
+    temporary array at their desired sample rate.
+
+=== Frame Dependencies ===
+
+    CHOPs are frame-dependent only if its data channels change every
+    frame Houdini advances to another frame. Most chops will not be
+    frame dependent, even if they have an animated curve in them because
+    it will just be sampled (not cooked) each time it is polled for
+    values at a certain frame.
+
+    Frame-dependent chops are ones whose shape changes each time it is
+    called such as:
+
+    * a chop that reads data from an external device each frame
+
+    * a chop that reads a sop and converts it into a curve each frame
+
+    * a chop that has animated (non-constant) control channels.
+
+    CHOPs are independent of `$F`. Only when you use chops in a display
+    does `$F` come into play to use the chop and its sample rate to
+    choose the index to sample.
+

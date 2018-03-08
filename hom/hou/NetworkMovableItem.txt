@@ -1,0 +1,184 @@
+= hou.NetworkMovableItem =
+#type: homclass
+#cppname: HOM_NetworkMovableItem
+#superclass: hou.NetworkItem
+#group: nodes
+
+"""The base class for all visible elements within a network, such as Nodes, Network Boxes, and Sticky Notes."""
+
+Each movable item has a position, color, and other attributes that allow for
+common interactions in the network editor. All movable items will have a
+parent network (except the node represented by `hou.node('/')`), and may be
+contained by a [Hom:hou.NetworkBox]. Not all movable items have a name, but
+all have a numeric session id, which is a unique number within a given
+Houdini session for a given subclass of `NetworkMovableItem`.
+
+@methods
+
+== Name and path ==
+
+::`name(self)` -> `str`:
+    #cppname: HOM_NetworkMovableItem::name
+    #replaces: Cmd:opname, Exp:opname, Exp:optypeinfo
+    Return this node's name.  See also [Hom:hou.NetworkMovableItem#path].
+
+::`setName(self, name, unique_name=False)`:
+    #cppname: HOM_NetworkMovableItem::setName
+    #replaces: Cmd:opname, Exp:opname
+    Set the name of this node.  Raises [Hom:hou.OperationFailed] if the new
+    name contains characters other than letters, numbers, periods, dashes, or
+    underscores.  Raises [Hom:hou.OperationFailed] if the node could not be
+    renamed (for example, another node already exists with the name, the node
+    is the root node or top-level manager (e.g. /obj), or the node is inside
+    a locked asset).  If the unique_name parameter is set to True, the
+    supplied name may be changed to ensure that it doesn't match the name of
+    any existing node.
+
+::`digitsInName(self)` -> `int`:
+    #cppname: HOM_NetworkMovableItem::digitsInName
+    #replaces: Exp:opdigits
+    Return the value of the last set of digits inside the node's name, or
+    0 if there are no digits.
+
+    For example, the result is `102` for a node named `geo102`, and `34` for
+    a node named `light12to34`.
+
+::`path(self)` -> `str`:
+    #cppname: HOM_NetworkMovableItem::path
+    #replaces: Exp:opfullpath, Exp:opinputpath, Exp:opoutputpath
+    Return the full path (i.e. starting with `/`) of this node in the network.
+
+::`relativePathTo(self, base_node)` -> `str`:
+    #cppname: HOM_NetworkMovableItem::relativePathTo
+    #replaces: Exp:oprelativepath
+    Return a relative path to another node object from this node.
+
+    {{{
+    #!pycon
+    >>> box1 = hou.node("/obj/box_object1/box1")
+    >>> sphere1 = hou.node("/obj/sphere_object1/sphere1")
+    >>> box1.relativePathTo(sphere1)
+    '../../sphere_object1/sphere1'
+    >>> hou.node("/obj").relativePathTo(box1)
+    'box_object1/box1'
+    >>> box1.relativePathTo(box1)
+    '.'
+    }}}
+
+== Hierarchy ==
+
+::`parent(self)` -> [Hom:hou.Node]:
+    #cppname: HOM_NetworkMovableItem::parent
+    Return the node that contains this item.
+
+    Note that this method returns None if the item is the root node (i.e. `/`).
+
+    {{{
+    #!pycon
+    >>> hou.node("/obj/box_object1").parent()
+    <hou.Node at /obj>
+    >>> print hou.node("/").parent()
+    None
+    }}}
+
+::`parentNetworkBox(self)` -> [Hom:hou.NetworkBox] or `None`:
+    #cppname: HOM_NetworkMovableItem::parentNetworkBox
+
+    Returns the parent network box which contains this item, or None
+    if it is not inside a network box.
+
+== Selection ==
+
+::`isSelected(self)` -> `bool`:
+    #cppname: HOM_NetworkMovableItem::isSelected
+    #replaces: Cmd:opget, Exp:opflag
+    Return whether this item is selected.
+
+    See also [Hom:hou.selectedNodes].
+
+::`isPicked(self)` -> `bool`:
+    #cppname: HOM_NetworkMovableItem::isPicked
+    #replaces: Cmd:opget, Exp:opflag
+    Equivalent to calling [Hom:hou.NetworkMovableItem#isSelected].
+
+::`setSelected(self, on, clear_all_selected=False, show_asset_if_selected=False)`:
+    #cppname: HOM_NetworkMovableItem::setSelected
+    #replaces: Cmd:opset, Exp:opselect
+    Select or deselect this item, optionally deselecting all other selected
+    items in this network. If `show_asset_if_selected` is True, and this item
+    is a `Node`, then the panes will show the top-level asset of the selected
+    item instead.
+
+::`setPicked(self, on)`:
+    #cppname: HOM_NetworkMovableItem::setPicked
+    #replaces: Cmd:opset, Exp:opselect
+    Equivalent to calling [Hom:hou.NetworkMovableItem#setSelected] with
+    default values for all optional parameters.
+
+== Metadata ==
+
+::`color(self)` -> [Hom:hou.Color]:
+    #cppname: HOM_NetworkMovableItem::color
+    #replaces: Cmd:opcolor
+    Return the color of this item's tile in the network editor.
+
+::`setColor(self, color)`:
+    #cppname: HOM_NetworkMovableItem::setColor
+    #replaces: Cmd:opcolor
+    Sets the color of this item's tile in the network editor to the
+    given [Hom:hou.Color].
+
+::`sessionId(self)`:
+    #cppname: HOM_NetworkMovableItem::sessionId
+    #replaces: Exp:opid
+
+    Returns an integer value that uniquely identifies this item
+    in a given Houdini session. This id is only guaranteed to be unique
+    in a single Houdini process. It is useful as a quick and easy way to
+    save a restore a reference to an item. It is also only unique for
+    a specific item subclass. So there may be a `Node` with the same
+    session id as a `NetworkBox`.
+
+    See [Hom:hou.nodeBySessionId] to turn a session id back into a node,
+    or [Hom:hou.networkBoxBySessionId] to turn a session id back into a
+    network box, or more generally, [Hom:hou.itemBySessionId] to turn a
+    session id combined with an enum value indicating the item subclass
+    into an item of that type.
+
+== Layout ==
+
+::`position(self)` -> [Hom:hou.Vector2]:
+    #cppname: HOM_NetworkMovableItem::position
+    #replaces: Cmd:oplocate
+    Return the position of this item's tile in the network editor graph as
+    a `Vector2`. See also `move()` and `setPosition()`.
+
+::`setPosition(self, vector2)`:
+    #cppname: HOM_NetworkMovableItem::setPosition
+    #replaces: Cmd:oplocate
+    Sets the position of this item's tile in the network editor graph.
+    Raises [Hom:hou.InvalidInput] if the item cannot have the given position.
+
+::`move(self, vector2)`:
+    #cppname: HOM_NetworkMovableItem::move
+    #replaces: Cmd:oplocate
+    Moves this item's tile in the network editor graph by the increments in
+    the given [Hom:hou.Vector2].
+
+    To position a item absolutely, use `setPosition()`.
+
+    To get the item's current graph position, use `position()`.
+
+    Raises [Hom:hou.InvalidInput] if the item cannot move to the position
+    specified.
+
+::`shiftPosition(self, vector2)`:
+    #cppname: HOM_NetworkMovableItem::shiftPosition
+    #replaces: Cmd:oplocate
+    Equivalent to calling [Hom:hou.NetworkMovableItem#move].
+
+::`size(self)` -> [Hom:hou.Vector2]:
+    #cppname: HOM_NetworkMovableItem::size
+    Return the size of this item's tile in the network editor graph as a
+    `Vector2`.
+

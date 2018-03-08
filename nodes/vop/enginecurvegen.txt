@@ -1,0 +1,69 @@
+= Houdini Engine Procedural: Curve Generate =
+
+#type: node
+#context: vop
+#internal: enginecurvegen
+#icon: VOP/enginecurvegen
+
+"""Cooks a SOP asset for each point in the source geometry and instances the generated curves onto the point."""
+
+== Overview == (oview)
+
+This procedural shader lets you specify a SOP asset to generate instanced geometry at render time. If any attributes on the source points have the same name as parameters on the asset, Mantra sets the parameters to the attribute values, then cooks the SOP to generate the geometry for the point. This is very similar in spirit to Copy Stamp.
+
+For example, you could set the procedural to use an HDA that generates curves (i.e. [Hair Generate|Node:sop/hairgen]), and add a single point with attributes to control the hair generation.
+
+WARNING:
+    This procedural only allows the generation of curve geometry (polygon, Bezier or NURBS curves).
+
+WARNING:
+    To render a scene using this procedural, you must ensure mantra is using at least basic engine mode, using the `-e basic` command line option or the `MANTRA_ENGINE_PROCEDURAL` environment variable. See [the help for -e|/render/batch#mantra].
+
+
+== Notes == (notes)
+
+* If you don't specify the bounding box, the procedural uses the bounding box of this object's geometry, increased by the predicted instance sizes.
+
+* If the SOP contains a SHOP network with SHOPs that are used, a non-displayed version of the SOP should be in your scene file. You should also set the output driver to have the __SHOP References__ parameter set to __Declare all SHOPS__.
+
+* The procedural procedural will pass its level of detail to a parameter named `lod`. If there is an attribute named `lod`, it will override the level of detail calculated by mantra.
+
+
+@parameters
+
+== Main ==
+
+SOP:
+    Name of the SOP type.  This is the internal name, not the label.  For example, `box`, `platonic`, `sphere`.
+
+OTL Files:
+    Paths to asset libraries that HScript should `otload` prior to creating the SOP.
+
+Basic Size:
+    The estimated maximum size (as a radius in each direction) of each instance. Mantra uses this to compute the new bounding box for the object after instancing. If you underestimate how much space to add for the instances you can get rendering errors, while overestimating might slow the render down, so it's better to overestimate. 
+
+Orient to Point:
+    Try to align the instance to the point's velocity.  When this is off, the shader translates to the point's space.
+
+Defer Geometry Creation:
+    Normally this generates all geometry when the procedural is rendered.  Turning this on defers creation of instances until each instance is rendered. For example, if you have scattered instances, but only render a few of them, this option may save memory since some geometry will never be created.
+
+    When this option is on, the procedural can no longer share geometry between different point instances. So if you're instancing the same geometry to a lot of points, the geometry will be duplicated (not instanced), so the mantra will use _more_ memory.
+
+SOP HDA Requires LOD:
+    Compute an approximate level of detail and pass this to a parameter on the SOP asset named `lod` (if it exists).  If your SOP asset doesn't use the LOD to cook differently, turn this off to allow mantra to be more efficient.
+
+
+== IFD Bounds ==
+
+Bounding Box:
+    A bounding box for the total generated geometry. Only when this bounding box is "on screen" will mantra load the referenced geometry. If you don't can't estimate the bounding box, set this to __No bounding box required__ to always load the geometry. You can also specify the bounding box by referencing the SOP's bounding box in the __SOP Bounds__ parameter.
+
+SOP Bounds:
+    Use the bounding box of this SOP as the bounding box for the total generated geometry.
+
+Min Bounds:
+    The minimum bounding box dimensions, when setting explicit bounds.
+
+Max Bounds:
+    The maximum bounding box dimensions, when setting explicit bounds. 

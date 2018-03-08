@@ -1,0 +1,1161 @@
+= Operator Type Properties window =
+
+#helpid: h.opmenu.typeprop
+#bestbet: disablewhen
+
+"""The type properties window lets you edit the metadata and parameter interface of a digital asset node type."""
+
+== Overview ==
+
+Several different collections of information contribute to the overall definition of a [digital asset|/assets/]:
+
+* The nodes inside the asset's subnetwork.
+
+* The asset's parameter interface.
+
+* Metadata such as the asset's human-readable label and icon.
+
+* Extra files embedded in the asset, such as textures.
+
+Except for the subnetwork contents, you edit all the rest using this window. As you develop an asset, you'll open and use this window a lot, especially as you build and refine the asset's parameter interface.
+
+NOTE:
+    Some of the information you set up when you created the asset, such as its human-readable label and the number of inputs, can be changed in this window. However, the internal name you set when you create the asset (which may include a namespace and version) becomes intrinsic to the asset and cannot be changed. If you make a mistake or want to change it, you must create a new asset.
+
+
+== Type properties vs. spare parameters ==
+
+You can use a similar interface to add [spare parameters|/network/spare] and/or [render properties|/props/] to a single node. It's important to keep the difference between editing an asset's _node type_, as in this window, and adding spare parameters to a _single node_.
+
+_Spare parameters_ are "extra" parameters added to a single node instance, which are not part of the node's inherent parameter interface. You can add spare parameters to both assets and "factory" nodes. They are useful for one-off customizations.
+
+_Render properties_ are a special type of spare parameter that convey information about the node (object, camera, material) to the renderer. Most render-related nodes are created with a set of render properties that you can [add to|/props/].
+
+If you are trying to add an extra parameter to a single node, you want a [spare parameter|/network/spare]. If you are customizing rendering, you want a [render property|/props/]. If you want to change the base parameter interface shared by all nodes of a certain asset type, you want this window.
+
+
+== How to ==
+
+:task: Edit the type properties of an asset:
+    Right-click an instance of the asset and choose __Type Properties__.
+
+    ~~~ or ~~~
+    
+    In the Asset Manager window (__Assets > Asset Manager__), right click the asset definition and choose __Type Properties__.
+
+    After you make changes in the window, you can apply them to the asset but keep the type properties window open by clicking __Apply__, or apply them and close the window by clicking __Accept__.
+
+
+== Basic tab == (basic)
+
+Label:
+    The human-readable label for the node type. This is what Houdini shows when the node appears in the user interface, such as in the ((Tab)) menu.
+
+Icon:
+    #id: icon
+    
+    A reference to an icon file (SVG or image), in one of the following formats:
+    
+    * An `opdef:` path to an embedded file in the asset's [extra files|#extra].
+    
+    * A file path or URL for a file containing the icon.
+    
+    * The name of a built-in Houdini icon. For example, `OBJ_geo` or `SHELF_candle`.
+    
+    Click the chooser button next to the field to browse for an icon. You can browse for a file on disk, or click `opdef:/` in the chooser to browse embedded files, or `hicon:/` to browse built-in icons.
+    
+    If you choose a file on disk and __Embed icon in operator__ is on, when you click __Accept__ Houdini will automatically copy the file into the asset's [extra files|#extra] and replace the __Icon__ field with an `opdef:` reference to the embedded icon.
+
+Version:
+    You can use this field with "upgrade handlers" to provide scripts to update old (but forward-compatible) version of a node when a new version is available.  Do not confuse this field with the [asset version|/assets/namespaces] which is part of the asset's internal name. See [the two types of asset versioning|/assets/versioning_systems] for more information.
+
+Minimum Inputs:
+    The number of inputs that must be connected for this node to work. The node may have more inputs than this (set by __Maximum outputs__ below), but if the first N inputs are not connected the node will error.
+
+Maximum Inputs:
+    The number of inputs the node has. Note that Houdini does not check that this number is greater than or equal to __Minimum inputs__ --- You can have a node with no inputs but a minimum input count of 1, meaning it will _always_ error.
+    
+    Use controls on the __Input/Output__ tab to give the input(s) human-readable labels.
+
+Maximum Outputs:
+    If the node category (for example, VOP) allows multiple outputs, this is number of outputs on the node.
+    
+    Use controls on the __Input/Output__ tab to give the output(s) human-readable labels.
+
+
+== Parameters tab == (parms)
+
+A significant percentage of the work on an asset will involve editing the asset's parameter interface, which is how users will control the asset's options.
+
+There are several ways to build the parameter interface.
+
+* Many parameters will be _promoted_ from nodes inside the asset.
+
+    When you "promote" a parameter, Houdini creates a copy of the parameter on the asset, and replaces the original parameter's value with an expression that references the value of the parameter on the asset. This means the parameter on the asset drives the value of the corresponding parameter inside.
+
+    For example, you might have an asset that scatters points on a surface and copies boxes onto the points. Inside the asset you, the author, will have a network with a [Scatter node|Node:sop/scatter] and a [Box node|Node:sop/box], but the user will see the asset as a single node, and won't see or interact with its contents. You will want the user to be able to control the number of points and the size of the boxes from the asset's interface, so you would _promote_ those specific parameters from the nodes inside onto the asset.
+
+* You can create new parameters on the asset. You can set up references for these parameters manually, or use callbacks/scripting to make the parameters functional.
+
+    For example, you might want one "Size" float parameter on the asset to drive all three of a contained node's Scale X, Scale Y, and Scale Z values. You could create a float parameter on the asset and manually set up references to it on the contained node.
+
+* If you are building a material, [Material assets|/shade/build] automatically create parameters corresponding to any [Parameter VOPs|Node:vop/parameter] inside the asset. See [building a material|/shade/build] for more information about material assets.
+
+The __Parameters__ tab is divided into three panes:
+
+Create Parameters:
+    This contains tabs representing different sources for parameters you can add to your asset. The __By type__ tab lets you create new parameters from scratch. 
+
+Existing Parameters:
+    This represents the node's current parameter interface. You can drag in parameters from the left pane or the parameter editor to add to it, or drag items within the tree to rearrange it.
+
+Parameter Description:
+    When a parameter is selected in the middle pane, you can edit its settings in this pane.
+
+:task: Promote a single parameter:
+    # Open the type properties window and click the __Parameters__ tab.
+    
+    # Select the node with the parameter you want to promote in the parameter editor
+    
+    # Drag the parameter from the parameter editor onto the __Existing parameters__ tree in the type properties window.
+
+:task: Browse for a parameter to promote:
+    Alternatively to dragging-and-dropping parameters, you can browse for a parameter from within the type properties window.
+    
+    # On the __Parameters__ tab, under __Create Parameters__, click the __From nodes__ sub-tab.
+    
+    # The tree control shows all nodes in the current scene, and inside each node, all of that node's parameters. Browse to the parameter you want to promote.
+    
+    # Drag the parameter from the tree on the left onto the __Existing Parameters__ tree in the middle.
+    
+        _or_
+        
+        Select the parameter under __From nodes__ and click the [Smallicon:BUTTONS/move_to_right] Move button to move it over.
+        
+        _or_
+        
+        Right-click the parameter under __From nodes__ and choose __Install parameters__. 
+
+:task: Create a parameter from scratch:
+    # Under __Create parameters__, click the __By type__ tab.
+    
+    # Find the type of parameter you want to add and drag it into the __Existing parameters__ to add it to the parameter interface.
+    
+        _or_
+        
+        Select the parameter under __By type__ and click the [Smallicon:BUTTONS/move_to_right] Move button to move it over.
+
+:task: Make a pop-up menu parameter:
+    # Under __Create parameters__, click the __By type__ tab.
+    
+    # Add either a String or Integer parameter (see how to create a parameter from scratch above). The parameter type controls what type of values you get from the menu.
+    
+    # Under __Parameter description__, on the __Parameter__ sub-tab, set up the parameter's controls such as its name and label.
+    
+    # On the __Menu__ sub-tab, turn on __Use menu__. If this is an Integer parameter, turn on __Use menu item token as value__.
+    
+    # Set up the menu items (see [the help for the Menu sub-tab|#menu_tab]. You can manually set up a list of items, or [write a script|/hom/locations#parameter_menu_scripts] to generate the menu items dynamically every time the user clicks the menu.
+    
+    When you read the value of the parameter in a script or channel reference, you will get the "token" for the currently selected item. You can also set up a [parameter callback script|/hom/locations#parameter_callback_scripts] to do something whenever the user chooses an item in the menu.
+    
+    TIP:
+        You can also set up a parameter that has a field for the user to type in but also a menu button they can choose possible values from. See [the help for the Menu sub-tab|#menu_tab] for more information.
+
+:task: Make a button strip or icon strip parameter:
+    # Under __Create parameters__, click the __By type__ tab.
+    
+    # Add either a Button Strip or Icon Strip parameter (see how to create a parameter from scratch above). Button strips have text labels, while icon strips show icons instead of text.
+    
+    # Under __Parameter description__, on the __Parameter__ sub-tab, set up the parameter's controls such as its name and label.
+    
+    # Click the __Menu__ sub-tab.
+    
+    # Set up the menu items (see [the help for the Menu sub-tab|#menu_tab]).
+    
+        * For button strips, the Tokens aren't used (although you can access the list of tokens in a script using [Hom:ParmTemplate#menuItems]). The Labels are the labels on the buttons in the strip.
+        
+        * For icon strips, fill in the Tokens with references to icon files. The Labels will be used as tooltips when the user hovers over an icon.
+    
+    # To make the buttons mutually exclusive, set the pop-up menu at the top to "Normal". To allow the user to turn on multiple buttons, set the pop-up menu to "Toggle".
+    
+        For example, you might have a "Quality" strip with "Low", "Medium", and "High" options. These are mutually exclusive, so you would set the pop-up menu to "Normal".
+    
+        On the other hand, you might have a node the generates text, with a "Style" strip with "Bold", "Italics", and "Underline". In this case you want the user to be able to turn each option on or off individually, so you would set the pop-up menu to "Toggle".
+    
+    When you read the value of the parameter in a script or channel reference:
+    
+    * For "Normal" (mutually exclusive) strips, it returns the index of the selected item (starting from 0).
+    
+    * For "Toggle" (multiple selection) strips, it returns a [bit field|Wp:Bit_field]. See [scripting button strips|/hom/locations#button_strip_scripts] for more information.
+    
+    You can also set up a [parameter callback script|/hom/locations#button_strip_scripts] to do something whenever the user clicks a button in the strip.
+    
+    TIP:
+        If you make a "Toggle" script and have the callback script turn off the selected item each time one is clicked, the button strip will act more like a toolbar of action buttons rather than a set of options.
+
+
+=== Import blocks === (importblocks)
+
+When you are developing a set of complex assets, with high-level assets that build on low-level assets, you sometimes want to promote an entire block of parameters from a lower-level asset onto the higher-level asset you're authoring. However, you want to be able to continue to edit the lower-level parameters and not have to re-promote them every time.
+
+_Import blocks_ let you promote a block of parameters and have them remember where they were promoted from so you can automatically update them with changes to the originals.
+
+:task: Promote a block of parameters as a single unit:
+    # Promote a folder of parameters from the contained node.
+    
+        (Tabs, group boxes, and collapsible sections in the UI are all represented by folders in the parameter tree.)
+    
+    # Under __Parameter description__, turn on __Import settings__.
+        
+    Now when you want to pick up changes to the original folder's contents, you can right-click the promoted folder and choose __Refresh imports__.
+
+
+=== Parameter types === (parmtypes)
+
+TIP:
+    There is no "menu" parameter type. If you want the user to choose a value from a pop-up menu, create an Integer or String parameter and then use the controls on __Menu__ sub-tab under __Parameter Description__ to set up a menu of value choices.
+
+:col:
+    [Icon:DATATYPES/angle] Angle:
+        A single float representing an angle in degrees. In old versions of Houdini this had a different UI than a plain float but this is no longer the case.
+
+    [Icon:DATATYPES/button] Button:
+        A clickable button. You can enter a script to run when the user clicks the button.
+
+    [Icon:DATATYPES/buttonstrip] Button Strip:
+        A horizontal strip of labelled options. The buttons can be mutually exclusive or individually set. See [how to create a button strip parameter|#parms] above, and [how to write a button strip callback|/hom/locations#button_strip_scripts].
+
+    [Icon:DATATYPES/rgb] Color:
+        A 3 float vector parameter with a UI for editing the value as a color. Channels use the suffixes `rgb` instead of `123`.
+
+    [Icon:DATATYPES/rgba] Color and Alpha:
+        A 4 float vector parameter with a UI for editing the value as a color with alpha channel. Channels use the suffixes `rgba` instead of `1234`.
+
+    [Icon:DATATYPES/data] Data:
+        Stores arbitrary binary data. The parameter has no UI, you must read or write the value in a script. This can be useful for stashing data on a node instance. For example, this is how the [Stroke SOP|Node:sop/stroke] stores stroke data.
+
+    [Icon:DATATYPES/direction_vector] Direction Vector:
+        A 3 float vector representing a direction. In old versions of Houdini this had a different UI than a plain vector but this is no longer the case.
+
+    [Icon:DATATYPES/file] File:
+        A string representing a file path, with a UI for choosing a file from disk.
+
+    [Icon:DATATYPES/directory] File - Directory:
+        A string representing a directory path, with a UI for choosing a directory from disk.
+
+    [Icon:DATATYPES/geo_file] File - Geometry:
+        A string representing a path to a geometry file, with a UI for choosing a file that filters out non-geometry files by default.
+
+    [Icon:DATATYPES/image_file] File - Image:
+        A string representing a path to an image file, with a UI for choosing a file that filters out non-image files by default.
+
+    [Icon:DATATYPES/float] Float:
+        A single floating point value.
+
+    [Icon:DATATYPES/vector2] Float Vector 2:
+        Two floating point values.
+
+    [Icon:DATATYPES/vector] Float Vector 3:
+        Three floating point values, for example a 3D position.
+
+    [Icon:DATATYPES/vector4] Float Vector 4:
+        Four floating point values, for example a quaternion.
+
+    [Icon:DATATYPES/folder] Folder:
+        A container for other parameters. Folders let you organize the node's parameters. You can choose to present the folder in different ways, such as a tab, group box, or collapsible section. Adjacent tabs join together automatically.
+
+    [Icon:DATATYPES/geometrydata] Geometry Data:
+        Stores arbitrary geometry data. The parameter has no UI, you must read or write the value in a script. This can be useful for stashing geometry on a node instance. For example, you could use this to make the [Stash SOP|Node:sop/stash].
+
+:col:
+    [Icon:DATATYPES/iconstrip] Icon Strip:
+        Like Button Strip but with icons on the buttons instead of text labels. The buttons can be mutually exclusive or individually set. See [how to create an icon strip parameter|#parms] above, and [how to write an icon strip callback|/hom/locations#button_strip_scripts].
+
+    [Icon:DATATYPES/int] Integer:
+        A single integer value.
+
+    [Icon:DATATYPES/int_vector2] Integer Vector 2:
+        Two integer values.
+
+    [Icon:DATATYPES/int_vector] Integer Vector 3:
+        Three integer values.
+
+    [Icon:DATATYPES/int_vector4] Integer Vector 4:
+        Four integer values.
+
+    [Icon:DATATYPES/keyvaluedict] Key-Value Dictionary:
+        Stores a table of string -> string associations.
+
+    [Icon:DATATYPES/label] Label:
+        A read-only line of text.
+
+    [Icon:DATATYPES/float_log] Logarithmic Float:
+        A single float, but the slider UI affects the value on exponential scale.
+
+    [Icon:DATATYPES/int_log] Logarithmic Integer:
+        A single integer, but the slider UI affects the value on exponential scale.
+
+    [Icon:DATATYPES/float_minmax] Min/max Float:
+        Two floats representing a low and high. Channels use the suffixes `min` and `max` instead of `1` and `2`. *Nodes with a parameter of this type will not load in Houdini versions before 16.0*.
+
+    [Icon:DATATYPES/int_minmax] Min/max Integer:
+        Two integers representing a low and high. Channels use the suffixes `min` and `max` instead of `1` and `2`. *Nodes with a parameter of this type will not load in Houdini versions before 16.0*.
+
+    [Icon:DATATYPES/node_list] Operator List:
+        A string representing a space-separated list of node paths, with a UI for choosing multiple nodes.
+
+    [Icon:DATATYPES/node_path] Operator Path:
+        A string representing a node path, with a UI for choosing a node.
+
+    [Icon:DATATYPES/rgba_mask] RGBA Mask:
+        An integer bitmask created from a UI allowing the user to turn each of a red, green, blue, and alpha button on or off individually.
+
+    [Icon:DATATYPES/ramp] Ramp (Color):
+        A three float vector with a color ramp UI. You can sample the ramp in an expression with [Exp:chramp].
+
+    [Icon:DATATYPES/ramp] Ramp (Float):
+        A single float with a curve ramp UI. You can sample the ramp in an expression with [Exp:chramp].
+
+    [Icon:DATATYPES/separator] Separator:
+        Inserts a separator line into the UI to organize the parameters.
+
+    [Icon:DATATYPES/string] String:
+        A text box for editing a string value.
+
+    [Icon:DATATYPES/boolean] Toggle:
+        A checkbox for editing a boolean value.
+
+    [Icon:DATATYPES/uv] UV:
+        Two floats representing surface coordinates. Channels use the suffixes `uv` instead of `12`.
+
+    [Icon:DATATYPES/uvw] UVW:
+        Three floats representing surface coordinates. Channels use the suffixes `uvw` instead of `123`.
+
+
+=== Common settings ===
+#display: pull left
+
+Name:
+    The _internal_ name of the parameter. This is how channel references and scripts refer to the parameter.
+
+Label:
+    The human readable label for the parameter. This is what appears next to the parameter's UI in the parameter editor. You can turn off the checkbox to not show any label next to the controls.
+
+Type:
+    The [parameter type|#parmtypes]. This affects how the value is stored and how the parameter is presented to the user in the parameter editor interface.
+
+Invisible:
+    When this is on, the parameter is not shown in the parameter editor, but you can still read and write its value using expressions and scripts.
+    
+    By default, invisible parameters are not shown under __Existing parameters__. If you want to show them so you can select them, rearrange them, and delete them, turn on __Show invisible parameters__ at the top.
+
+Horizontally join to next parameter:
+    Put this parameter and the next parameter in the same row in the parameter editor interface. Note that you can turn this on for more than one parameter in a row to layout three or more parameters horizontally. If all the "joined" parameters can't fit in a line, they will wrap to the next line.
+    
+    * When you have 2 or more related, compact controls in a row, you can join them to save space.
+    
+    * You can make a checkbox, turn its label off, and "join" it to the next parameter, for a UI where the checkbox controls whether the parameter applies or not, similar to the __Label__ control in this pane. (Note that you still need to actually implement that UI using expressions.)
+
+Show parm in:
+    There can be a few different parameter interfaces in Houdini. This controls which of these different interfaces this parameter appears in.
+    
+    Main Dialog Only:
+        Parameter only appears in the parameter editor.
+    
+    Main & Tool Dialogs:
+        Parameter appears in the parameter editor and the operator toolbar across the top of the viewer when the node is active.
+    
+    Main & Tool Dialogs + Toolbox:
+        Parameter appears in the parameter editor, and the operator toolbar across the top of the viewer when the node is active, and the floating parameter editor in the viewer.
+
+Disable when:
+    A rule for when this parameter should appear disabled/non-editable. This lets you set up parameters to dynamically disable based on the value of other parameters. See [disable/hide when syntax|#conditions].
+
+Hide when:
+    A rule for when this parameter should not appear. This lets you set up parameters to dynamically hide themselves based on the value of other parameters. See [disable/hide when syntax|#conditions].
+
+Tags:
+    Lets you attach arbitrary key/value data to the parameter template. You can access this data using [Hom:hou.ParmTemplate#tags].
+    
+    Currently this is used by the 3D viewer to signal when a parameter should be treated as an OpenGL value. For example, attaching the "OpenGL -> Diffuse" tag to a parameter on a material node makes the 3D viewer treat that parameter's value as the diffuse color when displaying the surface. Click __Built in tags__ to choose from these pre-defined tags.
+
+    Some parameters may have internal tags attached to them which store options for the parameter's look and behavior.  These internal tags are not editable in the tag list.
+
+    Tags must have unique names.
+
+Callback script:
+    Houdini will runs this script when the value of this parameter changes.
+
+    The pop-up icon menu to the right of this field lets you set whether the callback script is in HScript command language or Python. While the default is HScript, *we _strongly_ recommend you write callbacks in Python*.
+    
+    If the value in the field is one line, it is treated as a Python expression and evaluated. If it has more than one line, it is treated as if it was the body of a function and must use a `return` statement at the end to return a value.
+    
+    The script runs in an environment containing a `kwargs` global dictionary variable containing information about which parameter changed. 
+    See [parameter callback scripts|/hom/locations#parameter_callback_scripts] for more information.
+
+Available for import:
+    If you turn this off, this item will not be included when its parent folder is imported as a block.
+
+Help:
+    This is displayed as a tooltip when the user hovers over the parameter.
+
+
+=== String settings ===
+#display: pull left
+
+Multi-line string:
+    Display this field as a multi-line editor instead of a single line text field.
+    
+    Note that _all_ string parameters can hold multi-line text. You can get an extended multi-line editor for a single line text field by pressing ((Alt + E)) in the field. This checkbox simply changes the look/capabilities of the user interface for editing the sting.
+    
+Lines to Show:
+    When __Multi-line string__ is on, this is the minimum and maximum number of lines to show in the editor. The field will always be the minimum number of lines tall. If the content has fewer lines than the maximum, the field automatically sizes down to fit, and expands as the user types more, until the content has more than the maximum lines to show, at which point the content will scroll.
+
+Language:
+    If the field will contain source code, you can specify a programming language to enable auto-completion and syntax highlighting in the field.
+
+Suppress Quotes in VOP Code Blocks:
+    Whether this parameter should be expanded without quotes within VOP code
+    blocks. A common use is to allow strings from menus to be placed verbatim
+    in a code block. Only available for string parameters in a VOP definition.
+
+
+=== Numeric settings ===
+#display: pull left
+        
+Units:
+    Specifies a _unit type_ for this parameter's value, such "distance" or "mass". Choose a unit type from the pop-up menu to the right of the field, or leave this field blank if this value should not scale with a change in units.
+    
+    This tells Houdini whether/how to scale the parameter's default value when the user changes the HIP file's units. For example, if the user changes the HIP file's units to `cm`, it will use this setting to scale any defaults related to length/distance.
+    
+    The code uses the format `<<m/kg/s>><<exponent>>[<<m/kg/s>><<exponent>> ...]`. For example, length would be `m1`. Acceleration would be `m1s-2`  (that is, meters/seconds<sup>2</sup>, using a negative exponent instead of division). The following are some useful unit type specifications:
+
+    Mass |
+        #style: width: 33%
+        `kg1`
+    Time |
+        `s1`
+    Velocity |
+        `m1s-1`
+    Angular velocity |
+        `s-1`
+    Acceleration |
+        `m1s-2`
+    Angular acceleration |
+        `s-2`
+    Force |
+        `kg1m1s-2`
+    Force density |
+        `kg1m-2s-2`
+    Impulse |
+        `kg1m1s-1`
+    Torque |
+        `kg1m2s-2`
+    Drag |
+        `kg1s-1`
+    Angular drag |
+        `kg1m2s-1`
+    Pressure |
+        `kg1m-1s-2`
+    Spring constant |
+        `kg1s-2`
+    Linear density |
+        `kg1m-1`
+    Area density |
+        `kg1m-2`
+    Volume density |
+        `kg1m-3`
+ 
+Size:
+    When __Type__ is __Integer__, __Float__, or __Angle__, sets the
+    number of components in the parameter (1 to 4).
+    
+Defaults:
+    The default value for the parameter. If __Size__ is greater
+    than 1, a default can be specified for each component.
+
+Range:
+    The range for the slider in the interface.
+    
+    If you click the lock icon next to low and/or high value, the interface prevents the user from manually entering values lower and/or higher than this range.
+
+
+=== Node path/list settings ===
+#display: pull left
+
+Op filter:
+    Filters which types of nodes the user can see and select in the chooser interface for this parameter.
+    
+    For example, if the parameter requires the path to a bone, you would set this to "Object: Bone Only" to make it easier for the user to select from just the bones in the scene.
+
+
+=== File settings ===
+#display: pull left
+
+Browse Mode:
+    For operating systems that have a different file chooser UI depending on whether you're opening or saving a file (such as MacOS), this lets you specify which type of operation is associated with this parameter.
+    
+    For example, in a parameter that specifies a geometry file to load, you would set this to "Read Only". For a parameter that specifies an output file to write to, you would set this "Write Only".
+    
+    Houdini's file chooser currently does not use this information. This only makes a difference if you are using native file dialogs (you have set the `HOUDINI_USE_NATIVE_FILE_CHOOSER` environment variable) and the native file dialogs make this distinction (as on MacOS).
+
+
+=== Folder settings === (folders)
+#display: pull left
+
+Folder type:
+    How the parameter editor displays this group of parameters in the parameter editor.
+    
+    Collapsible:
+        Display as a collapsible heading containing the parameters.
+    
+    Simple:
+        Display as a labeled box around the parameters.
+    
+    Tabs:
+        Display as a tab. Multiple adjacent "tab" folders in the parameter tree display as a tab set in the parameter editor.
+    
+    Radio buttons:
+        Display as a tab that can change the operation of the node depending on which tab in the set is selected.
+    
+    Import Block:
+        Displays its contents as part of the normal parameter flow. This is useful when you are importing a folder as a block but don't want the parameters to appear inside a tab or whatever other folder type you're importing.
+    
+    Multiparm Block:
+        A _multiparm_ lets the user create multiple instances of a parameter. This folder type sets up an interface to let the user add parameters. The parameter(s) inside this folder act the template for the generated parameter blocks the user can add or delete.
+        
+        "List" style adds the user-generated blocks as part of the normal parameter layout in the parameter editor. "Scrolling" style puts the user-generated blocks inside a scrolling area. "Tabs" puts each user-generated block in a separate tab in a set.
+
+End tab group:
+    Adjacent "tab" folders are merged into a tab set. If you want a series of tabs to be in different tab sets, turn this on for the last tab in each set. It indicates this is the last tab in its set and if the next item is also a tab it should start a new set.
+
+Tab disable when:
+    A rule for when _all parameters_ in this tab should appear disabled/non-editable. See [disable/hide when syntax|#conditions].
+
+Tab hide when:
+    A rule for when this tab should be hidden. See [disable/hide when syntax|#conditions].
+
+Import settings:
+    Turn this on have this folder import its contents from a folder on a node inside this asset. See [import blocks|#importblocks].
+
+Source:
+    A reference to the node or file this folder imports its contents from, when __Import settings__ is on.
+    
+Token:
+    A reference to which item to import from the node/file, when __Import settings__ is on.
+    
+Mask:
+    Only import parameters matching this pattern, when __Import settings__ is on.
+
+
+=== Ramp settings === (ramps)
+#display: pull left
+
+Ramp type:
+    This can be "Color" for a color ramp or "Float" for a scalar curve ramp.
+
+Color type:
+    When __Ramp type__ is "Color", this specifies the model to use to generate color from the three channels in the data: "RGB", "HSV", "LAB", "HSL", "XYZ", or "TMI".
+
+Default Points:
+    The initial number of points when this parameter is created.
+
+Def Interpolation:
+    The default interpolation between ramp points for this parameter.
+
+First Instance:
+    The number associated with the first ramp point. This only affects how you refer to the ramp points in scripts.
+
+VEX Ramp Variables:
+    When this parameter is on a shader, this lets you specify VEX variable names for the basis, keys, and values parameters.
+
+Show Controls By Default:
+    Ramp parameters have a panel of controls below them that the user can collapse to save space. When this is on, the controls for this ramp will be visible at first when the node is created. When this is off, the controls will be collapsed at first.
+
+
+=== Key-Value settings ===
+#display: pull left
+
+Key label:
+    The text to display at the top of the left (key) column in the parameter UI. If you leave this blank, it uses "Key".
+
+Value label:
+    The text to display at the top of the right (value) column in the parameter UI. If you leave this blank, it uses "Value".
+
+Add chooser:
+    Turn this on to add a button in the parameter UI to choose a key-value pair from a predefined list.
+
+Chooser label:
+    The text to display on the chooser button (when __Add chooser__ is on).
+
+Chooser callback:
+    A Python script Houdini runs when the user clicks the chooser button (when __Add chooser__ is on). This script can present an interface for the user to choose a preset (for example, using [Hom:hou.ui#selectFromList] or [Hom:hou.ui#selectFromTree]). It must return a `(key, value)` tuple.
+    
+    See [how to write a key-value parameter button script|/hom/locations#keyvalue_button_scripts] for more information.
+
+
+=== Channels sub-tab === (channels_tab)
+
+This sub-tab shows the animatable _channels_ associated with this parameter.
+
+By default, Houdini creates an animated channel for each component of the parameter value (so for example, a __Translate__ vector parameter would get three channels, one for each component of the vector). However, you can have the parameter generate more (computed) channels or fewer channels.
+
+* You can turn on the [Icon:BUTTONS/scope] [Autoscope|/anim/scope] icon for a channel to make it key-able and automatically ["scoped"|/anim/scope] (shown in the animation editor) when the node containing this parameter is selected.
+
+    You should turn this on for all commonly animated values.
+
+* If this parameter is promoted, the "Linked Channels" column shows which channels this parameter was promoted from on the contained node. When the [Icon:BUTTONS/link] Link button in the middle is on, the channel gets its value from the linked channel.
+
+
+=== Menu sub-tab === (menu_tab)
+
+The controls on this tab let you set up a menu of values the user can choose from for this parameter. You can also use the __Callback script__ (on the __Parameter__ sub-tab) to script actions based on the user's menu choices.
+
+NOTE:
+    The menu editing interface is a holdover of very early Houdini UI. It can be a bit confusing.
+
+Each menu item has a _token_ and a _label_. The label is the human-readable label corresponding to the value that appears in the pop-up menu in the parameter editor.
+
+* In a String parameter, when the user selects an item, the parameter is set to the corresponding string token.
+
+* In an Integer parameter, by default when the user chooses an item, the parameter is set to the _index_ of the item (for example, `0` for the first item, `1` for the second item, and so on). If you turn on __Use menu item token as value__, the parameter will be set to the corresponding integer token instead.
+
+If you know the items you want to appear in the menu ahead of time, you can define them using the __Menu items__ table. If you want to dynamically compute the menu contents using a script, click __Menu script__ instead.
+
+Use menu:
+    Converts the parameter UI from the default (for example, a text box for entering an integer or string) to a pop-up menu allowing the user to choose from the items configured below.
+    
+    The pop-up menu to the right lets you choose the interface style for the menu:
+
+    Normal (Menu Only, Single Selection):
+        Display the parameter as a pop-up menu.
+    
+    Normal Mini (Mini Menu Only, Single Selection):
+        Display the parameter as a "mini" pop-up menu. This style only shows a small button to open the menu, instead of showing the current value.
+        
+        You can use this with __Horizontally join to next parameter__ on the previous parameter to put a mini-popup menu after another parameter.
+    
+    Replace (Field + Single Selection Menu):
+        This displays a regular field the user can manually edit, with a mini pop-up menu at the end from which they can choose items. Choosing an item replaces the contents of the field.
+    
+    Toggle (Field + Multiple Selection Menu):
+        This setting is only useful for String parameters. If you choose it for an Integer parameter you will get the same UI as Replace (above).
+        
+        This treats the parameter value as a space-separated list of keywords. It shows a regular text field the user can manually edit, with a mini pop-up menu at the end from which they can choose items. Choosing an item _adds_ its token to the list (or _removes_ it if it is already there).
+
+Use menu item token as value:
+    In an Integer parameter, by default when the user chooses an item, the parameter is set to the _index_ of the item (for example, `0` for the first item, `1` for the second item, and so on). If you turn this on, the parameter will be set to the corresponding integer token instead.
+
+Menu items:
+    Click this tab to define the items that will appear in the menu.
+    
+    * Select a row and use the fields under Token and Label to edit the row's contents.
+    
+    * To add a new row, select the empty row at the end of the table.
+    
+    * Click the [Icon:BUTTONS/list_reorderup] move up button to move a row higher in the table. Click the [Icon:BUTTONS/list_delete] delete button to delete a row.
+
+Menu script:
+    When this tab is selected, Houdini will run this script to generate the menu contents. This lets you dynamically change the menu items depending on the current situation.
+    
+    Below the script field is a __Menu script language__ menu (you may need to scroll down to see it). While the default is HScript, *we _strongly_ recommend you write callbacks in Python*.
+    
+    See [Parameter Menu Scripts|/hom/locations#parameter_menu_scripts] for more information on writing a menu script.
+    
+    TIP:
+        Houdini runs this script whenever the user opens the menu, and when the parameter is evaluated, so make it as simple and fast as possible.
+
+
+=== Import sub-tab ===
+
+Houdini stores information here about where a parameter was promoted from, for use when updating [import blocks|#importblocks]. You should not edit this information unless you know what you're doing.
+
+
+=== Action Button sub-tab ===
+
+Some parameters can have a small button appear to the right of the field in the parameter editor that runs an arbitrary script.
+
+Unlike other parts of Houdini, this is no checkbox to control whether the action button appears. Instead, if the script editor on this tab is empty, the parameter has no action button, and if the script editor has any content, the action button appears.
+
+If the script is one line, it is treated as a Python expression and evaluated. If it has more than one line, it is treated as if it was the body of a function.
+
+The script runs in an environment with a global `kwargs` dictionary variable containing the following keys:
+
+`"node"`:
+    A [Hom:hou.Node] reference for the current node.
+
+`"parmtuple"`:
+    A [Hom:hou.ParmTuple] reference for the parameter.
+
+`"script_multiparm_index"`:
+    If the parameter with the action button is one instance of a multiparm, this is the (0-based) number of the specific instance. For example, if a multiparm has three instances and you click the action button for the second instance, this would equal `1`. If the parameter is not a multiparm, this is `-1`.
+
+`"ctrl"`, `"shift"`, `"command"`, `"alt"`:
+    If the given modifier key was held when the user clicked the button, the corresponding value will be `1`, otherwise it's `0`. You can use this to modify the action the script performs based on modifier keys.
+
+The following action button script for a node path parameter opens a chooser, waits for the user to pick an Object node, and then fills in the parameter with the path to that node. If the user shift-clicks the button, the chooser is limited to selecting cameras, and if they ctrl-click the button, it's limited to selecting lights.
+
+{{{
+#!python
+# Get the reference to the current parameter
+parm = kwargs["parmtuple"]
+
+# Get the current value of the parameter, to use as the default in the chooser.
+# Note that the method returns a tuple, so we grab the first (and only) item in
+# the tuple.
+path = parm.evalAsStrings()[0]
+node = hou.node(path)
+
+# Check the modifier keys to set the filter
+if kwargs["shift"]:
+    nodetype = hou.nodeTypeFilter.ObjCamera
+elif kwargs["ctrl"]:
+    nodetype = hou.nodeTypeFilter.ObjLight
+else:
+    nodetype = hou.nodeTypeFilter.Obj
+    
+# Ask the user to choose a node
+newpath = hou.ui.selectNode(initial_node=node, node_type_filter=nodetype)
+
+# Set the parameter value (again, it's a ParmTuple, so we need to set it as
+# as tuple with a single item)
+parm.set( (newpath, ) )
+}}}
+
+
+=== Disable when/Hide when syntax === (conditions)
+#index: document
+#bestbet: disablewhen
+
+Often you want to dynamically show or enable parameters based on the values of other parameters. For example, you might have a checkbox that enables some feature, and only want to enable editing parameters related to that feature when the checkbox is on.
+
+The __Disable when__ and __Hide when__ settings of a parameter let you set up when the parameter should be disabled or hidden. The value is a code using the syntax shown below to calculate whether to disable/hide based on other parameter values.
+
+The general syntax is:
+
+{{{
+{ parm_name [operator] value ...} ...
+}}}
+
+* One or more comparisons inside curly braces.
+
+* Inside the curly braces are one or more comparisons with a parameter name, a comparison operator, and a value.
+
+* The following comparison operators are available: `==`, `!=`, `<`, `>`, `>=`, <=`, `=~` (matches pattern), `!~` (doesn't match pattern).
+
+    {{{
+    { type == 1 count > 10 } { tolerance < 0.1 }
+    }}}
+    
+    NOTE:
+        You *must* put spaces around the comparison operator, otherwise Houdini will not accept the rule.
+
+* You can omit the comparison operator, in which case it will be assumed to be `==`. For readability however we recommend you always explicitly type an operator.
+
+    {{{
+    { geotype 1 } { geotype 2 }
+    }}}
+
+* If there are multiple comparisons inside a set of curly braces, _all_ the comparisons must be true for that condition to be true.
+
+    For example, with the condition below, if the `enablefeature` checkbox parameter is on _and_ the `count` parameter is more than `10`, this parameter would be disabled/hidden:
+    
+    {{{
+    { enablefeature == 1 count > 10 }
+    }}}
+
+* If there are multiple conditions (sets of curly braces), _any_ of the conditions may be true to activate disabling/hiding.
+
+    For example, with the condition below, if the `enablefeature` checkbox parameter is on _or_ the `count` parameter is more than `10`, this parameter would be disabled/hidden:
+    
+    {{{
+    { type == 1 } { count > 10 }
+    }}}
+
+* You can't use [expression functions|/expressions/] in the rule string. However, a workaround is to create an invisible parameter containing an expression that calculates what you need, and then reference it in a comparison.
+
+* There are a few special functions you can use in place of the parameter name on the left side of a comparison. (You _can not_ use these as a _value_ on the right side of a comparison.)
+
+    `ninputs()`:
+        The highest wired input number. This may be more than the number of wires if inputs in the middle are not connected. It also counts subnet inputs that may not be wired in the parent node.
+    
+    `hasinput(<<n>>)`:
+        Returns `1` if the given input number is connected, or `0` if not. This does not count an input wired into a subnet input if that input is not also wired in the parent node.
+    
+    `isparm(<<parmname>>)`:
+        Returns `1` if this parameter's name is <<parmname>>. This is meant for use with multiparm items.
+
+        For example, this rule would apply to the first item in a multiparm named `blend`, but not the second (`blend1`), third (`blend2`), and so on:
+
+        {{{
+        { isparm(blend0) == 1 }
+        }}}
+
+
+== Node tab == (node)
+
+Representative Node:
+    For Object assets, this lets you choose a node inside the asset to indicate the general type of object the asset is (for example, a light, or camera, or geometry object). Houdini can use this information to filter and categorize this asset in the UI, such as in the [link editor|/ref/panes/linker].
+
+Guide Geometry:
+    For SOP assets, Houdini will cook this node to create _guides_ shown along with the node's actual output. Guide geometry lets you include "extra" geometry aside from the node's output to serve as indicators or visualization. For example, volume SOPs often have guide geometry indicating the bounding box, with ticks indicating the voxel size.
+
+Editable Nodes:
+    A space-separated list of node paths. These nodes can be edited even if this asset is locked.
+    
+    Usually you want assets to seem like self-sufficient black boxes to the user, however for complex operations it might be expedient to let the user dive inside and modify nodes such as paint nodes or curves that affect how the asset works.
+    
+    Editability does not "bubble up" to assets containing other assets. If node A is editable in asset B, that does not automatically make it editable in an asset C which contains an instance of B. You would need to list A as an editable node of C.
+
+Message Nodes:
+    A space-separated list of node paths. Warnings and errors on these nodes will bubble up onto the asset node. List any nodes inside the asset that might cause problems so the user will be able to see the warning/error.
+    
+    For example, if you have a File node inside your asset that loads a path defined on the asset, you should include it in this list so if it can't find the file the error is visible on the asset.
+
+Dive Target:
+    If this contains a subnetwork path, when the user double-clicks the asset (or uses the "Dive into Network" command), the network jumps to the contents of this subnetwork instead of the asset's own contents. If you have a dive target you should add the target node to the list of __Editable nodes__ above.
+    
+    Since the contents of an asset are always the asset's definition network, this is a workaround to allow assets to _seem to the user_ as if the asset is a subnetwork with its own contents.
+    
+    Users can still navigate to other nodes inside the asset using the tree view and other means. This setting only affects the "Dive in"/"Up to parent network" actions.
+
+Descriptive Parm:
+    If this contains the internal name of a parameter on this asset, Houdini will display the value of the parameter as the descriptive text badge in the network editor.
+    
+    This should be a parameter whose value tells the user at-a-glance the most important thing about the node's current settings. For example, on a File node this is the file path.
+
+Default State:
+    If this is not blank, when the user enters the Handles tool for this node, use this "state" instead of the generic node state.
+    
+    Currently, the most common use for this is to set it to `stroke` to have the Handles tool use the [Stroke state|/nodes/sop_state/stroke] when a node of this type is active. Other built-in states are too coupled with a specific node to work here.
+    
+    If you write your own interactive state using the HDK, you can use this setting to associate your custom state with the asset.
+
+Shader Name:
+    For material nodes, this is used as the internal name of the shader (for Mantra shaders, this is the name of the VEX shader function). This should usually be the same as the asset's internal name.
+    
+    Houdini automatically converts illegal characters in this string (for example, `principledshader::2.0` might become `principledshader__2_0` internally).
+
+Shader Type:
+    Narrows down the type of computations a material does and indicates how it should be invoked, and what the material can be expected to compute. Choose a type from the pop-up menu to the right of the field. The most common one is "vopmaterial" (which can provide both surface and displacement shaders). But the field can be also `surface` or `displace` if it only generates one type of shader. For RenderMan it is often `bsdfshader` or `generic`.
+
+Render Mask:
+    For material assets, this lists the renderer(s) this material works with. For example, the Principled Shader works with Mantra and the viewport OpenGL renderer, so its mask is `VMantra OGL`. The Pxr Disney shader only works with RenderMan, so its mask is `RIB`.
+    
+VopNet Mask:
+    A space-separated list of VEX contexts in which the user can create this node. If you leave this blank, the node can appear in any context.
+    
+    Available context keywords are `surface` (surface shading), `displace` (displacement shading), `chop` (motion data: [VOP CHOP|Node:chop/vop]), `cop2` (compositing: [VOP COP2 Generator|Node:cop2/vopcop2generator] and [VOP COP2 Filter|Node:cop2/vopcop2filter]), and `cvex` (no specific context: e.g. [Attribute VOP|Node:sop/attribvop], [Point VOP|Node:sop/pointvop]).
+
+Unit Length:
+    The length (in meters) of one distance unit, according to the units used for values and defaults in the asset. For example, if you developed the asset assuming 1 unit = 1 foot, you should set this to `0.3048`.
+    
+    Houdini uses this to scale "distance" parameters according to the HIP file's units (__Edit > Preferences > HIP file options__). You can specify that a parameter represents distance using the __Units__ setting for the parameter on the __Parameters__ tab.
+
+Unit Mass:
+    The mass (in kilograms) of one mass unit, according to the units used for values and defaults in the asset. For example, if you developed the asset assuming 1 unit = 1 pound, you should set this to `0.45`.
+    
+    Houdini uses this to scale "mass" parameters according to the HIP file's units (__Edit > Preferences > HIP file options__). You can specify that parameter as represents mass using the __Units__ setting for the parameter on the __Parameters__ tab.
+
+Get Properties from Vex Code:
+    Allow [pragma statements|/vex/pragmas] in the VEX source code to control settings in this window.
+
+
+== Save tab == (save)
+
+Save information from node:
+    This shows the path of the specific node instance Houdini will use to update the asset contents if you click __Apply__ or __Accept__ in this window. (This is the node you right-clicked and chose __Type properties__ for to open this window.)
+
+Save Contents and Parameters:
+    When this is off, when you click __Apply__ or __Accept__ in this window, changes you made in this window will be saved to the asset defintion, but changes to the current node (its parameter values/defaults and contents) are _not_ saved as part of the asset definition.
+    
+    You should not turn this off unless you have a good reason.
+
+Save Defaults as Initial Parameters:
+    When this is on and you save the node type definition, the current node's _defaults_ are saved as the initial values for new instances. When this is off and you save the node type definition, the current node's _current parameter values_ are saved as the initial values for new instances.
+
+Save Spare Parameters:
+    If this is on and you save the node type definition, any [spare parameters|/network/spare] on the current node are saved as part of the node type, so any new instances would have the same spare parameters added.
+
+Save Contents as Locked:
+    Never turn this off. See __Unlock new nodes on creation__ instead.
+
+    Unlock New Nodes on Creation:
+        When Houdini creates new instances of this node type, they are automatically unlocked (that is, editable). This was added for example files. When you put down an example asset, you don't have to unlock it before you can go inside it and play with the nodes inside.
+        
+        This should always be off for assets you will give to users for use in production.
+
+    Compress Contents:
+        Gzip is faster, Blosc gives better compression but may be slightly slower. The decompression speed of Gzip is practically unnoticeable on modern hardware, so there's usually no point to using No Compression.
+
+Check for External Node References:
+    Show a warning if there references in the asset to nodes outside the asset when you save.
+
+Save Cached Code:
+    When this checkbox is turned on, Houdini saves compiled VEX code inside the HDA and uses it instead of generating that code from the node network.
+
+    Currently, it applies mainly to the Shader Builder SHOPs, which contain VOP nodes. Traditionally Houdini would use nodes to generate .vfl source code and then compile it to vex. By using the cached vex code, Houdini saves time, which can be quite substantial for complex shaders. Also, the synched HDA nodes don't need to create child nodes to build the VOP network inside them (since they are not needed to generate code), so time is saved by skipping the creation of node network when loading hip files. 
+        
+
+== Help tab == (help)
+
+The contents of the text field appear in the help browser when the user clicks the help button for a node of this operator type in the [parameter editor|/ref/panes/parms].
+
+This help can be HTML, or you can use a simple but powerful wiki format to create documentation that looks like the native Houdini help. See [how to write wiki-format help|/help/format].
+
+
+== Handles tab == (handles)
+
+The controls on this tab let you create _handles_ (3D user interface elements that appear in the 3D view) and bind the editable parts of the handles to parameters on your asset. This lets the users of your asset control it interactive in the view. The handles appear in the Handles tool when an instance of this asset is current.
+
+The controls in this pane are the same as for the [Persistent handle editor|/ref/windows/handleeditor].
+
+
+== Code tab == (vex)
+
+This tab lets you create and edit code used to implement Python surface nodes, VEX shaders, VOP operators, and other code-based operators.
+
+<!-- TBD -->
+
+
+== Scripts tab == (scripts)
+
+This tab lets you store scripts that are triggered by asset events (such as when an instance of the asset is created or deleted), as well as arbitrary scripts and Python modules needed by the asset. The interface is very similar to the [Extra files tab|#extra_files], but includes a pop-up menu for specifying event scripts.
+
+* *Do not* create a script (on the __Scripts__ tab) and an extra file (on the __Extra files__ tab) with the same name. The two tabs share a single namespace, and unpredictable behavior may result.
+
+* See [how to write asset event scripts|/hom/locations#events] in the Scripting chapter for information on how to write the Python event scripts.
+
+* See [how to reference embedded files|#access_contents] for how to refer to the embedded scripts anywhere Houdini expects a filename.
+
+
+=== Adding and loading scripts ===
+
+:task:Start a new event script:
+    # Choose the event type from the __Event handler__ pop-up menu.
+        
+        * If you choose an [event type|/hom/locations#asset_events], Houdini will automatically create a script with the proper name.
+        
+        * If you choose "Custom Script", Houdini will wait for you to fill in a name. Enter a name in the __Section name__ field, then click __Add empty section__.
+
+    # Below the editor on the right side of the pane, set __Edit as__ to "Python".
+
+    # Use the editor to write the script. The pop-up menu at the bottom controls whether the script is Python, HScript, or expressions.
+        
+:task:Load an existing file as an event script:
+    # Choose the event type from the __Event handler__ pop-up menu.
+        
+        Choosing an event type (other than __Custom script__) will create a "section" for the script if it doesn't already exist.
+            
+    # Enter the filename for the script file to load in the __Filename__ field.
+        
+    # Click __Add file__.
+        
+    A copy of the file is saved into the digital asset. If you change the file on disk, it will not affect the version in the asset. You will have to reload the file into the __Scripts__ tab.
+
+:task:Run a function from a module on disk in response to an event:
+    # Make sure the module is in Houdini's Python path. In a Python shell, check that the module's parent directory appears in the list output by this:
+    
+        {{{
+        #!pycon
+        >>> import sys
+        >>> sys.path
+        }}}
+    
+    # Create an event handler in the operator type window and write it to call the code in the module.
+    
+        For example, say you have a Python module with studio-wide code called `companyutils`. You can write an event handler that just calls code in the module like this:
+        
+        {{{
+        #!python
+        import companyutils
+        
+        companyutils.creation_handler(kwargs)
+        }}}
+        
+        You probably want to pass the `kwargs` global (which Houdini provides to the handler script) on to the function you call. See [how to write asset event handlers|/hom/locations#asset_events] for more information about `kwargs`.
+
+:task:Add a python module:
+    The `PythonModule` section serves as a central place for Python values, classes, and functions related to the asset. The only thing that's special about it compared to any other embedded file is that it's returned by the `<<node>>.hdaModule()` method, which makes it convenient to access in scripts.
+        
+    # Click __Event handler__ and choose __Python module__.
+        
+    # Do one of the following:
+        
+        - If you have a file on disk you want to load as the module contents, enter it in the __Filename__ field, then click __Add file__.
+            
+        - Use the editor on the right side of the pane to write the module contents.
+    
+:task:Add a custom script:
+    # Click __Event handler__ and choose __Custom script__.
+        
+    # Enter a __Section name__ for the script. This is how you will refer to the custom script within Houdini.
+        
+    # Do one of the following:
+        
+        - If you have a file on disk you want to load as the custom script, enter it in the __Filename__ field, then click __Add file__.
+            
+        - If you want to start the script from scratch in the editor, click __Add empty section__.
+
+
+== Tools == (tools)
+
+This tab lets you create [shelf tools|/ref/windows/edittool] associated with this asset. When the asset is loaded, the tools you define on this tab will be available for the user to add to the shelf, and will show up in the viewer tab menu.
+
+NOTE:
+    Any tools you define on this tab will not automatically show up on the shelf whenever the asset is available. The user has to add the tools to the shelf, by right-clicking the shelf and choosing __Edit Shelf Tab__, then choosing the tools from a list of all available tools.
+
+When you create an asset, Houdini automatically adds a tool to this tab, that invokes a generic script to create an instance of the asset. You can edit the script of this tool, or add additional shelf tools to provide alternate ways of instantiating the asset. Click __Create New__ and choose __Tool__ to start a new tool.
+
+See [how to create shelf tools|/ref/windows/edittool].
+
+
+== Selectors tab == (selectors)
+
+NOTE:
+    This interface is leftover from old versions of Houdini. It only works for object-level assets, and only supports using HScript commands. The modern way to ask for selections is to incorporate selection in the [Python tool script of a shelf tool|/ref/windows/edittool].
+    
+    This tab will probably disappear in a future version of Houdini.
+
+This tab lets you set up a (possibly multi-step) selection process to allow the user to select what (objects/geometry) the node applies to when you create it. For example, you have the node prompt the user to select an object your object-level asset will attach to.
+
+The Type field is not editable and reflects the basic type of the
+selector. The Name field is the english name which should uniquely
+define this selector with respect to the operator type. The Prompt
+field displays the string during the selection process. The
+Multi-selection checkbox indicates whether or not multiple object
+selections are allowed for the current selector. The editable text
+field allows for a user-defined script to be executed when object
+selections are finished. The input objects are accessed by the
+variables `$argc`, and `$arg0, $arg1,..., $arg($argc-1)`, where `$argc` is
+the number of inputs and the remaining variables represent each of
+the input objects.
+
+There is no variable which holds a path to your current node; however, you can retrieve the current node using the `pwd` HScript command.
+
+For example, you can wire in the first selected input into your current node by doing the following:
+{{{
+set curNode = `run("pwd")`
+opwire -n $arg0 -1 $curNode
+}}}
+
+
+== Input/Output tab == (inout)
+
+For VOPs, this tab lets you set up the inputs and outputs that appear on the node and their types.
+
+For other node type categories, the controls on this tab let you give human-readable labels to the asset's inputs and outputs. These appear in the network editor as tooltips when the user hovers over a connector.
+
+
+=== VOP assets ===
+
+* The tab has two table editors, one for inputs and one for outputs.
+
+* Click __Create/update inputs from parameters__ to automatically create inputs based on the node's parameters. This lets the user override parameter values by connecting inputs.
+
+    The button creates inputs with the same name and label, and guesses the input type from the parameter type. If an input already exists with the same name as a parameter, the button only updates the label, so that changes to the input type aren't overwritten.
+
+    *Inputs based on parameters cannot be edited in the table.* They are marked with an [Icon:BUTTONS/info] info icon.
+    
+    If you manually create an input that has the same name as a parameter, they will automatically be linked.
+
+* To add an input or output, choose the type from the __New input__ or __New output__ menus above the tables.
+
+* Click the name, or label of an existing input/output in the table to edit it.
+
+* Select the first cell in a row and then drag it up or down to rearrange the row in the table.
+
+    You can select multiple rows by Shift-clicking or Ctrl-clicking the first cell of each row, and then drag multiple rows at once.
+    
+    You can drag column headings to rearrange signature order.
+
+* To delete an input/output, click the [Smallicon:BUTTONS/list_delete] Delete icon in the row.
+
+* Some cells cannot be edited or deleted. For example, inputs corresponding to parameters, and outputs corresponding to exported parameters or VOP network outputs.
+
+Force code generation:
+    When a VOP operator appears in a VOP network, the VEX Builder will
+    only include the code generated by that operator if it determines
+    that its code is required. Generally, this is true for subnet type
+    VOPs, the Output VOP, and any VOP that is connected, directly or
+    indirectly, to the input of a VOP that has required code. However,
+    you can force the VEX Builder to generate the code for your VOP by
+    turning on __Force Code Generation__.
+
+External or Procedural Shader:
+    Turn this on if this VOP is implemented by a DSO or DLL file instead of generated VEX code.
+
+
+=== VOP signatures ===
+
+* A VOP can have multiple _signatures_: a set of input types and output type. For example, the [Sine VOP|Node:vop/sine] has different signatures (float -> float, vector -> vector) corresponding to the different usages of the VEX [Vex:sin] function.
+
+* Each signature is represented by a column in the inputs table, and _three_ columns in the output table. You can match them up by the __Signature name__ (the first cell in a signature column). Initially, a VOP node has one signature named `default`.
+
+* You can use the __New signature__ button to add a new signature (that is, a new way of calling the underlying VEX code with a different set of typed arguments and a different output). This adds one new column to the top inputs table, and _three_ columns to the bottom outputs table.
+
+* The first cell in a signature column is the signature name. The second cell is a human-readable label for the signature. These are shown in both the signature column in the input table and the corresponding first column of the signature in the output table. Editing the name or label in one table automatically updates the other.
+
+* In the inputs table, the rows of a signature column (after the name and label rows) contain the types of each input _when that signature is active_. (The user chooses the active signature from a pop-up menu at the top of the node's parameter interface.) click a cell to choose the type from a pop-up menu.
+
+    In the outputs table, the rows of the first signature column (after the name and label rows) contain the type of the output.
+
+* To provide a default parameter to use for a particular signature, create a parameter with the same name as the input, followed by an underscore, then the name of the signature.
+
+    For example, suppose you have two inputs, color and multiplier, which have the data types vector4 and float. You would create two parameters, also called color and multiplier. The first would be a Color parameter, and the second a single float parameter. Now you want to allow multiplier to also be a vector4. Create a new
+    signature, and name it v4. Change the data type of multiplier for that signature to vector4. The create a new parameter named multiplier_v4, which is 4 floats. Now when one of these operator is created, and the signature is set to v4, the VEX Builder will use the color and multiplier_v4 parameters to provide the default values.
+
+
+== Extra Files tab == (extra_files)
+
+* Any "unsaved" files (either by changing them in the editor, or because they're newly added) will have an asterisk in the section list.
+    #glyph: fa-asterisk
+
+:task:Add a new file to the definition:
+    # Type the filename in the __File name__ field, or click the
+      + button next to the field to choose the file.
+
+    # __Section name__ is the name of the file inside the HDA.
+      It defaults to the base name of the file (that is, the
+      file name without any path information). You can edit it
+      to give the file a different name inside the HDA.
+
+    # Click __Add File__.
+
+:task:Edit the contents of a text file:
+    # Select the file in the section list to show its contents
+      in the text editor on the right, along with the size and
+      time stamp of the section.
+
+    # Edit the contents in the text editor.
+
+    # Click __Apply__.
+
+:task:Edit the contents of a binary file:
+    # Select the file in the section list.
+
+    # Click __Save As File__ in the lower right to save the
+      contents of the section as a file on disk.
+
+    # Edit the saved file.
+
+    # Add the file back into the HDA with the same section name
+      to replace the old binary using __Add File__.
+
+:task:Delete a file:
+    * Click the X button next to the file's name in the section
+      list.
+
+:task:Use an embedded file:
+    Wherever Houdini takes a filename, you can enter a [reference to an embedded file in an asset|/assets/opdef] instead. For example, your asset might take a path to a texture file, and if that parameter is blank, use an embedded default texture. To point a node inside the asset at the embedded default texture file, you would use a reference like this:
+    
+    `opdef:.?default_texture.jpg`
+    
+    ...instead of a file path.
+
+
+
+
+
+
+

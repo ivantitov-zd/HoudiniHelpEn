@@ -1,0 +1,187 @@
+= hou.Attrib =
+#type: homclass
+#cppname: HOM_Attrib
+#group: geo
+"""This class stores information about a Geometry attribute."""
+
+An attribute describes extra data you can attach to different elements
+of geometry.  The attribute values are the individual instances of that data,
+and for each attribute there is exactly one attribute value per geometry
+element.  For example, if you look at the points in Houdini's geometry
+spreadsheet, the point numbers are listed down the side, the point
+attributes are listed across the top, and the point attribute values are
+contained in the table.
+
+The attribute specifies which elements store the attribute values: points,
+primitives, or vertices.  An attribute can also be global (also known as
+a detail attribute), in which case there is one instance of the attribute
+value in the geometry.
+
+The attribute also specifies the data type of the attribute values.
+
+To look up existing attributes, use [Hom:hou.Geometry#findPointAttrib],
+[Hom:hou.Geometry#findPrimAttrib], [Hom:hou.Geometry#findVertexAttrib], and
+[Hom:hou.Geometry#findGlobalAttrib].  To add a new attribute, use
+[Hom:hou.Geometry#addAttrib].
+
+NOTE:
+    Point positions are stored in a point attribute named `P` and point weights
+    are stored in `Pw`.  See [Hom:hou.Point#position] and
+    [Hom:hou.Point#weight] for more information.
+
+@methods
+
+::`name(self)` -> `str`:
+    #cppname: HOM_Attrib::name
+    Return the attribute's name.  Each attribute in the geometry has a unique
+    name.
+
+::`type(self)` -> [Hom:hou.attribType] enum value:
+    #cppname: HOM_Attrib::type
+    Return the type of attribute (point, primitive, vertex, or global).
+
+::`dataType(self)` -> [Hom:hou.attribData] enum value:
+    #cppname: HOM_Attrib::dataType
+    Return the attribute's data type (int, float or string).
+
+    The size of the attribute also determines the format of the attribute
+    values.  For example, if the data type is `int` and the size is 3,
+    the attribute value will be a tuple of 3 ints.  If the size was 1,
+    the attribute value would simply be an int.
+
+    Note that a string attribute's size must be 1.
+
+::`isArrayType(self)` -> `bool`:
+    #cppname: HOM_Attrib::isArrayType
+    Return True if the attribute is a type that contains array data (i.e. Float
+    Array, Integer Array, String Array) and False otherwise.
+
+::`qualifier(self)` -> `str`:
+    #cppname: HOM_Attrib::qualifier
+    Return the attribute's type qualifier.  The qualifier is a description
+    of the data contained in the attribute.  An empty string is returned
+    if the attribute has no numeric representation or if the
+    attribute is the pseudo `Pw` point attribute.
+
+::`size(self)` -> `int`:
+    #cppname: HOM_Attrib::size
+    #replaces: Exp:pointattribsize, Exp:primattribsize, Exp:vertexattribsize
+    Return the number of data components in the attribute value.  See
+    [Hom:hou.Attrib#dataType] for more information.
+
+::`setSize(self)`:
+    #cppname: HOM_Attrib::setSize
+    Sets the number of data components in the attribute value.  See
+    [Hom:hou.Attrib#dataType] for more information.
+
+::`defaultValue(self)` -> `int` or `float` or `str` or `tuple`:
+    #cppname: HOM_Attrib::defaultValue
+    Return the attribute's default value.  Returns a single int/float/string
+    for attributes of size 1 and a tuple of values for attributes with more
+    than one component.
+
+    This method is useful when duplicating an attribute.  See
+    [Hom:hou.Geometry#addAttrib] for an example.
+
+::`setDefaultValue(self, default_value)`:
+    #cppname: HOM_Attrib::setDefaultValue
+    #status: ni
+
+::`strings(self)` -> tuple of `str`:
+    #cppname: HOM_Attrib::strings
+    Return the string table for this attribute.  If the attribute is not
+    a string, returns an empty tuple.
+
+    A string attribute does not store each string value inside the attribute
+    element (i.e. point, primitive, etc.).  Instead, the unique string
+    attribute values are stored in a table inside the attribute, and each
+    attribute value stores an index to that string.
+
+    For example, suppose this attribute stores strings on points.  If
+    all points have the attribute value `"foo"` then the string table will be
+    just `("foo",)` and each point will store the index 0.  When you set some
+    points' values to `"bar"`, Houdini adds sets the string table to
+    `("foo", "bar")` and sets stores the index 1 in those points.  When you set
+    one of those points back to `"foo"`, Houdini leaves the string table
+    unchanged and stores the index 0 in that point.
+
+    When using string attribute values, this implementation is hidden from you,
+    and you get and set those attributes as strings.  This method is provided
+    only in case you need access to the string table.
+
+::`indexPairPropertyTables(self)` -> tuple of [Hom:hou.IndexPairPropertyTable]:
+    #cppname: HOM_Attrib::indexPairPropertyTables
+    Return the property tables for this attribute.  If the attribute is not
+    an index pair, returns an empty tuple.
+
+::`geometry(self)` -> [Hom:hou.Geometry]:
+    #cppname: HOM_Attrib::geometry
+    Return the Geometry object containing this attribute.
+
+::`isTransformedAsNormal(self)` -> `bool`:
+    #cppname: HOM_Attrib::isTransformedAsNormal
+    Return whether attribute values in the geometry are automatically
+    transformed as a normal when Houdini transforms (e.g. rotates) the
+    geometry.
+
+    For more information, see the [Hom:hou.Geometry#addAttrib], in the
+    `transform_as_normal` parameter documentation.
+
+::`destroy(self)`:
+    #cppname: HOM_Attrib::destroy
+    Remove this attribute from the geometry.  You would typically call this
+    method from the code of a Python-defined SOP.
+
+    Raises [Hom:hou.GeometryPermissionError] if this geometry is not modifiable.
+
+    Raises [Hom:hou.OperationFailed] if you try to destroy the `P` or `Pw`
+    point attributes.
+
+::`options(self)` -> `dict` of `str` to `bool`, `int`, `float`, `str`:
+    #cppname: HOM_Attrib::options
+    Return a dictionary containing the extra options attached to this
+    attribute.
+
+    Note that the contents of this dictionary are saved to geometry files.
+
+    See also [Hom:hou.Attrib#option], [Hom:hou.Attrib#setOption] and
+    [Hom:hou.Attrib#removeOption].
+
+::`option(self, name)` -> `bool`, `int`, `float`, `str`, [Hom:hou.Vector2], [Hom:hou.Vector3], [Hom:hou.Vector4], [Hom:hou.Quaternion], [Hom:hou.Matrix3], [Hom:hou.Matrix4], tuple of `int`, or tuple of `float`
+    #cppname: HOM_Attrib::options
+    Return the value of an individual option, on `None` if no such option
+    exists.
+
+    See also [Hom:hou.Attrib#options], [Hom:hou.Attrib#setOption] and
+    [Hom:hou.Attrib#removeOption].
+
+::`optionType(self, name)` -> [Hom:hou.fieldType] enum value:
+    #cppname: HOM_Attrib::optionType
+    Return a [Hom:hou.fieldType] enumerated value that describes the type
+    of data stored in an option.  Returns `hou.fieldType.NoSuchField` if
+    no field exists with that name.
+
+::`setOption(self, name, value, type_hint = hou.fieldType::NoSuchField)`:
+    #cppname: HOM_Attrib::setOption
+    Set an entry in the dictionary of options.  See
+    [Hom:hou.Attrib#options] for more information.
+
+    name:
+        The name of the option to set.
+
+    value:
+        An integer, float, string, [Hom:hou.Vector2], [Hom:hou.Vector3],
+        [Hom:hou.Vector4], [Hom:hou.Quaternion], [Hom:hou.Matrix3],
+        [Hom:hou.matrix4], or sequence of numbers.
+
+    type_hint:
+        Used to determine the exact [Hom:hou.fieldType] desired when the
+        specified value type is not enough to unambiguously determine it.
+
+::`removeOption(self, name)`:
+    #cppname: HOM_Attrib::removeOption
+    Remove an entry in the dictionary of options.  See [Hom:hou.Attrib#options]
+    for more information.
+
+    Raises [Hom:hou.OperationFailed] if there is no entry in the dictionary
+    with this name.

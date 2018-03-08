@@ -1,0 +1,112 @@
+﻿#type: node
+#context: out
+#internal: wedge
+#icon: ROP/wedge
+
+= Wedge =
+
+"""Re-renders the same ROP multiple times with different settings"""
+
+The Wedge ROP will render the specified ROP multiple times.  Each time
+it will vary some parameters in the .hip file.  This is useful for
+exploring how changing parameters will change the look for expensive
+functions.
+
+The WEDGE variable will be set to a string that describes the current
+set of parameters.  Using this in filenames output can ensure each
+wedge doesn't conflict with the other wedges.  Alternatively, if one
+is wedging to MPlay, the individual wedges will render together.  The
+output file could be set to `<<filename>>_$WEDGE_$F.pic` to ensure each
+wedge gets its own image sequence.
+
+If wedging images, you can also use the hwatermark program to stamp
+the images with the wedge name.  Setting the Post Frame Script to
+{{{unix hwatermark -x 4 10 -m "$WEDGE" `chs("vm_picture")` `chs("vm_picture")` $HFS/houdini/fonts_texture/Fixed-Bold.24}}}.
+
+The WEDGENUM variable will be set to the currently processed wedge
+number.  This ranges from 0 to one less than the number of wedges.  If
+you render a specific wedge with the Wedge Range, WEDGENUM will be set
+to that wedge number.
+
+@parameters
+    Render Wedges:
+        #channels: /execute
+
+	Runs the specified render operation once for each wedge.
+
+    Prefix:
+	This prefix is added at the front of the WEDGE variable.  This
+	can be used to separate different sets of wedges.
+
+    Wedge Range:
+	All Wedges will cause every computed wedge to be rendered at
+	once.  Alternatively, one specific wedge can be rendered.  The
+	latter is useful if manually splitting up the wedges across
+	machines, which may be necessary for simulations.
+
+    Output Driver:
+	Which ROP will be run for each wedge.  The ROP should have a
+	parameter called "take" for take based wedging to work.  If it
+	outputs to a file, the filename should have $WEDGE in it to
+	avoid writing the same file twice.
+
+    Wait for Render to Complete:
+	Sets the Block Until Render Completes temporarily on the
+	Output Driver.  This avoids all the wedges being started
+	simultaneously, which can inconvenience a single-user machine.
+	However, by not blocking, you can return control to Houdini
+	quickly while waiting for the renders to run in background.
+
+    Wedge Method:
+	Controls how the scene is varied.  
+	
+	By Channels:
+	    Each of the Wedge Parameters is varied according to its
+	    number of steps and range and applied to its specified
+	    channel.  All combinations of the parameters are then
+	    wedged.  The total number of wedges is the product of all
+	    of the step values.
+
+	By Take:
+	    One wedge is performed for each immediate child of the
+	    given parent take.  The output driver's take parameter is
+	    set to each child take's value.
+
+    Parent Take:
+	In By Take wedging, this is the name of the parent take.  Only
+	immediate children of this take are used for wedges.
+
+    Random Samples:
+	Instead of uniformly sampling each range, a random value
+	will be picked inside the range for each sample.
+
+    Number of Samples:
+	Determines how many wedges will be run when in random sampling
+	mode.
+
+    Random Seed:
+	The seed used for generating the random samples.  Changing
+	this will create a different set of random samples.
+
+    Wedge Parameters:
+	The number of parameters to use in By Channel wedging.  Each
+	parameter is a single float value which is divided uniformly
+	across a given interval.
+
+    Name:
+	The english name of the channel.  This is added to the WEDGE
+	variable.  If blank, the channel name is used.
+
+    Channel:
+	The channel path to vary.  This is a full channel path, a path
+	to a node followed by the name of a channel.  Note that it is
+	not a parameter path: `/obj/geo1/tx` is legal but `/obj/geo1/t` is
+	not.
+
+    Range:
+	The minimum and maximum values that the channel will vary
+	over.
+
+    Number of Steps:
+	The number of steps that the range will be broken into.
+	Ignored if random sampling is performed.

@@ -1,0 +1,195 @@
+= Lattice =
+
+#type: node
+#context: sop
+#internal: lattice
+#icon: SOP/lattice
+#tags: reshape, deform, model, anim
+
+"""Deforms geometry based on how you reshape control geometry."""
+
+Lattice deformation takes the edits you apply to simple geometry and
+applies the equivalent deformations to source geometry, such as the arm
+of a character. For example, you can create a bulge in the lattice to
+create a bulge in the geometry.
+
+The Lattice operator has two methods for specifying the control
+geometry: _lattice_, which requires a control geometry with a specific
+ordering of points, as created by a [Bound SOP|Node:sop/bound] or [Box
+SOP|Node:sop/box]; and _points_, which allows _any_ shape to be control
+geometry.
+
+NOTE:
+    The value of `Pw` affects the outcome of Lattice SOP when doing point based deformations.
+
+[Include:/shelf/lattice#includeme]
+
+== Lattice deformer ==
+
+To create a simple lattice from the bounding box of the source
+geometry, append a [Bound SOP|Node:sop/bound] to the source
+geometry. Turn on __Divisions__ and set the values to set the number
+of control points available. Create a Lattice node and connect the
+network as shown above. In the Lattice node, turn on __Lattice__ and
+set the __Divisions__ to the same values.
+
+TIP:
+    The Bound SOP recomputes the bounding box for the shape of the
+    source geometry at each frame. If you use a Bound SOP to create
+    the lattice and the source geometry is animated, you may want to
+    [lock the Bound node|/nodes/sop/] if you don't want the
+    lattice to animate along with it.
+
+NOTE:
+    The "division" values on the node generating the lattice and on
+    the Lattice node must be identical, or the Lattice node will
+    show an error.
+
+    Houdini *only supports divisions up to 30 when the interpolation
+    type is set to Bezier*.
+
+Alternatively, use the [Box SOP|Node:sop/box] to create an arbitrary
+lattice shape not linked to the bounding box of the source geometry.
+Set the __Primitive type__ to Polygon, turn on __Divisions__ and set
+the values to set the number of control points available.
+
+You can also use a lattice shape with the Points method shown below
+under "arbitrary control geometry", which will give different
+results and allow you to control the radius of influence of the
+points in the lattice.
+
+== Points deformer (arbitrary control geometry) ==
+
+The points method lets you use arbitrary control geometry. It also
+lets you control the radius of influence of each point in the rest
+control geometry, letting the control shape "capture" geometry
+similarly to how bones capture skin surfaces in character modeling.
+You can use this method to deform a character or prop by
+manipulating a simplified, low-poly version of the character or
+prop.
+
+The points method works by creating a metaball at each point on the
+rest control geometry and assigning influence to each point on the
+source geometry based on the density of the "control" metaballs it
+intersects.
+
+To visualize the capture regions, set the display flag on the
+Lattice node and turn on __Visualize point-specific radii__ in the
+Lattice node's parameters. The 3D view shows the radius of influence
+of each point.
+
+Use the __Radius__ parameter to control the distance of influence of
+each point in the rest control geometry.
+
+[Image:/nodes/images/lattice_pointradius_1.png]
+[Image:/nodes/images/lattice_pointradius_2.png]
+[Image:/nodes/images/lattice_pointradius_3.png]
+[Image:/nodes/images/lattice_pointradius_4.png]
+
+Larger radius values lead to smoother deformations because the
+influence of each control point is averaged over more points in the
+source geometry. Small radius values lead to very sharp
+deformations, because each control point will only influence a few
+points on the source geometry.
+
+Lattice computes the influence falloff from the  [metaball
+kernel|/nodes/sop/metaball#kernels]  you choose
+in the __Kernel function__ parameter. Lattice's behavior is similar
+to applying a magnet metaball to every point in the source
+geometry.
+
+TIP:
+    The control geometry should enclose the geometry being deformed.
+
+WARNING:
+    The "rest" and "deformed" versions of the control geometry must have
+    the same number of points, and in the case of lattices they must be
+    in certain order (the order automatically created by Box and Bound).
+    Usually this is automatic using the network layout shown above,
+    because the deformed control shape comes from the same node as the
+    rest control shape, but with edits applied. Just make sure any nodes
+    you use to edit the control shape do not change the control shape's
+    topology.
+
+@parameters
+
+Group:
+    Points in the first input to be deformed.
+
+== Lattice ==
+
+Overview:
+    Deform with a regularly space lattice
+
+Divisions:
+    #id: divs
+
+    Must match the number of divisions in the lattice grid.
+Interpolation:
+    Points in the deformed geometry are interpolated using this
+    method.
+
+== Points ==
+
+Overview:
+    Deform using arbitrary point clouds
+
+Rest Group:
+    Points in the rest geometry which are used. The
+    corresponding points in the deformed geometry are used as
+    the implicit deform group.
+
+Kernel:
+    Which meta kernel to use to determine the influence of a
+    point.
+
+Radius:
+    #id: radius
+
+    The size of the points capture regions.
+
+Normalize Threshold:
+    #id: normthreshold
+
+    Defines the transition sharpness of the deformed surface
+    geometry across the capture region boundary. If the
+    threshold is zero, the transition is steep. If the threshold
+    is large, the deformed data source geometry is smooth.
+    Technically, the threshold defines the value after which the
+    weights are normalized. If a total weight of all capture
+    regions for a given point is greater than the threshold,
+    then the weights for this point are normalized; otherwise
+    they are not.
+
+Visualize Point-Specific Radii:
+    Turns on the display of guide spheres that represent the
+    radii of each point in the rest geometry.
+    
+    NOTE:
+        To override the radius in point mode on a point by point basis you need to use a point expression. For example, `point("../attribcreate1",$PT,"rad",0)`.
+
+@inputs
+
+Data Source:
+    The geometry you wish to deform. Accepts all input types.
+
+Initial Source:
+    The "rest" version of the control shape.
+
+Deformed Source:
+    The deformed version of the control shape. Lattice uses the
+    difference between this and the "Initial" input to calculate the
+    deformation to apply to the data source input.
+    
+@locals
+
+[Include:standardvariables]
+
+@related
+
+- [Node:sop/bound]
+- [Node:sop/box]
+- [Node:sop/bulge]
+- [Node:sop/magnet]
+- [Node:sop/spring]
+

@@ -1,0 +1,72 @@
+﻿= Instancing =
+
+== Overview ==
+
+Instancing replaces an object with another at render time. This lets you, for example, use lightweight proxy geometry from the 3D display, and swap it efficiently for more heavyweight, detailed geometry at render time.
+
+_Point instancing_ replaces the points of an object with other objects _at render time_. This makes it easy to create a large number of efficient copies of an object. For example, scatter points on a surface representing a meadow, and replace them in the render with trees.
+
+Because instancing takes place in the renderer, the instanced geometry does not use memory or slow down the display as you work in Houdini. On the other hand, since you can't see the instanced geometry in the viewport, it might be hard to visualize the finished scene.
+
+Point instancing is very similar to [particle instancing|/particles/instancing_rendering].
+
+TIP:
+    Using the [delayed load shader|delayedload] lets you store the geometry to instance on disk rather than in the scene.
+
+== How to ==
+
+# In the network editor, create an [Instance object|Node:obj/instance] at the object level.
+
+# In the object's parameters, click the __Instance__ tab and set the __Instance object__ parameter to the path of the object you want to instance onto the points of the Instance object. (You can drag the node from the network onto the parameter to set it.) Turn on __Point instancing__ to instance onto the points of the Instance object instead of _replacing_ the Instance object.
+
+# Go inside the Instance object and model the _template geometry_. The object you set above to instance will be copied onto the points of this geometry at render time.
+
+(See [how to use the network editor|/network] if you need help working with the network and the parameter editor.)
+
+TIP:
+    The Instance object is just a regular [Geometry container object|Node:obj/geo] with some extra [render properties|/props] related to instancing added to it. You could manually turn any object into an instancing object by adding the same properties (in the parameter editor, Gear menu > Edit rendering parameters, open Mantra x.x folder, and drag the __Instance__ folder into the __Existing parameters__ list). However, it's usually more convenient to start with the Instance object.
+
+== How it works ==
+
+You can only instance _object-level_ nodes using point instancing: geometry container objects, lights, cameras, object subnets, object-level [digital assets|/assets], and so on.
+
+You can vary object-level parameters for each instance, such as transforms. You can also _override material parameters_ per-instance, which can be very powerful. Instances can also pick up various attributes from the points they are instanced onto. See [varying copies and instances|varying] for more information.
+
+Instancing is fast and efficient because the renderer only needs to keep one copy of the object's geometry, and just output it multiple times for each instance. This means that the object's actual surface geometry _cannot changed between instances_.
+
+For example, you could have a skyscraper object asset with a parameter that changed the surface network inside to vary the number of floors. You could *not* instance the object with varying number of floors, because the renderer keeps _one_ copy of the object's geometry for instancing. To do instancing with varying geometry, you would have to do one of the following:
+
+- [Save out archives of each geometry variation|/io/geo], then use a delayed load shader and a point attribute or expression to control which variation is instanced onto the point. See [delayed load instancing|delayedload].
+
+- If possible, change the asset so its variation works at the object level instead of the geometry level (for example, a skyscraper asset where each part is an object).
+
+== Viewport Instancing ==(viewport)
+
+The viewport renderer supports instancing to a limited degree. Simple and point instancing are supported at the object level using an [Instance|Node:/obj/instance] object or a geometry object with instancing parameters. The viewport supports:
+
+* Simple instancing, where point instancing is not used and the object references another object's geometry.
+* Point instancing, where an object's geometry is instanced onto each point in the instancing object. [Point attributes|instanceattrs] can be used to vary the transform.
+* Point instancing with the object path or transform varying by the value of an [instancepoint()|Exp:instancepoint] expression.
+* Point instancing with the object path specified by a point `instancepath` attribute.
+
+Variations of the above cases are also supported (some parameters driven by `instancepoint()`, others by attributes). 
+
+The number of instances can be reduced to improve performance by changing the __Point Instancing__ percentage on the __Geometry__ tab of the viewport [Display Options|/ref/windows/displayopts_3d]. The number of instances that can be displayed in a fluid manner is dependent on your graphics hardware. __Point Instancing__ can also be turned off to show the underlying instancing point geometry.
+
+Entering the instance object will show the instancing geometry rather than the instances themselves, similar to disabling the __Point Instancing__ display option.
+
+NOTE:
+        You can set the __Instancing Limit__ on the __Geometry__ tab of the [3D View Display Options dialog|/ref/windows/displayopts_3d] to the maximum number of OpenGL primitives that can be instanced before some instances start being replaced by the __Stand-In Geometry__. This prevents the graphics card from being overrun by a huge amount of rendering which could halt or reset the graphics driver. Setting this to zero will always use the stand-in geometry. 
+
+Currently [Material Overrides|varying] and instancing of materials using [shop_material|instanceattrs] are not supported in the viewport. Procedurals are also not supported.
+
+TIP:
+   Older tutorials suggest using a [Copy SOP|Node:sop/copy] with its display flag turned on and its input with the render flag turned on to emulate __Point Instancing__. This was the way to show instances in the viewport before instancing was natively supported by the viewport. In this case, the [Copy SOP|Node:sop/copy] is being used to replicate the geometry. Now you can skip this step because the viewport's __Point Instancing__ feature will do this for you.
+
+   If you use both the [Copy SOP|Node:sop/copy] method and the viewport's __Point Instancing__, it will display the instance object on all the points of the replicated geometry, which is not only incorrect but will be very slow due to the huge number of instances being displayed.
+
+@related
+
+- [Varying instances|varying]
+
+

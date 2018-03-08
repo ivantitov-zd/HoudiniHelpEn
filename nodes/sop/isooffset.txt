@@ -1,0 +1,320 @@
+= IsoOffset =
+
+#type: node
+#context: sop
+#internal: isooffset
+#icon: SOP/isooffset
+#tags: create, dynamics, model, surface
+
+"""Builds an offset surface from geometry."""
+
+The IsoOffset operation builds an implicit function given the input
+geometry. It then uses the implicit function to create a shell at a
+fixed offset from the original surface.
+
+The tetrahedral mesh mode may be used to create a uniformly sampled
+array of tetrahedrons for use in simulations.
+
+The volume output modes allow the implicit function to be output
+directly as a volume primitive without further processing.
+
+@parameters
+
+Output:
+    Controls what is done with the implicit surface generated.
+
+    Iso Surface:
+        A polygonal mesh will be created along the specified
+        offset of the implicit function.
+    
+    Fog Volume:
+        The volume primitive will be set to 1 inside the object
+        and 0 outside the object.  Boundary cells will have an
+        interpolated value between these extremes.
+    
+    SDF Volume:
+        The volume primitive will be a Signed Distance Field.
+        Inside the object will store negative numbers storing the
+        distance to the nearest point on the surface.  Outside the
+        object will store positive numbers storing the distance to
+        the nearest point on the primitive.  In the GL display,
+        these tend to look inverted as the exterior is what
+        renders as opaque.  SDFs are also used by the [RBD Solver|Node:dop/rbdsolver] and the [Fluid Solver|Node:dop/fluidsolver]. For additional information, see the [Volume Sample VOP|Node:vop/volumesample] help.
+
+    Tetra Mesh:
+        The interior of the object is filled with tetrahedrons.
+        The resulting mesh can be used for deformers or for
+        softbody approaches.
+
+Tetra Type:
+    #id: tetratype
+
+    Tetra Skeleton:
+        A mesh of tetrahedrons is built within the "inside" of the
+        field. This regular mesh is ideal for use in softbody
+        dynamics. 
+
+        NOTE:
+            The tetrahedrons share faces, so do not have well defined normals.
+    Tetra Solid:
+        A mesh of individual tetrahedrons is built within the
+        "inside" of the field. These tetrahedrons do not share
+        points or faces, so can be split up for various fracturing
+        operations.
+    Cubes:
+        Builds a mesh of individual cubes inside the field. These
+        cubes do not share faces or points, so can be split up for
+        fracturing operations.
+
+Mode:
+    #id: mode
+
+    Governs the method that will be used to generate the signed
+    distance field.
+
+    Ray Intersect:
+        Rays will be fired at the geometry from various directions
+        to determine where the surface is. The resulting field will
+        be signed, so an offset of 0 will generate an iso surface
+        separating the inside from the outside.
+    
+    Meta Balls:
+        The __Ray Intersect__ method determines if voxels are inside or
+        outside the object by sending rays. This can result in leaks
+        and other problems. If you are building an SDF from a
+        collection of metaballs, you can instead determine
+        inside/outside by looking at the metaball field. That is
+        what this method uses. Note that Laser Scanning is likely
+        unwanted when this method is used.
+
+    Minimum:
+        Exact minimum point to surface will be found. This is slow,
+        but accurate. The resulting field is not signed, so you can
+        only generate a shell around the geometry. An offset greater
+        than 0 must be specified.
+
+    Point Cloud:
+        Only the points of the incoming geometry are used in
+        constructing the field. If the points have normals, the
+        normals are used to determine sign. Otherwise, the field is
+        unsigned like in the case of Minimum. The [Scatter SOP|Node:sop/scatter] is a
+        good way to create a good collection of points from
+        geometry.
+
+    Implicit Box:
+        The geometry's bounding box is used to create an implicit
+        representation.
+
+    Implicit Sphere:
+        The geometry's bounding sphere is used to create an
+        implicit representation.
+
+    Implicit Plane:
+        The geometry is represented by a plane.
+
+     Volume Sample:
+         The volumes in the incoming gdp are all sampled and the
+         sum of their values used to initialize the signed distance
+         field.  No correction is done after the fact, so the
+         result may not actually be a signed distance field if the
+         input isn't.
+
+     Rebuild Volume Sample:
+         The same behavior as Volume Sample, but a correction pass
+         is done afterward to make the result a signed distance
+         field using the provided zero crossing.
+
+Name:
+     The name primitive attribute will be set to this value.
+
+Uniform Sampling:
+     It is often advantageous to make sure voxels in a volume are
+     cubes.  This option allows the resolution of the volume to be
+     specified without having to worry about matching the size and
+     resolution fields.  This parameter controls which axis is
+     divided into Uniform Sampling Divisions.
+
+Uniform Sampling Divs:
+     The number of voxels to divide the __Uniform Sampling__ axis into.
+     The other axes will be divided into the number of cells that
+     fit for this voxel size.
+
+Sampling Divs:
+     When using non-uniform voxel cells, each dimensions resolution
+     can be specified here.
+
+Div Size:
+     The uniform size of the voxels, when specifying the voxel size directly.  The given sized box will be filled by voxels of this size.
+
+Override Output Divs:
+     The resolution of the output mesh or voxel array can be
+     different from what the input was sampled at.
+
+Output Divs:
+    #id: isodiv
+
+    The number of divisions to evaluate the field at. This can be
+    set to a higher resolution than the field, in which case the
+    field is linearly interpolated for the missing values.  When
+    outputing volumes, this is unused as they are generated at the
+    sampling resolution.
+
+Override Bounds:
+    The default bounding box is set to be slightly larger than the
+    incoming geometry. If you want to do a large offset, or ensure
+    that the polygonization is stable over changing input geometry,
+    override the bounds to something else. If
+    __Force Bounds__ is on it is assumed that the geometry will fit
+    entirely within these bounds.  If a second input is specified,
+    the bounding box of that input will be used rather than the
+    bounds specified here.
+
+Pad Bounds:
+    Slightly increase the specified bounds to ensure there is a
+    layer of voxels outside of the specified boundary.  This can
+    ensure that there are proper outside voxels.
+
+Minimum Bound:
+    The minimum clipping plane boundary for field evaluation and
+    surface construction.
+
+Maximum Bound:
+    The maximum clipping plane boundary for field evaluation and
+    surface construction.
+
+Offset:
+    The offset to build the iso surface on. The resulting surface
+    will describe points at this distance from the original surface.
+
+Build Polygon Soup:
+    Creates the iso surface as a polygon soup primitive instead of creating separate polygon primitives when the output is an iso surface.
+
+Tolerance:
+    The tolerance to use for building the SDF. This affects the ray
+    intersection code. This tolerance is multiplied by the maximum
+    bounding box size of the original geometry, so normally is
+    independent of geometry scale.
+
+Laser Scan:
+    #id: laserscan
+
+    The __Laser Scan__ mode only applies to the __Ray Intersect__ mode.
+
+    In laser scan mode the SDF is build by sending rays along the
+    primary axes. Only the closest and farthest intersection is
+    used. The space between these two points is classified as
+    inside, and the rest outside.
+
+    The laser scan mode will work even with geometry which has
+    poorly defined normals, self intersects, or isn't fully
+    watertight. The disadvantage is that interior features can't be
+    represented as they aren't detected.
+
+    When laser scanning is turned off, the SDF is still built by
+    sending rays along the primary axes. However, all intersections are
+    found. Each pair of intersections is tested to see if
+    the segment is inside or outside. This relies on the normal of
+    the geometry being well defined (ie: manifold, no self
+    intersections), and the geometry being watertight. However, complicated
+    shapes with holes can be accurately represented.
+
+Fix Signs:
+    Even with the best made geometry, numerical imprecision can
+    result in incorrect sign choices. This option will cause the SDF
+    to be post-processed to look for inconsistent signs. These are
+    then made consistent, usually plugging leaks and filling holes.
+
+    This takes time, however, so can be turned off in cases where
+    the SDF is known to generate without problems.
+
+     NOTE:
+    Due to the nature of __Fix Signs__ it also rounds sharp
+     features in the SDF as they may be considered inconsistent
+     signs.
+
+Force Bounds:
+    The __Fix Signs__ method alone will smooth out, and usually
+    eliminate, sign inversions. However, it is possible for regions
+    of wrong-sign to become stabilized at the boundary of the SDF.
+    This option will force all voxels on the boundary to be marked
+    as exterior. The __Fix Signs__ will be much less likely to stabilize
+    incorrectly then.
+
+Invert Sign:
+    If one wants a hollow box, one method is to build one box inside
+    the other and not use __Laser Scanning__. A more robust method is to
+    just specify the inner box and use sign inversion. This treats
+    everything outside of the box as inside, allowing the more
+    robust __Laser Scanning__ method to be used.
+
+Num Neighbour:
+    #id: numneighbour
+
+    The Point Cloud mode finds this number of nearest points and
+    uses them to determine the local surface properties. A higher
+    number of neighbor will smooth out local variations and create
+    a smoother field.
+
+Sign Sweep Threshold:
+    After the fix signs process is complete there can still be
+    inconsistent areas in the SDF.  Large blocks can become
+    stabilized and stick out of the SDF.  A second sign sweep pass
+    can be performed to try to eliminate these blocks.
+
+    The sign sweep threshold governs how big of a jump has to
+    occur for a sign transition to be considered inconsistent.  If
+    the values of the sdf change by more than this threshold times
+    the width of the cell, it is considered an invalid sign
+    transition.  The original geometry is then ray intersected to
+    determine inside/outside and the result used to determine
+    which sign is correct.  The correct sign is then propagated
+    forward through the model.
+
+Max Sign Sweep Count:
+    The sign sweeps are repeated until no signs are flipped (ie,
+    all transitions are within the threshold) or this maximum is
+    reached.  Too low of a sign sweep threshold may prevent the
+    process from converging.  Otherwise, it tends to converge very
+    quickly.
+
+File Mode:
+    The IsoOffset SOP can be used to load and save SDFs from disk
+    rather than always having to recalculate them. The File Mode
+    determines what, if any, disk access occurs.
+
+    Automatic:
+        If the file does not exist, the file will be written.
+        Otherwise, the SDF will be read from the file.
+    Read Files:
+        The file will be read. The input geometry will only be used
+        to determine the bounding box (if override bounds is off)
+        and otherwise ignored.
+    Write Files:
+        The SDF will be calculated from the input geometry and the
+        result saved in the given file name.
+    No Operation:
+        No file access will occur. The SDF will be generated from
+        the input geometry and then discarded after the result
+        geometry is created.
+
+File Name:
+    The name of the file to save the SDF representation to. If the
+    extension is .simdata, it will be saved in a format readable by
+    the File DOP. If it is saved in .sdf, it will be saved in the
+    .sdf format. Behavior with other extensions is undefined.
+
+@inputs
+
+Source:
+    The geometry to convert into an SDF and then rebuild.
+
+Reference Bounds:
+    The geometry to use for the bounding box if __Override Bounds__ is
+    specified.
+
+@related
+
+- [Node:sop/iso]
+- [Node:sop/scatter]
+- [How to convert an object into smoke|/pyro/convertobjecttosmoke]
+

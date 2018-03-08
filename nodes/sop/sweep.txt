@@ -1,0 +1,166 @@
+#type: node
+#context: sop
+#internal: sweep
+#icon: SOP/sweep
+
+#tags: model, curveup, splines, curves, core
+
+= Sweep =
+
+"""Creates a surface by sweeping cross-sections along a backbone
+curve."""
+
+The Sweep op sweeps primitives in the Cross-section input along Backbone
+curve(s), creating ribbon and tube-like shapes. The cross-section
+primitives are placed at each point of the backbone perpendicular to it.
+If a Reference Point input is given, each primitive will be oriented to
+aim at its corresponding reference point.
+
+* The backbone curve can be open or closed, but must have at least two
+  points.
+
+* If the backbone input has more than one primitive, Sweep will sweep
+  the cross section along each one.
+
+* If the cross-section input has multiple primitives, you can control
+  them using the __Cycle type__ parameter.
+
+* Sweep places the _origin_ of the cross-section on the backbone by
+  default. You can specify a point on the cross-section to attach to the
+  backbone instead with the __Use vertex__ and __Connection vertex__
+  parameters.
+
+* In most cases, you should build the cross section primitives in the XY
+  plane. Sweep will automatically orient them properly along the
+  backbone.
+
+* If the backbone curve(s) have point colors or texture coordinates,
+  they will be maintained and applied to the cross section primitives.
+
+[Include:/shelf/sweep#includeme]
+
+@parameters
+    X-Section Group:
+        #channels: /xgrp
+
+        Only use the geometry in this group as the cross-section, instead of all geometry in the first input.
+    Path Group:
+        #channels: /pathgrp
+
+        Only use the geometry in this group as the backbone curve(s), instead of all geometry in the second input.
+    Reference Group:
+        #channels: /refgrp
+
+        Only use the geometry in this group as reference points, instead of all geometry in the third input.
+    Cycle Type:
+        #channels: /cycle
+
+        How to sweep the primitives.
+    Angle Fix:
+        #channels: /angle
+
+        Attempt to fix buckling twists.
+    Fix Flipping:
+        #channels: /noflip
+
+        Fixes flipped normals.
+    Remove Coincident Points on Path:
+        #channels: /skipcoin
+
+        Removes overlapping points.
+    Aim at Reference Points:
+        #channels: /aimatref
+
+        Tilt the cross-sections towards their respective reference points from the Reference Points input.  The Reference Points input will still be used to roll the cross-sections around the backbone even when this parameter is turned off.
+    Use Vertex:
+        #channels: /usevtx
+
+        Connect a specific vertex of the cross-section to the backbone.
+    Connection Vertex:
+        #channels: /vertex
+
+        Specific vertex to connect to backbone.
+    Transform Using Attributes:
+        #id: xformbyattrib
+
+        When enabled, instead of using the __Scale__, __Twist__, and __Roll__ parameters,
+        the cross-sections are transformed using the backbone attributes: `pscale`, `scale`,
+        `N`, `up`, `trans`, `rot`, `orient`, and `pivot`.  If none of `N`, `up`, `trans`, `rot`, `orient`, or `pivot` are specified, (possibly `pscale` or `scale` still), the rotation from the curve will be used.
+    Scale:
+        #channels: /scale
+
+        Uniform scale of cross-section.
+    Twist:
+        #channels: /twist
+
+        Cumulative rotation of cross-sections around the backbone.
+    Roll:
+        #channels: /roll
+
+        Non-cumulative rotation of cross-sections around the backbone.
+    Create Groups:
+        #channels: /newg
+
+        Creates a group for each backbone.
+    Sweep Groups:
+        #channels: /sweepgrp
+
+        Allows naming of the sweep groups. A separate group is created for each backbone by appending a number to the group name. If there is only one backbone, the created group will be called sweepGroup1.
+    Attributes from Path:
+        #id: ptattribs
+
+        These point attributes and groups will be copied from the backbone points to the cross-section points.
+        If a `uv` attribute is present on both the cross-section and backbone, and __Cycle Type__ is set to either __One Primitive at a Time__ or __Cycle Primitives__,
+        only the u component will be copied from the backbone, so the v component will still be from the cross-section `uv` attribute.
+        Although only point attributes are copied from the backbone, there is a special case for if the cross-section has a vertex `uv` attribute, point `uv` values can be
+        copied into the destination vertex `uv` attribute, but this only works for `uv`.
+    Skin Output:
+        #channels: /skin
+
+        How/whether to create a surface connecting the cross-sections along the backbone.
+
+
+        Off:
+            Do not create a surface.
+        On:
+            Skin each set of swept cross-sections.
+        On with Auto Close:
+            Skin each set and close if the underlying path is closed.
+        On with Preserve Shape:
+            Like __On__ above, but ensure the swept curves are fully encased in the resulting surface.
+        On with Preserve Shape and Auto Close:
+            Skin with __Preserve Shape__ and __Auto Close__ put together.
+    Fast Sweep:
+        #channels: /fast
+
+        More efficient skinning. Use when the input geometries maintain
+        the same topologies between cooks and each cross-section has the
+        same number of points.
+    Output Polygons:
+        #channels: /polyout
+        Outputs meshes as polygons rather than meshes.
+@inputs
+    Cross-section:
+        The geometry to sweep along the backbone curve.
+    Backbone path:
+        The curve(s) to sweep the cross-section shape along.
+    Reference Points:
+        If this input is connected, each primitive will be oriented to
+        aim at its corresponding reference point in this geometry.
+@locals
+    PT:
+        Current vertex. It is the current point along the current path.
+    NPT:
+        Total number of points.
+    PATH:
+        Path primitive number. It tells you which path you are on.
+    PCT:
+        Percentage along backbone (path).
+        
+NOTE:
+        `$PT` can't be used to directly index a point in the source, you need to use `$PATH` to access the proper primitive, and `$PT` the correct vertex in that primitive. 
+
+@related
+    - [Node:sop/rails]
+    - [Node:sop/skin]
+

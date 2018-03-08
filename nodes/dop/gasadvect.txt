@@ -1,0 +1,142 @@
+#type: node
+#context: dop
+#internal: gasadvect
+#icon: DOP/gas
+
+= Gas Advect =
+
+"""A microsolver that advects fields and geometry by a velocity
+field."""
+
+The Gas Advect DOP is a microsolver used in building larger fluid
+simulations. The [Fluid Solver|Node:dop/fluidsolver] and [Smoke Solver|Node:dop/smokesolver] DOPs that allow
+microsolvers to be added before or after the main solver step to extend
+or tweak the simulation. Alternatively, advanced users could try to build an entire new solver out of microsolvers.
+
+The Gas Advect DOP evolves fields and geometry according to a specified
+velocity field. The fields and geometry will be moved by the velocity
+field for a distance proportional to the current solver timestep.
+
+@parameters
+
+Field:
+    The list of fields to move according to the velocity field.
+    This can be a space separated or globbed list. __Scalar__, __Vector__, and __Matrix__ fields can all be advected.
+    
+Geometry:
+    The list of geometry to move according to the velocity field.
+    This can be a space separated or globbed list. 
+
+    If the geometry is not a Geometry Copy, it will be converted into one so
+    that it can be changed by this solver.
+
+Point Group:
+    An optional point group to specify which points will be advected.
+    
+Velocity Field:
+    The velocity field used to drive the other field and geometry
+    values. This must be a Vector field. 
+
+    It is possible to advect
+    the velocity field with itself, however in this case one is
+    advised to do so without also advecting any other fields or
+    geometry.
+    
+Collision Field:
+    Specifies a signed distance field to use for collision
+    detection. Advection of points and field data will be
+    prohibited wherever this field is negative.
+    
+Use Geometry Velocity:
+    Instead of using a Velocity Field to do the advection, use the
+    velocity attribute of the Geometry object. 
+
+    The radius of the
+    particles will be used to determine where they affect the
+    velocity. This can be used to advect the geometry with respect
+    to itself as well as advecting the scalar, vector, and matrix
+    fields.
+    
+Use Nearest Neighbor if Outside of Particle Velocity Field:
+    #id: useneighbor
+    
+    When computing velocity values for the geometry, points outside
+    of the radius of influence of any particle usually get a zero
+    velocity. This option causes such points to get the velocity of
+    the closest point allowing for a continuous fall off.
+
+Update Position Attribute:
+    Update the __Position Attribute__ with the advected position of the 
+    point.
+
+Position Attribute:
+    The name of the attribute holding the point position.
+
+Update Velocity Attribute:
+    Update the __Velocity Attribute__ with the velocity that would cause
+    the equivalent displacement as the advection over the timestep.  This 
+    option can be useful when you need accurate particle advection, but
+    will be using a particle solver to actually update the particle 
+    position, in which case you should turn off __Update Position__.
+
+Velocity Attribute:
+    The name of the attribute holding the velocity.
+    
+Advection Method:
+    Controls how the particle tracing is performed.
+    
+    Single step:
+        Takes the velocity at each voxel and makes a single step in
+        that direction for the timestep.  This is fastest and is
+        independent of the speed of the velocity field, but will start
+        to break up if large timesteps have to be performed.
+        
+    Trace:
+        Will ensure the backtracking does not move more than a single
+        voxel before the velocity is updated, allowing for larger
+        timesteps.
+    
+    Trace Midpoint:
+        Like Trace but uses second order
+        advection for more accuracy but at greater speed cost.
+
+    HJWENO:
+	A non-lagrangian integrator, this allows for theoretically more
+	accurate advection of divergent fields.  Unfortunately, if too large
+	substeps are taken, it will explode.
+        
+    Upwind:
+	A faster but less accurate non-lagrangian integrator.
+
+    Trace RK3:
+        Like __Trace__ but uses third order advection for more accuracy but at greater speed cost.
+
+    Trace RK4:
+        Like __Trace__ but uses fourth order advection for more accuracy but at greater speed cost.
+
+Advection CFL:
+    When tracing the particles, this controls how many voxels may be
+    stepped in a single iteration.  Higher values will result in
+    faster tracing, and hence faster advection, but more errors.
+
+[Include:standard_gas_timestep]
+
+[Include:standard_solver_parms]
+
+@inputs
+
+[Include:standard_data_inputs]
+
+@outputs
+
+[Include:standard_data_outputs]
+
+@locals
+
+[Include:standard_data_locals]
+
+[Include:standard_locals]
+
+@related
+
+- [Node:dop/gasadvectfield], [Node:dop/gasadvectcl]

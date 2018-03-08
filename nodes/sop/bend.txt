@@ -1,0 +1,144 @@
+#type: node
+#context: sop
+#internal: bend
+#icon: SOP/bend
+
+#tags: reshape, anim, model
+
+= Bend =
+
+"""Applies deformations such as bend, taper, squash/stretch, and twist."""
+
+[Image:/images/model/bend_flounder.png]
+
+With the bend operation you define two parallel planes.  The geometry between these planes is then bent, twisted, and deformed.  One plane is the source, and all geometry outside of it remains unchanged.  The other
+plane is the destination and all geometry outside of it receives a constant transform.  Geometry in between receives a partial transform.
+
+When doing the name-sake bend operation, the line between the center of the planes is kept at constant length.  A circular arc is fitted between two planes providing a smooth transition from one orientation 
+to another.  While distances along the center line are preserved, points outside of or inside of the bend will be distorted.
+
+@parameters
+Group:
+    Subset of geometry to deform.
+
+    Primitives with transforms (such as spheres, packed primitives, and volumes) will be transformed if their base point is. 
+    
+Group Type:
+    While defined as a point deformer, you can select different group types and operate on the implied set of points.
+
+== Deformation ==
+
+Enable Deformation:
+    This toggle turns on and off all deformation.  This is useful for adjusting the capture planes in the pre-deformed space.
+
+Limit Deformation to Capture Region:
+    When limited, the deformation is only performed in the region of the model
+    that has been captured.   The surrounding area gets a constant transform so
+    remains intact.  Turning this off will extend the deformation globally.
+
+    In particular, a global squash/stretch works best not limited to a region
+    as the squishing will be performed uniformally rather than tapering off to
+    the capture bounds.
+
+Visualize Falloff:
+    Controls the generation of the `vis_falloff` attribute.  This attribute stores where points lie on the capture range and by default is visualized.
+
+=== Deformation ===
+
+Bend Mode:
+    The amount of bend can be given by either an angle, or by
+    providing a direction that the original capture axis
+    should end up in.
+Bend:
+    Angle in degrees to bend.  You can make this over 180 to bend
+    something over itself multiple times.
+Up Vector:
+    The bend is always perpendicular to the capture axis, but this
+    specifies what orientation it should use.
+Goal Direction:
+    The capture axis will be bent until it lines up with this direction.
+
+Twist:
+    Angle in degrees to rotate around the capture axis.  Can be over
+    180 to twist multiple times int he interval.
+
+Length Scale:
+    The captured length will be squashed or stretched by
+    this scale factor.
+
+Preserve Volume:
+    If scaling the length, a corresponding inverse scale will be
+    performed on the other axes to roughly preserve volume.  Because
+    this is applied smoothly, it is not an accurate volume preservation
+    but is of the appropriate magnitude.
+
+Taper Mode:
+    When tapering from one scale to another, it can either be applied
+    at a constant rate, making a linear taper, or be eased-in and
+    eased-out to give a smoother connection.
+
+Taper:
+    The amount to scale the final transform by.
+
+Squish:
+    The center of the transform will be scaled by this amount.
+    The amount of scale will be eased-in and eased-out from
+    this total scale, letting you build bulges or pinches.
+
+=== Capture ===
+
+Capture Origin:
+    The center of the source capture plane.
+Capture Direction:
+    The normal of the capture planes, and the direction pointing to the destination capture plane from the source.
+Capture Length:
+    Controls the region of space that receives the partial transforms.  Must be non-zero in length.
+Guide Scale:
+    Scale of the guide geometry so it can be made to better fit the model.
+
+== Attributes ==
+
+Use Rest Positions:
+    If set, and there is a second input, it is used to determine how
+    to capture geometry.  If there is no second input, and a `rest`
+    point attribute is present, that attribute is used.  If there is
+    no `rest` point attribute, a `rest` attribute is created and used.
+    This ensures downstream Bend SOPs will operate on the undeformed
+    geometry as expected.
+
+    If clear, the point positions are used as is and no rest attributes
+    will be created.  This is useful if using as a pure modeling tool.
+
+Attributes to Transform:
+    Point and Vertex attributes that match this pattern will be
+    transformed.  Their Type Info will be used to determine how
+    they should transform, as points, vectors, and normals
+    all need different operations.
+
+    If `P` matches this string, then primitive transforms will
+    also be rotated.
+
+Recompute Affected Normals:
+    Recomputes any normals that are affected by polygons that use both
+    transformed and untransformed points. When transforming the full
+    geometry or full connected components, the results should be the same
+    as when this option is off, i.e. the normals will just be transformed
+    and not recomputed. This does nothing if `P` is not being transformed.
+
+Preserve Normal Length:
+    Normal lengths remain unaffected.
+
+Step Size:
+    A small step is taking in each direction to determine how the deformer is twisting space.  This must be small enough to pick up the key feature changes of your space, but not so small as to lead to numerical problems.  A good rule of thumb is half the inter-point spacing of your model.
+
+@inputs
+Geometry to Bend:
+    Can be any geometry, including NURBS and Beziers, but should have sufficient points for a better deformation. 
+
+Rest Geometry:
+    If attached, this will be used to determine where points are in the capture range.  This is useful if stacking deformation operations and one doesn't want the capturing to change as a result of upstream operations.
+
+@related
+
+- [Node:sop/deformationwrangle]
+- [Node:sop/twist]

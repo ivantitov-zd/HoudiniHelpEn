@@ -1,0 +1,374 @@
+﻿= Arrays =
+
+== Overview ==
+
+VEX includes an array datatype. This is useful in several places:
+
+- Supporting ramp parameters.
+
+- Reading capture data from surface nodes using the [Vex:import] function.
+
+- General programming, wherever arrays would be useful.
+
+NOTE:
+    Currently VEX does not support multi-dimensional arrays.
+
+This example shows off some of the crazy things that you can do with arrays:
+
+{{{
+#!vex
+surface
+crazy(
+      string maps[] = { "Mandril.rat", "default.pic" };
+      export float alength = 0;
+      )
+{
+    vector texclr, av[];
+
+    texclr = texture(maps[s+t > 1], s, t);
+    av = array( {1,0,0}, vector(nrandom()), t, texclr, {.5,0,0});
+
+    if (fit(noise(s*8), 0, 1, .3, .7) > t)
+        av = array(1, {0,1,0}, 0);
+
+    Cf = spline("linear", s, av);
+    alength = len(av);
+}
+}}}
+
+== Declaring array types ==
+
+To declare an array variable, the general form is
+`<<member_type>> <<var_name>>[]`:
+
+{{{
+#!vex
+// my_array is an array of floats
+float   my_array[];
+
+// v is a single vector, vector_array is an array of vectors
+vector  v, vector_array[];
+
+// str_array is an array of strings
+string  str_array[];
+}}}
+
+You can optionally put a size inside the square brackets, but the
+VEX compiler currently ignores it.
+
+To declare a function that returns an array:
+
+{{{
+#!vex
+// A function which returns an array of vectors
+vector[] rgb_array()
+{
+...
+};    
+}}}
+
+To declare a nested function that returns an array:
+
+{{{
+#!vex
+// A function which returns an array of vectors
+cvex
+foo()
+{
+    // Use the optional 'function' keyword to avoid type ambiguity
+    function vector[] rgb_array()
+    {
+    ...
+    };    
+}
+}}}
+
+To specify a literal array, use curly braces, with the array members
+separated by commas:
+
+{{{
+#!vex
+vector an_array[] = { {1, 2, 3}, {2, 3, 4}, {4, 5, 6} };
+
+vector[] rgb_array()
+{
+    return { {1, 0, 0}, {0, 1, 0}, {0, 0, 1} };
+}
+}}}
+
+If you specify scalars where a vector is expected, the compiler assigns
+the scalar value to all components of the vector:
+
+{{{
+#!vex
+vector an_array[] = { 1, 2, 3};
+// an_array[] == { {1, 1, 1}, {2, 2, 2}, {3, 3, 3} }
+}}}
+
+The `array()` function creates an array from its arguments.
+
+{{{
+#!vex
+int my_array[] = array(1, 2, 3, 4, 5);
+}}}
+
+You can use `array()` to generate an array of any type.
+To force `array()` to generate vectors (for example):
+
+{{{
+#!vex
+vector (array (value1, value2, ...) );
+}}}
+
+== Accessing and setting array values ==
+
+Use `<<arrayname>>[<<index>>]` to look up a value by its position in the
+array.
+
+{{{
+#!vex
+vector bw[] = { 0, 1 };
+// bw[] == { {0, 0, 0}, {1, 1, 1} }
+Cf = bw[index];
+}}}
+
+Array bounds are checked at run time.  Reading out of bounds will return `0` or
+`""`.  This may generate a warning or optional run-time error in the future.
+Writing past the end of an array will resize the array to include the
+index written to.  The new entries will be set to `0` or `""`.
+
+Python-style indexing is used.  This means negative indices refer to positions
+from the end of the array.
+
+{{{
+#!vex
+int nums[] = { 0, 1, 2, 3, 4, 5 };
+int n = nums[10];  // Returns 0
+int b = nums[-2];  // Returns 4
+
+string strs[] = { };
+string s = strs[20];  // Returns ""
+}}}
+
+You can also assign values using the square brackets notation:
+
+{{{
+#!vex
+float nums[] = { };
+nums[0] = 3.14;
+}}}
+
+(The [Vex:getcomp] and [Vex:setcomp] functions are equivalents for using
+the square brackets notation.)
+
+NOTE:
+    The square-brackets operator also works on vectors. You can use it with
+    matrices as well using a pair of brackets: `float a = m3[0][1];`
+
+== Slicing Arrays ==
+
+The square-brackets can be used to extract sub-arrays using the Python slicing notation.
+
+{{{
+#!vex
+int nums[] = { 0, 1, 2, 3, 4, 5 };
+int start[] = nums[0:2];  // { 0, 1 }
+int end[] = nums[-2:];  // { 4, 5 }
+int rev[] = nums[::-1];  // { 5, 4, 3, 2, 1, 0 }
+int odd[] = nums[1::2]; // { 1, 3, 5 }
+}}}
+
+The [Vex:slice] function is the equivalent for using the slice-based square
+brackets notation.
+
+== Copying between arrays and vectors/matrices ==
+
+The assignment operator supports assigning values between vector types and
+arrays of floats:
+
+{{{
+#!vex
+float x[];
+// Cf and P are vectors
+
+x = set(P);   // Assigns the components of P to the corresponding
+              // members of the array x
+
+Cf = set(x);  // Assigns the first 3 members of x as the
+              // components of the vector Cf
+}}}
+
+If the array is not long enough to fill the vector/matrix, the last member is
+repeated as often as necessary.
+
+{{{
+#!vex
+float x[] = {1, 2} // Not long enough to fill a vector
+Cf = set(x);  // Cf == {1, 2, 2}
+}}}
+
+You can also assign between matrix types and arrays of `vector2`/`vector`/`vector4`:
+
+{{{
+#!vex
+vector2     v2[];
+vector      v[];
+vector4     v4[];
+matrix2     m2 = 1;
+matrix3     m3 = 1;
+matrix      m4 = 1;
+
+v = set(m3);   // Each row of the 3x3 matrix is put into a vector
+m3 = set(v);   // Copy the vectors into the row vectors of the matrix
+v4 = set(m4);  // Extract the rows of the matrix into the vector4 array
+m4 = set(v4);  // Create a matrix using the vector4's in the array as row vectors
+}}}
+
+In summary:
+
+table>>
+    tr>>
+        th>>Left side =
+        th>>Right side
+        th>>Notes
+    tr>>
+        td>>`vector2`
+        td>>`float[]`
+        td>>E.g. `vector2  v = {1,2}`
+    tr>>
+        td>>`vector`
+        td>>`float[]`
+        td>>E.g. `vector  v = {1,2,3}`
+    tr>> 
+        td>>`vector4`
+        td>>`float[]`
+        td>>E.g. `vector4 v = {1,2,3,4};`
+    tr>>
+        td>>`matrix2`
+        td>>`float[]`
+        td>>E.g. `matrix2 m = {1,2,3,4};`
+    tr>>
+        td>>`matrix2`
+        td>>`vector2[]`
+        td>>E.g. `matrix2 m = { {1,2}, {4,5} };`
+    tr>>
+        td>>`matrix3`
+        td>>`float[]`
+        td>>E.g. `matrix3 m = {1,2,3,4,5,6,7,8,9};`
+    tr>>
+        td>>`matrix3`
+        td>>`vector[]`
+        td>>E.g. `matrix3 m = { {1,2,3}, {4,5,6}, {7,8,9}};`
+    tr>>
+        td>>`matrix`
+        td>>`float[]`
+        td>>E.g. `matrix  m = {1,2,3,4,5,6,7,8,9.., 16};`
+    tr>>
+        td>>`matrix`
+        td>>`vector4[]`
+        td>>E.g. `matrix  m = { {1,2,3,4}, {5,6,7,8}, ... {13,14,15,16}};`
+    tr>>
+        td>>`float[]`
+        td>>`vector2`
+        td>>Create an array of 2 floats from the components
+    tr>>
+        td>>`float[]`
+        td>>`vector`
+        td>>Create an array of 3 floats from the components
+    tr>>
+        td>>`float[]`
+        td>>`vector4`
+        td>>Create an array of 4 floats from the components
+    tr>>
+        td>>`float[]`
+        td>>`matrix2`
+        td>>Create an array of 4 floats from the matrix2
+    tr>>
+        td>>`vector2[]`
+        td>>`matrix2`
+        td>>Create an array of 2 vector2s from the matrix2
+    tr>>
+        td>>`float[]`
+        td>>`matrix3`
+        td>>Create an array of 9 floats from the matrix3
+    tr>>
+        td>>`vector[]`
+        td>>`matrix3`
+        td>>Create an array of 3 vectors from the matrix3
+    tr>>
+        td>>`float[]`
+        td>>`matrix4`
+        td>>Create an array of 16 floats
+    tr>>
+        td>>`vector4[]`
+        td>>`matrix4`
+        td>>Create an array of 4 `vector4`s.
+
+== Looping over an array ==
+
+See [Vex:foreach].
+
+== Working with arrays ==
+
+The following functions let you query and manipulate arrays.
+
+[Vex:resize]:
+    Sets the length of the array. If the array is enlarged, intermediate values
+    will be `0` or `""`.
+    
+[Vex:len]:
+    Returns the length of an array.
+
+[Vex:pop]:
+    Removes the last item from the array (decreasing the size of the array by 1)
+    and returns it.
+
+[Vex:push]:
+    Adds an item to the end of an array (increasing the size of the array by 1).
+    
+[Vex:getcomp]:
+    Gets the value of an array component, the same as `array[<<num>>]`.
+
+[Vex:setcomp]:
+    Sets the value of an array component, the same as `array[<<num>>] = <<value>>`.
+    
+[Vex:array]:
+    Efficiently creates an array from its arguments.
+    
+[Vex:serialize]:
+    Flattens an array of vectors or matrices into an array of floats.
+    
+[Vex:unserialize]:
+    Reverses the effect of [Vex:serialize]: assembles a flat array of floats
+    into an array of vectors or matrices.
+    
+[Vex:neighbours]:
+    An array-based replacement for the [Vex:neighbourcount]/[Vex:neighbour]
+    combo. Returns an array of the point numbers of the
+    neighbors of a given point.
+    
+In addition, the following functions work with arrays:
+
+- [Vex:min]
+- [Vex:avg]
+- [Vex:spline]
+- [Vex:import]
+- [Vex:addattribute]
+- [Vex:metaimport]
+
+== VCC pragmas ==
+
+The `ramp` pragma lets you specify a ramp user interface for a set of
+parameters.
+
+{{{
+#pragma ramp <ramp_parm> <basis_parm> <keys_parm> <values_parm>
+}}}
+
+See [VCC pragmas|pragmas] for more information.
+
+== Limitations ==
+
+- Currently VEX does not support multi-dimensional arrays.
+- Arrays cannot be passed between shaders (through [Vex:simport], etc.).
+- Arrays cannot be written to image planes.

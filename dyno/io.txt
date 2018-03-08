@@ -1,0 +1,120 @@
+= Input and output =
+
+== Overview ==
+
+This page describes...
+
+- How to get information _into_ a simulation, for example grabbing geometry from a geometry network to use as an RBD object.
+
+- How to _cache_ simulation information to avoid recalculating the simulation.
+
+- How to get information _out of_ a simulation, for example taking the volume data from a smoke simulation into a geometry network so you can shade and render it.
+
+== A note on the dynamics shelf tools ==
+
+When you use the shelf tools to create simulation objects from existing Geometry container objects, Houdini does some interesting magic where it sets up an import from the Geometry container into a dynamics node (such as an RBD Object), and a corresponding DOP Import surface node inside the container to import the dynamics object's transforms back onto the geometry.
+
+So, in the case of RBDs, the Geometry container provides the shape of the object to the simulation, and the simulation then drives the transforms of the geometry.
+
+This lets you quickly set up a Geometry object, make it a simulated object, and have the simulation drive the motion of the original object, without worrying about import and exporting information.
+
+The information on this page describes how this import and export works so you can set it up manually if you need to.
+
+== Importing geometry into a simulation ==
+
+These nodes let you grab geometry from a node in a geometry network and attach it as `Geometry` data to a dynamics object.
+
+To import ||
+    Use this node ||
+Geometry |
+    [SOP Geometry|Node:dop/sopgeo]
+Scalar field (from a [volume primitive|/model/volumes]) |
+    [SOP Scalar Field|Node:dop/sopscalarfield]
+Vector field (from a [volume primitive|/model/volumes]) |
+    [SOP Vector Field|Node:dop/sopvectorfield]
+Object position and velocity |
+    [Object Position|Node:dop/objpos]
+
+== Importing particles ==
+
+See the [particle solver|Node:dop/particlefluidsolver].
+
+== Caching/archiving simulation to disk == (cache)
+
+See [caching simulations|cache].
+
+== Exporting simulation data to other networks ==
+
+=== Data reference syntax ===
+
+You can use the following syntax to reference dynamics data in various import nodes discussed below:
+
+`<<network path>>[:<<name>>[/<<data name>>]]`
+
+...where name can be an object name, object ID, or group name, and can be a wildcard.
+
+For example...
+
+Network ||
+    Object ||
+        Data name ||
+`/obj/AutoDopNetwork` |
+    `object1` |
+        `Geometry`
+
+If you set the DOP Network as the node to import, you will import the geometry of every object in the simulation. If you include an object name or ID (or object name wildcard, such as `brick*`), you will import the `Geometry` data of that object. If you include a data name, you will import that specific piece of data.
+
+TIP:
+    You can pull out _any type of geometry_ data from a simulation, including not just the final simulated geometry, but also collision fields, visualizations, and guide geometry. Look in the [details view|/ref/windows/] to see what data is available on a given object.
+
+=== Geometry and transforms ===
+
+:task:Import geometry from a simulation into a geometry network:
+    - Use the [Object Merge|Node:sop/object_merge] surface node in a geometry network to pull `Geometry` data out of a simulation.
+        
+    - The [DOP Import|Node:sop/dopimport] surface node can also import geometry from a simulation.
+        
+        DOP Import includes an option to undo the world transformation so you can work on the object in local space instead of at its final world position. You can put another DOP Import node with another transformation inversion at the end of the surface node chain to move the geometry back to world space position.
+        
+:task:Use position data from a simulation as the transform of an object:
+    The [Fetch object|Node:obj/fetch] is a geometry container that gets its transform from the position data of a dynamics object.
+
+:task:Use position data from a simulation as the transform for geometry:
+    The [DOP Import|Node:sop/dopimport] surface node can take input geometry and then use the Position data from a referenced simulation object to transform the input geometry.
+        
+== Fluid fields == (fluids)
+
+Use the [Object Merge|Node:sop/object_merge] or [DOP Import|Node:sop/dopimport] surface nodes to import scalar or vector field data (as a [volume primitive|/model/volumes]) or geometry from a fluid object for shading and rendering.
+
+A dynamics [Fluid Object|Node:dop/fluidobject] has several useful pieces of data to import, including the `surface` and `visualization` fields, as well as fields like velocity (`vel`). You can use the details view to see what data is available on a fluid object.
+
+For example:
+
+- Surface sign distance field: `/obj/AutoDopNetwork:fluid/surface`
+- Visualization geometry: `/obj/AutoDopNetwork:fluid/surface/Visualization`
+- Velocity vector field: `/obj/AutoDopNetwork:fluid/vel`
+
+The visualization field may be more useful to extract the surface than the actual surface field so you don't have to surface it yourself (see below), but you may want to turn off the bounding box first on the fluid object's __Guides__ tab.
+
+=== Reversing and manipulating a field ===
+
+The sign distance field you get by importing the `surface` data from a fluid object is reversed from what the volume primitive expects, so that the "fluid" and "absence" areas are reversed when you import a fluid into a volume primitive.
+
+You can reverse reverse the field by appending a [Volume Mix surface node|Node:sop/volumemix]. On the Mix Method node, set the __Mix method__ parameter to __User__ and the __Value__ parameter to `-$V` (`$V` is the current value of a point, so `-$V` just reverses the value).
+
+=== Surfacing volumes ===
+
+You can use the [Iso surface node|Node:sop/iso] to create a surface along the fluid boundary in a sign distance volume like you get from a fluid object. Append the IsoSurface node and set the __Implicit function__ parameter to `$V`.
+
+== Display and render geometry ==
+
+Like [surface nodes|/nodes/sop/], dynamics objects can have separate _display_ and _render_ geometry. In dynamics, this is accomplished by attaching two different pieces of geometry data to the object representing display and render geometry, and then attaching rendering sub-data to each piece of geometry.
+
+You can use the [Rendering Parameters|Node:dop/renderparms] node to attach sub-data to geometry data indicating whether the geometry should be used for display or render or both. To attach the sub-data, connect the Rendering Parameters node to the object with an [Apply Data|Node:dop/applydata] node, and set the Rendering Parameter's __Data name__ parameter to a path under the geometry where the sub-data should be attached, for example `Geometry/RenderParms`.
+
+Once you've attached the sub-data, you can use the Rendering Parameter node's __Display__ and __Render__ parameters to control whether the geometry data it's attached to should be visible in the viewer and/or when the dynamics network is rendered directly.
+
+(The Rendering Parameters node also lets you attach a material for test rendering.)
+
+
+

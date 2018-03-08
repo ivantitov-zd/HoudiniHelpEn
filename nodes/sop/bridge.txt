@@ -1,0 +1,177 @@
+= Bridge =
+
+#type: node
+#context: sop
+#internal: bridge
+#icon: SOP/bridge
+#tags: merge, fillet, model
+
+"""Skins trimmed surfaces or holes, creates highly controllable joins
+between arms and body, branches, or tube intersections."""
+
+The Bridge SOP is similar to the [Skin SOP|Node:sop/skin] but with much
+greater control over the resulting surface. Given a set of profiles
+(i.e. curves on surface) and/or spatial faces, the Bridge op builds a
+NURBS skin with specified tangent and curvature characteristics. The
+precision of the resulting surface is highly dependent on the number of
+required cross-sections and on the quality of the profile extraction.
+High precisions will generate a very dense surface with, potentially,
+many multiple knots.
+
+In general, the higher the order of the curve, the better the fit the
+Bridge op will be able to provide. However, it is generally better to
+stick to cubics (order 4) curves, as the software is optimized for
+cubics.
+
+Because the Bridge op can join both a set of spatial curves and trim
+curves, it can be used much like the [Skin SOP|Node:sop/skin] and/or the
+[Fillet SOP|Node:sop/fillet]. However, bridging trimmed surfaces is more
+expensive than bridging carved surfaces.
+
+You will usually need a [Trim SOP|Node:sop/trim], Bridge SOP, or
+[Profile SOP|Node:sop/profile] after a [Project SOP|Node:sop/project].
+
+* Use a [Trim SOP|Node:sop/trim] to cut a hole in the projected surface.
+
+* Use a [Bridge SOP|Node:sop/bridge] to skin the profile curve to
+  another profile curve.
+
+* Use a [Profile SOP|Node:sop/profile] to extract the curve on surface
+  or remap it's position.
+
+NOTE:
+    To texture-map the resulting skin, use an Orthographic projection
+    rather than a Spline-based projection. This results in better
+    continuity across the surfaces.
+
+== Example: Joining Two Trim (Profile) Curves ==
+
+    steps>>
+        # Place a [Circle SOP|Node:sop/circle]. Primitive Type: NURBS;
+          Radius = 0.2, 0.2
+
+        # Place a [Grid SOP|Node:sop/grid]. Primitive Type: NURBS.
+
+        # Feed both the Circle and Grid SOPs into a [Project
+          SOP|Node:sop/project]. Make it the display SOP. You notice the
+          projected circle on the grid: our trim curve.
+
+        # Append a [Trim SOP|Node:sop/trim] and make it the display SOP.
+          Turn on Gouraud shading for the Viewport. You now see the
+          trimmed holes in the surface of the grid.
+
+        # Append a [Copy SOP|Node:sop/copy]. Number of Copies: 2;
+          Translation Z: 1.0; Rotation X: 30. Make it the display SOP.
+          Now we have two grids with trimmed holes in them.
+
+        # Append a Bridge SOP, and make it the display SOP. Scale
+          Tangents: 0, 0, 0; Use Curvature: On; Scale Curvatures: 3, 3, 3 .
+
+        # To specify which profile curves to skin, turn on
+          Profile Numbers in the Viewport options, (click ((Plus)) at the
+          bottom-right of Viewport, and enable the icon). We can see the
+          profile numbers of the two trim curves are 0.0 and 1.0,
+          meaning the 0th profile of the 0th primitive and the 0th
+          profile of the 1st primitive). The strange numbering is
+          because primitive numbers start at 0 instead of 1.
+
+        # In the Bridge SOP's Group field enter: _*.0_. This means to
+          include the 0th (first) curve from all (the _*_ wildcard
+          character) primitives in the skin. You now see the resulting
+          bridge between the two trim curves. The skin bulges outwards.
+
+        # We can control the bulge by playing with the Scale Curvatures
+          and the Tangent Magnitudes. Set the Scale Curvatures to: -3,
+          -3, -3 . Now we have an inward-bulging tube connecting the two
+          holes. 
+            [Image:../images/BridgeSOPExample.jpg]
+
+        # Experiment with moving the location and size of the holes
+          (change the Translation and Radius in the [Circle
+          SOP|Node:sop/circle]). The Bridge SOP dynamically updates the
+          geometry connecting the two surfaces. Setting the Scale
+          Curvature to: 0, 0, 0 produces a straight-through connection
+          between the two holes.
+
+
+@parameters
+    Group:
+        Subset of profiles and/or faces to bridge.
+    Bridge:
+        Allows bridging of subgroups of N primitives or patterns of
+        primitives.
+    N:
+        #channels: /inc
+
+        Pattern of primitives to bridge.
+    Order:
+        #channels: /order
+
+        Spline order for both profile extraction and skin.
+
+    == Surface Properties ==
+
+        Min X-sections:
+            #channels: /isodivs
+
+            Minimum number of cross-sections in skin.
+        Use:
+            Type of normal to use for computing direction.
+
+            Frenet Frame:
+                This sets the local normal according the the frenet
+                frame of the curve. This is the vector perpendicular to
+                both the tangent of the curve and the binormal (the
+                direction of curvature).
+            Normal:
+                This uses the calculated normal of the entire curve as
+                the normal.
+        Circular-Arc Fillet:
+            Build the skin as a circular fillet, if possible.
+        Rotate/Scale Tangents:
+            The scaling and rotation parameters contain three fields:
+
+            First Field:
+                Applies to the first face in the input.
+            Second Field:
+                Applies to all intermediate faces.
+            Third Field:
+                Applies to the last face in the input.
+        Rotate Tangents:
+            #channels: /rotatet1 /rotatet2 /rotatet3
+
+            Further rotation of the tangents (degrees).
+        Scale Tangents:
+            #channels: /scalet1 /scalet2 /scalet3
+
+            Further scaling of the tangents. When building a circular
+            fillet, only the sign of the tangents is used.
+        Use Curvature:
+            Take curvature into consideration as well.
+        Scale Curvatures:
+            #channels: /scalec1 /scalec2 /scalec3
+
+            Further scaling of the curvature.
+
+    == Profile Extraction ==
+
+        Overview:
+            The parameters in this tab determine the precision with
+            which to extract profile curves.
+        Divisions Per Span:
+            #channels: /sdivs
+
+            Number of 2D points evaluated in each span.
+        Tolerance:
+            #channels: /tolerance
+
+            Precision of 2D fitting algorithm.
+        Preserve Sharp Corners:
+            Enables or disables fitting of sharp turns.
+
+@related
+    - [Node:sop/fillet]
+    - [Node:sop/join]
+    - [Node:sop/stitch]
+    - [Node:sop/skin]
+

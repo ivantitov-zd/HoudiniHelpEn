@@ -1,0 +1,93 @@
+#type: node
+#context: dop
+#internal: gasdissipate
+#icon: DOP/gas
+
+= Gas Dissipate =
+
+"""A microsolver that dissipates a field."""
+
+The Gas Dissipate DOP is a microsolver used in building larger fluid
+simulations. The [Fluid Solver|Node:dop/fluidsolver] and [Smoke Solver|Node:dop/smokesolver] DOPs allow
+microsolvers to be added before or after the main solver step to extend
+or tweak the simulation. Alternatively, enterprising people may attempt
+to build an entire new solver out of microsolvers.
+
+The Gas Dissipate DOP performs several types of dissipation on the
+specified field.  This will drive the fields value to zero,
+causing the smoke to disappear over time.  An optional control field
+can be used to affect when the dissipation occurs.  Using the heat
+field for a control, if the solver is set to add the heat field, will
+allow having dissipation be dependent on how long since the smoke was
+added to the simulation.
+
+@parameters
+
+Field:
+    The field to dissipate. This is a single scalar field.
+
+Control Field:
+    The field to use for looking up in the ramps.  This is a
+    single scalar field.  If it is the heat field, it can be
+    thought of as measuring the time since a voxel was added to
+    the simulation.
+    
+Diffusion:
+    A fixed diffusion of the field in all directions.  This is a
+    time based blurring effect.
+    
+Evaporation Rate:
+    The rate at which the field will be reduced. An evaporation of 0.1 means 10% of the field will be lost in one second. The __Evaporation Rate__ is a multiplicative factor which acts as a sort of half life for the smoke. The rate is what % of smoke should disappear after 1 second. So a rate of 1 means all the smoke disappears in a second, which for a halflife effect means it disappears immediately. 0 means no effect. 0.5 means that after 1 second you have 50% of the smoke left you did at the start.
+
+    Since this uses multiplication to achieve its effect over one second, the per frame action may be a lot less than expected. A value of 0.75, which removes 75% of the field over one second, only removes 5.6% of the field every frame at 24 FPS. This compounds over the 24 frames to get the final desired 75% removal. 
+
+    NOTE: 
+        __Evaporation Rate__ and __Evaporate by Subtraction__ do not work together, they layer on top of each other.
+
+Evaporate by Subtraction:
+    Evaporation uses a multiplicative process which tails smoothly to zero. You may want a harsher linear reduction on smoke values. This is done by subtracting a fixed amount from the field proportional to the timestep. The given subtraction amount will be subtracted every second. The ramp will be multiplied by the subtraction amount to give a per-voxel control of the subtraction rate dependent on the control volume. 
+
+    Subtraction, as the name suggests, just subtracts the subtraction amount times the timestep away from all the density every timestep. So a value of 0.1 means that 0.1 of density will be lost per voxel every second.
+
+    NOTE:
+        __Evaporation Rate__ and __Evaporate by Subtraction__ do not work together, they layer on top of each other.
+
+Scale Evaporation Rate by Control:
+    The specified evaporation will be multiplied by this ramp
+    value.  This allows one to turn on evaporation on cooler or
+    older smoke by tying it to a control field.
+    
+Clamp To Minimum:
+    The field is clamped from below by this value.  This can
+    ensure the evaporate by subtraction option does not create a
+    negative field.
+    
+Clamp To Maximum:
+    A per voxel maximum is calculated using the control field.
+    This is then multiplied by the maximum value to get a clamp to
+    clamp the maximum of the field.
+    
+Remap Control Field:
+    The ramps all expect a control field in the 0 to 1 range, with
+    0 meaning the left hand of the ramp and 1 meaning the right
+    hand.  However, heat and temperature fields are 1 when first
+    created and decay to 0 over time, and since one often expects
+    the right side to control the "older" smoke, the default
+    mapping has been reversed here. The range can also be
+    adjusted for other control fields.
+
+@inputs
+
+[Include:standard_data_inputs]
+
+@outputs
+
+[Include:standard_data_outputs]
+
+@locals
+
+[Include:standard_data_locals]
+
+[Include:standard_locals]
+
+

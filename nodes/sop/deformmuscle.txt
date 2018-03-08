@@ -1,0 +1,229 @@
+= Deform Muscle =
+
+#type: node
+#context: sop
+#internal: deformmuscle
+#icon: SOP/deformmuscle
+#tags: capture, character, muscle
+
+"""Deforms captured points according to muscle deformations. """
+
+Connect the output of a [Capture Metaball SOP|Node:sop/capturemeta]
+that uses muscles as its capture regions to the input of this node.
+This node deforms the captured skin geometry as the muscles deform
+using the attributes created by the Capture Metaball SOP to determine
+which surfaces are controlled by which metaball groups.  Muscles are
+created using the [Muscle Object|Node:obj/muscle].
+
+This deformation occurs in two stages. First, the skin geometry is
+deformed according to the positions of the metaballs contained in each
+muscle (see also [Deform Metaball|Node:sop/deformmeta]). Next, the skin
+geometry is inflated over the muscle surface (see also
+[Inflate|Node:sop/inflate]) so that the shape of the muscles is
+preserved by the skin.
+
+Muscles are generated using blended metaballs. The density of each
+metaball where it captured to the skin geometry at the capture frame
+controls how much influence the metaball has when it deforms the skin
+geometry. This density is multiplied by the weight of the group that
+metaball is contained in. Group weights are specified by the [Capture
+Metaball|Node:sop/capturemeta] and [Capture Layer
+Paint|Node:sop/capturelayerpaint] nodes.  Group weights are also used
+by this operator to determine which muscles influence each point
+during inflation.
+
+@parameters
+
+== Deform ==
+
+This tab controls point deformation.  In this stage, input
+points are deformed according to changes in the captured
+muscle structure.
+
+Normalize Group Weights:
+    #id: normalize
+
+    Normalize group weights before performing the deformation.
+
+Pre-Compute Normals:
+    Calculates point normals before doing anything. You can use
+    these normals with __Deform Normals__.
+
+Deform Normals:
+    Deforms point normals to match the deformation of the
+    points. This can help keep normals pointed correctly after
+    deformation.
+
+Deform Vector Attributes:
+    Deforms vector attributes to match the deformation of
+    the points.
+
+Vector Attributes:
+    Vector attributes to deform.
+
+Deform Quaternion Attributes:
+    Deforms quaternion attributes to match the deformation
+    of the points.
+
+Quaternion Attributes:
+    Quaternion (Float\[4]) attributes to deform.
+
+Position Bias Multiplier:
+    Increasing this parameter biases the capture weights of
+    points more towards metaballs that are close to that point's
+    capture position. It can be used in conjunction with the
+    Capture Position Bias parameter on the Muscle Object.
+    This parameter acts as a multiplier to the muscle specific
+    __Capture Position Bias__ parameter in the
+    [Muscle Object|Node:obj/muscle].  Increase this parameter
+    to reduce the effective radius of influence of metaballs
+    on surrounding points during deformation.  Decrease this
+    parameter to increase this radius of influence.
+
+Assume Only Coordinate Changes In Input:
+    Enables the assumption that only point positions need to be
+    re-cached when the input geometry has changed to allow faster
+    cooking. Unpredictable results will occur with this enabled if
+    attributes or topology changes.
+
+== Inflate ==
+
+This tab controls point inflation.  In this stage, points are
+optionally inflated to lie on top of the captured muscle
+geometry.
+
+Enable Inflation:
+    Enables or disables the inflation step of the deform
+    process. If inflation is disabled, then the captured
+    geometry is deformed according to the underlying muscle
+    positions but is not inflated to lie on top of the muscle
+    surface.
+
+Points To Inflate:
+   Specifies which points in the input geometry should be
+   influenced in the inflation step.
+
+   Inflate All Points:
+        All points in the input geometry may be inflated.
+   Use Inflate Modifier Attribute:
+        The [Slide Modifier Paint operator|Node:sop/slidemodifierpaint]
+        may be used to paint a "Surface Inflation Modifier" attribute
+        using the __Attribute to Paint__ parameter on this node.
+        This attribute is used to determine how to inflate points
+        in the input geometry when "Use Inflate Modifier Attribute"
+        is specified.  This float attribute may take any value between
+        0 and 1.  A value of 0 specifies that a point should remain at
+        its deformed position without inflating.  A value of 1 specifies
+        that a point should be transformed to its fully inflated position.
+        Values in between 0 and 1 blend linearly between the two
+        positions.  This option can be used to specify exactly what
+        locations of the input geometry require inflation.
+
+Muscles For Inflation:
+    Use this parameter to specify a list of muscles over which the
+    input geometry is to be inflated.  Points in the input geometry
+    will only be inflated over the muscles in this list.
+
+Maximum Inflation:
+    The maximum distance that a point can be pushed away from
+    its original position. If a muscle cannot be found within
+    this distance, the point is kept at its original position.
+
+Inflate Tolerance:
+    This controls the tolerance used when trying to locate a
+    position on the muscle surface to place each point in the
+    deformed geometry. A higher tolerance can provide increased
+    performance, while a lower tolerance results in a smoother
+    skin surface. In general, a higher tolerance such as 0.01 is
+    sufficient for interactive work, while a lower tolerance
+    such as 0.0001 is more appropriate for animation.
+
+Joint Group:
+    The points in this group will be considered joint points,
+    and so special consideration for them will be given when
+    inflating and __Exclude Opposing Metaballs for Joint Group__
+    is enabled. When a point is in a joint group, it will not be
+    inflated to any metaballs whose normals point in an opposite
+    direction to the point's normal. This is especially useful
+    for points in the inside curve of a joint because it will
+    keep points from inflating to a muscle on the opposite side
+    of the joint. The [Group Paint SOP|Node:sop/grouppaint] can
+    be used to easily paint this group.  Alternately, inflation
+    can be avoided entirely in the inside of a character's joints
+    by setting __Points to Inflate__ to
+    "Use Inflate Modifier Attribute" and painting points such that
+    these points are not inflated.
+
+Exclude Opposing Metaballs for Joint Group:
+    Checks to make sure that a metaball's normal and the point
+    normal for a given point are not pointed in opposite
+    directions. If they are, the point should not be inflated to
+    that metaball, since it is on the opposing side of the
+    joint. This option turns this check on or off for points in
+    the joint group.
+
+Enable Sliding:
+    If this parameter is enabled then the Deform Muscle SOP
+    simulates the effect of skin sliding over top of the underlying
+    muscle surface. For this to work, each [Muscle
+    Object|Node:obj/muscle] to which the geometry is captured must
+    define a rest anchor.
+
+Sliding Coefficient:
+    The amount of sliding to allow during deformation. If this
+    parameter is set to zero, then points in the captured geometry
+    stick perfectly to the muscle surface during deformation and no
+    sliding occurs. If this parameter is set to one, then points do
+    not stick to the underlying muscle surface at all, and the skin
+    slides freely over the muscles. This parameter may be modified
+    on a per-point basis using the [Slide Modifier
+    Paint|Node:sop/slidemodifierpaint] operation.
+
+== Smoothing ==
+
+This tab controls geometry smoothing.  It can optionally be used to
+smooth out portions of the input geometry that have deformed or
+inflated in an undesirable way.  See also the
+[Smooth SOP|Node:sop/smooth].
+
+Enable Smoothing:
+    Enables or disables geometry smoothing.
+
+Primitive Group to Smooth:
+    Use this parameter to specify a primitive group in the input
+    geometry to perform the smoothing operation on.
+
+Smoothing Cutoff Frequency:
+    Noise frequency to remove. The larger this value, the more it
+    will keep the original shape of the geometry.
+
+Smoothing Iterations:
+    Number of smoothing steps.
+
+Boundary Clamping:
+    When this parameter is set to 0, points on the boundary of the
+    group specified in __Primitive Group to Smooth__ may also be
+    affected by the smooth operation.  Setting this parameter to 1
+    clamps this points to remain in their original position.
+    Values between 0 and 1 blend the boundary point positions between
+    their un-clamped and fully clamped positions.
+
+@inputs
+
+Captured Geometry:
+    This must be geometry that has a valid `metaCapture` point
+    attribute, such as the output of a [Capture Metaball
+    SOP|Node:sop/capturemeta].
+
+@outputs
+
+Output:
+    The deformed geometry.
+
+@related
+
+- [Node:obj/muscle]
+- [Node:sop/slidemodifierpaint]
+- [Node:sop/capturemeta]
+- [Node:sop/capturelayerpaint]
+

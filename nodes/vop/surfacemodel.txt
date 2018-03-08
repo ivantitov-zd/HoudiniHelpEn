@@ -1,0 +1,745 @@
+= Surface Model Shader =
+
+#type: node
+#context: vop
+#internal: surfacemodel
+#icon: VOP/surfacemodel
+
+"""A powerful, highly flexible, general model for surface shading."""
+
+== Overview ==
+
+This node is a fully featured model of surface shading. It supports
+diffuse, specular, and refractive components and computes direct
+lighting (from light sources) and indirect lighting (lighting bouncing
+off other objects in the scene).
+
+Since the Surface Model itself takes care of lighting and simulates most
+physical properties, simply connecting the Surface Model VOP to the output
+would create an "uber-shader" capable of simulating most surfaces.
+
+For more information on building a material shader with VOPs, see
+[creating materials|Node:shop/vopmaterial].
+
+These are the main features:
+
+* Diffuse reflection
+* Specular reflections with 2 separate layers
+* Refraction
+* Subsurface scattering
+* Emission controls
+
+In non-physically based renders, this node adds support for the following:
+
+* Per-light exports
+* Variance antialiasing support for area lights
+* Variance antialiasing support for raytracing
+
+TIP:
+    Most of the parameters are available as inputs but are hidden by
+    default. See [working with VOPs|/shade/vops] for information on
+    connecting hidden inputs.
+
+== Reflectivity ==
+
+This node uses _reflectivity_ (or _intensity_) to scale the different
+contributions. For example, the default look reflects 50% of the
+incoming illumination as diffuse and 10% as specular reflection. The
+remaining 40% is absorbed by the surface and not reflected into the
+scene. Using reflectivity makes it easy to model real materials and
+ensure energy is conserved (that is, to ensure the surface shader does
+not increase the amount of light in the scene). It also lets you
+accurately predict how much indirect light will be present in a
+physically based render.
+
+This is significantly different from how you specify diffuse and
+specular amounts in older shaders such as the [plastic
+shader|Node:shop/v_plastic] or the [Lighting Model
+VOP|Node:vop/lighting]. In those nodes, varying the specular highlight
+size by changing the roughness would have a dramatic effect on the
+surface reflectivity, making it difficult to predict the amount of
+light in the scene when using physically based rendering. With this
+node, you can vary the specular highlight size and anisotropy without
+having any effect on the total amount of light reflected by that
+component.
+
+The side effect of this design is that the maximum intensity of the specular
+highlight varies as you change the roughness and anisotropy. For this
+reason, sharp specular highlights you create with the Surface Model
+node often appear much brighter.
+
+TIP:
+    To measure the actual reflectivity of a material, place a sphere under a
+    default white environment light, and inspect the color of the surface
+    under this simple lighting. The average pixel color is the actual shader
+    reflectivity.
+
+== Reflectivity and point/spot lights == (pointlights)
+
+The default diffuse reflectivity (or _intensity_) of the surface model is
+0.5.  However, when rendering using light sources with non-physical
+attenuation (for example, a default point light), pixels can have values
+higher than 0.5, especially where the light hits the surface directly. Even
+though the image appears brighter, the actual surface reflectivity is still
+0.5 -- the brighter image is the result of a higher default intensity for these
+light types.
+
+In particular, the following non-physical light source types will do this:
+
+* Point/spot lights with __No Attenuation__ on.
+* Distant/sun lights
+* Area lights with __No attenuation__ and __Normalize Light Intensity to Area__ on.
+
+If you increase the reflectivity above 0.5 for physically based renders, the
+maximum brightness in the image can be above 1 if you use these light
+types. To reduce the brightness of the image in these cases, decrease light
+intensities (instead of decreasing __Diffuse Intensity__), since changing
+light intensity doesn't affect the proportion of reflected light in the scene
+for physically based renders.
+
+== Anisotropic highlights/reflections ==
+
+Anisotropic materials have different physical properties in one
+direction. Classic examples are hair, brushed metal, and record albums
+(ask your parents, kids!), which all have "stretched"
+reflections/highlights along one direction because of how light
+interacts with microscopic grooves in the material.
+
+* The __Specular anisotropy__ parameter on the __Reflect__ tab
+  controls the direction of the highlights. Negative values stretch the
+  highlight along the V direction. Positive values stretch the highlight along
+  the U direction.
+
+* The __Tangent style__ controls how the node decides which directions
+  on the object correspond to U and V. You can use the inherent
+  tangents, world or local space, UV attributes, or for complete control
+  hook up the `U tangent (utan)` and `V tangent (vtan)` inputs.
+
+== Exporting image planes == (exports)
+
+This node _exports_ a large number of variables you can use to create extra
+image planes when rendering to the OpenEXR format. It is often useful for compositing and special effects to have, for example, the diffuse and specular output of the shader as separate images.
+
+For example, you can export the shader's direct/indirect/combined diffuse/reflect/refract output, scattering, samples, and so on. You can export the total output for each variable, or separate _per-light_ exports.
+
+See the [Extra image planes|Node:out/ifd#vm_numaux] parameter of the
+[mantra render node|Node:out/ifd] for more information.
+
+@parameters
+
+== Diffuse ==
+
+This tab controls diffuse reflection (in simple terms, the overall
+color of the surface). The default values reflect 50% of the incoming
+light.
+
+Enable Diffuse:
+    #id: diff_enable
+
+    Enables diffuse reflection.
+
+Diffuse Intensity:
+    #id: diff_int
+
+    The proportion of incoming light reflected back as the diffuse
+    component, from `0` (no diffuse reflection) to `1` (all incoming
+    light is reflected). Non-attenuated lights such as point lights
+    and spot lights [may produce brighter pixel values than this value|/nodes/vop/surfacemodel#pointlights].
+
+    (Old shaders such as the [VEX Plastic|Node:shop/v_plastic] shader
+    implicitly have a reflectivity of `0.5` when the shader's diffuse
+    coefficient is set to `1`.)
+
+Diffuse Minimum:
+    #id: diff_min
+
+    When __Fresnel Blending__ is on, controls the minimum amount of
+    reflection that will not be blended with the Fresnel factor.
+    Diffuse components are blended with the transmissive Fresnel
+    component.
+
+    Fresnel blending of the diffuse component only makes sense when
+    one or both specular reflection layers are on. If there is no
+    specular reflection, you should turn off __Fresnel Blending__.
+
+Diffuse Color:
+    #id: diff_clr
+
+    The color reflected by the object (technically, the reflectivity
+    of red, green, and blue color components).
+
+Oren-Nayar Roughness:
+    #id: diff_rough
+
+    A floating point value used to control the size or spread of the
+    diffuse  component. Higher values make the surface look less
+    glossy with flatter color.
+
+Diffuse Component:
+    #id: diff_label
+    #contentfrom: pbrspecular#label
+
+== Subsurface ==
+
+This tab controls subsurface scattering. This node provides a subset of the
+interface of the [Physical SSS|Node:vop/physicalsss] node. If you need even
+more control over subsurface scattering, you may want to create a Physical SSS
+node yourself.
+
+Enable Subsurface Scattering:
+    #id: sss_enable
+
+    Simulate subsurface scattering of light through the object.
+
+Subsurface Albedo:
+    #id: sss_int
+
+    The overall proportion of light that is scattered, from `0` (no
+    scattering) to `1` (all light is scattered). Higher subsurface albedo
+    values will produce more multiple scattering and a greater scattering
+    distance.
+
+Subsurface Color:
+    #id: sss_clr
+
+    The dominant color in lit areas of the surface.
+
+Subsurface Minimum:
+    #id: sss_min
+
+    The minimum scattering intensity.
+
+[Include:physicalsss#attendensity]
+
+Attenuation Color:
+    #id: sss_attenclr
+
+    The color tint that light takes on as it's scattered under the surface. In practice, this controls the "far side" color of subsurface scattering.
+
+Scattering Phase:
+    #id: sss_phase
+    #contentfrom: physicalsss#g
+
+Enable RGB Spectral Scattering:
+    #id: sss_spectral
+    #contentfrom: physicalsss#spectral
+
+Enable Single Scattering:
+    #id: sss_1enable
+    #contentfrom: physicalsss#singlesss
+
+Single Intensity:
+    #id: sss_1intensity
+
+    A scaling factor for the contribution of single scattering to the surface
+    color, from `0` (no contribution) to `1` (full contribution).
+
+Single Quality:
+    #id: sss_1quality
+    #contentfrom: /nodes/vop/physicalsss#nsingle
+
+Enable Multiple Scattering:
+    #id: sss_2enable
+
+    Enable contribution from light that scatters more than once in the surface.  For low albedo materials (low __Subsurface Albedo__), multiple scattering contributes little to the image and can be disabled to reduce computation time.
+
+Multi Model:
+    #id: sss_2model
+    #contentfrom: physicalsss#multimodel
+
+Point Cloud Mode:
+    #id: sss_pcmode
+    #contentfrom: /nodes/vop/physicalsss#pcmode
+
+Point Cloud:
+    #id: sss_pcname
+    #contentfrom: /nodes/vop/physicalsss#pcname
+
+Multi Intensity:
+    #id: sss_2intensity
+
+    A scaling factor for the contribution of multiple scattering to the surface
+    color, from `0` (no contribution) to `1` (full contribution).
+
+Multi Quality:
+    #id: sss_2quality
+
+    Controls the number of samples in the point cloud. Low values give fast
+    renders but a sharper, less accurate look. High values give slower renders
+    but a blurrier, more accurate look.
+
+== Base / Coat Reflection ==
+
+This tab lets you add one or two layers of specular reflection. The
+__Enable reflection layer__ checkbox on each tab turns each layer
+on or off. Turning on both layers does not blend between them, the
+node simply adds them together.
+
+Enable Reflection Layer:
+    #id: refl_enable
+
+    Enables this reflection layer.
+
+Reflect Lights:
+    #id: refl_lights
+
+    Light sources (including environment lights) will be reflected.  Light
+    source reflections are commonly known as "Specular Highlights".
+
+Specular Model:
+    #id: spec_model
+    #contentfrom: /nodes/vop/pbrspecular#model
+
+Specular Intensity:
+    #id: spec_int
+
+    The proportion of light that is reflected by this specular layer,
+    from `0` (no light reflected) to `1` (all light is reflected).
+
+    [Image:/images/nodes/shop/mantrasurface_spec_int.png]
+
+Specular Minimum:
+    #id: spec_min
+
+    When Fresnel Blending is enabled, controls the proportion of
+    specular reflection that will _not_ be blended with the Fresnel
+    factor. Increasing this parameter will cause a minimum amount of
+    reflection to appear even for rays perpendicular to the surface.
+
+Specular Color:
+    #id: spec_clr
+
+    The tint of the specular highlight (technically the reflectivity
+    for the red, blue, and green color components). For example,
+    setting the specular color to `1, 0, 0` will reflect only red
+    light, giving red highlights.
+
+Specular Metallic:
+    #id: spec_metallic
+
+    Controls how metallic reflections appear. This uses a different method of calculating reflection intensity that is physically correct for conductive materials.
+
+    [Image:/images/nodes/shop/mantrasurface_spec_metallic.png]
+
+Metallic Edge Tint:
+    #id: spec_edgetint
+
+    Controls the tint color used for the metallic reflection model. This controls the color around the edges of objects (where the surface is seen at a grazing angle). Metals typically have a slightly different tint in these regions.
+
+Specular Roughness:
+    #id: spec_rough
+    #contentfrom: pbrspecular#rough
+
+Specular Anisotropy:
+    #id: spec_aniso
+    #contentfrom: pbrspecular#aniso
+
+Anisotropy Direction:
+    #id: spec_anisodir
+    #contentfrom: pbrspecular#anisodir
+
+Reflect Objects:
+    #id: refl_objs
+
+    This reflection layer will reflect other objects in the scene,
+    using raytracing.
+
+Separate Object Reflection Parameters:
+    #id: refl_sep
+
+    Enables separate roughness, intensity, and color parameters for object
+    reflections, independent of the parameters for specular
+    reflections. This lets you create artistic (physically
+    unrealistic) differences between the object reflections and light
+    reflections.
+
+Reflection Intensity:
+    #id: refl_int
+
+    The intensity to use for object reflections, when __Separate
+    object reflection parameters__ is on. This overrides __Specular
+    Intensity__.
+
+Reflection Color:
+    #id: refl_clr
+
+    A tint color for object reflections, when __Separate object
+    reflection parameters__ is on. This overrides __Specular Color__.
+
+Reflection Roughness:
+    #id: refl_rough
+
+    The roughness used for object reflections when __Separate Object Reflection Parameters__ is enabled.
+
+Reflection Component:
+    #id: refl_label
+    #contentfrom: pbrspecular#label
+
+== Refract ==
+
+This tab contains parameters for refraction (light bending as it
+travels through the object, such as in glass or water). Refraction is
+off by default. If you turn it on the surface will refract light
+proportional to the __Refraction intensity__.
+
+For physically plausible results with refractions, you should also
+turn on __Fresnel Blending__ and __Conserve Energy__.
+
+Enable Refractions:
+    #id: refr_enable
+
+    Turns on simulation of light refracting through the object.
+
+Refract Lights:
+    #id: refr_lights
+
+    Light sources (including environment lights) will appear in refractions.
+
+Refraction Model:
+    #id: refr_model
+
+    The mathematical model used to simulate glossy refractions. For each viewing angle and surface normal, the model defines from which directions and at what intensity light is refracted. This is what shapes highlights and refractions in general.
+
+    The overall glossiness, and with it the size of highlights, is controlled by __Refraction Roughness__.
+
+    The chosen model has no effect when __Refraction Roughness__ is `0`, since this causes light to be refracted from a single direction at full intensity, making the model irrelevant.
+
+Refraction Intensity:
+    #id: refr_int
+
+    The proportion of light refracted by the surface, from `0` (no
+    light refracted) to `1` (all incoming light is refracted).
+
+Refraction Minimum:
+    #id: refr_min
+
+    When __Fresnel Blending__ is on, controls the proportion of
+    refraction that will _not_ be blended with the Fresnel factor.
+    Increasing this parameter will cause a minimum amount of
+    refraction to appear even for rays that graze the surface (and so
+    would normally not refract).
+
+Refraction Color:
+    #id: refr_color
+
+    A tint for the refracted light (technically, the refraction amount
+    for different color components). For example, setting the
+    refraction color to `1, 0, 0` will cause the surface to refract
+    only red light.
+
+Refraction Roughness:
+    #id: refr_rough
+
+    Roughness is a measure of how bumpy a surface is at the microscopic level. The most obvious effect is that refractions become glossier as roughness increases.
+
+    At a value of `0`, the surface is perfectly smooth and produces perfect refractions like glass. A value of `1` simulates a very rough surface, which results in very blurry refractions, like milky glass.
+
+    The visual change when transitioning from `0` to `1` should be close to linear.
+
+
+Refraction Anisotropy:
+    #id: refr_aniso
+
+    The direction and amount of anisotropy in the refraction. Values
+    less than 0 will sharpen the refraction in the U direction while
+    values larger than 0 will sharpen the refraction in the V
+    direction. When the __Refraction Anisotropy__ is `-1` or `1`,
+    refractions will have a width of `0` in the other direction.
+
+Refraction Anisotropy Angle:
+    #id: refr_anisoangle
+
+    The angle to rotate anisotropic refrations.  A value of 0 will align it
+    directly with the parametric directions while other angles rotate
+    clockwise.
+
+Refract Objects:
+    #id: refr_objs
+
+    Show refractions of objects. You should normally leave this option
+    on (otherwise no refractions will appear) unless you are
+    simulating a single sheet of reflective material, and you still
+    want light to filter through the object.
+
+Enable Attenuation:
+    #id: atten_enable
+
+    Tint the refractions based on the distance the light traveled
+    through through the object, with rays that travel further through
+    the object being more opaque.
+
+Attenuation Density:
+    #id: atten_den
+
+    The density of the material, for calculating attenuation (see
+    above). Larger density values make the material appear more
+    opaque. Setting the density to `0` is the same as turning off
+    attenuation.
+
+Attenuation Color:
+    #id: atten_clr
+
+    The color to tint light passing through the object. Technically,
+    this is the inverse of the color that is absorbed (the opacity).
+
+Thin Film Refraction:
+    #id: refr_thin
+
+    Treat the surface of the shaded object as a thin refractive film
+    rather than the boundary between the outside of the object and a
+    solid interior. Turn this on to simulate hollow and/or thin
+    refractive objects such as bubbles or windows. The node still uses
+    the refractive index to calculate the proportion of reflection and
+    refraction for fresnel blending, but the transmitted ray will not
+    change direction.
+
+Refraction Component:
+    #id: refr_label
+    #contentfrom: pbrspecular#label
+
+== Emission == (emission)
+
+Enable Emission:
+    #id: emit_enable
+
+    Add a constant amount of diffuse light emitted from the surface. For example, with emission on, the object would be visible in the render even
+    if none of the light objects were shining on it. This may be useful in
+    some circumstances, but normally you should simply use an
+    [Area Light|Node:obj/hlight] to add light to the scene more efficiently
+    and controllably, especially if you need to add a lot of light.
+
+Emission Intensity:
+    #id: emit_int
+
+    The amount of emission.
+
+Emission Color:
+    #id: emit_clr
+
+    The color of the emitted light.
+
+Emission Illuminates Objects:
+    #id: emit_illum
+
+    The light emitted by this object will brighten the surfaces of other
+    objects. When this option is off, the emitted light will be visible in
+    the camera, but will not fall on other objects in the scene.
+
+== Opacity ==
+
+The parameters on this tab control the rendered opacity of the
+surface, useful for fake transparency effects such as sprite rendering
+and fake caustics.
+
+Opacity Scale:
+    #id: opac_int
+
+    Scales the value of the __Opacity__ parameter. This is useful as a
+    single number to manipulate rather than having to change all three
+    components of the __Opacity__ parameter together.
+
+Opacity:
+    #id: opac_clr
+
+    The opacity for each color component.
+
+Enable Fake Caustics:
+    #id: fake_enable
+
+    Transmissive objects produce semi-transparent shadows that attempt
+    to approximate the amount of light that would be transmitted if
+    real caustics were rendered. If you're rendering real caustics
+    using an [Indirect Light|Node:obj/indirectlight], turn this
+    parameter off.
+
+Min Shadow Intensity:
+    #id: fake_min
+
+    The minimum shadow intensity to use for fake caustics. Increase
+    this to darken the lightest part of the shadow.
+
+Max Shadow Intensity:
+    #id: fake_max
+    The maximum shadow intensity to use for fake caustics. Decrease
+    this to lighten the darkest part of the shadow.
+
+Enable Opacity Falloff:
+    #id: opac_falloff
+
+    Blend between different opacities for parts of the surface that are perpendicular (head-on) to the camera and parts that are parallel (edge-on).
+
+Parallel Opacity:
+    #id: opac_para
+
+    The opacity to use for rays that are parallel to the surface
+    normal, when __Enable opacity falloff__ is on.
+
+Perp Opacity:
+    #id: opac_perp
+
+    The opacity to use for rays that are perpendicular to the surface
+    normal (rays that graze the surface), when __Enable opacity
+    falloff__ is on.
+
+Opacity Rolloff:
+    #id: opac_rolloff
+
+    Controls the blending point between parallel and perpendicular
+    opacity. Values larger than `1` give more parallel opacity, values
+    smaller than `1` give more perpendicular opacity.
+
+== Settings ==
+
+Inside IOR:
+    #id: ior_in
+
+    The interior index of refraction for use in physical Fresnel
+    computations. Water has an index of refraction around `1.33`.
+
+Outside IOR:
+    #id: ior_out
+
+    The exterior index of refraction for use in physical Fresnel
+    computations. Air has an index of refraction near `1`.
+
+Conserve Energy:
+    #id: conserveenergy
+
+    Ensures that the surface reflects no more light than it receives.
+    This is important in physically based rendering and raytracing to
+    ensure the illumination in the scene does not increase as the
+    number of raytracing bounces increases. For example, a surface
+    that reflects twice as much light as it receives (by turning off
+    __Conserve Energy__ and setting the __Specular Intensity__ to 2)
+    would produce a unnaturally bright render as you increase the
+    __Reflect Limit__.
+
+    This setting conserves energy by scaling the BSDF by the inverse
+    of its reflectivity when the node detects the reflectivity is
+    greather than 1. This reduces all components of the surface model
+    by the same factor, linearly darkening of the surface.
+
+    You can calculate the total reflectivity of a surface (assuming
+    __Fresnel Blending__ is off) by summing the __Diffuse Intensity__,
+    __Specular Intensity__ (for each layer) and __Refraction
+    Intensity__. For predictable results, you should try to conserve
+    energy manually by limiting the intensity or reflectivity
+    parameters.
+
+Fresnel Blending:
+    #id: fres_enable
+
+    Turns on Fresnel blending, where the reflection and/or refraction
+    amount varies based on the viewing angle to the surface. This
+    allows you to simulate materials such as glass and water. You can
+    control the proportion of Fresnel blending for each component
+    through the "minimum" parameters on the different tabs (for
+    example, __Diffuse Minimum__ on the __Diffuse__ tab).
+
+    Diffuse and Refract components use the transmissive component for
+    Fresnel blending, while Reflect components use the reflective
+    component.
+
+Fresnel Style:
+    #id: fres_style
+
+    How the Fresnel blending factor is calculated, either from
+    parameters or the `Fresnel` input.
+
+    Physically Based:
+        Calculate Fresnel factors from the __Inside IOR__ and
+        __Outside IOR__ parameters. These parameters let you simulate
+        the Fresnel properties of real-world physical materials/media
+        by entering their _index of refraction_ values.
+
+    Use Connected `fresnel`:
+        Use the `Fresnel` input if it is connected. The `fresnel`
+        input should be the reflective Fresnel coefficient. The
+        transmissive component will be calculated automatically as
+        1-Fresnel.
+
+        If the `fresnel` input is not connected, uses __Inside IOR__
+        and __Outside IOR__ blending instead.
+
+Ensure Faces Point Forward:
+    #id: facefwd
+
+    Automatically flip normals if necessary so planal surfaces are
+    diffuse shaded the same way regardless of normal direction. This
+    setting does not apply to refractions and Fresnel reflections
+    since they rely on the normal direction to define inside and
+    outside for Fresnel blending.
+
+    NOTE:
+        If normal maps exported from another software package look strange with this option on, it may be because the normal map was output with flipped normals.
+
+[Include:computetan#tan_style]
+
+Max Ray Distance:
+    #id: maxdist
+
+    For reflections and refractions in non-[PBR|/render/pbr]
+    renders, treat rays that travel farther than this distance (in
+    Houdini world space units) without intersecting any geometry as
+    missed rays.
+
+
+@inputs
+
+None of these inputs need to be connected for correct operation of the
+Surface Model node - when left disconnected, the correspondingly named
+global variable or attribute will be bound automatically.
+
+P:
+    Surface position, used as the origin for raytracing operations
+    from the surface.
+
+N:
+    Surface normal. You can override `N` to enable bump mapping.
+
+I:
+    Incident ray direction.
+
+uv:
+    Parametric coordinate, for tangent vector calculation when the
+    __Tangent Style__ is set to "Compute From UV". When disconnected,
+    the "uv" parameter will be assumed.
+
+utan:
+    U Tangent vector to use when __Tangent Style__ is "Use Connected
+    utan, vtan".
+
+vtan:
+    V Tangent vector to use when __Tangent Style__ is "Use Connected
+    utan, vtan".
+
+fresnel:
+    Reflective fresnel blending coefficient to use when __Fresnel
+    Style__ is "Use Connected fresnel".
+
+@outputs
+
+The output values can be connected to the output variables in the
+surface context of the same name.
+
+Cf:
+    The shaded, lit surface color for use in micropolygon rendering
+    and raytracing rendering engines.
+
+Of:
+    The surface opacity.
+
+F:
+    The surface BSDF.
+
+@related
+
+- [Node:vop/brushedmetalshader]
+- [Node:vop/carpaintshader]
+- [Node:vop/glass]
+- [Node:vop/principledshader]
+- [Node:vop/layercomp]
+- [Node:vop/layermix]
+- [Node:vop/layerpack]
+- [Node:vop/layerunpack]
+- [Node:vop/setlayercomponent]

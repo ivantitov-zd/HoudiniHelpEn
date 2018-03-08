@@ -1,0 +1,182 @@
+﻿= Attribute Randomize =
+
+#type: node
+#context: sop
+#internal: attribrandomize
+#icon: SOP/attribrandomize
+#tags: attrs, random
+
+"""Generates random attribute values of various distributions."""
+
+== Overview ==
+
+This node generates random values to create or modify an attribute.
+
+Turn on the __Visualize as Points__ toggle to preview the probability distribution as a generated point cloud whose positions are drawn from the distribution.
+
+@parameters
+
+Group:
+    #id: group
+
+    The subset of geometry whose attribute should be modified.
+
+    This can be a point, vertex, primitive, or edge group.  If necessary, it will be expanded to a point, vertex, or primitive group, depending on the value of __Attribute Class__.
+    If the input geometry doesn't have the specified attribute, geometry elements outside the group will get the value zero.
+
+Group Type:
+    #id: grouptype
+
+    The type of group that __Group__ specifies.
+
+    If __Guess from Group__ is specified and the group type is ambiguous, the guess is made that __Group__ specifies a point group.
+
+Attribute Class:
+    #id: class
+
+    The type of elements for which to create or modify the attribute specified by, __Attribute Name__.
+
+Attribute Name:
+    #id: name
+
+    The name of the attribute to create or modify.
+
+    It will be added to the type of elements specified by __Attribute Class__.
+
+Operation:
+    #id: operation
+
+    Specifies how to modify existing attribute values.  If the attribute doesn't already exist, this should be __Set Value__.
+
+    __Set Value__ means that the generated value will be written over the existing attribute value.
+    __Add Value__ means that the generated value will be added to the existing attribute value.
+    __Minimum__/__Maximum__ means that the final attribute value will be the minimum/maximum of the generated value and the existing attribute value.
+    __Multiply__ means that the existing attribute value will be multiplied by the generated value.
+
+Global Scale:
+    #id: scale
+
+    Scales the generated value just before applying the operation specified by __Operation__.
+
+== Distribution ==
+
+Distribution:
+    #id: distribution
+
+    Overall type of probability distribution from which values are generated.
+
+    Constant Value:
+        The generated values will all be the specified value, instead of being random.
+    Two Values:
+        The generated values will either be __Value A__ or __Value B__, depending on __Probability of Value B__.
+    Uniform (Continuous):
+        The generated values will be between __Min Value__ and __Max Value__, with equal probability for all values in that range.
+    Uniform (Discrete):
+        The generated values will be between __Min Value__ and __Max Value__ (inclusive), landing only on values that are some
+        multiple of __Step Size__ greater than __Min Value__.
+
+        [Image:/images/nodes/sop/attribrandomize/uniform_2d.jpg]
+
+    Direction or Orientation:
+        The generated values will be unit vectors (i.e. length 1) with the specified number of __Dimensions__.
+        The samples will be uniform random unit vectors, within any __Cone Angle__ of __Direction__, unless __Bias Toward Direction__ is used.
+
+        NOTE:
+                For 4 __Dimensions__ that __Cone Angle__ is the maximum quaternion rotation angle away from __Direction__, which is twice the Euclidean cone angle of the unit 4D hypersphere being sampled.
+
+        [Image:/images/nodes/sop/attribrandomize/direction_cone.jpg]
+        [Image:/images/nodes/sop/attribrandomize/direction_bias.jpg]
+        [Image:/images/nodes/sop/attribrandomize/orientation_cone.jpg]
+
+    Inside Sphere:
+        The generated values will be vectors with length less than 1, i.e. inside the unit sphere, with the specified number of __Dimensions__.
+        The samples will be uniform random unit vectors, within any __Cone Angle__ of __Direction__, unless __Bias Toward Direction__ is used.
+
+        [Image:/images/nodes/sop/attribrandomize/circle_slice.jpg]
+        [Image:/images/nodes/sop/attribrandomize/sphere_cone.jpg]
+
+    Normal (Gaussian):
+        The generated values will be drawn from the normal distribution whose mean/median is given by __Middle Value__,
+        and whose standard deviation is given by __Scale Around Middle__.
+
+        In multiple __Dimensions__, this distribution is naturally isotropic, i.e. rotationally symmetrical.
+
+        [Image:/images/nodes/sop/attribrandomize/normal_distrib.jpg]
+
+    Exponential:
+        The generated values will be drawn from the exponential distribution whose median is given by __Middle Value__.
+        The mean and the standard deviation are equal to the median divided by `ln(2)`.
+
+        [Image:/images/nodes/sop/attribrandomize/exponential_distrib.jpg]
+
+    Log-Normal:
+        The generated values will be drawn from the log-normal distribution whose median is given by __Middle Value__, and whose standard deviation is given by __Spread Around Middle__.  This distribution is useful for generating random scales, because its values are strictly positive, and it tapers off toward zero, helping avoid
+        scales that are too small or negative.
+
+        [Image:/images/nodes/sop/attribrandomize/lognormal_distrib.jpg]
+
+        The parameter μ, of the underlying normal distribution is `ln(median)`.
+        The parameter σ, of the underlying normal distribution is
+        `sqrt(log(0.5*(1 + sqrt(1 + 4*(stddev*stddev)/(median*median)))))`.
+
+    Cauchy-Lorentz:
+        The generated values will be drawn from the Cauchy distribution whose median is given by __Middle Value__, and whose scale parameter, γ, is given by __Scale Around Middle__.  This distribution has larger tails than the normal distribution, so it has more outliers, meaning that __Min Value__ and __Max Value__ will probably be useful for preventing problematic outliers.
+
+        With __Dimensions__ greater than 1, this samples the multi-variate Cauchy distribution, forcing the distribution to be isotropic, i.e. rotationally symmetrical.  For 2 __Dimensions__, this is the distribution of photons hitting a plane from a point light at `(0,0,scale)`.
+
+        [Image:/images/nodes/sop/attribrandomize/cauchy_distrib.jpg]
+
+    Custom Ramp:
+        The custom ramp will be sampled as the inverse cumulative distribution function (inverse CDF) of a probability distribution, and then scaled by __Fit Value 1 To__ minus __Fit Value 0 To__, and added to __Fit Value 0 To__.
+
+    Custom Discrete:
+        The specified values will be sampled with the specified weights, i.e. unnormalized probabilities.
+
+        Type:
+            Specifies whether to randomly sample from a list of __Float__ or __String__ values.
+
+        [Image:/images/nodes/sop/attribrandomize/discrete_example.jpg]
+
+== Options ==
+
+Visualize as Points:
+    #id: visualize
+
+    When enabled, the specified number of points are generated whose positions are sampled from the specified distribution, instead of modifying input geometry.
+    No input is needed when this is enabled.
+
+Visualize as Points:
+    #id: nvisualizepts
+
+    When enabled, the specified number of points are generated whose positions are sampled from the specified distribution, instead of modifying input geometry.
+    No input is needed when this is enabled.
+
+Fraction Attribute:
+    #id: fractionattrib
+
+    This gives a way of non-randomly sampling the distribution, by specifying locations in the uniform parametric space of the distribution, known as "quantiles".
+
+    For example, if the fraction attribute is 0.61 for some element, and the distribution is continuous and 1-dimensional, the resulting value should be greater than exactly 61% of samples, if one were to sample the distribution an infinite number of times.
+    For multi-dimensional distributions, the fraction attribute should have as many components as are needed to represent the distribution.
+    For example, when sampling directions in 3D, it should have size 2, corresponding (non-linearly) with longitude and latitude.
+
+Global Seed:
+    #id: seed
+
+    All generated values depend (psuedo)randomly on this value.  No two Attribute Randomize nodes in a scene should have the same value here, unless required, because the same or similar values may be generated if two are the same.  Choose a different value if the current seed produces samples that are from the right distribution, but happen to be undesirable samples.
+
+    This is not applicable when __Fraction Attribute__ is enabled.
+
+Seed Attribute:
+    #id: seedattrib
+
+    When disabled, the element number is used as a random seed for each element, in addition to the __Global Seed__ parameter.
+    When enabled, the specified attribute is used instead, which allows for consistent generation when deleting geometry, if using a consistent ID.
+    It also allows changing of seeds for just a subset of the elements, when only some samples are undesirable.
+
+    This is not applicable when __Fraction Attribute__ is enabled.
+
+@related
+
+- [Node:sop/attribwrangle]
+

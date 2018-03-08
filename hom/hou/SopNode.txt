@@ -1,0 +1,371 @@
+= hou.SopNode =
+#type: homclass
+#cppname: HOM_SopNode
+#superclass: hou.Node
+#group: geo
+
+"""Represents a surface node."""
+
+@methods
+
+::`geometry(self, output_index=0)` -> [Hom:hou.Geometry]:
+    #cppname: HOM_SopNode::geometry
+    Return the geometry computed by this SOP node.  If the SOP has not already
+    cooked, this method will cook the SOP.
+
+    The returned Geometry object is not frozen.  See [Hom:hou.Geometry#freeze]
+    for more information on frozen Geometry objects.
+
+    You can optionally specify the `output_index` argument to request the
+    geometry attached to another output on the node.  This only applies to SOP
+    nodes with multiple outputs.  If there is no geometry for the specified
+    output index then None is returned. 
+
+::`geometryAtFrame(self, frame, output_index=0)` -> [Hom:hou.Geometry]:
+    #cppname: HOM_SopNode::geometryAtFrame
+    Return the geometry computed by this SOP node cooked at the specified
+    frame.  If the SOP has not already cooked, this method will cook the SOP.
+
+    The returned Geometry object is frozen.  See [Hom:hou.Geometry#freeze]
+    for more information on frozen Geometry objects.
+
+    You can optionally specify the `output_index` argument to request the
+    geometry attached to another output on the node.  This only applies to SOP
+    nodes with multiple outputs.  If there is no geometry for the specified
+    output index then None is returned. 
+
+::`inputGeometry(self, index)` -> [Hom:hou.Geometry]:
+    #cppname: HOM_SopNode::inputGeometry
+    Return the geometry that is connected to the node input specified by `index`.
+
+    The returned Geometry object is not frozen.  See [Hom:hou.Geometry#freeze]
+    for more information on frozen Geometry objects.
+
+::`inputGeometryAtFrame(self, frame, index)` -> [Hom:hou.Geometry]:
+    #cppname: HOM_SopNode::inputGeometryAtFrame
+    Return the geometry that is connected to the node input specified by `index`
+    and at the specified frame.
+
+    The returned Geometry object is not frozen.  See [Hom:hou.Geometry#freeze]
+    for more information on frozen Geometry objects.
+
+::`selection(self, selection_type)` -> [Hom:hou.Selection]:
+    #cppname: HOM_SopNode::selection
+    Return the current component selection of the specified component type.
+
+    This method is deprecated now that component selections are once again
+    managed at the viewer level. See [Hom:hou.SceneViewer#currentGeometrySelection].
+
+::`setSelection(self, selection)`:
+    #cppname: HOM_SopNode::setSelection
+    Sets the current component selection to the supplied value. A separate
+    selection object is stored for each component type, so changing the
+    selection this way may not update the viewport if it is not currently set
+    to show this type of selection.
+
+    This method is deprecated now that component selections are once again
+    managed at the viewer level.  See [Hom:hou.SceneViewer#setCurrentGeometrySelection].
+
+::`curPoint(self)` -> Point:
+    #cppname: HOM_SopNode::curPoint
+    Return this node's current point.  You would typically call this method
+    from an expression on a node that iterates over a set of points and
+    re-evaluates the parameter for each point.
+
+    This method lets you implement the Python equivalent of Hscript's local
+    variables.  Many of Houdini's SOPs iterate over a set of points, and
+    for each point they store the current point and then evaluate a parameter.
+    If the parameter contains a local variable, Houdini looks up the SOP's
+    current point when evaluating that variable.  For example, the point SOP
+    evaluates the `t` parameter for each point, and sets that point's position
+    according to the value of the parameter.  If that parameter contains,
+    say, the local variable $TX, it will evaluate to the x position of the
+    current point.
+
+    This method gives you access to the [Hom:hou.Point] representation of
+    Houdini's current point.  Using this point you could evaluate the position,
+    an attribute value, or do more complex operations like compute the
+    distance from the point to the origin.
+
+    Raises [Hom:hou.OperationFailed] if you call this method from outside
+    a SOP parameter expression, or if the SOP does not support local variables.
+
+    The following lists Python equivalents for some point-related Hscript
+    expression local variables.  Note that you can also access local variables
+    from Python using [Hom:hou.lvar].
+    
+    {{{
+    #!python
+    # $PT (Hscript expression) or lvar('PT') (Python):
+    pwd().curPoint().number()
+
+    # $NPT (Hscript expression) or lvar('NPT') (Python):
+    len(pwd().geometry().iterPoints())
+
+    # $TX (Hscript expression) or lvar('TX') (Python):
+    pwd().curPoint().position()[0]
+
+    # $WEIGHT (Hscript expression) or lvar('WEIGHT`) (Python):
+    pwd().curPoint().position()[3]
+
+    # $CR (Hscript expression) or lvar('CR') (Python):
+    pwd().curPoint().attribValue("Cd")[0]
+
+    # $ID (Hscript expression) or lvar('ID') (Python):
+    pwd().curPoint().attribValue("id")
+
+    # $LIFE (Hscript expression) or lvar('LIFE') (Python):
+    pwd().curPoint().attribValue("life")
+
+    # $VX (Hscript expression) or lvar('VX') (Python):
+    pwd().curPoint().attribValue("v")[0]
+    }}}
+
+::`setCurPoint(self, point_or_none)`:
+    #cppname: HOM_SopNode::setCurPoint
+    Set this node's current point.  You can only call this method from
+    a Python-defined SOP.
+
+    See [Hom:hou.SopNode#curPoint] for an explanation of a SOP's current point.
+    You would use this method to set the current point from inside a SOP
+    written in Python, before you evaluate a parameter containing a local
+    variable referring to the current point.  See [Hom:hou.Geometry#globPoints]
+    for an example.
+
+    Note that you can set the current point to None.  In this case,
+    subsequent calls to [Hom:hou.SopNode#curPoint] will raise
+    [Hom:hou.OperationFailed].  After a Python SOP is done cooking, Houdini
+    will automatically set the current point back to None.
+
+    Raises [Hom:hou.OperationFailed] if called from outside a Python-defined
+    SOP.
+
+::`curPoint2(self)` -> Point:
+    #cppname: HOM_SopNode::curPoint2
+    #status: ni
+
+::`curPrim(self)` -> Prim:
+    #cppname: HOM_SopNode::curPrim
+    Return this node's current primitive.  You would typically call this method
+    from an expression on a node that iterates over a set of primitives and
+    re-evaluates the parameter for each primitive.
+
+    See [Hom:hou.SopNode#curPoint] for more information.
+
+    The following lists Python equivalents for some primitive-related Hscript
+    expression local variables.  Note that you can also access local variables
+    from Python using [Hom:hou.lvar].
+    
+    {{{
+    #!python
+    # $PR (Hscript expression) or lvar('PR') (Python):
+    pwd().curPrim().number()
+
+    # $NPR (Hscript expression) or lvar('NPR') (Python):
+    len(pwd().geometry().iterPrims())
+
+    # $NX (Hscript expression) or lvar('NX') (Python):
+    pwd().curPrim().attribValue("N")[0]
+    pwd().curPrim().normal()[0]
+
+    # $CR (Hscript expression) or lvar('CR') (Python):
+    pwd().curPrim().attribValue("Cd")[0]
+    }}}
+
+::`curPrim2(self)` -> Prim:
+    #cppname: HOM_SopNode::curPrim2
+    #status: ni
+
+::`setCurPrim(self, prim_or_none)`:
+    #cppname: HOM_SopNode::setCurPrim
+    Set this node's current primitive.  You can only call this method from
+    a Python-defined SOP.  See [Hom:hou.SopNode#setCurPoint] for more
+    information.
+
+::`curVertex(self)` -> Vertex:
+    #cppname: HOM_SopNode::curVertex
+    Return this node's current vertex.  You would typically call this method
+    from an expression on a node that iterates over a set of primitive
+    vertices and re-evaluates the parameter for each vertex.
+
+    See [Hom:hou.SopNode#curPoint] for more information.
+
+    Note that [Hom:hou.SopNode#curPrim] returns the primitive containing this
+    vertex returned by this method.
+
+    The following lists Python equivalents for some vertex-related Hscript
+    expression local variables.  Note that you can also access local variables
+    from Python using [Hom:hou.lvar].
+    
+    {{{
+    #!python
+    # $VTX (Hscript expression) or lvar('VTX') (Python):
+    pwd().curVertex().number()
+
+    # $NVTX (Hscript expression) or lvar('NVTX') (Python):
+    pwd().curPrim().numVertices()
+    }}}
+
+::`curVertex2(self)` -> Vertex:
+    #cppname: HOM_SopNode::curVertex2
+    #status: ni
+
+::`setCurVertex(self, vertex_or_none)`:
+    #cppname: HOM_SopNode::setCurVertex
+    Set this node's current primitive.  You can only call this method from
+    a Python-defined SOP.  See [Hom:hou.SopNode#setCurPoint] for more
+    information.
+
+    Note that setting the current vertex will also set the current primitive
+    to the primitive containing the vertex.
+
+::`curPointBoundingBox(self)` -> BoundingBox:
+    #cppname: HOM_SopNode::curPointBoundingBox
+    #status: ni
+
+::`curPointBoundingBox2(self)` -> BoundingBox:
+    #cppname: HOM_SopNode::curPointBoundingBox2
+    #status: ni
+
+::`curPrimBoundingBox(self)` -> BoundingBox:
+    #cppname: HOM_SopNode::curPrimBoundingBox
+    #status: ni
+
+::`curPrimBoundingBox2(self)` -> BoundingBox:
+    #cppname: HOM_SopNode::curPrimBoundingBox2
+    #status: ni
+
+::`displayNode(self)` -> Node:
+    #cppname: HOM_SopNode::displayNode
+    If this is a subnet SOP, return the SOP inside the subnet with its display
+    flag on.  Otherwise, return None.
+
+::`renderNode(self)` -> [Hom:hou.Node]:
+    #cppname: HOM_SopNode::renderNode
+    If this is a subnet SOP, return the SOP inside the subnet with its render
+    flag on.  Otherwise, return None.
+
+::`isBypassed(self)` -> `bool`:
+    #cppname: HOM_SopNode::isBypassed
+    #replaces: Exp:opflag, Cmd:opget
+    Return whether this node's bypass flag is on.
+
+::`bypass(self, on)`:
+    #cppname: HOM_SopNode::bypass
+    #replaces: Exp:opset
+    Turn this node's bypass flag on or off, making this node have no effect.
+
+::`isDisplayFlagSet(self)` -> `bool`:
+    #cppname: HOM_SopNode::isDisplayFlagSet
+    #replaces: Exp:opflag, Cmd:opget
+    Return whether this node's display flag is on.
+
+::`setDisplayFlag(self, on)`:
+    #cppname: HOM_SopNode::setDisplayFlag
+    #replaces: Exp:opset
+    Turn this node's display flag on or off.
+
+::`isRenderFlagSet(self)` -> `bool`:
+    #cppname: HOM_SopNode::isRenderFlagSet
+    #replaces: Exp:opflag, Cmd:opget
+    Return whether this node's render flag is on.
+
+::`setRenderFlag(self, on)`:
+    #cppname: HOM_SopNode::setRenderFlag
+    #replaces: Exp:opset
+    Turns this node's render flag on or off.
+
+::`isHighlightFlagSet(self)` -> `bool`:
+    #cppname: HOM_SopNode::isHighlightFlagSet
+    #replaces: Exp:opflag, Cmd:opget
+    Return whether this node's highlight flag is on.  When this flag is
+    turned on, Houdini displays portions of the geometry in yellow in
+    the viewport, to indicate the operations performed by this SOP.
+
+::`setHighlightFlag(self, on)`:
+    #cppname: HOM_SopNode::setHighlightFlag
+    #replaces: Exp:opset
+    Turn this node's highlight flag on or off.
+
+::`isTemplateFlagSet(self)` -> `bool`:
+    #cppname: HOM_SopNode::isTemplateFlagSet
+    #replaces: Exp:opflag, Cmd:opget
+    Returns whether this node's template flag is on.  Templated SOPs are
+    display as wireframe in the viewport, and you cannot select geometry
+    from them.
+
+::`setTemplateFlag(self, on)`:
+    #cppname: HOM_SopNode::setTemplateFlag
+    #replaces: Exp:opset
+    Turns this node's template flag on or off.
+
+::`isSelectableTemplateFlagSet(self)` -> `bool`:
+    #cppname: HOM_SopNode::isSelectableTemplateFlagSet
+    #replaces: Exp:opflag, Cmd:opget
+    Return whether this node's selectable template flag is on.  A selectable
+    template displays like the display SOP in the viewport, and you can
+    select it when choosing points, primitives, etc.  Note that only the
+    display SOP will be included in the containing geometry object or
+    SOP subnet, however, so selectable templates are only visible while
+    working inside their SOP network.
+
+::`setSelectableTemplateFlag(self, on)`:
+    #cppname: HOM_SopNode::setSelectableTemplateFlag
+    #replaces: Exp:opset
+    Turn this node's selectable template flag on or off.
+
+::`isHardLocked(self)` -> `bool`:
+    #cppname: HOM_SopNode::isHardLocked
+    #replaces: Exp:opflag, Cmd:opget
+    Return whether this node is hard-locked.  A hard-locked node stores
+    its data inside the node, and no longer responds to parameter or input
+    node changes.
+
+::`setHardLocked(self, on)`:
+    #cppname: HOM_SopNode::setHardLocked
+    #replaces: Exp:opset
+    Turn this node's hard-lock flag on or off.  Locking a node saves its
+    current cooked geometry into the node.  If you unlock a hard-locked
+    node, it will discard its locked geometry data and recook, computing its
+    geometry from its inputs and parameters.
+
+::`isSoftLocked(self)` -> `bool`:
+    #cppname: HOM_SopNode::isSoftLocked
+    #replaces: Exp:opflag, Cmd:opget
+    Return whether this node is soft-locked.  A soft-locked node stores
+    position delta information
+    , preventing all but a small set of
+    manual modeling changes from being made.
+
+::`setSoftLocked(self, on)`:
+    #cppname: HOM_SopNode::setSoftLocked
+    #replaces: Exp:opset
+    Turns this node's soft-lock flag on or off, allowing a subset of manual
+    modeling changes to be made to the locked node.
+
+::`isUnloadFlagSet(self)` -> `bool`:
+    #cppname: HOM_SopNode::isUnloadFlagSet
+    #replaces: Exp:opflag, Cmd:opget
+    Returns whether this node's unload flag is on.
+
+::`setUnloadFlag(self, on)`:
+    #cppname: HOM_SopNode::setUnloadFlag
+    #replaces: Exp:opset
+    Turns this node's unload flag on or off.
+
+::`memorySizeInBytes(self)`:
+    #cppname: HOM_SopNode::memorySizeInBytes
+    #status: ni
+
+::`createEditSopFromThisTo(self, sop_node, look_for_deforms=False)`:
+    #cppname: HOM_SopNode::createEditSopFromThisTo
+    #status: ni
+
+::`hasVerb(self)` -> Boolean:
+    #cppname: HOM_SopNode::hasVerb
+    Returns if the node has a verb represenation.
+
+::`verb(self)` -> [hou.SopVerb]:
+    #cppname: HOM_SopNode::verb
+    Returns the verb associated with a specific node.  This allows you to
+    run the nodes operation on geometry independently of the node itself.

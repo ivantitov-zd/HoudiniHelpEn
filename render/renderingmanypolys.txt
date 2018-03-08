@@ -1,0 +1,87 @@
+= Render with a large number of polygons =
+
+The following tips explain ways to optimize rendering for scenes with high polygon counts (30-300 million polygons).
+
+* Make sure you're using [packed primitives|/model/packed] wherever possible (see [geometry|#geometry] above). This is the simplest and yet _most effective_ way to optimize rendering. Using packed references to geometry on disk (usually Alembic files), or procedural geometry shaders, allows the renderer to stream the geometry from disk as needed, and discard it when finished, rather than loading and retaining the geometry in memory. This makes rendering faster.
+
+* Spatially subdividing your geometry works very well if all of the objects have non-overlapping bounding boxes, as it allows each spatial voxel to work on a small subset of objects. However, when many objects have overlapping polygons, there is no way to sub-divide the bounding boxes to limit the number of primitives tested. Optimizing spatial subdivision structures makes rays move faster through objects. Rays are more efficient because they have to do less work when looking for objects. 
+
+* Similar to spatial subdivision, the idea is to have objects separated in space so that their bounding boxes do not overlap.
+
+    For example, a scene containing buildings on a grid will typically have each building object spatially separated from the other buildings, whereas a scene with a bowl of fruit where each piece of fruit is an separate will typically have lots of overlapping objects. If you were to send a shadow ray from the table through the bowl of fruit, you would end up having to test all the pieces of fruit, since their bounding boxes overlap.
+    
+    You could try merging all of the objects into a single object so that mantra can do better optimization on the primitives in the single object.
+    
+    You could also try ray predicing. When objects are included in ray-predicing, they are all processed before any rays are sent. All pre-diced objects are automatically put into a single object by mantra. This can make ray-tracing significantly faster, at the cost of memory consumption.
+
+* Displacement bounds do not shrink correspondingly when you split a primitive into two primitives. Therefore, displacement bounds will result in overlapping primitives, which means that each ray has to do more work. The following are ways of dealing with this problem to make ray-tracing more efficient:
+
+    * Try turning off __True Displacements__ and __True Ray-Displacements__. This treats displacements as bump maps (that is, it does not create new geometry). If the look is acceptable, it will be much faster.
+
+    * Don't use big displacements. If you have a displacement bound set to 0.1 and your polygons are 0.01 units in size, you will end up with potentially between 100 and 1000 with overlapping bounding boxes. By keeping displacement bounds small, you can minimize the overlap.
+
+    * Use ray-predicing. Turning on ray-predicing will cause all displacement shaders to be run before rendering begins. This allows for optimal subdivision structures to be built since mantra already knows the exact position of displaced polygons when rendering begins. Unfortunately, using this option can balloon memory usage, since dicing is normally resolution-dependent (i.e. larger images will use more memory).
+
+    * Use perfect bounding boxes. Similar to predicing, this will run the displacement shaders before the rendering begins when the building the spatial subdivision structures, resulting in efficient ray-tracing. However, it will not keep the diced polygons around afterward. The memory usage will be better, but geometry will have to be regenerated when rendering is performed.
+
+* When displacement shading, mantra will cache the geometry in case it needs to be traced against again. However, mantra cannot keep all of the geometry in memory at once so it throws geometry out of the cache. Mantra defaults to keeping approximately 32 MB of displaced geometry in RAM at one time. By increasing the size of the geometry cache, mantra will do a lot less work re-dicing displaced geometry. If you have a lot of RAM, use ray predicing since it forces all of the geometry to be cached for the duration. Otherwise, changing the cache size to something reasonable for your system.
+
+* Simplify the objects rays intersect. This can be done by limiting the intersection scope of the rays or by using proxy geometry from ray-tracing.
+
+    * Scoping: Choosing a scope of objects to intersect against allows mantra to build slightly more efficient high-level subdivision structures. Therefore, if a ray is not going near the intersecting object, mantra can quickly cull that ray.
+    
+    * Max ray distance: Sometimes you can use the maximum ray distance to limit the scope of objects being intersected against. This is a parameter on the VEX functions and has to be written into shaders. When performing ambient occlusion, for example, you might only want to check against objects which are relatively close to the surface you are shading.
+    
+    * Proxy geometry: By using phantom objects, combined with scoping, you can "fake" objects. For example, rather than a bowl of fruit, put a card with a texture map in as a phantom object. Primary rays will still hit the real bowl of fruit, but refractions through the glass of wine will hit the single polygon card, which is a lot more efficient. Phantom is only supported at the object level.
+        
+    * Adjusting the shading quality: The idea here is to make slightly larger primitives when ray-tracing, resulting in fewer primitives to ray-trace against. To control shading quality, adjust the __Rays Shading Quality__ parameter. The ray-measurer can also be used to tweak this behavior. Adjusting the z-importance will cause more or fewer divisions in the Z direction. Fewer would be more efficient.
+
+* Aside from making rays faster, the only other way to speed up ray-tracing is to send fewer rays. While raytracing is almost always preferable to using maps in terms of quality, for extremely complex scenes using maps can be necessary.
+
+    * Shadow maps: Using shadow maps instead of raytraced shadows is particularly important when volume rendering. Each volume is evaluated N times for each sample when generating a shadow map. When performing shadow evaluation, it is a texture map lookup (which may or may not be more expensive than a volume evaluation). Each pixel in the main image has M volume evaluations when performing ray-traced shadows. However, each of those volume evaluations has N (or some fraction of N) evaluations for shadow evaluation. This is M*N operations. Non-volume rendering can also benefit from shadow maps, since typically sending a ray is more expensive than performing a map lookup.
+
+    * Reflection maps: Reflection Maps are similar to shadow maps, but are typically only useful for environment lighting since there are unreconcilable issues with local illumination and environment maps.
+
+    * Limit ray-bounces: If limiting the ray-bounces is too tricky, consider changing the ray weight parameter. If shaders are written correctly, the expected contribution of each ray will be available and only rays which will contribute more than the weight specified will be traced.
+    
+    * Environment map lighting (HDRI Lighting): Use the environment light object rather than writing your own shader. The environment map light will perform an analysis on the texture map and optimize sampling of the environment.
+
+* When a shader sends a ray, the ray can start from anywhere and go to anywhere. This means that it is impossible for mantra to predict if a ray is going to intersect geometry at some future time. At the current time, if a ray ever hits a procedural, the procedural is flagged as being ray-traced and its geometry is retained. This means that you can not ray-trace 300 million polygons unless you have a 64 bit machine. It might be possible to render smaller scenes, but mileage may vary.
+
+* Mantra offers a few procedural shaders out of the box, with the ability to write custom procedural geometry using the HDK. It should be noted that unless you specify a bounding box for the procedural, mantra has no idea how big the geometry is and may run the procedural as if it were specified in the IFD. For all intents and purposes, this defeats the benefits of the procedural.
+    
+    * The File Procedural (delayed geometry load), will load geometry from disk on demand. You must specify the bounding box for the file, otherwise the procedural will load the geometry during IFD processing. This defeats the purpose of the procedural.
+            
+        The file procedural has two modes of operation. When __Share Geometry__ is toggled on, the geometry loaded will be shared amongst other instances of this procedural. This is useful when you have one piece of heavy geometry that's instanced many times. Rather than loading the geometry multiple times, mantra will load the geometry once and share the geometry amongst all procedurals. 
+            
+        However, this means that mantra needs to hold onto the geometry for the duration of the render. The alternative (when __Share Geometry__ is turned off), is that mantra will load the geometry for the procedural on demand, and then free the geometry after the fact. This can have a large impact on the rendering footprint. 
+            
+    * The Program Procedural: It is possible to have mantra run an external program to generate geometry. One advantage of this approach is that the program can perform differently based on the visual level of detail of the procedural. The program string is scanned for %LOD which is then replaced with the level of detail of the object.
+    
+        Your program could be a simple shell script which uses different geometry based on the level of detail in screen space. For example, if you have a 1 million polygon spaceship model which is crammed into 4 pixels of screen space, you might consider using a lower polygon count model in this case.
+
+* Approaches to minimizing cached geometry include:
+
+    * Rendering in strips and compositing the resulting image:
+        Using the camera crop channels, you can render a strip of the image. This might be a column or row, but the idea is to minimize the amount of geometry mantra keeps in cache.
+        
+        The problem that this attempts to solve is that when the first tile of a scanline gets rendered, it may have some primitives which are retained until the tile above it gets rendered. For a very large x-resolution, this can result in the overlapping primitives being held for a long time. By breaking the image into vertical strips, the memory is not held on as long.
+    
+    * Varying bucket-size 
+        What may be surprising is that a larger bucket size may result in a smaller memory footprint. Since the larger bucket will have fewer overlapping primitives, there may be more memory which can be freed after the tile finishes.
+        
+    * Instead of splitting the image into strips in screen space (rendering strips), it may also be possible to split the image spatially. By breaking up the scene into a sub-set of objects (say background and foreground objects), it may be possible to render these sub-sets with better memory performance. The images can then be composited together to form the final image.
+    
+    * Using the phantom channels allows objects to appear in ray-tracing, but not be visible to the camera. This allows proxy geometry to be used providing the actual geometry is turned off for ray-tracing.
+
+* The term Depth Complexity refers to how many primitives are stacked in Z at a particular point in screen space. For example, a single polygon in the scene would have a depth complexity of 1 (or 0 for pixels that the polygon doesn't cover). A box will have a depth complexity of 2 (one for the front surface, and one for the back surface). The greater the depth complexity, the greater the processing and memory use.
+
+    However, objects which are entirely occluded by foreground primitives can be culled by mantra, so that mantra can minimize work and memory when objects are fully occluded. However, the only way mantra knows whether a primitive is occluded is by evaluating its bounding box.
+    
+    So, if you think of two circles which are right behind each other, as a human you would be able to say that the background circle wouldn't need any processing. However, mantra only knows about the bounding box of the background circle. Since the foreground circle does not occlude the entire bounding box, the background circle needs to be processed.
+    
+    In many cases, this will result in the background primitive being split and some of the split primitives being discarded, but it is still possible to end up with additional processing.
+    
+    Depth complexity can become a serious issue when it come to transparency. Consider a stack of semi-transparent sprites. Each sprite is 50% opaque, but there are 1000's of sprites stacked into a single pixel. The compositing over operation states that the contribution of the 2nd sprite will only be 0.5, the third sprite 0.25, the fourth 0.125, etc. So, by the 10th sprite, it will only be contributing 0.0001 to the pixel color. The opacity threshold (`vm_opacitythresh`) can be used to specify a threshold at which the accumulated opacity is considered complete. For example, setting the threshold to 0.99 would limit the number of sprites processed in the above example.
+    
+    For each tile, mantra needs to store a certain amount of information for each sample of each pixel. Therefore, the memory used is a function of: depth complexity, pixel samples, and bucket size.

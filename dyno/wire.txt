@@ -1,0 +1,141 @@
+= Simulating ropes, wires, and other bendable objects =
+
+== Overview ==
+
+Wire simulations are useful for simulating anything long and flexible, for example grass, fur, or even scaffolding. When wire objects are used with constraints, they can be used to simulate things such as ropes swinging, bungee jumping cords springing, or a tail of a kite, as well as for effects like a structure of collapsing girders.
+
+{Pic}
+
+Houdini's wire solver is quite fast. It's often worth trying to find ways to use the wire solver to achieve effects involving bending or springy objects, because it's so fast.
+
+== How to ==
+
+:task:Create a field of curves to use as wires:
+    Creating a field of wires is really just creating a field of _curves_ at the geometry (SOP) level and then importing that geometry into a dynamics network with the [Icon:DOP/wireobject][Wire Object|Node:dop/wireobject] node.
+
+    One way to create a field of curves at the SOP level is:
+    
+    # Use the [Icon:SOP/grid] [Grid|Node:sop/grid] tool on *Create* shelf tab to create a plane and size it to the scale you want for your field.
+    
+    #  [Icon:VIEW/display_points] [Turn on the display of points|/basics/view] in the viewer using the toolbar on the right side of the viewer.
+    
+    # You can just use the points of the grid as the locations for the curves if you want ordered rows and columns of curves, or you can scatter an arbitrary number of points across the grid.
+    
+      - If you want ordered rows and columns of curves, use the __Rows__ and __Columns__ parameters on the Grid node to set them up.
+    
+      - To scatter points across the grid, use the [Icon:SOP/scatter][Scatter|/shelf/scatter] tool on the *Model* shelf tab with the grid object selected, and set the __Number of points__ parameter to the number of curves you want in your field.
+    
+    # Draw a curve starting at the bottom (that is, at the point you want to touch the field plane).
+    
+    # Use the [Icon:SOP/copy] [Copy to points|/nodes/sop/copy] tool on the *Modify* shelf tab to copy the curve onto the points.
+    
+      [Image:/images/wire_field.png]
+    
+    # Use the [Icon:DOP/wireobject] [Wire Object|/shelf/wireobject] tool on the *Wires* shelf tab to turn the curve field into simulated wires.
+    
+    {Pic}
+
+:task:Convert an object to wires:
+    # Select the object containing the curves you want to use as wires.
+    
+    # On the __Wires__ tab, click the [Icon:DOP/wireobject] [Wire object|Node:dop/wireobject] tool.
+    
+    See [configuring wires|#configure] below.
+    
+:task:Constrain wire points:
+    The tools on the __Wires__ shelf tab let you set up constraints on the positions of wire points.
+
+    To pin to a position in space, use the [Icon:SHELF/wirepinconstraint] [/shelf/wirepinconstraint] or [Icon:SHELF/wirespringconstraint] [/shelf/wirespringconstraint].
+
+:task:Pin wires to a simulated object:
+    # Set up the wire object and the "goal" dynamic object (such as an RBD object) you want to attach the wires to.
+    
+    # On the __Wire__ shelf tab, click [Icon:SHELF/sbdattachmentconstraint] [Attach Wire to Surface|/shelf/wireattachtosurface].
+    
+    # Click any of the wires in the wire object, or select the Wire Object node in the network editor, then press ((Enter)).
+    
+    # Select the points in the wire object you want to pin (usually the last point at the root of each wire, next to the surface), then press ((Enter)).
+    
+    # Press ((Enter)) to finish the tool.
+    
+    (see [the helpfor Attach Wire to Surface|/shelf/wireattachtosurface] for more on how to use the tool).
+    
+:task:Pin wires to a surface:
+    You can pin wire points to their positions in the source geometry with the `pintoanimation` or `gluetoanimation` point attribute. (`pintoanimation` locks the point's position, while `gluetoanimation` locks the point's position and normal.)
+    
+    In the wire source geometry network, create a [group|Node:sop/group] containing the root points, and use the [AttribCreate node|Node:sop/attribcreate] to create the attribute. Use the following settings:
+    
+    Group |
+        The name of the group containing the root points, such as `roots`.
+    Name |
+        `pintoanimation` or `gluetoanimation`
+    Class |
+        Point
+    Value |
+        `1`
+
+:task:Deform geometry based on a dynamics wire:
+    You can use a curve being controlled by a wire simulation to drive the deformation of a model. For example, you can model a snake and control it with a dynamics wire.
+    
+    Deforming geometry based on a dynamics wire is basically the same problem as [deforming geometry based on a curve|/character/facialrigging]. Create a control curve to represent the object you want to deform, and make it a simulated wire using the shelf tools. Add any constraints and forces you want to the simulated wire. 
+    
+    Then, create the [Icon:SOP/wirecapture][Wire Capture surface node|Node:sop/wirecapture] to capture the geometry you want to deform to the wire geometry. In the Wire Capture node's parameters, click the __Capture__ tab and set the __Min/Max weight__ to `1` and `1`. Connect the original curve to the Wire Deform node's second (rest) input and the DOP Import node (automatically created by the shelf tools to import the simulated wire's motion back onto the curve geometry) to the Wire Deform node's third (deformed) input.
+
+== Wire network ==
+
+TBD.
+
+== Configuring wires ==
+
+* Click the __Physical__ tab to set the physical properties of the wire. The density and width affect the overall mass of the wire. The width also affects collisions. You can also set these (as well as per-point mass) through attributes on the source geometry.
+
+* The __Linear spring constant__ is the wire's resistance to stretching. Decrease this value to make the wire more stretchy.
+
+* The __Angular spring constant__ is the wire's resistance to bending. Decrease this value to make the wire looser, or increase it to make the wire more stiff.
+
+* To get a completely loose wire (like a rope or string), set __Angular spring constant__ to 0. However, when __Angular spring constant__ is 0, you must add an __Angular damping constant__ (such as `0.001`). If both __Angular spring constant__ and __Angular damping constant__ are `0`, the wire can go crazy.
+
+* To simulate "fat" wires, change the __Width__ on the Wire Object node's __Physical__ tab. This affects the mass of the wires (it is multiplied by the __Density__) as well as collisions with other objects. You can visualize the width of the wires by turning on __Width__ on the Wire Object's __Visualization__ tab. This displays the wires as tubes in the viewport.
+
+* To set physical properties per-point, use [point attributes|#point] on the source geometry (see below).
+
+* To have the wires in a wire object collide with themselves and each other, turn on __Self collisions__ on the Wire Object's __Collisions__ tab. This will slow down the simulation but not by much. If you still find fast moving wires are interpenetrating, turn up the __Minimum Substeps__ parameter on the Wire Solver DOP.
+
+== Useful point attributes == (point)
+
+You can override or scale (depending on the attribute) the default properties set up by the Wire Object node using point attributes on the wires. See the [Icon:DOP/wireobject][Wire Object|Node:dop/wireobject] help for a list of [attributes|/model/attributes] used by wires. 
+
+The wire solver uses the values of the attributes if they are present on the wire geometry, otherwise it uses the defaults defined by the parameters of the [Icon:DOP/wireobject][Wire Object|Node:dop/wireobject] node.
+
+`pintoanimation`:
+    Setting this to `1` on a point will prevent the wire solver from affecting the point's position, meaning it will use its position any any animation from the source geometry.
+    
+    This is very useful to anchor root points on an object, and have them follow the object's animation.
+
+`gluetoanimation`:
+    Like `pintoanimation`, but in addition to position it uses the point's normal in the source geometry to orient the wire.
+
+The wire solver automatically keeps the point position and the `v` (velocity) point attribute, `angvel` (angular velocity) attribute, and `orient` (orientation quaternion) attribute up to date.
+
+== Example: toppling scaffolding ==
+
+# Build your scaffolding using [Icon:SOP/curve][curves|Node:sop/curve] or [Icon:SOP/line][lines|Node:sop/line].
+
+# Convert your curves or lines to wire objects using the [Icon:DOP/wireobject][Wire Object|/shelf/wireobject] tool on the Wires tab of the shelf.
+
+# Use either a [Icon:SHELF/wirepinconstraint][Wire Pin Constraint|/shelf/wirepinconstraint] or a [Icon:SHELF/wirespringconstraint][Wire Spring Constraint|/shelf/wirespringconstraint] to constrain the points of the pieces of scaffolding together.
+
+# If you used a wire pin constraint, [keyframe|/anim/basics] when the constraint should break by changing the __Activation__ to 0.
+
+    If you used a wire spring constraint, you can either [keyframe|/anim/basics] when the constraint should break by changing the __Activation__ to 0 or set a __Maximum Force__ or __Maximum Length__ on the __Spring__ tab of the parameter editor. Once the spring reaches the maximum force or length the constraint will break.
+
+   NOTE:
+        Using a [Icon:SHELF/wirespringconstraint][Wire Spring Constraint|/shelf/wirespringconstraint] will allow you to set a __Maximum Force__ or __Maximum Length__ on the __Spring__ tab in the parameter editor to indicate when the constraint should break. However, the [Icon:SHELF/wirepinconstraint][Wire Pin Constraint|/shelf/wirepinconstraint] does not have these parameters.
+        
+# Create a [Icon:DOP/rbdobject][Rigid Body Object|/shelf/rbdobject] that will bump into the scaffolding.
+
+# Apply [Icon:DOP/gravity][Gravity|/shelf/gravityforce] to the objects in your scene to make them look as if they are falling naturally.
+
+[Image:/images/dynamics/wire_scaffolding.png]
+
+

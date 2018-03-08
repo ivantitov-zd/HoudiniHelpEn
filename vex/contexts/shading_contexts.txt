@@ -1,0 +1,223 @@
+= Shading context information =
+
+The shading [contexts|/vex/contexts/] share many common attributes. Each context
+represents a different stage in the rendering pipeline. Displacement
+shading is done first, followed by surface shading, then
+fog/atmosphere shaders. During surface and fog shading, light
+and shadow shaders may be run in order to compute illumination.
+
+NOTE:
+    All available variables in all the shader contexts are in world (camera) space.
+
+
+== Optional intersection scoping parameter == (scope)
+
+When sending rays, the list of objects to intersect against are
+typically limited by a "scope", set in the Houdini UI. For example,
+sending a reflection ray will limit the objects which are tested for
+ray-intersection to the objects which match the reflection mask of the
+reflective object.
+
+You can override which objects to test in the following functions:
+
+Function ||
+    Default light/shadow scope ||
+        Default surface scope ||
+
+[Vex:fastshadow] |
+    Light shadow |
+        Object reflection
+
+[Vex:filtershadow] |
+    Light shadow |
+        Object reflection
+
+[Vex:rayhittest] |
+    Light shadow |
+        Object reflection
+
+[Vex:reflectlight] |
+    Object reflection |
+        Object reflection
+
+[Vex:refractlight] |
+    All objects (`"*"`) |
+        All objects (`"*"`)
+
+[Vex:trace] |
+    Object reflection |
+        Object reflection
+    
+[Vex:irradiance] |
+    Object reflection |
+        Object reflection
+
+[Vex:occlusion] |
+    Light shadow |
+        Object reflection
+
+For example,
+
+{{{
+#!vex
+Cr = reflectlight(bias, max_contrib, "scope", "geo1,geo2");
+}}}
+
+...will only cause objects "geo1" and "geo2" to be picked up in the
+reflections.
+
+All Houdini scoping patterns (excepting group expansion) are supported:
+
+* `*` - wild-card match
+
+* `?` - single character match
+
+* `^` - exclusion operator
+
+* `[list]` - character list match
+
+An empty string will set the scope to nothing.
+
+Examples:
+
+* `geo*` - Matches all objects starting with "geo"
+
+* `geo*,^geo2` - Matches all objects starting with "geo" except "geo2".
+
+* `leg*,arm[123]` - Matches all objects starting with "leg" as well as
+  "arm1", "arm2", and "arm3".
+
+
+== How the L variable is set == (lvar)
+
+This explains how VEX sets the initial value of `L` (light direction) in
+the Light and Shadow contexts. Although Houdini provides a value as
+explained below, you can set `L` to any value.
+
+In Houdini, lights can have _orthographic_ or _perspective_ projections.
+An orthographic light represents an infinite (or very distant) light
+source with parallel light rays. A perspective light represents a point
+light source with radiating light rays.
+
+When a perspective light shader runs, VEX sets L to `P - Ps`, where the
+`P` variable contains the position of the light source and the `Ps`
+variable contains the position of the surface point being shaded.
+
+Orthographic lights, on the other hand, are initialized so that the
+direction of L is the same for each light ray emanating from the light
+source: `L = Lz * dot(Lz, P - Ps);`, where the `Lz` variable contains
+the normalized "z-axis" of the light source (that is, a unit vector
+pointing down the z-axis in the space of the light). So the scale of the
+L variable will be the orthographic distance from the plane of the light
+source and the surface point being shaded.
+
+
+== Opacity vs. alpha == (opacity)
+
+In the surface shading context, there are two separate variables to
+control transparency: `Of` (opacity) and `Af` (alpha) are related, but
+represent different things.
+
+`Of` represents the opacity of the surface, when mantra resolves
+surface colors. For example,
+
+{{{
+#!vex
+Of = {1, 1, 1}
+}}}
+
+...makes a fully opaque surface the will occlude surfaces behind it.
+
+{{{
+#!vex
+Of = {0.5, 0.5, 0.5}
+}}}
+
+...makes a partially transparent surface.
+
+{{{
+#!vex
+Of = {1, 0, 0}
+}}}
+
+...makes the surface opaque to red, but pass through green and blue
+light. This creates a cyan-colored gel.
+
+`Af` controls the alpha channel of the output pixel in an RGBA image.
+If a shader doesn't set `Af`, mantra uses the default formula,
+
+{{{
+#!vex
+Af = avg(Of)
+}}}
+
+However, if you set this variable explicitly, the shader can control the
+value of the alpha channel of the output image. This lets you write
+shaders like "matte" or "shadowmatte".
+
+For example, the following shader simulates a blue screen effect:
+
+{{{
+#!vex
+surface bluescreen(vector clr=0)
+{
+    Cf = clr;
+    Of = 1;
+    Af = 0;
+}
+}}}
+
+The default surface color is black (`vector clr=0`). The shader sets
+opacity to 1, meaning this surface will occlude other surfaces.
+However, the alpha value of the pixels in the output image
+corresponding to this surface will be 0 (fully transparent).
+
+If you composite the output image over another image, the background
+image will be visible through the hole this surface left. You can
+use this technique to, for example, create a window in a wall
+without modifying the geometry.
+
+You can set `Af` to a fractional number between 0 and 1 to create
+partially transparent areas in the output image.
+
+NOTE:
+    The default for `occlusion()` is to use closest sample filtering. To handle transparency, pass it the option: "samplefilter", "opacity". This is also handled by the environment light asset, using the __Transparent Shadows__ toggle when in __Ambient Occlusion__ mode. 
+
+
+== Special variables ==
+
+There are several "special" variables you can give as parameters to
+shaders in the shading contexts. Typically, these are export
+parameters.
+
+`__nondiffuse` :
+    If this variable is set to a non-zero value, the light shader will
+    not contribute to diffuse illumination in the standard diffuse()
+    functions.
+    
+`__nonspecular` :
+    If this variable is set to a non-zero value, the light shader will
+    not contribute to specular illumination in the standard phong(),
+    blinn(), or specular() functions.
+    
+`__contrib_names` :
+    An array of string component names whose contributions will be
+    manipulated by the `__contrib_amounts` export. This export must a
+    constant value, since mantra queries the names before executing the
+    shader.
+    
+`__contrib_amounts` :
+    An array of floats aligned with the `__contrib_names` array, specifying
+    the amount the light will contribute to each component. A value of 1.0
+    means full contributes while a value of 0 is no contribution. Currently
+    only 0 and non-zero values are recognized by mantra meaning no
+    contribution and full contribution respectively - there is no support
+    for fractional contributions. This export must a constant value, since
+    mantra queries the amounts before executing the shader.
+    
+`__nofog` :
+    If this variable is set to a non-zero value, no fog shaders will
+    affect the surface color.
+    
+`__illuminateangle`:
+    Indicates the angle of illumination for a light or surface shader to the renderer . Angles are measured from the light's direction to the edge of the illuminating cone. The angle must be specified in radians and should evaluate to a constant expression. For example, the angle cannot depend on varying values such as `P` or `s`/`t`.

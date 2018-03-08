@@ -1,0 +1,336 @@
+= Particle Fluid Emitter =
+
+#type: node
+#context: dop
+#internal: particlefluidemitter
+#icon: DOP/particlefluidemitter
+#tags: fluid, emit
+
+"""Emits particles into a particle fluid simulation."""
+
+== Overview ==
+
+This node is intended to be wired into the second (`Particles`) input of the [FLIP Solver DOP|Node:dop/flipsolver]. It adds new particles to a given particle fluid object using either "stream emission" or the standard particle emission method from the [Source POP|Node:pop/source].
+
+== Stream emission vs. POP emission ==
+
+The __Use stream emission__ option lets you set and initial velocity for the emitted particles, and calculates the emission rate from that based on the desired particle separation in the particle fluid object, as in the [Velocity Stream POP|Node:pop/velocitystream]. This option only emits particles from the _points_ of the source geometry.
+
+Turning __Use stream emission__ off gives you a more complex but flexible set of parameters to control particle emission, identical to the options on the [Source POP|Node:pop/source]. You can use the __Emission type__ parameter to emit randomly from the surface of the source geometry instead of from the points (as well as many other options).
+
+[Include:/shelf/emitparticlefluid#includeme]
+
+@parameters
+
+== Source ==
+
+Particle Fluid Object:
+    The Particle Fluid Object node for the simulation to
+    be affected.  
+
+The Particle Fluid Emitter uses this node
+    to obtain information such as fluid particle attributes,
+    parameters from the Particle Fluid Object node, etc.
+
+Use Stream Emission:
+    Enable this toggle to use stream-based emission of particles
+    rather than constant or impulse emission.  Stream-based
+    emission controls the timing of particle emissions to
+    maintain a specified particle separation in the outgoing
+    particle stream.  
+
+This can be useful for creating a smooth,
+    uniform stream of fluid spraying from an emitter.
+
+NOTE: 
+	If stream emission is set, a special detail attribute is set to
+	record the last emission time.  If you want to re-use a
+	particle simulation with a different start time, you may have
+	to first delete this detail attribute with an [Attribute SOP|Node:sop/attribute].
+
+Emission Type:
+    Where on source geometry to emit particles from.
+
+
+    Points (ordered):
+        Emit particles from each point in the source geometry,
+        in order. Primitives (for example, primitive sphere)
+        have only one point from which to emit particles.
+        
+    Points (random):
+        Same as "Points (ordered)", but emits particles from
+        points in random order. This order does not change over
+        time: the same randomized sequence repeats over and
+        over.
+        
+    Prim center (ordered):
+        Birth particles from the center of each primitive in the
+        source geometry, in order. This is useful when used in
+        combination with the __Rotate to Template__ parameter in
+        the [Primitive SOP|Node:sop/primitive].
+        
+    Prim center (random):
+        Same as "Prim center (ordered)", but emits particles
+        from primitive centers in random order. This order does
+        not change over time: the same randomized sequence
+        repeats over and over.
+        
+    Prim center (attribute):
+        Use the attribute named in the __Distribution
+        attribute__ parameter below as the probability that a
+        primitive will emit a particle.
+
+        Primitives where the attributes is less than or equal to
+        0 will not emit particles.
+
+        For primitives where the attributes is over 0, for each
+        particle to be emit, the probability that a primitive
+        will emit it is equal to that primitive's attribute
+        value divided by the sum of the attribute values of all
+        the primitives.
+
+        You use the [Measure SOP|Node:sop/measure] to create an
+        attribute on primitives that records the surface area,
+        then use that attribute here so primitives with greater
+        surface area emit particles more often.
+
+    Edges (ordered):
+        Emit particles from each spline/polygon edge in the
+        source geometry, in order. The birth points are along
+        continuous intervals on the curve, not just from CVs or
+        points.
+        
+    Edges (random):
+        Same as "Edges (ordered)", but emits particles from
+        edges in random order. This order does not change over
+        time: the same randomized sequence repeats over and
+        over.
+        
+    Edges (attribute):
+        See "Prim center (attribute)" above.
+        
+    Surfaces (ordered):
+        Emit particles from each UV spline surface or mesh type
+        in the source geometry, in order. If there is no surface
+        but only a spline curve, then emit particles from the
+        curve. For polygons are used, only emits particles from
+        the polygon edges.
+        
+    Surfaces (random):
+        Same as "Surfaces (ordered)", but emits particles from
+        surfaces in random order. This order does not change
+        over time: the same randomized sequence repeats over and
+        over.
+        
+    Surfaces (attribute):
+        See "Prim center (attribute)" above.
+        
+    Volume:
+        Emit particles from inside the volume of the source
+        geometry. The behavior is undefined if the source
+        geometry is not closed.
+        
+    Metaballs:
+        Emit particles from inside the volume of a metaball,
+        according to the Density Threshold and Density Minimum
+        parameters below.
+
+    Emission Geometry:
+        The Particle Fluid Emitter can either emit particles from a
+        specified piece of emission geometry, or from pre-built
+        elliptical or rectangular grids of particles.  Use this
+        menu to choose which type of emission geometry to use.
+
+    Source SOP:
+        The name of the emission geometry to use, if __Emission
+        Geometry__ is set to __Specify Emission Geometry__.
+
+    Source Group:
+        Subset of all points/primitives in the source geometry to
+        emit from.
+
+    Ignore Transform Object:
+        Particles normally use the object space of emission geometry.
+        Turn this parameter on to not transform in to the space of
+        the emission geometry SOP.
+
+    Distribution Attribute:
+        When __Emission type__ is "Prim center (attribute)", "Edges
+        (attribute)", or "Surfaces (attribute)", the attribute to use
+        as the probability of emitting a particle.
+
+    Density Threshold:
+        When __Emission type__ is "Metaballs", continue sampling points
+        until the summed density exceeds this threshold.
+
+    Density Minimum:
+        When __Emission type__ is "Metaballs", points with densities less
+        than or equal to this value will not emit particles.
+
+    Use Metaball Density:
+        Use the metaball density function as the probability of emitting a
+        particle, so denser areas emit particles more often.
+
+== Birth ==
+
+This emitter creates fluid particles in three different ways; constant,
+impulse and stream emission.  Constant emission emits a constant number
+of particles per second, regardless of the number of points in the
+emission geometry.  Impulse emission emits a specified number of particles
+each time the emitter is cooked.  Stream emission always emits a
+particle from each point in the emission geometry simultaneously.  The
+timing of these emissions is determined by the outgoing particle velocity
+and a __Stream Spacing__ attribute.  Particles are emitted with the
+desired spacing between emissions.  This can be useful for creating a
+smooth, uniform stream of fluid emitted from a surface.
+
+Impulse Activation:
+    Activates or deactivates impulse emission.
+
+Impulse Birth Rate:
+    The number of fluid particles to emit at each time step.
+
+Constant Activation:
+    Activates or deactivates constant emission.
+
+Constant Birth Rate:
+    The number of fluid particles to emit per second.
+
+Stream Activation:
+    Activates or deactivates stream emission.
+
+Stream Spacing:
+    Controls the spacing between particles in the emitted stream.
+    This is done by regulating the times at which particles are
+    emitted.  
+
+For example, if the velocity of emitted particles
+    is set to 1 in the x direction, and the Stream Spacing
+    parameter is set to 1, then particles will be emitted from
+    each point in the Geometry Source every 1 second in order
+    to maintain the desired spacing.
+
+Stream Acceleration:
+    This parameter does not affect the behavior of particles once
+    they are emitted, but rather affects the timing and direction
+    of particle emission. It is used to regulate the timing of
+    particle emission in the presence of external forces accelerating
+    the particles.  
+
+For example, if particles are emitted with no
+    velocity, but are immediately affected by a downward gravity
+    force, then the acceleration caused by that force could be
+    specified here.
+
+Stream Velocity Scale:
+    This parameter is a multiplier which controls the velocity used
+    to determine the timing of particle emissions.  It does not
+    affect the actual velocity of emitted particles, but rather
+    can be used to internally scale the emission velocity to thicken or thin out the emitted particle stream.  
+
+    Setting this parameter to 2, for instance, causes the emitter to emit points twice as often.
+
+Life Span:
+    Determines how long generated particles will live, in
+    seconds, before they die of old age.  A value of -1 will
+    cause them to live forever.
+
+Random Seed:
+    When birthing particles at random, this seed determines
+    what random sequence will be used.  
+
+    By varying the seed on
+    multiple runs through the particle simulation you can get
+    variations on how the particles were created.
+
+== Velocity ==
+
+This tab is used to control the velocity of emitted fluid particles.
+
+[Include:popCommonParms#inheritVeloParms/]
+
+[Include:popCommonParms#veloAttrParms/]
+
+== Density Test ==
+    
+This tab is used to control the number of particles emitted by
+ensuring that particles are not created in areas where the
+fluid density is too high.  This is available to prevent large
+spikes in pressure as fluid particles are created.
+
+Density Test Activation:
+    Activates or deactivates the density test.
+
+Density Threshold:
+    This is a multiplier for the fluid rest density.  If a particle
+    is emitted in a location where the density exceeds this quantity
+    multiplied by the fluid rest density, then the particle is
+    immediately killed.
+
+== Pre-built Emitter ==
+    
+This section appears at the bottom of the parameter pane and contains
+parameters related to pre-built emission geometry in the Particle
+Fluid Emitter node. The emitter node provides pre-built geometry to
+emit particles in a grid pattern from a rectangular or elliptical
+surface.
+
+The geometry automatically makes use of the __Particle Separation__
+parameter on the [Particle Fluid Object|Node:dop/particlefluidobject] specified in the __Particle Fluid Object__ parameter to determine the necessary spacing between points in this pre-built geometry.
+
+Size:
+    The two-dimensional size of the geometry.
+
+Center:
+    The center point of the pre-built geometry.
+
+Orientation Type:
+    How to orient the geometry in space.
+    Align With Velocity:
+        Aligns the emission geometry to be perpendicular with the
+        emission velocity specified in the __Velocity__ tab.
+
+    Specify Direction:
+        Aligns the emission geometry to be perpendicular with
+        the direction vector specified in __Direction Vector__.
+
+    Free Rotation:
+        Allows the geometry to be freely rotated using the
+        __Rotation Order__ and __Rotate__ parameters.
+
+Direction Vector:
+    The direction to align the emission geometry with if
+    __Orientation Type__ is set to "Specify Direction".
+
+Rotation About Axis:
+    If __Orientation Type__ is set to align the emitter with a
+    velocity or direction vector, this parameter specifies the
+    rotation of the geometry about that vector.
+
+Rotation Order:
+    If __Orientation Type__ is set to "Free Rotation", this controls
+    the order in which rotations are applied.
+
+Rotate:
+    If __Orientation Type__ is set to "Free Rotation", this controls
+    the rotation of the emission geometry about the x, y and
+    z axes.
+
+Jitter Scale:
+    Controls the amount of random jitter to apply to points in the
+    pre-built emission geometry.
+
+Jitter Seed:
+    The seed to use when applying random jitter to points in the
+    pre-built emission geometry.
+
+
+@locals
+
+[Include:standard_locals]
+
+@related
+
+- [Node:dop/particlefluidobject]
+- [Node:dop/particlefluidsolver]
+- [Node:dop/particlefluidsink]

@@ -1,0 +1,381 @@
+= hou.IPRViewer =
+#type: homclass
+#cppname: HOM_IPRViewer
+#superclass: hou.Pane
+#group: ui
+
+"""An interactive preview render (IPR) window."""
+
+The IPR viewer progressively refines a render, first providing a rough view
+of the rendered image and eventually providing the fully rendered image.
+When you change a shader value, move an object, etc., the viewer will re-render
+the image.
+
+When you Ctrl+click on a pixel in the rendered image, Houdini searches
+`$HOUDINI_PATH` for `scripts/ipr/pickpixel.py` and runs it.  The version of
+this file that ships with Houdini pops up the shader contributing the pixel, or
+an information window if there is is no shader.  If Houdini cannot find that
+Python file it then looks for the Hscript file `scripts/ipr/pickpixel.cmd`.
+
+When you drag a SHOP node onto the rendered image, Houdini searches for
+and runs `scripts/ipr/dragdrop.py`.  By default, this script assigns the
+SHOP to the object contributing the pixel.  If it cannot find a Python
+version, Houdini then looks for `scripts/ipr/dragdrop.cmd`.
+
+Note that shelf scripts can access the last location the user clicked on with
+[Hom:hou.IPRViewer#lastClickLocation].
+
+@methods
+
+::`isPaused(self)` -> `bool`:
+    #cppname: HOM_IPRViewer::isPaused
+    Indicates whether the IPR session is paused.  If there is
+    no active session, this returns false.
+
+::`isRendering(self)` -> `bool`:
+    #cppname: HOM_IPRViewer::isRendering
+    Indicates whether the IPR session has an render in progress. Returns
+    True even if the render is paused.
+
+::`isActive(self)` -> `bool`:
+    #cppname: HOM_IPRViewer::isActive
+    Indicates whether an active IPR sessions exists. 
+
+::`killRender(self)`:
+    #cppname: HOM_IPRViewer::killRender
+    Kills the active IPR session (if there is one).
+
+::`pauseRender(self)`:
+    #cppname: HOM_IPRViewer::pauseRender
+    Pauses the active IPR session (if there is one).
+
+::`resumeRender(self)`:
+    #cppname: HOM_IPRViewer::resumeRender
+    Resumes the active IPR session (if there is one).
+
+::`startRender(self)`:
+    #cppname: HOM_IPRViewer::startRender
+    Start a new render if there is no active IPR session or issue a
+    re-render if there is one.
+
+::`isPreviewOn(self)` -> `bool`:
+    #cppname: HOM_IPRViewer::isPreviewOn
+    #replaces: Exp:iprquery
+    Return whether or not the Preview checkbox is checked.  When it is
+    unchecked, the viewer will not progressively refine the image using IPR,
+    and will instead use the rendering engine from the ROP node to render it.
+
+    See also [Hom:hou.IPRViewer#setPreview].
+
+::`setPreview(self, on)`:
+    #cppname: HOM_IPRViewer::setPreview
+    #replaces: Exp:iprquery
+    Check or uncheck the Preview checkbox.
+
+    See [Hom:hou.IPRViewer#isPreviewOn] for more information.
+
+::`isAutoSaveOn(self)` -> `bool`:
+    #cppname: HOM_IPRViewer::isAutoSaveOn
+    Returns whether or not the Auto Save toggle is selected. When turned on,
+    IPR will periodically save the render progress to the auto save file path. 
+    The time between saves can be configured by setting the auto save time.
+
+    See also [Hom:hou.IPRViewer#setAutoSave].
+
+::`setAutoSave(self, on)`:
+    #cppname: HOM_IPRViewer::setAutoSave
+    Set or unset the Auto Save toggle.
+
+    See [Hom:hou.IPRViewer#isAutoSaveOn] for more information.
+
+::`autoSavePath(self)` -> `str`:
+    #cppname: HOM_IPRViewer::autoSavePath
+    Returns the render save path. This is the path that is used when the IPR
+    viewer is set to automatically save render progress to disk.
+
+    See also [Hom:hou.IPRViewer#setSavePath].
+
+::`setAutoSavePath(self, path)`:
+    #cppname: HOM_IPRViewer::setAutoSavePath
+    Sets the render progress save path.
+
+    See also [Hom:hou.IPRViewer#autoSavePath] for more information.
+
+::`autoSaveTime(self)` -> `float`:
+    #cppname: HOM_IPRViewer::autoSaveTime
+    Returns the time between IPR auto saves in seconds. When auto saving is
+    on, a render progress image is written out at this rate.
+
+    See also [Hom:hou.IPRViewer#setAutoSaveTime].
+
+::`setAutoSaveTime(self, float)`:
+    #cppname: HOM_IPRViewer::setAutoSaveTime
+    Sets the auto save time in seconds.
+
+    See also [Hom:hou.IPRViewer#autoSaveTime] for more information.
+
+::`isAutoUpdateOn(self)` -> `bool`:
+    #cppname: HOM_IPRViewer::isAutoUpdateOn
+    #replaces: Cmd:iprview
+    Return whether or not the Auto-Update checkbox is checked.  When it is
+    unchecked, the viewer will not refresh when objects, shaders, lights, etc.
+    change.  In this case, you can force a re-render by clicking on the Render
+    button.
+
+    See also [Hom:hou.IPRViewer#setAutoUpdate].
+
+::`setAutoUpdate(self, on)`:
+    #cppname: HOM_IPRViewer::setAutoUpdate
+    #replaces: Cmd:iprview
+    Check or uncheck the Auto-Update checkbox.
+
+    See [Hom:hou.IPRViewer#isAutoUpdateOn] for more information.
+
+::`delay(self)` -> float:
+    #cppname: HOM_IPRViewer::delay
+    #replaces: Cmd:iprview
+    Return the contents of the viewer's Delay field.  This value determines how
+    long Houdini waits between when you change a parameter value and when it
+    starts re-rendering.
+
+    See also [Hom:hou.IPRViewer#setDelay] and [Hom:hou.IPRViewer#updateTime].
+
+::`setDelay(self, time)`:
+    #cppname: HOM_IPRViewer::setDelay
+    #replaces: Cmd:iprview
+    Set the contents of the viewer's Delay field.
+
+    See [Hom:hou.IPRViewer#delay] for more information.
+
+::`updateTime(self)` -> float:
+    #cppname: HOM_IPRViewer::updateTime
+    Return the contents of the viewer's Update Time field.  This value
+    determines approximately how long each progressive refinement should take.
+    Smaller values will produce more progressive renders where detail is
+    added more gradually.
+
+    See also [Hom:hou.IPRViewer#setUpdateTime] and [Hom:hou.IPRViewer#delay].
+
+::`setUpdateTime(self, time)`:
+    #cppname: HOM_IPRViewer::setUpdateTime
+    Set the contents of the viewer's Update Time field.
+
+    See [Hom:hou.IPRViewer#updateTime] for more information.
+
+::`lastClickLocation(self)` -> (`int`, `int`):
+    #cppname: HOM_IPRViewer::lastClickLocation
+    Return the x and y coordinates for the pixel location where the user last
+    clicked in the IPR viewer.  Note that this location might be outside the
+    image: the x and y coordinates can be negative and can be greater than
+    or equal to the image resolution.  Note that if the user never clicked in
+    the viewer, the x and y coordinates will be negative.
+
+    You would typically call this method from a shelf script.  For example,
+    a user can click on a pixel in the IPR viewer and then click on the shelf
+    to perform an action on that pixel (e.g. display the shader parameters,
+    assign a shader, etc.).
+
+    Use [Hom:hou.IPRViewer#imageResolution] to get the valid range for pixel
+    coordinates.
+
+    Note that when you Ctrl-click on a pixel, Houdini searches `$HOUDINI_PATH`
+    for `scripts/ipr/pickpixel.py` and runs it.  This script can access the
+    viewer with `kwargs["viewer"]` and the location where the user clicked with
+    `kwargs["position"]`.
+
+    The following script opens a floating parameter window for the shader
+    corresponding to the pixel the user last clicked on.
+    {{{
+    #!python
+    viewer = hou.ui.paneTabOfType(hou.paneTabType.IPRViewer)
+    px, py = viewer.lastClickLocation()
+
+    if (px < 0 or px > viewer.imageResolution()[0] or
+            py < 0 or py >= viewer.imageResolution()[1]):
+        hou.ui.displayMessage("Click on the image and then run this script again")
+    else:
+        material = viewer.materialNode(px, py)
+
+        if material is not None:
+            parm_window = hou.ui.curDesktop().createFloatingPaneTab(
+                hou.paneTabType.Parm)
+            parm_window.setCurrentNode(material)
+            parm_window.setPin(True)
+        else:
+            hou.ui.displayMessage("Click on an object to bring up the shader.")
+    }}}
+
+::`ropNode(self)` -> [Hom:hou.RopNode] or `None`:
+    #cppname: HOM_IPRViewer::ropNode
+    #replaces: Exp:iprquerys
+    Return the ROP node that is selected in the viewer, or `None` if nothing
+    is selected.
+
+::`setRopNode(self, rop_node)`:
+    #cppname: HOM_IPRViewer::setRopNode
+    Set the ROP node to use for rendering.
+
+::`imageResolution(self)` -> (`int`, `int`):
+    #cppname: HOM_IPRViewer::imageResolution
+    #replaces: Exp:iprquery
+    Return the resolution of the image.
+
+    Raises [Hom:hou.OperationFailed] if the viewer does not contain an image.
+
+::`cropRegion(self)` -> (`float`, `float`, `float`, `float`):
+    #cppname: HOM_IPRViewer::cropRegion
+    #replaces: Exp:iprquery
+    Return the `x0`, `x1`, `y0`, and `y1` normalized coordinates of the
+    subregion that is selected, where `(x0, y0)` is the bottom-left corner
+    and `(x1, y1)` is the top-right corner of the subregion.
+
+    You can optionally tell the IPR viewer to only re-render only a portion of
+    the image.  To select a subportion of the image, hold down shift and
+    select the box.
+
+    Note that the bottom-left corner is `(0.0, 0.0)` and the top-right corner
+    is `(1.0, 1.0)`.  For example, if the entire image is being rendered, this
+    method returns `(0.0, 1.0, 0.0, 1.0)`.
+
+::`planes(self)` -> `tuple` of `str`:
+    #cppname: HOM_IPRViewer::planes
+    #replaces: Exp:iprquery, Exp:iprquerys
+    Return the names of the image planes in the rendered output.
+
+    Note that the special `Op_Id` image plane contains the
+    [Hom:hou.Node#sessionId] ids of the object nodes in the image.  -1
+    indicates that there is no object node associated with the pixel.
+    Use [Hom:hou.IPRViewer#objectNode] to access the object corresponding to
+    that id.
+
+    Similarly, the `Prim_Id` plane contains the [Hom:hou.Prim#number] ids
+    of the primitives in the image.  Use [Hom:hou.IPRViewer#prim] to access
+    the primitive corresponding to that id.
+
+    Raises [Hom:hou.OperationFailed] if the viewer does not contain an image.
+
+::`displayedPlane(self)` -> `str`:
+    #cppname: HOM_IPRViewer::displayedPlane
+    #replaces: Exp:iprquery, Exp:iprquerys
+    Return the name of the currently-displayed image plane in the rendered output.
+
+    Note that the special `Op_Id` image plane contains the
+    [Hom:hou.Node#sessionId] ids of the object nodes in the image.  -1
+    indicates that there is no object node associated with the pixel.
+    Use [Hom:hou.IPRViewer#objectNode] to access the object corresponding to
+    that id.
+
+    Similarly, the `Prim_Id` plane contains the [Hom:hou.Prim#number] ids
+    of the primitives in the image.  Use [Hom:hou.IPRViewer#prim] to access
+    the primitive corresponding to that id.
+
+    Raises [Hom:hou.OperationFailed] if the viewer does not contain an image.
+
+::`pixel(self, plane_name, x, y)` -> `tuple` of `float`:
+    #cppname: HOM_IPRViewer::pixel
+    #replaces: Exp:iprquery
+    Return the value of a pixel in one plane of the image.  This method returns
+    a tuple of 1 to 4 floats, depending on the type of image plane.
+
+    Note that the color plane is named `C`.
+
+    Raises [Hom:hou.OperationFailed] if the plane name is invalid, the pixel
+    location is outside the image, or the viewer does not contain an image.
+
+    You can determine the number of components in the image plane using the
+    following: `len(viewer.pixel(plane_name, 0, 0))`.
+
+    {{{
+    #!pycon
+    >>> viewer.pixel("C", 300, 200)
+    (0.69970703125, 0.46728515625, 0.289794921875, 1.0)
+    }}}
+
+::`pixels(self, plane_name)` -> `tuple` of `tuple` of `float`:
+    #cppname: HOM_IPRViewer::pixels
+    Returns the value of all pixels in one plane of the image.  This method
+    returns a tuple of tuples of 1 to 4 floats, depending on the type of image
+    plane. The results are in row-major order, starting at the bottom left
+    corner of the IPR image.
+
+    Note that the color plane is named `C`.
+
+    Raises [Hom:hou.OperationFailed] if the plane name is invalid or the viewer
+    does not contain an image.
+
+    {{{
+    #!pycon
+    >>> all_pixels = viewer.pixels("C")
+    >>> width = viewer.imageResolution()[0]
+    >>> all_pixels[width*200 + 300]
+    (0.69970703125, 0.46728515625, 0.289794921875, 1.0)
+    }}}
+
+::`evaluatedStyleSheetJSON(self, x, y)` -> `str`:
+    #cppname: HOM_IPRViewer::evaluatedStyleSheetJSON
+    Returns a JSON string describing the material style sheet at a given
+    pixel. If no style sheet is active, an empty string is returned.
+
+::`evaluatedStyleSheetPaths(self, x, y)` -> `tuple` of  `str`:
+    #cppname: HOM_IPRViewer::evaluatedStyleSheetPaths
+    Returns a list of paths to the styles that contribute to the style sheet
+    at the current pixel.
+
+::`saveFrame(self, file_path, snapshot=0, xres=-1, yres=-1, color='C', alpha='C', scope='*', lut='', gamma=1.0, convert=True)` -> `bool`:
+    #cppname: HOM_IPRViewer::saveFrame
+    Saves the current IPR render to the specified file path. It is possible to
+    save an in progress/incomplete render.
+    
+    The output image type is inferred from the file extension on the provided
+    file path.  The `snapshot` parameter controls which IPR snapshot to save. A
+    value of 0 indicates the active render.
+    
+    The native IPR resolution is used by default, however a custom resolution
+    can be specified with the `xres` and `yres` parameters. The `color` and
+    `alpha` parameters control which render planes are used when  writing RGBA
+    images like .jpg or .png. If a deep image format such as .pic or .exr
+    is used, the scope parameter can be used to specify which image planes
+    to include in the output. 
+
+::`objectNode(self, x, y)` -> [Hom:hou.ObjNode] or `None`:
+    #cppname: HOM_IPRViewer::objectNode
+    #replaces: Exp:iprquerys
+    Return the object node contributing the pixel at the specified location,
+    or `None` if there is no object at the pixel or if the pixel location
+    is outside the image bounds
+
+    The following function returns the SOP node containing the geometry that
+    contributes the pixel to the final image:
+    {{{
+    #!python
+    def sopNode(viewer, x, y):
+        obj_node = viewer.objectNode(x, y)
+        return (obj_node.renderNode() if obj_node is not None else None)
+    }}}
+
+    Raises [Hom:hou.OperationFailed] if the viewer does not contain an image.
+
+::`prim(self, x, y)` -> [Hom:hou.Prim] or `None`:
+    #cppname: HOM_IPRViewer::prim
+    #replaces: Exp:iprquery
+    Return the geometry primitive contributing the pixel at the specified
+    location, or `None` if there is nothing at the pixel or if the pixel
+    location is outside the image bounds
+
+    Raises [Hom:hou.OperationFailed] if the viewer does not contain an image.
+
+::`materialNode(self, x, y)` -> [Hom:hou.ShopNode] or `None`:
+    #cppname: HOM_IPRViewer::materialNode
+    #replaces: Exp:iprquerys
+    Return the SHOP node contributing the pixel at the specified location, or
+    `None` if there is nothing at the pixel, the pixel location is outside the
+    image bounds, or there is no shader on the geometry.
+
+    This method first checks the primitive corresponding to the pixel and
+    returns the SHOP corresponding to its `shop_materialpath` attribute.
+    If the primitive does not have this attribute then it returns the SHOP
+    assigned to the object.  If no SHOP is assigned to the object, it returns
+    `None`.
+
+    Raises [Hom:hou.OperationFailed] if the viewer does not contain an image.
+

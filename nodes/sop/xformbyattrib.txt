@@ -1,0 +1,78 @@
+#type: node
+#context: sop
+#internal: xformbyattrib
+#icon: SOP/xformbyattrib
+
+#tags: transform
+
+= Transform By Attribute =
+
+"""Transforms the input geometry by a point attribute."""
+
+Unlike the [Transform SOP|Node:sop/xform], the transform applied to each point
+will be different, and be governed by a point attribute.
+
+This is useful to apply a deformation to all attribute types. An [Attribute VOP SOP|Node:sop/attribvop] may be used to create a deformation attribute, and then this node can apply it to the relevant attribute types.
+
+Primitives attached to the points will also by transformed, allowing volumes and packed primitives to transform as expected.
+
+A deformer can either be written by leaving `P` unaffected and generating a full 4x4 matrix on each point in VOPs.  Then this node will perform the actual deformation across all attribute types.  You can also deform `P` in the VOP code, but output a 3x3 matrix representing the local derivatives of the transform, allowing vectors such as `up` and `v`
+to properly reorient.  If you want to enforce a pure rotation, use the `polardecomp` function.
+
+@parameters
+Group:
+    Point group to transform.
+Group Type:
+    The type of elements referenced in the __Group__ field.
+
+Transform Attribute:
+	A point attribute to use as the transform at each point.
+
+	This should be a float attribute.  The size of the attribute
+	determines the type of transformation.
+
+	3:
+	    Translation by a delta.  Only affects Point and HPoint attributes.
+	4:
+	    Rotation by a quaternion.  Does not affect Point or HPoint attributes.
+	9:
+	    Multiplication by a 3x3 transform matrix.  Does not affect Point or HPoint attributes.
+	16:
+	    Multiplication by a 4x4 transform matrix.
+
+Attributes to Transform:
+	Point and Vertex attributes that match this pattern will be
+	transformed.  Their Type Info will be used to determine how
+	they should transform, as points, vectors, and normals
+	all need different operations.
+
+	If `P` matches this string, then primitive transforms will
+	also be rotated.
+
+	In no case is the transform attribute itself transformed.
+
+Invert Transformation:
+    #id: invertxform
+
+    When enabled, the inverse of the transform will be applied, instead of
+    the transform itself.
+
+Recompute Affected Normals:
+	Recomputes any normals that are affected by polygons that use both
+	transformed and untransformed points. When transforming the full
+	geometry or full connected components, the results should be the same
+	as when this option is off, i.e. the normals will just be transformed
+	and not recomputed. This does nothing if `P` is not being transformed.
+
+Preserve Normal Length:
+        Normal lengths remain unaffected.
+
+Delete Transform Attribute:
+	The transform attribute is deleted after being used.
+	
+
+@related
+    - [Node:sop/primitive]
+    - [Node:sop/point]
+    - [Node:sop/xform]
+

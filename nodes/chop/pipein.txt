@@ -1,0 +1,323 @@
+#type: node
+#context: chop
+#internal: pipein
+#icon: CHOP/pipein
+
+= Pipe In =
+
+"""Pipes data from custom devices into a CHOP, without needing the Houdini Developers' Kit or knowledge of Houdini internals."""
+
+You can use a "named pipe" or "FIFO" (first in, first out) on Linux and Mac OS X (see `man -S 7 pipe`) or a network connection (for remote connections) on Windows, Linux, and Mac OS X. 
+
+You need a program that gets values from the input device, and outputs them
+into a file specified in Filename or a Network port. Your custom program writes
+formatted messages into the file or port, and the Pipe In CHOP reads it,
+creating the channels specified in the messages.
+
+== Networking into Houdini ==
+
+You can receive network data from another server (e.g. from a
+Houdini [Pipe Out CHOP|pipeout] running remotely). A connection must be
+established between the server and the Pipe In CHOP before data is
+sent. Do this by changing the Source from Pipe to Network). You must
+supply the Server Address and Port from which to receive incoming
+data to a channel. The server should be listening for connections on
+the port that this CHOP is using.
+
+To setup a link between two Houdini processes, one process should
+have a [Pipe Out CHOP|pipeout] active (thus listening for connections) on an
+arbitrary port (i.e. port #5010). The second Houdini uses a Pipe In
+CHOP with the network address set to the name of the machine that
+the first Houdini process is running on. The network port should be
+set to the same port as the server (in this case, 5010). The port
+number can be any number between 5000 and 10000, as long as it is
+consistent between the Pipe In and [Pipe Out|pipeout] CHOPs. For more than one
+connection, use distinct port numbers. Pipe In/Out CHOPs with
+matching port numbers on different machines should automatically
+sense one another.
+
+If you just want to send data from a local process to Houdini, set the server address to `localhost`.
+
+== Programming the Pipe In CHOP ==
+
+The Pipe In chop is designed to allow you to program an interface to
+chops that do not require a Houdini Developers Kit.
+
+The Pipe In CHOP allows Houdini to read information in a special
+formats described here from a FIFO (First In, First Out) file and
+create CHOP channels. As long as the correct formats are used,
+Houdini will be able to get data from any source including devices
+such as a joystick, microphone or PuppetWorks' hardware.
+
+The Pipe In CHOP has two parameters and parses three command
+formats. The first parameter specifies which file to read from and
+the second toggles between active (reading) and inactive (discards
+data) modes. The formats supported allow the following
+functionality: upload the most current sample data, upload all
+sample data and create a full waveform, and upload the channel
+names.
+
+=== Using the Pipe In CHOP ===
+
+In order to read information with this chop, a separate
+application has to be developed to write to a FIFO in the proper
+format. The following sections describe and give sample code
+(written in C) for opening a file and writing values that will
+be accepted by the Pipe In CHOP.
+
+=== Opening a Fifo File ===
+
+To create a file that the Pipe In CHOP will read from, use the
+following code to open a new FIFO called FIFO_NAME. Define
+FIFO_NAME to be the desired file name to create. The output
+stream that is used for writing will block until a reader is
+connected to the file.
+
+{{{
+#include    <sys/types.h>
+#include    <sys/stat.h>
+#include    <stdio.h>
+mode_t       prev_mask;
+FILE        *output = 0;
+/* Create a new fifo */
+prev_mask = umask(0);
+mkfifo (FIFO_NAME, 0666);
+umask(prev_mask);
+/* Open the file for writing */
+fprintf(stderr,
+"Awaiting reader of FIFO %s\n\r", FIFO_NAME);
+output = fopen(FIFO_NAME, "wb");
+}}}
+
+=== Writing To The File ===
+
+The Pipe In chop reads information from the FIFO in eight-byte
+big endian chunks of data called tokens, so it is necessary to
+write to the file in the same format. There is also a method in
+place for sending an escape character in case a reset is required
+in the middle of parsing a command.
+
+NOTE:
+    In versions prior to Houdini 12, 4 byte tokens were used instead of 8
+    byte tokens.
+
+The reset character is an integer value of `170`. When this byte
+is received, followed by a byte with a value of zero, the
+current parsing is reset. In order to send a value of `170`
+without the command being reset, two bytes with a 170 value must
+be sent consecutively so that the Pipe In CHOP will disregard
+the first value.
+
+{{{
+#define ESCAPE_CHARACTER        170
+void
+write_byte(char b, FILE *output)
+{
+    /* Prepend escape character */
+    if (b == ESCAPE_CHARACTER)
+      fputc(ESCAPE_CHARACTER, output); 
+      fputc(b, output);
+}
+void
+write_values(const char *p, int size, FILE *output)
+{
+    int          i;
+    for(i=0; i<size; i++)
+      write_byte(p[i], output);
+}
+void
+send_reset(FILE *output)
+{
+    fputc(ESCAPE_CHARACTER, output);
+    fputc(0, output);
+    fputc(ESCAPE_CHARACTER, output);
+    fputc(0, output);
+    fputc(ESCAPE_CHARACTER, output);
+    fputc(0, output);
+    fputc(ESCAPE_CHARACTER, output);
+    fputc(0, output);
+    fflush(output);
+}
+}}}
+
+Using these functions, any 8 bytes of data (e.g. 00000001, 3.141,
+Chan, ...) can be sent to the file. To send a reset signal, four
+escape sequences are written to pad to 8 bytes. It is a good idea
+to send a reset signal before the command and flush the FIFO at
+the end of a command.
+
+{{{
+int64       token;
+double	    sample;
+send_reset(output); 
+/* Send a command here */
+write_values((char *)&token, sizeof(token), output);
+write_values((char *)&sample, sizeof(sample), output);
+fflush(output);
+}}}
+
+NOTE:
+    An escape character (170) can be sent, followed by any
+    other character, to stop the current command parsing and
+    begin again.  If the 170-170 sequence is sent, the first
+    character is ignored and the value is sent normally.
+
+=== Command Type #1: Current Values ===
+
+The first type of command that the Pipe In CHOP will read is
+used to get the most recent channel data. It has a default
+sample rate of 30 samples per second, CHOP length of 1, and a
+start position of `0`. This command allows the number of channels
+to be set and the samples associated with those channels to be
+read.
+
+(int64) 1:
+    Command Type.
+(int64):
+    Number of Channels.
+(double):
+    Sample Data, one sample for each channel.
+
+=== Command Type #2: Upload ===
+
+The second type of command that can be parsed is used to upload
+a full set of samples to create a waveform. The sample rate,
+track length, start position, number of channels, and samples
+for each channel to fill the track length must be provided. The
+channel samples must be interleaved so that all the channels for
+one index are filled before moving forward to the next index.
+
+(int64) 2:
+    Command Type.
+(int64):
+    Track Length.
+(double):
+    Sample Rate.
+(double):
+    Start Index.
+(int64):
+    Number of Channels.
+(double):
+    Sample Data, one sample for each channel for each index.
+
+=== Command Type #3: Channel Names ===
+
+This command allows the channels to be assigned names before
+they are created. Since the names are usually strings, it is
+important to remember to write them as eight-byte tokens (padded
+with zeroes at the end if necessary) so they will be parsed
+correctly. This format requires the number of names to be set,
+followed by the name length (in number of eight-byte tokens) and
+name data for each channel.
+
+(int64) 3:
+    Command Type
+(int64):
+    Number of Names
+
+For each name, the following data is read:
+
+(int64):
+    Name Length, one per name
+(char*):
+    Name Chunks (char\[8\] * _Name Length_)
+
+=== Command Type #4: Disconnect ===
+
+This command causes the Pipe In CHOP to disconnect the network connection. It
+is typically sent by the [Pipe Out CHOP|pipeout] when its Active parameter is
+turned off or if the node is bypassed.
+
+(int64) 4:
+    Command Type
+
+=== Additional commands ===
+
+{{{
+delay refresh
+    (int64)	5 - command type
+    (int64)	- seconds to delay
+
+script
+    (int64)	6 - command type
+    (int64)	- Script Length
+    (char*)	- Script Chunks (char[8] * Script Length)
+}}}
+
+=== Writing a Command ===
+
+Using command type 1 as an example, the following function could
+be used to send a command to the FIFO which will be read by the
+Pipe In CHOP.
+
+{{{
+void
+send_current_values(FILE *output, int num, double *samples)
+{
+    int64       token;
+    int         j;
+    send_reset(output);             /* just to be safe */
+    /* Command Type */
+    token = 1;
+    write_values((char *)&token, sizeof(token), output);
+    /* Number of Channels */
+    token = num;
+    write_values((char *)&token, sizeof(token), output);
+    /* Sample Values */
+    for(j=0; j<num; j++)
+      write_values((char *)&samples[j],
+        sizeof(samples[j]), output);
+      fflush(output);
+}
+}}}
+
+== Source Code Example ==
+
+You can find a compilable example of a Pipe In application in:
+
+{{{
+$HH/public/PPD.tar.Z
+}}}
+
+One device that is implemented using this protocol the Puppetworks device, and its driver can be installed via the proto_install application.
+
+
+@parameters
+
+== PipeIn ==
+
+Source:
+    Data can be piped in through a UNIX pipe or a Network port.
+    
+Filename:
+    The file that the device data will be read from. The file must
+    not be a regular file. It must be a "named pipe" or "FIFO". In
+    UNIX, see "mknod".
+    
+Server Address:
+    The network address of the server computer. This address is a
+    standard WWW address, such as 'foo' or 'foo.bar.com'.
+    
+Server Port:
+    The network port of the server. The port is a number between
+    `5000` and `10000`, which both the server and the client use to
+    connect with.
+    
+Active:
+    While active, the CHOP receives information from the pipe or
+    server. When off, no updating occurs. Data sent by a server is
+    lost, but a pipe will store the data until active is turned on
+    again. If in Network mode, turning this parameter on initiates a
+    connection, and turning it off breaks the connection.
+    
+Reset Channels:
+    Clears all channels and data.
+        
+[Include:common#common]
+
+@related
+
+- [Node:chop/audioin]
+- [Node:chop/midiin]
+- [Node:chop/pipeout]
+

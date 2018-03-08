@@ -1,0 +1,288 @@
+﻿= OpenGL Shaders =
+
+"""How to customize how materials appear in the OpenGL viewport."""
+
+
+== Overview ==
+
+OpenGL shaders are hardware accelerated shaders that are executed on the video card when Houdini tries to display a material in the viewport. OpenGL shaders only affect the viewport (and viewport flip-books), not rendered images.
+
+To get a better representation of a material in the viewport, you can tag parameters in your material with the equivalent GL properties. Or, you can write your own custom OpenGL shader using GLSL and include it inside your material.
+
+[Image:/images/shade/principled_viewport.jpg]
+
+
+== Tagging material parameters with viewport properties ==
+
+=== Overview ===
+
+:col:
+    The viewport shader does _not_ evaluate the material's VOP network. Instead, it simply uses the values of material parameters you tag as representing certain OpenGL properties.
+
+    The viewport shader supports a wide variety of shading properties which describe parameters and textures. You can use [GL tags and parameters|/props/material#ogl] in your material to tell the viewport shader what parameters to use without needing to write a custom GLSL shader.
+
+    For example, if your material has a __Base color__ parameter, tagging it as `ogl_diff` lets the viewport shader know to use that color as the diffuse color in the viewport.
+
+    * You can tag a parameter with more than one GL tag, for example you can tie the material's __Base Color__ to the OpenGL diffuse, specular, and ambient lighting colors.
+    
+    * The viewport shader ignores parameters that are not tagged.
+
+    * To display all the material properties, the user must turn on High Quality Lighting in the Houdini viewport. Normal Quality lighting supports a smaller subset of material parameters for better performance.
+
+    * Not all properties need to be specified. For properties which are constant and have no shader parameter, use a GL parameter instead (found in Edit Rendering Parameters > Material Options > OpenGL).
+
+        For example, for a material which uses the GGX specular model, you can add the [Specular Model|/props/material#ogl_spec_model] GL parameter and set it to "GGX".
+    
+    The materials shipped with Houdini already have OpenGL tags set up. *If you use a pre-made material such as the Principled Material, you don't need to set up OpenGL tags*.
+    However, if you create a custom material, you should tag your material parameters to get better viewport display of the material.
+
+:col:
+    :box:
+        #display: rounded gray compact
+        
+        The default viewport shader supports the following properties (on polygon-based geometry):
+    
+        * PBR or non-realistic rendering with a variety of shading models
+        * Texture maps for color and lighting adjustments:
+            * Diffuse
+            * Specular
+            * Normal/Bump
+            * Metallic
+            * Coat reflections
+            * Opacity
+            * Occlusion
+            * Roughness
+            * Reflection
+            * Environment
+        * Proper layered transparency
+        * Displacement mapping
+        * Shadows: point, spot, and area
+        * Ambient Occlusion
+        * Reflections
+    
+    OpenGL tags are implemented using key-value parameters, however the value is not currently used.
+
+
+=== How to tag parameters on a VOP material === (gl_tags)
+
+* For tags that have a "#" in the name, change the "#" to the layer number (e.g. `ogl_tex#` would be `ogl_tex1` for the base diffuse texture layer). 
+
+* For more information on the GL tags available, see the [complete list of GL tags|/props/material].
+
+:task: Tag a Parameter VOP:
+
+    In the [Parameter VOP|Node:vop/parameter]. Type an OpenGL tag name directly into the __Tags__ parameter, or click the __BuiltIn Tags__ button and select a tag from the list. You can select more than one tag for the parameter.
+  
+:task: Tag a parameter in an asset's Type Properties window:
+
+    In the [Type Properties dialog|/ref/windows/optype], select a parameter. Type an OpenGL tag name directly into the __Tags__ field, or click the __BuiltIn Tags__ button and select a tag from the list. You can select more than one tag for the parameter.
+
+:task: Add a GL parameter to the material VOP:
+    # In the Parameter dialog, Click the [Icon:BUTTONS/gear] gear icon and choose __Edit Rendering Parameter__.
+    
+    # Expand __Material Options > OpenGL__ in the tree on the left.
+    
+    # Drag a GL property from the tree into the __Existing Parameters__ list.
+    
+    # Set the value for the parameter in the __Channels__ tab.
+    
+    When you're done adding properties, click __Accept__.
+
+
+== Basic viewport shading properies ==
+
+=== Diffuse ===
+#display: pull left
+
+*Diffuse* lighting is controlled be several GL properties. The diffuse lighting model is Oren-Nayar, which is a slightly more realistic model than the basic Lambert model.
+
+*Diffuse* |
+    #width: 30%
+    
+    the color that tints (multiplies) the diffuse lighting component. If not specified, the *Diffuse Color* from the display options is used.
+    
+*Diffuse Intensity* |
+    adjust diffuse lighting intensity by multiplying it by the this factor. 
+    
+*Enable Diffuse* |
+    When enabled, the material has a diffuse component, otherwise diffuse lighting is disabled (zeroed out). 
+    
+*Diffuse Roughness* |
+    The Oren-Nayar model has a diffuse roughness parameter which primarily affects the falloff from direct to grazing angles. This parameter ranges from 0 to 1, where 1 produces a very gradual falloff and a more constant look, almost like clay.
+    
+*Diffuse textures* |
+    Textures can be layered on diffuse. All textures are tinted by the diffuse color and adjusted by diffuse intensity. The base diffuse texture will affect the transparency of the material with its Alpha channel unless *Use Diffuse Map Alpha* is disabled. All other diffuse layers use an over operation to layer on top of the base layer.
+    
+*Diffuse UV sets* (`ogl_tex#`) |
+    Each diffuse texture can specify its UV set with the `UVSet #` property. If blank, the implicit UV set for that layer will be used (`uv` for the base texture, `uv2` for the first layer, `uv3` for the second, etc). If not blank, it refers to the attribute used as the uv set for the layer.
+
+=== Specular ===
+#display: pull left
+
+*Specular* reflections control light reflected from the material. The specular model can be selected from Phong, Blinn, and GGX. To conserve energy, any light reflected from the model will reduce the diffuse contribution, and also the light transmission (increasing *Opacity*). 
+
+*Specular* |
+    #width: 30%
+    
+    the color that tints (multiplies) the specular lighting component. If not specified, the *Specular Color* from the display options is used.
+    
+*Specular Intensity* |
+    adjust specular lighting intensity multiplying by by this factor. 
+    
+*Enable Specular* |
+    When enabled, specular reflections occur on the material, otherwise the material will not have any specular lighting.
+    
+*Specular Tint* |
+    Controls how much the *Specular* color tints the specular reflection. 1 will tint it normally, and reducing to zero will gradually remove the tint.
+    
+*Coat Intensity*, *Coat Roughness* and *Coat Specular Model* |
+    If intensity is non-zero, a second layer of specular reflections is added to the material using the specified model and roughness. 
+    
+*Inner IOR* |
+    The Index of Refraction of the material, which adjusts the falloff of specular reflections at grazing angles. 
+    
+*Specular Model* |
+    Defines the model to use for specular reflections.
+    
+    * *Phong* (default) - basic plastic-like specular model.
+    * *Blinn* - basic specular model
+    * *GGX* - more realistic specular mode used for Physically Based Rendering
+    
+*Roughness* |
+    Controls the sharpness of the specular reflection. Materials wiith near-zero roughness will have very sharp, bright specular reflects (like shiny metals). Materials with near-one roughness will have dull, wide specular reflections.
+    
+*Shininess* |
+    The opposite of *Roughness*. This is ignored if *Roughness* is present. Unlike *Roughness* this is not a 0 to 1 parameter; instead it ranges from 1 (rough) to infinity (shiny). 
+    
+*Specular Map* |
+    A texture map (RGB or single channel) which can be applied to multiply the *Specular* color. This would have no effect if *Specular Tint* was 0. 
+    
+*Coat Intensity* and *Coat Roughness* maps |
+    Single channel texture maps which mutliply the coat specular intensity and roughness properies (or are the property if the property doesn't exist).
+
+=== Metallic ===
+#display: pull left
+
+*Metallic* properties provide support for both Metallic and dielectric materials, or a blend of both.  A metallic material has a very small diffuse contribution with high specular reflection. Dielectric materials have a large diffuse contribution mixed with specular.
+
+*Metallic* |
+    #width: 30%
+    
+    How metallic the material is, from 0-1. Completely metallic materials (1) have no diffuse lighting at all. A value of 0 will make the material completely dielectric. A value in between will produce a mix of the two, like an oxidized metal.
+  
+*Metallic Edge* |
+    A tint that can be applied to specular reflection at grazing angles.
+  
+*Metallic Map* |
+    A single channel texture map that multiplies the *Metallic* property, which can be used to specify which parts of the material are metallic and which are not.
+
+=== Emission ===
+#display: pull left
+
+*Emission* is independent of lights. It is added to the resulting color from specular, diffuse, and ambient lighting sources. Because of this, emission often needs to be subtle or it will overpower the lighting completely.
+
+*Emission* |
+    #width: 30%
+    
+    the emission color added to the material's lit color. If not set, the emission color from the display options is used.
+    
+*Emission Intensity* |
+    adjusts the amount of emission produced (multiplies *Emission* and *Emission map*)
+    
+*Enable Emission* |
+    When enabled, emission is computed and added to the lit color. When disabled, the emission parameters have no effect and the material does not emit a color.
+    
+*Emission Map* |
+    A color (RGB) or intensity (single channel) texture map used to multiply the *Emission* Color.
+
+=== Opacity and transparency ===
+#display: pull left
+
+*Opacity* can be controlled realistically through *Transparency* and *IOR*, or more specifically through *Alpha* and *Alpha Parallel*. By setting *Alpha* and *Alpha Parallel* to the same value, the material will be uniformly transparent regardless of the incident angle.
+
+*Transparency* |
+    #width: 30%
+    
+    A value from 0 to 1 which determines how much light is transmitted through the material. This also affects the diffuse lighting component, reducing it to zero as transparency climbs to 1. This is used with *Inner IOR* and overrides the *Alpha* properties when present.
+    
+*Inner IOR* |
+    At grazing angles, even completely transparent objects are opaque. The Index of Refraction determines where the material begins completely reflecting light rather than transmitting it. 
+    
+*Alpha* and *Alpha Parallel* |
+    The transparency of the surface at a direct angle (*Alpha*) and a grazing angle (*Alpha Parallel*). These properties are ignored if *Transparency* is present. An Alpha value of 1 is opaque, and 0 is completely transparent (the opposite of *Transparency*). 
+    
+*Opacity Map* |
+    The single-channel opacity map multiplies either the *Transparency* or *Alpha*/*Alpha Parallel* properties. If neither is specified, it acts as *Alpha*. Since most maps are expressed as Alpha, to work as a transparency map the *Invert Opacity Map* property is needed to interpret '0' as opaque and '1' as transparent (as Alpha is the opposite).
+    
+*Enable Alpha and Transparency* |
+    Enables or disables all of the opacity properties. When disabled, the material will be completely opaque.
+
+NOTE: 
+  To get a PBR (physically based rendering) look, the diffuse, specular and metallic edge colors should be the same color (and their intensities tied to a single intensity slider). You can tag the same color parameter with each of those tags. Then tie both diffuse roughness and specular roughness to a single roughness parameter. The specular model should be GGX, and Transparency should be used instead of Alpha. Other useful parameters are metallic and index of refraction. 
+
+
+=== Lighting texture maps ===
+#display: pull left
+
+These textures are all single channel maps that affect various parts of the lighting model. Each has a property to specify the channel to use as the map value (red, green, blue, alpha, or luminance of RGB).
+
+*Coat Intensity* |
+    If non-zero, a shiny coat is added which produce additional specular reflections based on the *Coat Specular Model*. This multiplies the *Coat Intensity* property if present, or specifies it if not. 
+    
+*Coat Roughness* |
+    Multiplies the *Coat Roughness* property, if present, allowing for variations in the coat's specular sharpness.
+    
+*Occlusion* |
+    Multiplies the diffuse intensity. A value of 1 will preserve the diffuse, while 0 will make it black.
+    
+*Metallic* |
+    Multiplies the metallic property if present, or specifies it.
+    
+*Reflect* |
+    Specifies the reflection intensity for reflection mapping. An additional property 'Reflect Multiplies IOR` can be enabled to have the reflection map affect the IOR instead of the reflection intensity.
+    
+*Roughness* |
+    Multiplies the roughness property if present, or specifies it.
+
+NOTE: 
+  In order to support visualization of all these map types, the Graphics hardware and driver must support 32 textures per stage or higher. If it does not, the Coat, Metallic, Occlusion, and Reflection maps will not be shown in the viewport.
+
+=== Geometry texture maps ===
+#display: pull left
+
+Finally, there three texture maps which modify the underlying geometry before lighting is applied. Normal and Bump maps perturb or replace the normals on the model. Displacement mapping moves the surface either along the normal or along a vector it specifies.
+
+*Normal* |
+    Normal maps can be in world space, object space, or tangent space. World and object space maps are good at preserving sharp creases but don't work on deforming geometry, whereas tangent space maps have the opposite properties (good for deformation, bad for creases). Normal maps have a lot of properties which control how they are interpreted, such as flipping the X or Y component. Often these properties will be added as constant GL parameters, or tagged on spare parameters, rather than being tagged on a shader parameter as often the same types of normal maps will be used in a shot.
+    
+*Bump* |
+    Bump maps are a special form of tangent-space normal map. The height of the map and its neighbouring texels is used to determine the direction to move the normal.
+
+*Displacement* |
+    Displacement maps subdivide the underlying mesh and translate the subdivided mesh, giving proper silhouettes that normal and bump mapping cannot. Supported displacement modes are:
+    
+    * Along Normal - a single value which moves the surface up (or down) along the original normal
+    
+    * Vector - an XYZ value which moves the surface in that direction, in one of the following spaces:
+    
+        * World - the XYZ value is a world-space translation.
+        * Object - the XYZ value is an object-space translation.
+        * Tangent - The space is defined by the UV vectors and the normal, and changes along the surface. 
+
+NOTE: 
+  Displacement mapping requires GL4.0 capable graphics hardware. This can be a heavy operation, and weaker GPUs may need the __Displacement Level__ display option reduced for better performance.
+
+
+=== Other material properties ===
+#display: pull left
+
+An environment map can be specified to use for that particular material, which affects the tint of specular reflection. Normally the environment maps from environment lights are used, but this can be used as an override using the *Environment map* property.
+
+There are also two toggles, *Use Geometry Color* and *Use Packed Color* which can disable the tinting of the material by the geometry's `Cd` attribute. If the geometry is inside a packed primitive, both the `Cd` on the packed primitive and the packed geometry can be used (they are multiplied together).
+
+The *Ambient* color property can also be used to affect ambient reflections on metallic objects, but this property is being deprecated.
+
+
+
+
+

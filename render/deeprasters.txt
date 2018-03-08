@@ -1,0 +1,121 @@
+= Rendering extra image planes (deep rasters) =
+
+== Overview ==
+
+You can include extra image planes (also called deep rasters) containing image representations of VEX (the mantra shading language) global variables, or exported variables/parameters from any surface or fog shader.
+
+You can even output extra planes per light if you assign the exported variable inside an illuminance loop.
+
+When rendering to a `.pic` (Houdini image format) or `.exr` (OpenEXR) format image (or the special `ip` name, which outputs to MPlay instead of a file) you can include the extra planes in the same multi-plane image as the main render. You can also specify that extra planes go into multiple separate files (or put multiple extra planes in a separate multi-plane file from the main render).
+
+== Examples ==
+
+For example, you can export the value of the global variable `N` (surface normal) for each pixel to an image.
+
+The rendered color plane: a torus lit from above |
+    [Image:/images/render/deepraster_original1.png]
+The `N` plane, showing the surface normals as color |
+    [Image:/images/render/deepraster_exportN.png]
+
+(You can view the extra plane(s) in [MPlay|/mplay] using the popup menu in the top left under the toolbar.)
+
+Another example: Houdini's basic surface shader exports a variable named `diffuse_color_noshading`, containing the shader's diffuse color contribution before lighting. This can be very useful information to have during compositing.
+
+The color plane: a torus lit from various angles, with point colors |
+    [Image:/images/render/deepraster_original2.png]
+The `diffuse_color_noshading` plane, showing the surface shader's original color contribution before lighting and shadows |
+    [Image:/images/render/deepraster_paintExport.png]
+
+== How to ==
+
+:task:Set up a render node to export an extra plane:
+    # Select the mantra render output node.
+        
+    # In parameter editor, click the __Properties__ tab, then click the __Output__ sub-tab.
+        
+    # Scroll down to the __Extra image planes__ parameter and click the + button next to it to add a new plane.
+        
+        You can add as many extra planes as you need by increasing the __Extra image planes__ parameter. See below for how to set up the plane's parameters.
+
+:task:Output a global or export variable:
+    # Set up an extra plane as shown above.
+    
+    # Click the popup menu button on the right side of the __VEX variable__ parameter and choose a variable.
+    
+:task:Output a shader variable:
+    # For VOP networks, set up a [Bind Export node|Node:vop/bind] for the variable and set its __Export__ parameter to __Always__. For VEX code, mark the variable as exported.
+    
+    # Set up an extra plane as shown above.
+        
+    # In the extra plane's parameters on the mantra render node, set the __VEX variable__ parameter to the name of the parameter you exported.
+        
+:task:Output a variable per-light:
+            
+    Set __Light Exports__ to __Export variable for each light__ on the render node and it will create the proper per light outputs. 
+
+    If you only want one light, you can set __Solo Light__ to the desired light in the __Objects__ tab of the [mantra output driver|Node:out/ifd]. 
+
+== Tips ==
+
+* Mantra doesn't export planes for lights that have zero intensity (because they're not sent to Mantra in the first place). This can cause problems if you're animating the intensity because it will cause a missing frame when the intensity is `0`.
+
+    You can add the light to __Force lights__ (or even put a `*` in that field) on the Mantra render node's __Objects__ tab to force Mantra to render the light even at zero intensity.
+
+== Parameters ==
+
+[Include:/nodes/out/extra_image_planes.txt]
+
+== Exporting components as separate image planes == (export)
+
+The [Mantra node|Node:out/ifd]'s __Output__ tab has a __Export components__ parameter. This is a space-separated list of component names. Components are named in the shader using the __Label__ parameter on VOPs that generate BSDFs. The shaders included with Houdini use component names such as `diffuse`, `reflect`, `coat`, `refract`, and `volume`.
+
+When you add __Extra image planes__, in the pop-up menu next to __VEX variable__ you can choose a type of lighting with "(per component)". This exports separate planes for each of the components listed in the __Export components__ parameter.
+
+If you set __Light exports__ to "Export variable for each light", you can get separate image planes _per light_, _per component_ for maximum compositing flexibility.
+
+== Intrinsic exports ==
+
+The following are deep raster planes that you can specify to get additional intrinsic information. They are in the defaults menu for deep raster planes, along with the PBR planes.
+
+Name ||
+    Type ||
+        Description ||
+Render_Time |
+    Float |
+        Outputs the number of seconds spent rendering the tile as a floating point value.
+Op_Id |
+    Float |
+        Output the object identifier as a floating point value. This plane will store the value specified by the "object:id" object-level setting, or if this setting was not specified, it will store a unique identifier for the object covered by the pixel. Pixels with a value of -1 are not covered by any objects.
+Prim_Id |
+    Float |
+        Output the primitive identifier as a floating point value. This plane will store the geometry primitive number as can be queried in SOPs. Pixels with a value of -1 are not covered by any primitives. For packed primitives, __Prim_Id__ will be set to the primitive id of the packed primitive, not the primitives inside it.
+Shading_Samples |
+    Float |
+        Output the number of transparent samples shaded per pixel sample.  This value is useful for debugging volume and sprite renders to determine how much processing time is spent shading transparent samples.
+Opacity_Samples |
+    Float |
+        Output the number of opacity samples shaded per pixel sample.  This deep raster is only non-zero for renders using stochastic transparency, and is useful to debug the amount of processing time that is spend evaluating opacities before allocating shading samples.  Using a larger volume step size in volume renders will decrease the number of opacity samples, improving performance.
+Pixel_Samples |
+    Float |
+        Output the number of pixel samples that have been computed for each pixel.  This is useful in IPR to examine completion in different parts of the image.
+ray:nts |
+    Float |
+        Output the number of ray tracing traversal steps for primary rays. This plane can be used for low-level debugging of ray tracing performance.
+ray:nets |
+    Float |
+        Output the number of ray tracing leaf node traversal steps for primary rays. This plane can be used for low-level debugging of ray tracing performance.
+ray:nobjs |
+    Float |
+        Output the number of instance object intersections that were performed for the primary ray. This plane can be used for low-level debugging of ray tracing performance.
+ray:nprims |
+    Float |
+        Output the number of primitive intersections that were performed for the primary ray. This plane can be used for low-level debugging of ray tracing performance.
+
+== Compositing ==
+
+In compositing, you should be able to reproduce the `Cf` beauty plane by summing together all the direct_, indirect_, and sss_ planes using a [Layer COP|Node:/cop2/layer] with the __Global Operation__ set to __Add__.
+
+The shadow matte planes can be combined by multiplying the unshadowed plane by the complement ([Invert COP|Node:/cop2/invert]) of the shadow matte.
+
+TIP:
+    When dealing with multi-channel .pic or .exr images, use the [Channel Copy COP|Node:/cop2/channelcopy] to extract a named plane into `C` so that COPs that operate only on `C` operate on that plane.  Set the __Target__ to `C` and the __Source__ to the plane you want to copy.

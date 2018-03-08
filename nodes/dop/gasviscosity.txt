@@ -1,0 +1,118 @@
+#type: node
+#context: dop
+#internal: gasviscosity
+#icon: DOP/gas
+
+= Gas Viscosity =
+
+"""A microsolver that applies viscosity to a velocity field."""
+
+The Gas Viscosity DOP is a microsolver used in building
+larger fluid simulations. 
+Advanced users could try to build an entire new solver out of microsolvers.
+
+The Gas Viscosity DOP applies a viscosity effect to a velocity field.
+A viscosity force causes nearby parts of the liquid to have similar
+velocities.  It can be thought of as a localized drag, where each
+part of the fluid is slowed to the speed of neighboring fluid. 
+
+For small amounts of viscosity, a simple [Gas Blur DOP|Node:dop/gasblur] can be used on
+a velocity field to achieve this effect.  However, this does not scale to large
+viscosities.  It also will dampen rotational motion incorrectly.
+
+The Gas Viscosity DOP performs an implicit solve, similar to what the
+[Gas Project Non Divergent Variational DOP|Node:dop/gasprojectnondivergentvariational]. However, it is approximately three times more complicated, so is correspondingly slower.
+
+NOTE:
+  For most accurate results, the velocity field provided should already be
+  divergence-free, usually as a result of applying the
+  [Gas Project Non Divergent Variational DOP |Node:dop/gasprojectnondivergentvariational].
+  However, the velocity field produced by the viscosity solve may no longer be divergence-free, so a typical viscous fluid solve will solve for non-divergence before and after the viscosity solve.
+
+@parameters
+    Velocity Field:
+        The velocity field to apply viscosity to.
+    Surface Field:
+        An SDF that specifies which voxels are to be considered in the
+        viscosity calculations. Voxels are either inside (less than 0)
+        or outside. Viscosity is only applied on the interior voxels.
+	This avoids 'frame dragging' from the surrounding empty
+	liquid.  If not provided, all of the voxels will be considered.
+    Surface Weights Field:
+	    This field stores what percentage of each voxel is inside the
+	    surface field.  It is usually computed with a [Gas SDF To Fog DOP|Node:dop/gassdftofog].
+    Viscosity Field:
+	A scalar field allowing the viscosity to vary across the
+	fluid.  The value of the field is multiplied with the __Scale__.
+	If not present, this field is assumed to be 1.
+    Collision Field:
+        Velocity values on collision boundaries are considered fixed.
+    Collision Velocity Field:
+	The velocity of each voxel in the collision object.  If not provided,
+        the collision velocities will be assumed to be zero.
+    Density Field:
+	A field that gives the relative inertia of each voxel, allowing
+	for viscosity to take different density fluids into consideration. Often the `massdensity` scalar field is
+	used to avoid confusion with the traditional `density` field of smoke simulations.  If this solver is used in conjunction with the [Gas Project Non Divergent Variational DOP |Node:dop/gasprojectnondivergentvariational]
+        solver, this should be the same field provided to the __Density__
+        parameter there.
+    Scale:
+	The strength of the viscosity effect, multiplied with the
+	viscosity field if present.  
+
+        NOTE: 
+            One of the viscosity field or the scale parameter need to be scaled to reflect the units of the simulation, but not both.  The standard [Flip Fluid Solver|Node:dop/flipsolver] setup uses a dimensionless scale and has the units applied to the viscosity field.
+
+    Min Viscosity:
+	The applied viscosity will revert to zero if less than this
+	minimum.  This helps avoid ill-conditioned matrices that may
+	fail to converge. This value is in units of kinematic viscosity
+        (meters-squared / second), and should be equal to the minimum
+        valid dynamic viscosity divided by the maximum valid
+        fluid density.
+    Error Tolerance:
+	How much error to allow in solving the viscosity equations.
+	Smaller errors will take longer to converge but produce
+	more accurate results.
+    Surface Extrapolation Cells:
+        Extrapolate the surface field into any collision objects if they
+        are within this fraction of a voxel.  This can provide more stable
+        collisions along curved surfaces, although it can also introduce
+        a small amount of stickiness into the fluid-solid collision.
+    Samples Per Axis:
+        The number of samples per axis for supersampling when computing internal surface weights.
+        Total samples is the cube of this, so two samples per axis is actually eight samples.
+    Float Precision:
+        This determines the floating point precision that is used internally by the viscosity solver. __Float 32 bit__ uses less memory and is generally faster than __Float 64 bit__. However, the extra accuracy of 64-bit floating point numbers may be needed when simulating fluid with very high viscosity or large variations in viscosity.
+    Use Preconditioner:
+	During the viscosity solve the matrices involved can be
+	preconditioned to speed up the solution.  However, this is a
+	single threaded process.  On machines with 4+ sockets it may be faster
+	to use a simpler Jacobi preconditioner which multithreads well, but
+	takes 6x more iterations to converge.  
+    Use OpenCL:
+        Solve the linear system for viscosity using OpenCL. This setting can accelerate high resolution fluid simulations with high viscosity, 
+        when run on a fast GPU.
+    Compute Collision Weights:
+        Compute collision weights for the solver in a similar method as surface weights.
+        Using collision weights in the solver helps alleviate grid artifacts that
+        can appear at fluid-solid collisions.
+    Use Waterline:
+	A closed boundary can be set as an open boundary above a specified waterline.
+	The height of the waterline boundary at a particular boundary voxel
+	is described by the waterline level and the waterline "up" direction.
+	
+    [Include:standard_solver_parms]
+
+@inputs
+    [Include:standard_data_inputs]
+
+@outputs
+    [Include:standard_data_outputs]
+
+@locals
+    [Include:standard_data_locals]
+
+    [Include:standard_locals]
+
+

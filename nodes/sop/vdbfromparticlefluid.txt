@@ -1,0 +1,146 @@
+= VDB from Particle Fluid =
+
+#type: node
+#context: sop
+#internal: vdbfromparticlefluid
+#icon: SOP/vdbparticlefluid
+#tags: fluid, surface
+
+"""Generates a signed distance field (SDF) VDB volume representing the surface of a set of particles from a particle fluid simulation."""
+
+This node replaces the [Particle Fluid Surface node|Node:sop/particlefluidsurface]. This node is much faster, uses less memory, gives smoother (less lumpy) results, and has much better "sheeting" (narrow tendrils will appear as connected fluid, instead of a line of droplets).
+
+This node outputs a Signed Distance Field (SDF) VDB the zero-level set of which represents the fluid surface.
+The output VDB can then be converted into a Polygon or PolySoup surface using the [Convert VDB node|Node:sop/convertvdb].
+No points or primitives from the input will appear in the output. 
+
+@parameters
+
+Limit Refinement Iterations:
+    #id:limitrefinement
+
+    When the checkbox is on, the node will only refine the geometry the specified number of times. When off, the node uses as many iterations as it needs to achieve a certain quality. Set this parameter from 1 to 4 to trade speed for quality.
+    
+    The number of iterations chosen by the node is always finite,
+    and the time taken by each iteration drops quickly as the number increases.
+    So, there is little benefit to setting an explicit limit beyond 3 or 4.
+
+Half-Band Voxels:
+    The width (in voxels) of the band around the generated surface on each side of the surface inside which the generated VDB stores detailed values of the output field.
+	Voxels outside this band carry the background value of the VDB (or its negation). 
+
+Rebuild SDF:
+    Converts the output to a standard signed distance field (SDF).
+    If this option is off, the output will be a scalar field for which the zero level set represents the 
+    fluid surface and the signs assigned to voxels agree with those of a standard SDFs 
+    (negative inside the fluid and positive outside of it). However, it is not a proper distance field 
+    in that its non-zero levels do not necessarily represent regular offsets of its 0 level. For example, the 0.1 level surface may not uniformly lie at distance of 0.1 from the 0.0 level surface. Furthermore, the background values of the VDB on the two sides of the surface are -1 and +1. Having this option off may generate a slightly higher quality surface. 
+
+Output Name:
+    The name for the generated field in the output.
+
+== Particles == (particles)
+
+Parameters on this tab control the output resolution, the sizing of the particles, and the extent of particle interaction. 
+
+Resample Input:
+    Resample the particles using the parameters below in order to compensate for irregularities in distribution of particles.
+    This can reduce the number of particles in over-sampled areas, giving better performance and preventing artifacts.
+
+Particle Separation:
+    #id: psep
+    
+    The particle separation used in the simulation. This is used as a unit length for the following next three parameters.
+
+Voxel Scale:
+    #id: voxelscale
+
+    The voxel side length to use for the generated VDB volume.
+    This is a scale on the __Particle separation__ length.
+    For example, if __Particle separation__ is `0.1` and __Voxel size__ is `0.5`,
+    the side length of the voxels of the output field will be `0.05`.
+	
+Influence Scale:
+    #id: influencescale
+
+    The maximum distance at which particles interact.
+    Small increases can give smoother results but increase the cooking time and memory usage greatly.
+    This is a scale on the __Particle separation__ length.
+    For example, if __Particle separation__ is `0.1` and __Influence radius__ is `3`,
+    particles will interact if they are within `0.6` units of each other.
+
+	Generally, higher values give more connected (and smoother) output which resembles fluids at smaller scales.
+	However, increasing this increases the cooking time _cubically_ with respect to the radius over the voxel size, particularly if __Resample Input__ options is not selected. Resampling substantially compensates for the cubic growth in performance, though much less so for the growth in memory usage. 
+
+Droplet Scale:
+    #id: dropletscale
+
+    The approximate desired distance between the particles and the generated surface. 
+    This is a scale on the __Particle separation__ length, and must be smaller than the __Influence scale__.
+    It becomes a scale on the `pscale` attribute value (instead of __Particle separation__ length) 
+    if `pscale` is present.
+    
+    NOTE:
+        This accurately determines the radius of a droplet formed by an isolated particle since in absence of interactions from other particles, the desired distance between a particle and the generated surface is realized exactly in the form of a sphere (droplet) centered at the particle. 
+    
+    You can use the `pscale` attribute to locally manipulate the distance of the surface to particles
+    (pulling it closer or pushing it away).
+    The `pscale` value replaces __Particle Separation__ as the scale by which this parameter is multiplied 
+    to calculate the indented distance of each particle from the surface of the fluid.  
+
+    You must ensure the __Droplet Scale__ times `pscale` value of all particles is smaller than
+    __Influence Radius__ times __Particle Separation__. 
+
+== Tiles == 
+
+The Advanced tab provides control over tiling and memory management aspects of of the fluid surfacing algorithm. 
+
+Tile Size:
+    The size of the cubic "tiles" used by the algorithm. These tiles are visualized in the viewport when the     display flag on this node is on. Tiles can be processed in parallel, so if you have many CPUs you may     want smaller tiles. There is however an overhead in distributing the work into tiles which increases with having more tiles. The amount of memory used by the node is related to tile size and not to the number of tiles. Larger tiles increase the amount of memory used by the node.
+    
+    This value is a scale on the __Influence Radius__ parameter on the __Particles__ tab.
+    So, if you keep the __Influence Radius__ the same, doubling this value increases the memory usage 8 times. Similarly, halving the voxel size would also increase memory usage 8 times.
+    
+Tile Offset:
+	The displacement of the origin of the tile array from the grid origin. Changing this parameter shifts the entire array of tiles by the specified amount (rounded to the nearest multiples of voxel size). Modifying this parameter can reduce the number of tiles which overlap the main body of the fluid and this can noticeably improve the performance of the node. For example, if the fluid simulation contains a shallow pool of water, it is a good idea to have this main pool (ignoring the splashes) covered by as few rows of tiles as possible. 
+
+NOTE:	
+	It is very important to have the __Tile Offset__ set to a fixed value for the entire range of frames for which the fluid is being surfaced as this ensures frame-to-frame coherence between the generated surfaces. 
+
+Additional Padding:
+    The amount of extra overlap between adjacent tiles.
+    The larger the padding, the lower the risk of inconsistencies between tiles, but at the same time, the more 
+    the amount of work the node has to do per tile. Increasing this value can greatly increase the cooking time 
+    of the node. Increasing this beyond `3` generally has little to no benefit.
+    
+    This value is a scale on the __Influence radius__ parameter on the __Particles__ tab.
+    
+	The padding amount should be less than half the size of the tile. 
+
+Limit Physical Memory %:
+    #id: memoryusage
+    
+    If turned on, the maximum _percentage of the computer's total memory_ to use for the node's work buffer.
+    
+    This does not affect the amount of memory used by the field created by the node.
+    
+    Large __Tile size__ and __Additional padding__ values may make it impossible to fit within this restriction.
+    In that case, the node will stop and display an error.
+    If the amount of memory is too small to use all available CPUs, the node will display a warning.
+
+Visualize:
+    The choice of visualization of __Tiles__ or __Padded Tiles__ (or both) used for the breakdown of the surfacing job. 
+
+NOTE:
+    You can press ((MMB)) on the node to see the number of CPUs it used.
+
+@inputs
+
+Particle Fluid Field:
+    The particle geometry to generate a surface around. In general you will connect the particle field from a particle fluid simulation, however any set of points may be used as an input to this SOP.
+
+@related
+
+- [Node:dop/particlefluidobject]
+- [Node:dop/particlefluidsolver]
+- [Node:sop/particlefluidsurface]

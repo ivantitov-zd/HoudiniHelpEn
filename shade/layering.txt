@@ -1,0 +1,166 @@
+= Layering shaders =
+
+"""How to mix and layer two or more materials together to create a combined material."""
+
+
+== Overview ==
+
+You can layer the output of [shader VOPs|workflow], mixing the results of two or more shaders, and controlling the mix with a texture map.
+
+:fig: [Image:/images/shade/layermix_nodes.png] [Image:/images/shade/layermix_result.jpg]
+
+    You can layer and mix the "layer" outputs of high-level shaders to create new layered materials. The `ShaderLayer` struct combines:
+
+    * Surface components such as BSDF and opacity.
+
+    * Displacement components such as the displaced position and normal.
+
+    * Export maps such as diffuse color, normals, occlusion, roughness, and specular. The layer mixing VOPs mix these exports as well as the surface and displacement shaders.
+
+    Because displacement and maps are part of the layer, layering or mixing shaders mixes the displacements and export maps as well, making layering an easy one-step process.
+    
+    The shaders contributing the layers are usually [cached|precompile] and they contribute information (BSDF, etc.) but don't run light loops themselves, so layering has very little cost.
+
+    Use the [Layer Mix|Node:vop/layermix] node to combine layers.
+    
+    * You can vary the alpha blending between the layers by connecting a texture to the `alpha` input.
+    
+    * You can choose whether to mix surface and/or displacement.
+
+
+== Building a layered material ==
+
+# In the network editor, choose __Go > Materials__ to switch to the material network.
+
+# Create the material nodes you want to mix together.
+
+    Materials must have a layer output to be mixable. Pre-made materials included with Houdini should all have a layer output. You can [add a layer output to your own custom materials|build#layeroutput].
+
+# Create a [Layer Mix VOP|Node:vop/layermix] and connect the layer outputs of the materials you want to mix to the Layer Mix node's A and B inputs.
+
+    You can choose how to mix the two materials using the Layer Mix node's parameters.
+    
+    You can mix more than two materials feeding the output of the Layer Mix and another material into another Layer Mix.
+
+If you are creating loose nodes at the `/mat` level, you can assign the Layer Mix node at the end of the chain as a material, or select the mixing chain and choose __Edit > Collapse into material__ to create a material builder from it. *This is the easiest way to creating a mixing material*.
+
+If instead you are already building inside a material builder network, you need to use a [Surface Exports VOP|Node:vop/surfaceexports] and [Displace Exports VOP|Node:vop/displaceexports] (if the material includes displacement) to pull the values needed by the Output nodes out of the layer struct.
+
+See [understanding shader outputs|build#shaders] for more information about the relationship between layers and shaders.
+
+
+== Combining BSDFs == (bsdfs)
+
+:col:
+    If you want to build something a little more custom, without having to write all the lighting code and BSDFs yourself, you can use nodes that generate useful basic BSDFs/layers such as diffuse, reflective, and glass. These nodes are in the __Shading (BSDFs)__ category in the ((Tab)) menu.
+
+:col:
+    :imagegrid:
+        * [Image:/images/shade/pbr_diffuse.jpg]
+          Diffuse
+        * [Image:/images/shade/pbr_sss.jpg]
+          SSS
+        * [Image:/images/shade/pbr_reflection.jpg]
+          Reflection
+        * [Image:/images/shade/pbr_metallic.jpg]
+          Metallic
+        * [Image:/images/shade/pbr_emission.jpg]
+          Emission
+        * [Image:/images/shade/pbr_glass.jpg]
+          Glass
+
+~~
+
+:col:
+    These nodes take a `base` layer input (where it makes sense) that let you easily combine them with other layers/BSDFs. The nodes take care of the physical aspects of combining the looks (fresnel components, energy conservation) automatically.
+
+:col:
+    [Image:/images/shade/bsdf_base.png]
+
+<!--
+
+[Image:/images/shade/panther_diffuse.jpg] Diffuse |
+    [Image:/images/shade/panther_reflect.jpg] Reflect |
+        [Image:/images/shade/panther_diffuse_reflect.jpg] Diffuse + Reflect
+~~
+-->
+
+[Image:/images/shade/panther_metallic.jpg] Metallic |
+    [Image:/images/shade/panther_reflect2.jpg] Reflect |
+        [Image:/images/shade/panther_metallic_reflect.jpg] Metallic + Reflect
+
+<!--
+~~
+[Image:/images/shade/panther_sss.jpg] Refract |
+    [Image:/images/shade/panther_texture.jpg] Emission |
+        [Image:/images/shade/panther_reflect.jpg] Reflect |
+            [Image:/images/shade/panther_sss_texture_reflect.jpg] Refract + Emission + Reflect
+-->
+
+
+== Useful nodes ==
+
+You can combine layers using the following nodes in the __Shading Layers__ submenu:
+
+[Layer Mix|Node:vop/layermix] |
+    Displays the "A" input over the "B" input, using an alpha map input to blend between them. This is the most commonly useful method of combining layers.
+
+[Layer Composite|Node:vop/layercomp] |
+    This is more complex than [Layer Mix|Node:vop/layermix], but has more options for how to combine the two layers. It has separate alpha maps for each layer, and lets you choose the method for compositing the two layers.
+
+
+== Packing and unpacking a layer ==
+
+If you want to modify the components of a ShaderLayer struct, you can:
+
+* Break out all components with [Surface Exports|Node:vop/surfaceexports] or [Displacement Exports|Node:vop/displacementexports].
+
+* Build a new `ShaderLayer` struct from components with [Layer Pack|Node:vop/layerpack].
+
+* Extract a single component with [Get Layer Export|Node:vop/getlayerexport].
+
+* Set a single component with [Set Layer Component|Node:vop/setlayercomponent] (if which component to change is known ahead of time) or [Set Layer Export|Node:vop/setlayerexport] (if the name of the component to replace comes from a string value).
+
+For example, you might need to use a low-level node that has a BSDF (`F`) input, but you only have a `layer`, you can break out the `F` from the layer using [Surface Exports|Node:vop/surfaceexports], modify it, and then put it back in the layer using [Set Layer Component|Node:vop/setlayercomponent].
+
+
+== Layering material properties ==
+
+Currently Houdini does not blend property values if the layered materials have [render properties|build#props]. This is because the code can't know how to combine the values (depending on the property, it might make sense to add the values, multiply them, take the maximum, blend by a certain amount, or use some other method).
+
+For now the only way to get properties on a layered material is to explicitly [add the properties in the final layered material|build#props], just like any other material.
+
+It's possible future versions of Houdini may have a solution for configuring how to blend property values in a layered shader.
+
+
+
+<!--
+=== Example ===
+
+Do the following to mix two [Node:vop/principledshader]s using a texture:
+
+# In a [Material Shader Builder network|build], create a [Node:vop/principledshader] node. Houdini will automatically create [Node:vop/computelighting] node to generate the required outputs for the shader.
+
+    [Image:/images/shade/layering_shadereffects1.png]
+
+# In the network editor, ((MMB)) on the [Node:vop/computelighting] node's __layer__ input.
+
+# ((LMB)) on __Layer__ > __Layer Mix__. This will insert a [Node:vop/layermix].
+
+    [Image:/images/shade/layering_shadereffects2.png]
+
+# ((MMB)) on the [Node:vop/layermix] node's __B__ input.
+
+# ((LMB)) on __Shaders__ > __Principled Shader__. This will attach another [Node:vop/principledshader] node to the [Node:vop/layermix] node.
+
+    [Image:/images/shade/layering_shadereffects3.png]
+
+# ((MMB)) on the [Node:vop/layermix] node's __alpha__ input.
+
+# ((LMB)) on __Texture/Geometry__ > __Surface Color__.
+
+    [Image:/images/shade/layering_shadereffects4.png]
+
+The output of the two shaders will now be mixed using the texture values from the __Surface Color__ node.
+-->
+

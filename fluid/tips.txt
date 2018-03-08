@@ -1,0 +1,41 @@
+= Particle fluid tips =
+
+* If a collision/container wall is too thin, the particles can collide with the wall but the pressure solve step may not see it, causing particles to "stack up" against the wall instead of bouncing off it, making the liquid appear to compress and disappear. Increasing the thickness of the collision geometry will fix this (note that you can use different geometry for creating the collision field and for rendering, so you can still render a thin container wall).
+
+    (Alternatively you could decrease the particle scale to the point where the pressure step will work because the collision grid will be fine enough to resolve the thin container wall.)
+
+* If you are animating source/collision geometry at the SOP level, you need to tell the FLIP Solver to look for point-based collision velocities. On the FLIP Solver's __Collisions__ tab, set __Velocity Type__ to "Point". It's usually a good idea to add a [Trail SOP|Node:sop/trail] to your collision object set to "Compute Point Velocities". Once you do that you should see good collision velocities in the visualization.
+
+    (When animating geometry for use with dynamics, remember to use `$FF` (fractional frame) or `$T` (time) in animation expressions instead of `$F` (frame number) for proper sub-frame interpolation.)
+
+* To get foam/white-water on splashes, take the velocity field from the fluid simulation and use it to advect "white" particles created within a tolerance of an SDF of the fluid surface.
+
+* If you're seeing unexpected collision behavior, turn on the __Collision Velocity__ visualization option on the FLIP object and make sure the solver is seeing reasonable velocities.
+
+* To create a more interesting fluid from an emitter, use an interesting shape (for example, a torus or tube rather than a sphere) and add noise to the emission velocities.
+
+    The fluid particles use the value of the `v` (velocity) attribute on the point they are birthed from as their initial velocity, so you can control the emission velocities by setting `v` in the geometry network of the source object.
+
+* By default, the fluid particles will be emitted from the _points_ of the geometry. To emit a solid stream of particles, scatter points within a volume and use the scattered points as the emission geometry. However, "shell" emitters with more points at the boundaries and fewer in the interior give more interesting results.
+
+    You can turn off __Stream emission__ on the Particle Fluid Emitter object to emit particles using the same kinds of controls as in a plain particle emitter.
+
+* Resize the clipping box to the size of your visible effect to avoid wasting computing resources on particles outside the shot.
+
+* On the FLIP solver, the __Smoothing__ parameter on the __Volume Motion__ tab lets you blend between look where individual particles are free to each moving in their own direction (__Smoothing__ = `0`) or a smooth flow where neighboring particles move in the same direction (__Smoothing__ = `1`).
+
+* On the FLIP solver, you can make the fluid cling more to collision objects by turning on __Sticky fluid__ in the __Volume Motion > Projection__ sub-tab.
+
+* By default, FLIP fluids slide over colliding surfaces. To make the fluid stick to the colliding surface, on the FLIP solver, turn on __Stick on Collision__ on the __Volume Motion__ tab.
+
+* You can use dynamics forces, such as the [Fan force|Node:dop/fan] to influence the fluid.
+
+* You can extract the computed velocity field from a FLIP fluid (the `vel` field), for example using a [DOP Import Fields surface node|Node:sop/dopimportfield] in a geometry network, and use the field to drive other effects. For example, you could use the field to drive the motion of a plain particle simulation to simulate debris suspended in the fluid.
+
+* To make a high-resolution particle fluid system run faster for prototyping or visualization, you can simulate just a slice of the system using the tools normally used for distributing to a simulation farm.
+
+    Use the [Icon:DOP/sliceplane] [Slice|/shelf/slice] and [Icon:DOP/slicealongline] [Slice Along Line|/shelf/slicealongline] tools on the __Particle Fluids__ shelf tab to slice the system into regions. Then click the [Icon:SHELF/distribute_fluid_sim] [Distribute|/shelf/distribute_pfluid] to set up the distribution nodes.
+    
+    Finally, you can select the "control" node created by the distribution tool and set the __Slice__ parameter to the slice number you want to view. (You can turn the distribution system off by bypassing the Gas Net Slice Exchange node).
+
+* To make particle fluids affect the motion of objects they collide with, turn up __Feedback Scale__ on the FLIP solver's __Volume Motion > Projection__ sub-tab. This value needs to be scaled according to the mass of the objects you need to push around and the mass of the particles, so values in the 100s may be necessary.

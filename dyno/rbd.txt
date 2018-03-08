@@ -1,0 +1,210 @@
+= Rigid body dynamics =
+
+== Overview ==
+
+The [Rigid Body solver|Node:dop/rigidbodysolver] simulates the motion and collisions of objects as if they were hard, solid objects (as opposed to other types of simulated objects such as fluids, cloth, and soft bodies). Rigid Body Dynamics is often abbreviated as _RBD_.
+
+RBD objects can be _active_ or _passive_. Active objects are affected by forces and collisions. Passive objects can be collided with by active objects, but don't move, and are not affected by forces.
+
+See [how to switch between keyframe animation and simulation|keyframe].
+
+:vimeo:113103248
+
+== How to ==
+
+# [Model|/model] a [geometry object|/basics/objects] containing the geometry you want for the rigid body.
+
+# [Select|/basics/select] the object.
+
+# On the [Rigid bodies|/shelf/rigidbodies] tab of the shelf, click one of the tools below to automatically create the dynamics nodes to put the object under simulation control.
+
+The tools on the [Rigid bodies shelf tab|/shelf/rigidbodies] let you create and constrain rigid body simulation objects.
+
+[Icon:DOP/rbdobject] [RBD Object|Node:dop/rbdobject]:
+    Creates a rigid body dynamic object from a [geometry object|/basics/objects]. 
+
+[Icon:DOP/rbdfracturedobject] [RBD Fractured Object|Node:dop/rbdfracturedobject]:
+    Creates a number of rigid body dynamic objects from a [geometry object|/basics/objects].
+
+    The individual RBD objects are created from name attributes you create beforehand in the geometry. You can either cut up the geometry manually, or use the [Break|Node:sop/break] on the [Model shelf tab|/shelf/model].
+
+    This tool is useful to simulate an object shattering, since it does not require much force to break the object apart.
+    
+[Icon:DOP/staticobject] [Static Object|Node:dop/staticobject]:
+    Creates a _static_ rigid body object from a [geometry object|/basics/objects].
+    
+    A static object participates affects other objects in the simulation (for example, other objects can bounce off it), but its motion is not controlled by the simulation -- it does not bounce off other objects, or fall according to gravity, or move at all unless you animate it.
+
+    This is useful for creating rigid objects that are extremely heavy or should will not move in your simulation, such as a table on which other objects sit.
+
+[Icon:DOP/rbdpointobject] [RBD Point Object|Node:dop/rbdpointobject]:
+    Creates a new simulation object _at each point_ of a source [geometry object|/basics/objects], similarly to how the [Copy surface node|Node:sop/copy] works.
+
+    This is useful for simulating a large collection of identical objects, such as a pile of cans in a grocery store or a forest of trees.
+
+[Icon:DOP/groundplane] [Ground Plane|Node:dop/groundplane]:
+    Creates an infinite ground plane suitable for RBD, cloth, or wire simulations. The ground plane is a type of _static_ rigid body (see Static Object above).
+
+[Icon:DOP/terrainobject] [Terrain Object|Node:dop/terrainobject]:
+    Creates a terrain object from a [geometry object|/basics/objects]. The terrain object is a type of _static_ rigid body (see Static Object above).
+    
+    Whereas the Ground Plane tool creates a perfectly flat static ground object at the origin, this tool lets you select a 3D surface (for example, a deformed [grid|Node:sop/grid] representing terrain) and automatically turn it into a suitable static ground object.
+    
+    Unlike the Ground Plane, which is infinite, the simulation object created by this tool is only as big as the original geometry.
+
+== Rigid body constraints ==
+
+There are also several constraints you can use with rigid body objects. For more information see the following:
+
+* [RBD Pin Constraint|Node:dop/rbdpinconstraint]
+* [RBD Hinge Constraint|Node:dop/rbdhingeconstraint]
+* [RBD Spring Constraint|Node:dop/rbdspringconstraint]
+* [RBD Angular Constraint|Node:dop/rbdangularconstraint]
+* [RBD Angular Spring Constraint|Node:dop/rbdangularspringconstraint]
+* [Parent Constraint|/shelf/parentconstraint]
+
+== Choosing a solver type == (rbd_solvers)
+
+The [Rigid Body solver|Node:dop/rigidbodysolver] lets you choose between three different "engines" to do the actual solving, each with advantages and disadvantages.
+
+You set the solver type using the Rigid Body solver's __Solver engine__ parameter. If you choose ODE or Bullet, each [RBD Object|Node:dop/rbdobject] has sub-tabs on the __Collisions__ tab to set ODE and Bullet specific options (such as the collision shape for ODE).
+
+(The [Rigid Body Solver node|Node:dop/rigidbodysolver] Houdini creates when you use the shelf tools is an asset that encapsulates sub-solvers for each engine. Scenes created with old versions of Houdini may have the traditional Houdini solver node, which does not have an option to switch to a different solving engine.)
+
+table>>
+    tr>>
+        th>>Engine
+        th>>Advantages
+        th>>Limitations
+    tr>>
+        td>>Bullet
+        td>>
+            This is the new default solver in Houdini 12. It is faster than the Houdini RBD solver and can handle large data sets.
+            
+            Supports dynamic fracturing, and is the only solver that can support the [glue adjacent feature|#glue_adjacent].
+        td>>        
+            The Bullet solver does not have the option to distinguish resting impact in impact data.
+        
+            Does not support scaling at the object level.
+    tr>>
+        td>>Houdini RBD
+        td>>
+            This was Houdini's native rigid body collision solver, so it supports all of Houdini's rigid body simulation features (forces, constraints, etc).
+    
+            The most important advantage of Houdini's RBD is that it can handle collisions between geometry of any shape.
+        td>>
+            Slower than ODE and Bullet.
+    tr>>
+        td>>ODE (Open Dynamics Engine, [home page|http://www.ode.org/])
+        td>>
+            An open-source RBD solver optimized for fast simulation of simple collision geometry (such as boxes, spheres, cylinders, and capsules). This will often increase performance where the geometry matches ODE's simplified shapes, for example simulating the rectangular bricks in a collapsing brick wall.
+            
+            ODE is really good at handling large numbers of simple objects. It is very fast in these situations, even when all the objects are stacked on top of each other.
+            
+            Since it is very easy to switch between RBD and ODE, it's possible to do a quick simulation using ODE before switching to RBD for a more detailed simulation.
+        td>>
+            ODE only solves collisions between boxes, spheres, and other geometric primitives. Your geometry doesn't necessarily have to _look like_ a geometric primitive, but it will _collide as if it was shaped like one_.
+        
+            ODE does not support glue or fracturing.  
+        
+            ODE does not support collision between triangle meshes. Object collision hulls in ODE must be composed of geometric primitives, such as boxes, spheres, etc.
+        
+            Does not support scaling at the object level.
+
+== Glue ==
+
+Houdini lets you "glue" disconnected RBD objects together. The objects
+stay together until forces pulling them apart exceed the strength of the glue.
+
+There are two main workflows for using glue: Glue an ordinary RBD object to another, or create "chunked" geometry (where the geometry is actually made up of individual pieces in groups) and import it as pieces glued together.
+
+This feature is especially useful for breaking an object into chunks,
+gluing them together, then colliding the glued object with another
+object to make the glued object "shatter".
+
+:task:Glue one RBD object to another:
+    # In the RBD object's parameters, click the __Glue__ tab. Set
+      the __Glue to object__ field to the name of the RBD object you
+      want to glue this object to.
+
+    # Set the __Glue strength__ and __Glue impulse half life__ to
+      control how much force is required to break apart the glued
+      objects. See the online help for the [RBD Object
+      operator|Node:dop/rbdobject] for information on these
+      options.
+
+:task:Set up chunked geometry:
+    # In a Geometry object or SOP network, create the pieces of the
+      model.
+
+    # Assign the geometry of each piece to a  [group|/model/groups].
+
+      Use meaningful names with a pattern (for example, `chunk1`,
+      `chunk2`, `chunk3`, or `chunk_leftarm`, `chunk_head`,
+      `chunk_rightleg`). This will let you pick out the groups using
+      the pattern parameter in the glue object.
+
+    # Merge them together to create the final geometry.
+
+:task:Import chunked geometry as glued-together RBD objects:
+    # Use the  [tab menu|/basics/tabmenu]  to create an [RBD Glue Object
+      node|Node:dop/rbdglueobject].
+
+    # In the glue object's parameters, click the + button next to
+      the __SOP path__ parameter and choose the SOP node or SOP
+      network containing the chunked geometry (see above).
+
+    # Use the __Group mask__ pattern to choose which groups to
+      import as pieces (for example `chunk*`), or leave it as `*` to
+      use all groups.
+
+    # Click the __Internal Glue__ tab, and set the __Glue strength__
+      and __Glue impulse half life__ to control how much force is
+      required to break apart the glued objects. See the online help
+      for the [RBD Glue Object operator|Node:dop/rbdobject] for
+      information on these options.
+
+== Glue adjacent == (glue_adjacent)
+
+TBD.
+
+== Important RBD Object parameters ==
+
+Use deforming geometry:
+    For efficiency, the dynamics engine does not use animated geometry by default. To have the RBD object use animated geometry, set __Use animated geometry__ to `1` in the RBD Object's parameters. You can animate the value of this option, so you can only use animation in the time periods where it matters, and switch back to static geometry in other places for efficiency.
+
+Number of objects:
+    # In an RBD Object's parameters, set the __Number of objects__
+      parameter.
+
+      The RBD object node creates multiple copies of the object, but
+      creates them at the exact same position, so they overlap and
+      still appear to be one object. You need to use an expression
+      in the object's __Position__ parameter to space them out.
+
+    # In the __Position__ parameter (on the __Initial State__ tab),
+      enter an expression that uses the `$OBJ` ("object number")
+      local variable to position the copies.
+
+      For example, use `$OBJ * 2` in the __Position X__ field to
+      space the copies 2 units apart along the positive X axis. The
+      expression is evaluated for each copy with $OBJ set to the
+      current copy number.
+
+== Tips ==
+
+* A convenient way to create a shatter an object is to start with the whole model and cut it up into chunks using the [Cookie SOP|Node:sop/cookie] and a cutting surface such as a sphere (to create smooth cuts), or a jagged polygonal surface.
+
+    Connect the results of each cookie to a [Group SOP|Node:sop/group] to create the "chunk" groups. Then use a [Merge SOP|Node:sop/merge] to merge the resulting chunks together.
+
+* A useful way to create groups out of large numbers of disconnected
+    "chunks" of geometry is to use the [Connectivity SOP|Node:sop/connectivity]
+    followed by the [Partition SOP|Node:sop/partition].
+    
+    Connectivity creates an attribute (`class` by default) and assigns it a unique value each set of connective primitives or points. You can then use Partition to make groups. In the __Rule__ parameter, enter a group name containing the `$CLASS` variable, for example `chunk$CLASS`.
+
+@related
+
+- [cache]
+
+

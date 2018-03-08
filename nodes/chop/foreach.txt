@@ -1,0 +1,112 @@
+﻿= Foreach =
+
+#type: node
+#context: chop
+#internal: foreach
+#icon: CHOP/foreach
+
+"""Divides the input channels into groups, cooking the contained network for each group."""
+
+Foreach is a specialized subnet which processes its channels in small
+groups, by cooking the contained network multiple times for each group. This 
+makes processing of hundreds of particles or objects much easier to manage since 
+the network only needs to be designed to handle a single object.
+
+By specifying a channel group pattern, the channels of input 1 are sorted into
+groups. Each group is processed by the subnet without the other channels.
+The channel names within the subnet have the channel group name removed from
+them, so that they are always consistently named. The subnet may manipulate
+the channels in any way, by adding, modifying, renaming or removing channels. 
+The remaining channels at the output of the subnet are added to the Foreach node's 
+output channels by reintegrating the channel group name back into them.
+
+The subnet contains a For node, 4 subnet inputs, and an Output node. The For
+node contains the channels of the currently processed channel group. The first
+subnet input contains all the channels that are being iterated over, in case
+collision detection or some other inter-group relationship needs to be 
+performed. The other 3 subnet inputs allow for constant input to the subnet.
+
+The output node is a convenience.  The Foreach draws its output from the node
+with the Audio flag set. 
+
+The current loop iteration can be queried from the For CHOP's 'Current Loop 
+Index' parameter using a ch() expression.
+
+Note: 
+      Channels that are not assigned to a channel group will not be processed
+      or present in the output.
+
+@parameters
+
+== Foreach ==
+
+   Channel Group:
+      A set of patterns which describe the members of the channel groups. A 
+      wildcard `*` is used to indicate the varying part of the channel name.
+      A channel group is formed by the channels that match the patterns when
+      `*` is replaced by the channel group name.
+
+      For example, a pattern of `leg*:tx leg*:ty leg*:tz` would create a 
+      channel group called `4` when `leg4:tx`, `leg4:ty` and `leg4:tz` are in the 
+      channels of input 1. 
+
+      Note: 
+      	    The channel group does not need to be numeric. The match pattern 
+	    could be `*:tx *:ty *:tz`, giving a channel group of `leg4` 
+	    in the above example.
+
+   Channel Indexing:
+      The channel group name is stripped out of the channels inside the subnet
+      so that the channel names remain constant within the loop. When these 
+      channels are added to the Foreach CHOP, their names are combined with the
+      channel group name to create a unique name for every channel in the 
+      channel group.
+
+      Append:
+          The channel group name is appended to the channel name.
+
+      Replace Token:
+          A text string is used to identify where the channel name should be
+          inserted into the channel name. 
+
+      Insert at First Separator:
+          The channel group is inserted before the first : or / separator
+	  in the channel name.
+
+      Insert at Last Separator:
+          The channel group is inserted before the last : or / separator in
+	  the channel name.
+
+   Group Token:
+      The token being replaced when the __Channel Indexing__ mode is Replace. It
+      should be a text string that isn't going to naturally occur in your 
+      channels (ie, 't'). Each of the output channels inside the Foreach CHOP
+      should contain this token somewhere in their name (ie, handIDX:tx, for
+      a token of IDX).
+
+   Renumber From:
+      If enabled, the channel group name is ignored and replaced with a number
+      starting at the specified index, increasing by 1 for each loop.
+
+   Preview Groups:
+      If enabled, only the specified channel groups are processed. This allows
+      for a quick preview of a fraction of the groups.
+
+   Debug Group:
+      If enabled, the specified channel group is processed last. This leaves 
+      the contained subnet in the state that cooked this channel group, so that
+      problems can be investigated and debugged. This only works for a single
+      channel group.
+
+[Include:common#common]
+
+@locals
+
+IDX:
+        Loop index.
+GRP:
+        Group name.
+
+@related
+    - [Node:chop/for]
+

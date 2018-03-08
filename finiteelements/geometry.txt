@@ -1,0 +1,82 @@
+= Modeling for finite elements =
+
+
+== Guidelines ==
+
+* The geometry input must be airtight with no self-intersections.
+
+* Always model your objects to real size. Make sure you set the correct __Unit Length__ in the Hip File Options *before* you start creating your DOP network.
+
+
+== Manually creating tet meshes ==
+
+The [Solid shelf tools|/shelf/solid] will automatically add nodes to the geometry network of your objects to convert them to tetrahedrons before importing them into the simulation network.
+
+However, if you want to convert geometry to tetrahedrons yourself for more control, use the following guidelines for good results.
+
+* Use the [Solid Embed SOP|Node:sop/solidembed] to create a tetrahedral mesh from geometry.
+
+    The Solid Embed SOP is usually the most effective option for finite element simulation. It may create a tetrahedral mesh that is slightly larger than the input surface representation. You can control the resolution of the tet mesh with the "Sizing" parameters on the node.
+
+* If you want the tet layout to match the source polygons exactly, use the [Solid Conform SOP|Node:sop/solidconform] instead of Solid Embed. This may be necessary if you needs to match the render geometry exactly, or you want complete control over tet orientation.
+
+    This may be the case when finite elements is used with very detailed character animation. However, you should not use Solid Conform directly on a render-quality geometry. Models that are used for rendering typically contain too many polygons to make a fast simulation possible. Also, the shapes of the polygons in a rendering geometry are a poor choice for finite element simulation, leading to poor simulation speeds.
+    
+    When a rendering model is all that's available, you should first apply a [Remesh SOP|Node:sop/remesh] before the Solid Conform.
+
+* For most types of simulations, you should use the [Solid Embed SOP|Node:sop/solidembed] to create a tet mesh. However, if you want more control over the tetrahedral mesh, you may use the lower-level [Tetrahedralize SOP|Node:sop/tetrahedralize] directly. 
+
+    If you choose to go this route, always leave the __Quality__ option enabled. The finite element solver will warn you about badly shaped tetrahedrons.
+    
+    Increase the quality settings if necessary.
+    
+    Often it helps to use a [Remesh SOP|Node:sop/remesh] before your [Tetrahedralize SOP|Node:sop/tetrahedralize].
+    
+    If you're using a tetrahedron mesh from a different source, you can improve the quality of it using the __Refine Existing Tetrahedron Mesh__ option on the [Tetrahedralize SOP|Node:sop/tetrahedralize].
+
+
+== Tips and notes ==
+
+* Don't worry too much about getting a high-resolution tet-mesh. That is what [embedding|about#embedding] is for.
+
+* Avoid tetrahedrons with very small edges and small internal angles. The more regular (equal length sides) each tetrahedron, the better. If the polygonal mesh that you start with has very irregular triangles, use a [Remesh node|Node:sop/remesh] before the tetrahedralizing.
+
+* You can look at slices of your tetrahedron mesh using the [Clip geometry node|Node:sop/clip].
+
+* Make sure you don't have points very close together. This creates self-collision problems. You should either remove or fuse such points. (The [Fuse node|Node:sop/fuse] tends to create tetrahedrons in which the same point occurs multiple times as a vertex. The [PolyDoctor node|Node:sop/polydoctor] can help fix this problem.)
+
+* Larger objects (in world size) take longer to simulate.
+
+* If your simulation is very slow, try reducing the tetrahedron resolution. You can see the number of tetrahedrons in a model by pressing ((MMB)) on a node in the geometry network.
+
+* Be careful if you SOP Solvers with finite element simulations. Unlike other solvers (for example, the Grain Solver), you should not directly modify the position (`P`) and velocity attributes (`v`) in a finite element simulation. If you want to influence a finite element simulation, use the target constraints instead.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

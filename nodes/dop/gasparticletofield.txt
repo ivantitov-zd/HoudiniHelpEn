@@ -1,0 +1,125 @@
+#type: node
+#context: dop
+#internal: gasparticletofield
+#icon: DOP/gas
+
+= Gas Particle to Field =
+
+"""A microsolver that copies a particle system's point attribute into a
+field."""
+
+The Gas Particle to Field DOP is a microsolver used in building larger
+fluid simulations. The [Fluid Solver|Node:dop/fluidsolver] and [Smoke Solver|Node:dop/smokesolver] DOPs that allow
+microsolvers to be added before or after the main solver step to extend
+or tweak the simulation. Alternatively, enterprising people may attempt
+to build an entire new solver out of microsolvers.
+
+The Gas Particle to Field DOP copies a point attribute value from a
+particle system into a field.
+
+
+@parameters
+    Destination Field:
+        This is the field that the result of the calculation will be
+        applied to. It should be the same dimension as the particle
+        attribute.
+    Particles:
+        The geometry whose point attributes will be copied to the
+        destination field.
+    Particle Group:
+        An optional point group to specify the points whose attributes will be copied.
+    Use Attribute:
+	If a point attribute isn't used as the source, each point will
+	be treated as if it had a point attribute with value of 1.
+    Attribute:
+        The name of the point attribute that will be copied to the
+        destination field.
+    Accumulated:
+        If accumulation mode is set each particle will only affect the
+        eight voxels whose centers that it is closest to. A trilinear
+        interpolation will be done to scale the particle's value for
+        each of those voxels according to how close the particle is to
+        the center of the voxel. 
+
+	When used with the Add calculation
+        method, this has the advantage of preserving the total value of
+        the particle attributes.
+    Extrapolated:
+        If a voxel cell is outside of the radius of any particles it
+        will use the value of the nearest particle. Extrapolation can be
+        expensive when performed far away from dense particle sets.
+    Use Max Extrapolate Cells:
+        Determines if extrapolation should be capped at a certain
+        number of voxel cells from the particles. This allows one to
+        fill holes in the particle data without having to extrapolate
+        for the entire voxel volume.
+    Max Extrapolation Cells:
+        The number of cells to extrapolate. This value is multiplied by
+        the maximum cell dimension and used as a distance cap for how
+        far away from the particle system that extrapolation should
+        occur.
+    Use Max Extrapolate Distance:
+        Determines if extrapolation should be capped at a certain
+	distance from the particles. This allows one to fill holes in
+	the particle data without having to extrapolate for the entire
+	voxel volume.
+    Max Extrapolation Distance:
+        The distance extrapolate.  The maximum of the cell
+	extrapolation and the raw distance extrapolation is used as
+	the extrapolation cap.
+    Threshold:
+        The total weight contributed by particles to the cell are
+        normalized if it is greater than the threshold. If the weight is
+        less than the threshold, the particle attribute values will not
+        be normalized and hence drop to zero.
+    Bandwidth:
+        This value is only used if extrapolation is turned off. The
+        bandwidth is specified in cells, so the value is multiplied by
+        the largest cell dimension. 
+
+	All particles have their effective
+        radii increased by the bandwidth value. This can ensure small
+        radius particles are always sampled in a resolution independent
+        manner.
+    Assume Uniform Radius:
+        All particles are assumed to have the same uniform radius as the first particle, and internally a faster algorithm can be used for spatial lookup that scales well to millions of input points.
+    Extrapolation Index:
+        An index field containing point numbers whose values can be used for extrapolation when Assume Uniform Radius is enabled. This field can be useful for extrapolating values from particles with small uniform radius that might not overlap the sample position, especially in the case of Face or Edge sampled fields. If used in conjunction with a [Gas Particle to SDF DOP|Node:dop/gasparticletosdf] that operated on a center-sampled field (as in the FLIP Solver, for example), the output from that nodes __Surface Index__ parameter can be supplied here to ensure no individual particles are missed when extrapolating.
+    Use Angular Momentum:
+        Use attributes created by the __Preserve Angular Momentum__ option on the
+        [GasFieldToParticle|Node:dop/gasfieldtoparticle] DOP to preserve angular momentum
+        when transferring particle velocities to the field.
+
+        NOTE:
+            With this parameter enabled, the radius used for transferring particle values
+            is always set to the voxel size, not the particle's `pscale` attribute.
+    Angular Momentum Prefix:
+        The attribute storing the angular momentum for each axis is retrieved from a vector attribute
+        named with the specified prefix.
+    Scale by Voxel Volume:
+        Scales the particle's value by the inverse of the destination
+        field's voxel volume.  
+
+	This is most useful in the Accumulated
+        mode where it ensures a particle will add the same number
+        total units to the field regardless of field resolution -
+        higher resolution fields will merely receive a denser
+        allocation.
+    [Include:standard_gas_calculate]
+
+    [Include:standard_gas_timestep]
+
+    [Include:standard_solver_parms]
+
+@inputs
+    [Include:standard_data_inputs]
+
+@outputs
+    [Include:standard_data_outputs]
+
+@locals
+    [Include:standard_data_locals]
+
+    [Include:standard_locals]
+
+

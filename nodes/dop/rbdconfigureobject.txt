@@ -1,0 +1,165 @@
+#type: node
+#context: dop
+#internal: rbdconfigureobject
+#icon: DOP/rbdconfigureobject
+
+= RBD Configure Object =
+
+"""Attaches the appropriate data for RBD Objects to an object."""
+
+The RBD Configure Object DOP takes a simulation object and attaches the
+data which is needed for it to be used as a [RBD Object|Node:dop/rbdobject].
+
+This DOP is very similar to the [RBD Object|Node:dop/rbdobject], except it allows you to
+explicitly control the creation of the object using another DOP, such as
+the [Empty Object DOP|Node:dop/emptyobject]. This can be used for more advanced instancing or
+creating objects every 10 frames.
+
+
+@parameters
+    SOP Path:
+        #channels: /soppath
+
+        The path to a SOP (or an Object, in which case the display SOP
+        is used) which will be the geometry for this object. 
+
+	This
+        parameter can also be a list of Object or SOP paths, and can
+        include wild card specifications or operator groups or bundles.
+        
+
+	If multiple Objects or SOPs match this string, a separate
+        simulation object will be created for each matching SOP.
+    Use Deforming Geometry:
+        #channels: /animategeo
+
+        Causes the geometry for the object to be pulled from the chosen
+        SOP at each timestep. If the SOP contains animated geometry, the
+        RBD object's geometry will also animate. 
+
+	If this option is used,
+        the __Use Point Velocity__ parameter of the [RBD Solver|Node:dop/rbdsolver] should also
+        be turned on to take into account the deformations when
+        calculating collision responses.
+    Use Object Transform:
+        The transform of the object containing the chosen SOP is
+        applied to the geometry.
+    Create Active Object:
+        Sets the initial active state of the object. An inactive object
+        doesn't react to other objects in the simulation.
+    Display Geometry:
+        Controls if the geometry is displayed in the viewport.  Does
+        not reset the simulation when it is changed.
+
+    == Initial State ==
+
+        Position:
+            #channels: /tx /ty /tz
+
+            Initial position in world space of the object.
+        Rotation:
+            #channels: /rx /ry /rz
+
+            Initial orientation of the object. This is in RX/RY/RZ
+            format.
+        Velocity:
+            #channels: /velx /vely /velz
+
+            Initial velocity of the object.
+        Angular Velocity:
+            #channels: /angvelx /angvely /angvelz
+
+            Initial angular velocity of the object. This is the axis of
+            rotation times the rate of rotation. Speed of rotation is
+            measured in degrees per second, so a multiplier of 360 will
+            cause the object to rotate once per second.
+
+        Inherit Velocity from Point Velocity:
+            When one brings in a moving piece of geometry from an
+            external source one does not always know the precise
+            velocity and angular velocity. 
+
+	    If this toggle is set, the
+            point velocity attribute of the geometry will be used to
+            calculate the estimated velocity and angular velocity of the
+            object. This allows one to effect a smooth hand off even if
+            the source geometry came from a sequence of geometries
+            rather than a simulation.
+    == Glue ==
+
+        Glue to Object:
+            #channels: /glueobject
+
+            The name of an object to glue to. If this is blank, the
+            object is glued to no other object and acts normally. If it
+            is the name of another RBD Object which it mutually affects,
+            this object becomes glued to the other object. Its relative
+            position to the other object is maintained by the solver.
+        Glue Strength:
+            #channels: /gluethreshold
+
+            The amount of accumulated force required to break a glue
+            bond. A value of -1 will prevent the bond from ever
+            breaking. A value of 0 will cause the bond to break with the
+            first external force.
+        Glue Impulse HalfLife:
+            #channels: /glueimpulsehalflife
+
+            The number of seconds for the glue impulse to decay by one
+            half. Whenever a glued object gets hit, it accumulates a
+            glue impulse force. This controls how fast that force
+            decays.
+    [Include:standard_rbdvolume_parms]
+
+
+    == Physical ==
+
+        Compute Center of Mass:
+            Determines if the center of the object should be found
+            automatically from the object's volumetric representation
+            and glued sub-objects.
+        Center of Mass:
+            #channels: /px /py /pz
+
+            If the center of mass is not computed automatically, this
+            value becomes the center of the mass. The center of mass can
+            be thought of as the pivot point about which the object will
+            rotate.
+        Compute Mass:
+            Determines if the mass will be calculated automatically
+            from the object's volumetric representation and glued
+            sub-objects.
+        Density:
+            #channels: /density
+
+            The mass of an object is its volume times its density. This
+            is only used if Compute Mass is turned on.
+        Mass:
+            #channels: /mass
+
+            The absolute mass of the object. Only used if Compute Mass
+            is off.
+        Rotational Stiffness:
+            #channels: /inertialtensorstiffness
+
+            When an object receives a glancing blow, it will often
+            acquire a spin. The amount of spin acquired depends on the
+            shape and mass distribution of the object, known as the
+            _inertial tensor_. The Rotational Stiffness is a scale
+            factor applied to this. A higher stiffness will make the
+            object less liable to spinning, a lower value will make it
+            more ready to spin.
+        [Include:standard_physparms]
+@inputs
+    First:
+        The simulation objects to turn into RBD objects by attaching
+        the appropriate data.
+@outputs
+    First:
+        The simulation objects which were passed into this node are
+        output with the data required for them to be considered RBD
+        Objects attached.
+@locals
+    [Include:standard_locals]
+
+

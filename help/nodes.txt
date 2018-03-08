@@ -1,0 +1,447 @@
+= Documenting your assets =
+
+== Overview ==
+
+When you create a [digital asset|/assets/], you can put the help in one of two places:
+
+* In the __Help__ tab of the asset's Type Properties window.
+
+* In a file in the Houdini path.
+
+See the [general form of a node help page|#form] and the [breakdown of the individual pieces|#breakdown] below.
+
+TIP:
+    You can see the wiki source of any page in the server by appending `.txt` to the end of the page URL.
+
+
+== File naming ==
+
+Usually pasting the help into an asset's __Help__ tab is the best and most convenient option. If that's how you work with help, you can ignore this section.
+
+However, if you want to keep the help in a file, you need to observe the correct naming convention so the help server can find it.
+
+* Create the file in: `HOUDINIPATH/Help/nodes/<<dir>>/`, where <<dir>> is a "short" version of the node type category (these directory names are dictated by age-old custom). For example:
+
+    Category ||
+        Directory ||
+    
+    Object |
+        `obj`
+    SOP |
+        `sop`
+    DOP |
+        `dop`
+    COP |
+        `cop2`
+    ROP |
+        `out`
+
+* In the directory, the filename pattern for an unscoped node is:
+
+    `[<<namespace>>--]<<name>>[-<<version>>].txt`
+    
+    For example, the `bravo` SOP with no namespace and no version would go in:
+    
+    `bravo.txt`
+    
+    If the `bravo` SOP is in the `com.corp` namespace, the filename would be:
+    
+    `com.corp--bravo.txt`
+    
+    Version `2` of the node would go in:
+    
+    `bravo--foo-2.txt`
+
+* For a scoped node, the recursive filename pattern is:
+
+    `[<<scope>>@]<<filename>>.txt`
+    
+    In building the recursive <<scope>> part, replace any slashes (for example, in `Object/alfa`) with underscores.
+    
+    For example, for the scoped, namespaced SOP node `com.corp::Object/alfa::2.0::com.corp::bravo::3.0`, the help would go in:
+
+    `/nodes/sop/com.corp--Object_alfa-2.0@com.corp--bravo-3.0.txt`
+
+    This allows fully encoding any number of recursive scopes.
+
+NOTE:
+    This naming convention was changed in Houdini 16. Unfortunately the previous convention had major problems.
+    
+    * It required intermediate directories which were inconvenient to work with.
+    * It used names starting with `-` and `--` which were difficult to work with in the UNIX shell.
+    * It didn't work with scoped nodes.
+
+
+== General form == (form)
+
+See [Houdini wiki markup|format] for a general wiki markup reference.
+
+{{{
+= My Asset =
+
+#icon: path/to/icon
+
+"""A quick summary of what the node does."""
+
+== Overview ==
+
+Explanation of the node's purpose and operation.
+
+@inputs
+
+Label:
+    What the input is for.
+
+@parameters
+
+Label:
+    #id: internalname
+    
+    Explanation of what the parameter does.
+
+Label:
+    #id: internalname
+
+    Explanation of what the parameter does.
+
+@related
+
+* [Node:sop/copy]
+}}}
+
+
+== Breakdown == (breakdown)
+
+=== Title ===
+
+{{{
+= Title =
+}}}
+
+This is the node's human-readable label. If you don't include this, the server will use HOM to get the node's label.
+
+
+=== Properties ===
+
+{{{
+#icon: path/to/icon.svg
+}}}
+
+`#icon: <<path>>`:
+    The path to an icon image for this node. Icons can be pixel images or 
+
+    * You can use images from the `HOUDINIPATH/Help` path. For example, if you have an image at:
+
+        `HOUDINIPATH/Help/nodes/sop/common.svg`
+
+        ...you can refer to it in the `#icon` property like this:
+
+        `/nodes/sop/common.svg`
+
+    * You can use `opdef:.?<<name>>` here to refer to an icon file in a section of the asset.
+    
+        For example, if you have an asset section called `Icon.svg`, you can refer to it in the help using:
+
+        `#icon: opdef:.?Icon.svg`
+
+    * If this is in the form `<<DIR>>/<<name>>`, it refers to one of Houdini's internal icons. For example, `SOP/copy`.
+
+The following properties will be inferred automatically by Houdini from the path. You don't need to include them, unless you want to for self-documentation purposes.
+
+`#type: node`:
+    Marks this page as documenting a node. If you don't include this, the server will infer it from the page path.
+    
+`#context: <<ctx>>`:
+    Indicates the node category: `obj`, `sop`, `dop`, `cop2`, `chop`, or `out`. If you don't include this, the server will infer it from the page path.
+
+`#namespace: <<ns>>`:
+    Indicates the namespace this node is in. If you don't include this, the server will infer it from the page path.
+
+`#internal: <<name>>`:
+    The internal name of this node. If you don't include this, the server will infer it from the page path.
+
+`#version: <<x.y>>`:
+    The version string of this node. If you don't include this, the server will infer it from the page path.
+
+
+=== Summary ===
+
+{{{
+"""Imports geometry from a file on disk."""
+}}}
+
+You can include a short summary paragraph in `"""triple quotes"""` after the title.
+
+* The server will use this as the tooltip for the node, and display it in some places in the help.
+
+* The summary should begin with a verb and describe what it accomplishes for the user.
+
+* Avoid verbiage like "This node allows the user to...".
+
+* The summary should generally be one sentence, or at most two.
+
+
+=== Body ===
+
+The text in the body of the page, between the title and the sections, should answer the following questions.
+
+* *What* does this operator do?
+* *Why* would I use the operator? How can it contribute to my scene?
+* *Where* does it fit into the network?
+
+
+=== Inputs section ===
+
+{{{
+@inputs
+
+Edges:
+    Geometry containing the edges you want to extrude.
+}}}
+
+If a node has inputs, start the section documenting the inputs with `@inputs`. For each input:
+
+* Write the input's label followed by a colon (`:`).
+
+* Under that, indent one or more paragraphs describing what the user should attach to the input, whether it's optional, what the node will do with the input, and so on.
+
+
+=== Parameters section ===
+
+{{{
+@parameters
+
+Group:
+    #id: group
+    
+    The group name or point numbers this node will extract.
+
+Distance:
+    #id: dist
+    
+    How far to move the extracted points.
+}}}
+
+Start the section documenting the parameters with `@paramters`.
+
+* Use headings to represent tabs in the interface. For example, if you have two parameters in a "Basics" tab and two parameters in an "Advanced" tab:
+
+    {{{
+    @parameters
+    
+    == Basics ==
+    
+    Group:
+        #id: group
+        
+        The group name or point numbers this node will extract.
+    
+    Distance:
+        #id: dist
+        
+        How far to move the extracted points.
+    
+    == Advanced ==
+    
+    Space:
+        #id: xformspace
+        
+        The transform space in which the node measures distance.
+    
+    Compression:
+        #id: compresslvl
+        
+        How much to compress the recorded data. Higher levels
+        use less disk space but take longer to load.
+    }}}
+
+
+=== Parameter tooltips ===
+
+Houdini automatically extracts the first paragraph of the parameter description to use as the parameter's tooltip if you don't explicitly set a tooltip in the parameter interface editor.
+
+*Important*: If you don't add an `#id:` property with the parameter's internal name (as shown above), Houdini will try to match parameters by their labels. However, it's good practice to add an `#id:` property to all parameters. This ensures the parameters are linked properly even if some of them have duplicate labels.
+
+
+=== Related section ===
+
+{{{
+@related
+
+* [Node:sop/polyextrude]
+* [Node:sop/mynamespace--myasset]
+* [Node:sop/mynamespace--otherasset-2.0]
+}}}
+
+You can create a section of links to related pages. See the [markup reference|format] for information on linking.
+
+
+== Linking and sharing content ==
+
+* See the [wiki markup reference|format] for how to make links and include images and other media.
+
+* The help server provides asset sections as sub-URLs of the node's URL. For example, if your asset is at:
+
+    {{{
+    /nodes/sop/mynamespace--myextrude
+    }}}
+    
+    ...then you can access the sections inside the asset using:
+    
+    {{{
+    /nodes/sop/mynamespace--myextrude/section_name
+    }}}
+    
+    For example, if you have a image file in a section named `MainImage.jpg`, you can use it in the asset's help:
+    
+    {{{
+    [Image:./MainImage.jpg]
+    }}}
+    
+    TIP:
+        Your section names should have extensions (for example `.jpg`) so the server can guess the file's type.
+
+* Alternatively, you can use Houdini's `opdef:` syntax to refer to sections. For example:
+
+    {{{
+    [Image:opdef:.?MainImage.jpg]
+    }}}
+
+* It's often useful to "include" text from another node. For example, if two nodes have very similar interfaces, or the interface of one node contains parameters promoted from another.
+
+    As long as a parameter has an `#id:` property, you can include it in other pages. For example, if one asset has the parameters:
+    
+    {{{
+    @parameters
+    
+    Group:
+        #id: group
+        
+        The group or point numbers to move.
+    
+    Distance:
+        #id: dist
+        
+        How far to move the points.
+    }}}
+    
+    You can include this parameter in another asset's help like this:
+    
+    {{{
+    @parameters
+    
+    [Include:otherasset#group]
+    
+    [Include:otherasset#dist]
+    }}}
+
+* Sometimes a parameter is duplicated or promoted, but with a different label or internal name. You can include just the _content_ by adding a trailing slash after the `#<<id>>` part in the include path:
+
+    {{{
+    @parameters
+    
+    Point group:
+        #id: ptgroup
+        
+        [Include:otherasset#group/]
+    }}}
+
+
+== Style tips ==
+
+=== Verbiage ===
+
+Don't include extra verbiage at the beginning of parameter help:
+
+:box:
+    #display: rounded
+    
+    Edge SOP:
+        This parameter sets the path to the geometry node.
+
+Instead, just declare what the _value_ is:
+
+:box:
+    #display: rounded
+    
+    Edge SOP:
+        Path to the geometry node containing the edges.
+
+
+=== Parameter help ===
+
+Avoid under-documenting parameters like this:
+
+:box:
+    #display: rounded
+    
+    Rotation:
+        Sets the rotation.
+    Order of rotation:
+        Sets the order of rotations.
+
+No matter how straightforward a parameter might seem to you, there is almost always a wealth of unspoken knowledge (for beginners) and/or obscure details (for experts) you can include, such as:
+
+* The range of acceptable values.
+* Why/when you would use this parameter.
+* What turning on/off/increasing/decresing/whatever the parameter accomplishes.
+* What this parameter does *not* do.
+* Edge conditions.
+* Defaults.
+* Units.
+
+For example:
+
+:box:
+    #display: rounded
+    
+    Rotation:
+        The rotation, in degrees, of the texture. Positive numbers rotate clockwise (relative to the texture), negative numbers rotate counter-clockwise. Use with the position parameters to place the texture on the model. You can set rotation in radians using the rotateTexture command.
+
+    Order of rotation:
+        Controls the order in which the object is rotated around the X, Y, and Z axes. Unlike moving and scaling, rotation can result in completely different orientations depending the order in which the axes are rotated. The conventional order is X, Y, then Z. In some animation situations, you will want to change the order to animate a rotation more easily.
+
+* Remember that you can use multiple paragraphs in a parameter description.
+
+* Keep in mind that the first paragraph is used as the tooltip for the parameter.
+
+
+=== Active voice ===
+
+Don't use passive voice or talk about the user in the third person:
+
+{{{
+The user should...
+When this parameter is set...
+The Force operation is used to create...
+This attribute will be set when...
+}}}
+
+Instead, use active voice and address the reader directly. The *doer* of the action should be clear:
+
+{{{
+You should...
+Set this parameter when you want to...
+The Force operation creates...
+The node sets this attribute when...
+}}}
+
+Avoid speaking in terms of the operator allowing something or making it possible.
+
+{{{
+This operator allows you to extrude...
+This makes it possible for you to extrude...
+}}}
+
+Instead, write in terms of performing concrete actions.
+
+{{{
+Extrudes a polygon...
+}}}
+
+
+=== POV ===
+
+Try not to document the node in terms of what it does to Houdini internally. Instead, describe *what it accomplishes for the user* in the scene.
+
+

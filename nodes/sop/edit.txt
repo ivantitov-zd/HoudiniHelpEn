@@ -1,0 +1,328 @@
+= Edit =
+
+#type: node
+#context: sop
+#internal: edit
+#icon: SOP/edit
+#tags: edit, reshape, paint
+
+"""Edits points, edges, or faces interactively."""
+
+== Overview ==
+
+:vimeo: Edit geometry
+    #id: 142494489
+
+:vimeo: Edit points
+    #id: 122358770
+
+The Edit SOP allows you to transform or sculpt faces/edges/points on a
+curve/surface interactively.
+
+Unlike most Houdini operators, _Edit is cumulative_. You can perform
+multiple edit operations (on multiple selections) in a single Edit node.
+An Edit node stores the _final result_ of all the edits you perform _in
+that node_.
+
+Edit supports two main ways of working: _edit_ (using a
+[manipulator|/basics/handles] ) and _sculpt_ (using [brush
+tools|/basics/brush] ).
+
+NOTE:
+    *You cannot animate Edit nodes*. To animate transformations, use the
+    [Point|Node:sop/point], [Transform|Node:sop/xform], [Soft
+    Transform|Node:sop/softxform], [Peak|Node:sop/peak], or [Soft
+    Peak|Node:sop/softpeak] operators, or other types of deformation.
+
+<!--
+Hitting "m" while in the edit SOP will switch to Sculpt mode.
+
+Usage note for Sculpt Mode:
+
+Holding ALT + LMB Drag over the surface of the geometry will allow you to interactively adjust the radius of the brush.
+
+Holding CTRL + RMB will allow you to quickly change Goals for the brush between Deform, Smooth, Deform and Smooth, and Erase.
+
+In Sculpt Mode, the brush casts through the surface and sometimes you may find that strokes on the surface deform points outside of the brush's radius; sometimes on the opposite side of the surface.
+
+You can minimize this behaviour by enabling the Depth parameter in the Brush tab. The Depth values limit how far above and below the surface the brush will cast. Usually, copying the Radius parameter from the Brush tab and pasting it as a relative reference into both Depth parameter fields is sufficent to eliminate this behaviour, unless, of course, you are using a brush with a very large radius. Pasting the Radius as a relative reference as above will give you a perfectly spherical brush or cubic brush depending on the brush type.
+-->
+
+== Setup ==
+
+* You can only use Edit interactively in the viewer.
+
+* *Keep the parameters for the Edit SOP visible* in a parameter
+  editor pane as you use the tool in the viewer pane. The parameters
+  contain controls that modify the behavior of the tool in the
+  viewer.
+
+  In edit mode, the parameters affect the current selection. When
+  you select new points/faces, the parameters reset. In sculpt mode,
+  the parameters affect future strokes.
+
+* Before you try to select points, turn on the Points icon in the
+  viewer pane's display options toolbar (on the right side of the
+  viewer). (If the display options toolbar is not visible, click the
+  stowbar on the right side of the viewer pane to show it.)
+
+
+== Tasks ==
+
+:task:Transform points and/or faces:
+    # In the parameters, click __Edit__ and then __Transform__.
+
+    # Set the selection type using the toolbar on the left side
+      of the 3D viewer, or the __Select > Selection Type__
+      submenu.
+
+    # Select the points/faces you want to transform.
+
+    # Do any of the following:
+
+:task:Move points and faces along their normals:
+    # In the parameters, click __Edit__ and then __Peak__.
+
+    # Use the manipulator to move the selected items along their
+      normals. See how to transform points and/or faces above
+      for more information about how to interact with the Edit
+      tool.
+
+    # See also the [Extrude SOP|Node:sop/extrude].
+
+:task:Push, pull, or smooth points by brushing over them:
+    # In the parameters, click __Sculpt__.
+
+    # The controls on the tabs control how the brush works.
+      These controls are common to all brush-based tools in
+      Houdini. See  [how to use brush tools|/basics/brush] .
+
+
+== Notes ==
+
+* Press ((RMB)) while working in the viewer to get a menu of
+  tool options. For example, you can assign different functions to
+  the mouse buttons.
+
+* Use the soft radius options to do _proportional modification_ of
+  the surrounding points as you transform.
+
+* Edit has an optional second input for reference geometry. When the
+  second input is connected, the Edit node transforms your edits
+  relative to the differences between the geometry to edit and the
+  reference geometry.
+
+* You can use the  [details
+  pane|/ref/panes/geosheet]  to edit the position of
+  each point or vertex in a piece of geometry.
+
+* Only committed edits are affected by reference geometry. Press the __Commit Transform/Peak Changes__ button to commit an edit. The current edit is automatically committed when starting a new edit or performing a sculpt operation. 
+
+
+@parameters
+
+Group:
+    #id: group
+
+    The group to apply the edits to. If this is blank, the edits
+    apply to all geometry in the first input. You can  [create a
+    group|/model/groups]  and use this parameter to mask the
+    edits so they only apply to the points or faces in the group.
+
+Group type:
+    #id: grouptype
+
+    The type of geometry to use in the group. If the group has only
+    one type of geometry (for example, points), you can just use
+    "Guess from group" and Houdini will figure out the geometry type
+    from the contents of the group.
+
+
+== Edit ==
+
+=== Transform ===
+
+See the online help for the [Transform SOP|Node:sop/xform]
+for information on the parameters on this tab.
+
+Preserve Normal Length:
+    Preserve normal lengths when recomputing point normals (when __Recompute point normals__ is on).
+    
+Local Space:
+    If this checkbox is turned on, the manipulation of selected points will take place in 
+    a frame defined by the averaged normals of the selected points.
+
+Up Vector:
+    If the soft transform node is operating in local space mode, 
+    then the second degree of freedom may be specified via this parameter.
+    The local y-axis will be rotated to match the specified up vector as
+    closely as possible.
+
+Slide on Surface:
+    Constrain edits to the existing surface, so points and edges will seem to "slide" across the existing surface when you move them.
+
+
+=== Peak ===
+
+See the online help for the [Peak SOP|Node:sop/peak] for
+information on the parameters on this tab.
+
+Soft radius:
+    #id: rad
+
+    Distance within which other points/faces follow the
+    points/faces you edit directly.
+    
+Soft type:
+    #id: type
+
+    The type of rolloff for soft modifications. This affects how
+    much influence your direct edits have on other points/faces
+    with the soft radius, based on their distance.
+
+    Linear:
+        Linear falloff: the amount of influence decreases
+        linearly with distance.
+    Quadratic:
+        Slow falloff: direct edits affect distant points/faces
+        more than with Cubic.
+    Cubic:
+        Quick falloff: direct edits affect distant points/faces
+        less than with Quadratic.
+    Metaball:
+        Calculate falloff according with the metaball density
+        function you specify in the __Kernal function__
+        parameter.
+        
+Tangent angles:
+    #id: begintandeg /endtandeg
+
+    Angles of the cubic rolloff function's tangents. The first
+    value applies to the tangent farthest from the source point,
+    the second applies to the tangent closest to the source
+    point.
+    
+Kernel function:
+    #id: kernel
+
+    Density function to use when __Soft type__ is __Metaball__.
+    
+Distance Metric:
+    #id: distmetric
+
+    Method for measuring which points are within the soft radius.
+
+    Edge Distance:
+        The shortest distance to a point in the group following a path along
+        edges.
+    Surface Distance:
+        The shortest distance to a point int the group following a path along
+        the surface.
+    Radius:
+        The 3D distance to the closest point in the group.
+    Radius with Connectivity (deprecated):
+        The 3D distance to the closest point in the group, as long as there
+        is a connected path contained entirely within the __Soft Radius__.
+    
+Visualize Falloff:
+    #channels: /visualizefalloff
+    When to output the soft radius falloff as a `vis_falloff` point
+    attribute.
+
+    Never:
+        Never create or write to the `vis_falloff` attribute.
+    Always:
+        Always create and write to the `vis_falloff` attribute. 
+    When Viewport Tool Is Active:
+        Only create or write to the `vis_falloff` attribute temporarily
+        when the viewport tool for this node is active.
+
+
+== Sculpt ==
+
+See the online help for the [Sculpt SOP|Node:sop/sculpt] for
+information on the brush parameters.
+
+Use Orient Attribute:
+    #id: useorient
+
+    If set, all edits are applied relative to the orientation
+    described by a quaternion point attribute named "orient". This
+    is most useful when the orient attribute is animated for use
+    with the Wire Solver DOP.
+    
+Use Mirror:
+    #id: doreflect
+
+    If set, all operations will be reflected along the plane of
+    symmetry.
+    
+Axis:
+    #id: symaxis
+
+    This defines the normal of the plane of symmetry for
+    reflection.
+    
+Origin:
+    #id: symorig
+
+    This defines the origin of the plane of symmetry for
+    reflection.
+    
+Distance:
+    #id: symdist
+
+    This is the distance of the plane of symmetry from the origin of
+    symmetry.
+    
+Threshold:
+    #id: symthreshold
+
+    This is the maximum distance from a points mirrored position to
+    search for the mirrored point.
+
+Plane Tolerance:
+    #id: symplanetol
+
+    This is the tolerance used to determine if a point lies directly on the
+    plane of symmetry.  The soft falloff from any points not directly on the
+    plane will be clamped at the plane of symmetry.
+    
+Recompute Point Normals:
+    #id: updatenmls
+
+    Recomputes point normals if they exist.
+    
+Commit Transform/Peak Changes:
+    #id: apply
+
+    Saves the current edit and resets the parameters to start a new
+    edit.
+    
+Reset All Changes:
+    #id: clearall
+
+    Restores geometry to initial state.
+
+
+@inputs
+
+Geometry to edit:
+    The geometry to apply the edits to.
+    
+Reference geometry:
+    (Optional) When this input is connected, all edits take place
+    relative to the difference between the geometry to edit and this
+    geometry.
+
+
+@related
+
+- [Node:sop/xform]
+- [Node:sop/sculpt]
+- [Node:sop/softxform]
+- [Node:sop/peak]
+- [Node:sop/softpeak]
+- [Node:sop/point]
+
+

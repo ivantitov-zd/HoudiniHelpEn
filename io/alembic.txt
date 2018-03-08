@@ -1,0 +1,305 @@
+= Alembic files =
+
+"""Houdini supports reading and writing Alembic interchange files, with on-demand loading."""
+
+== Overview ==
+
+Houdini supports loading and saving _Alembic_ (`.abc`) files.
+Alembic is an open interchange format for geometry and animation.
+It was initially developed by teams from Sony Pictures Imageworks and Industrial Light & Magic.
+
+* [Wikipedia article|Wp:Alembic_(Computer_Graphics)]
+* [Project site|http://code.google.com/p/alembic]
+
+Houdini supports _demand-loading_ Alembic data.
+The viewer can display geometry from an Alembic file without storing a copy in memory,
+and mantra can "stream" geometry from an Alembic file instead of loading it all into RAM.
+You can apply geometry nodes to demand-loaded Alembic primitives that do not move points.
+You can also load Alembic data as Houdini geometry, allowing you to edit the surfaces.
+
+When working with heavy data sets, Houdini provides methods for loading only part of the Alembic file at a time.
+For example, you can load specific objects in the Alembic hierarchy,
+or load only the geometry inside a bounding box,
+or load/display the geometry as boxes or points.
+
+Houdini can also "render" geometry and animation into an Alembic archive.
+
+== Import ==
+
+There are two styles of importing Alembic scenes. The first is to use the [Alembic SOP|Node:sop/alembic] and load the entire scene into a single piece of geometry. The other is to use the [Alembic Archive object|Node:obj/alembicarchive] to create an object level hierarchy representing the Alembic scene.
+
+* Houdini can load specific geometry from the Alembic file using the [Alembic SOP|Node:sop/alembic] inside a [Geometry object|Node:obj/geo].
+
+    You can choose to load the geometry as a demand-loaded Alembic primitive or actual Houdini geometry. An Alembic primitive uses very little memory and can be transformed, but you can't edit the geometry (move points). Loading as Houdini geometry lets you move points but uses much more memory.
+
+* To use object hierarchies in the Alembic file, use the [Alembic Archive object|Node:obj/alembicarchive].
+
+    The object's parameters have controls for building a network of [Alembic Transform objects|Node:obj/alembicxform] inside that represent the Alembic objects. You can choose to replicate the Alembic hierarchy as Houdini subnetworks, or load all Alembic objects side-by-side.
+
+    You can use __File > Import > Alembic Scene__ in the main menus to quickly set up an Alembic Archive object.
+
+Method ||
+    Pros ||
+        Cons ||
+
+Using the Alembic SOP |
+    This is likely the fastest way to import static geometry.
+    Though all nodes are put into separate groups, large numbers of groups may be difficult to manage in Houdini.
+    It is also memory efficient. |
+        Animated geometry may be slower to process since the geometry must be deformed, rather than just loading new object transforms.
+        Attributes are shared across all objects. 
+        For example, if only one object is missing uv coordinates, the Houdini geometry will still have uv coordinates, but the object will have invalid values.
+
+Alembic Archive object |
+    Once the scene is loaded, only animated objects will be updated on frame changes and only objects with deforming geometry will be processed.
+    This will likely provide faster playback performance. |
+        Houdini's objects can consume more resources than simple geometry.
+        In a scene with a large number of Alembic nodes which each contain a simple box as their shape node, it may be less efficient to re-build the entire Alembic tree in Houdini.
+
+== Export ==
+
+* To export to an Alembic file, create an [Alembic render node|Node:out/alembic].
+
+* Houdini lets you create an Alembic render node directly in a geometry network for convenience. This lets you wire geometry directly into the render node to export only that geometry.
+  
+    *Important*: even when you use the Alembic render node at the geometry level, the Alembic file will still contain the _containing object's transforms_.
+
+* To export animation, set __Valid frame range__ to "Render frame range" in the render node's parameters. Set the __Alembic file__ to the file name for the Alembic file.
+  
+    (_Do not_ add `$F` to the file name. The Alembic render node knows to render multiple frames of animation into the single Alembic file instead of overwriting the file as would happen if you didn't use `$F` when rendering images.)
+
+* You can use __File > Export > Alembic__ in the main menus to quickly set up an Alembic render node in the `/out` network.
+
+== Round-tripping == (roundtrip)
+
+You often want to import Alembic files into Houdini, modify them, and export to a new Alembic archive with the same hierarchy.
+
+TIP:
+    You can use Houdini's import and export support to merge existing archives into a new combined archives.
+
+* If you import the Alembic file as an Alembic Archive object, it's easy to use the [Alembic render node|Node:out/alembic] to output the same hierarchy.
+
+* If you import the Alembic file at the geometry (SOP) level using the [Alembic geometry node|Node:sop/alembic], the node has an option (__Add path attribute__, on by default) to record the shape's path in the original archive in a `path` string attribute on the Houdini primitive. For example, `/octopus_low/octopus_lowShape`. The [Alembic render node|Node:out/alembic] node can then use the `path` attribute to recreate the original hierarchy (when the __Build hierarchy from attribute__ parameter is on).
+
+* If the exported geometry includes a "packed Alembic" primitive (a type of packed primitive that gets its geometry from an Alembic file on disk), Houdini will copy the data directly from the original file.
+
+See [technical limitations|#limits] for information on possible round-tripping problems and workarounds.
+
+== Nodes ==
+
+[Alembic Archive object|Node:obj/alembicarchive]:
+    This object sits at the top of an Alembic import and provides controls for building
+    Houdini object nodes from the data in the Alembic file.
+    Inside this node are [Alembic Transform objects|Node:obj/alembicxform]
+    representing transforms in the Alembic file.
+
+[Alembic Transform object|Node:obj/alembicxform]:
+    This object represents a transform in the Alembic file.
+    Inside is an [Alembic SOP|Node:sop/alembic] that actually loads the data.
+
+[Alembic SOP|Node:sop/alembic]:
+    You can choose to load Alembic data as a demand-loaded Alembic primitive
+    or as actual Houdini geometry.
+
+[Alembic procedural shader|Node:shop/vm_geo_alembic]:
+    This shader implements loading data from an Alembic file at render time.
+    *You usually shouldn't need to use this shader directly*,
+    since using the Alembic Archive object and/or Alembic SOPs sets this up for you automatically.
+    However, the procedural shader has two potentially useful technical features.
+    
+    * You can load/remap Alembic _user properties_ to Houdini parameters.
+    
+    * You can import attributes from a separate Alembic file.
+      This lets you, for example, have an artist animating one copy of a file,
+      and a TD adding UVs to another copy of the same file,
+      and then load the UVs onto the animated file at render time. 
+
+[Alembic render node|Node:out/alembic]:
+    "Renders" Houdini geometry to an Alembic file.
+    You can place this render node directly in a geometry (SOP) network for convenience.
+
+== Alembic-Houdini model mismatch ==
+
+* Houdini represents scenes using _objects_ which are arranged hierarchically, containing _geometry networks_ which generate flat (non-hierarchical) geometry.
+
+* Alembic represents scenes using a hierarchy of "object nodes", some of which contain "shape nodes" with individual pieces of geometry.
+
+The mismatch between these two models requires quite a few "hacks" to allow "round-tripping" Alembic data through Houdini.
+
+== Geometry conversions ==
+
+* Currently, Houdini supports Object hierarchy import/export, Geometry import/export, and Camera import/export.
+
+* Houdini converts between Alembic and Houdini geometry types:
+
+    Alembic geometry ||
+        Houdini geometry ||
+    Face Sets |
+        Primitive groups
+    Subdivision Surfaces meshes |
+        Polygon primitives
+    Polygon Meshes |
+        Polygon primitives
+    Curve Sets |
+        Open polygon primitives
+    Point Sets |
+        Particle primitives
+    NuPatches |
+        NURBS surface primitives
+    Shape nodes |
+        Geometry groups
+
+* Houdini converts between Alembic geometry scopes and Houdini attribute types. The match is imperfect, but in general:
+
+    Alembic scope ||
+        Houdini attribute type ||
+    Constant |
+        Detail
+    Uniform |
+        Primitive
+    Facevarying |
+        Vertex
+    Vertex, Varying |
+        Point
+
+* Since Alembic doesn't support all the geometry types in Houdini, Houdini geometry may be "refined" into multiple Alembic shapes on export. Since Alembic requires shapes at the same hierarchy level to have unique names, Houdini will rename shapes in the order they are created (for example, `mesh`, `mesh_1`, `mesh_2`).
+
+* A new geometry group is created for each Alembic shape node. The group name is a mangled version of the path to the node, since Houdini group names have restrictions on valid characters.
+
+* For Polygon Mesh primitives, the render node checks if the containing object has either the [Polygons as subdivision|Mantra:vm_rendersubd] or the `ri_rendersubd` toggle property enabled. If so, the render node outputs the polygon mesh as an Alembic Subdivision Mesh.
+
+* Currently, the Alembic render node will convert all unsupported geometry into one of Polygon Mesh, Curve Mesh, or Point Set.
+
+* Alembic UVs only have 2 elements, while Houdini UVs have 3.
+
+* Alembic subdivision surfaces do not store the normal attribute as a first class attribute.
+
+== Visibility ==
+
+Alembic visibility is computed "bottom-up": a node can be visible, invisible, or "deferred", meaning it takes its visibility from the next-highest node in the hierarchy that isn't "deferred". In Houdini, visibility is computed "top-down": the visibility setting of an object determines the visibility of all sub-objects in the hierarchy.
+
+This causes issues when loading an Alembic archive using the [Alembic Archive object|Node:obj/alembicarchive]. By default, the __Flatten Visibility Evaluation__ parameter is on. This sets all of the [Alembic Xform|Node:obj/alembicxform] objects inside the archive object to be visible and pushes the visibility settings onto the geometry inside the object, so the correct geometry is visible on each frame.
+
+However, this is not ideal for round-tripping because it potentially rewrites the visibility of every object in the Alembic file. You can turn off __Flatten Visibility Evaluation__ for archives when it's important to preserve the original visibility information, However it may cause Houdini to display the Alembic geometry incorrectly in the viewport.
+
+== Working with Maya cameras ==
+
+The Maya camera model works using two "gates": the _film gate_ and the _resolution gate_. The film gate is what the camera can see, and the resolution gate is what is rendered.
+
+The Maya camera has a _lens squeeze_ attribute that has no equivalent in Houdini. To account for it and make sure the Houdini camera matches the Maya film gate, the following equations must be true:
+
+* `a = 10h * l`
+* `p = (h * l * resy) / (v * resx)`
+
+where:
+
+* `h` = Alembic horizontal aperture
+* `v` = Alembic vertical aperture
+* `l` = Alembic lens squeeze
+* `a` = Houdini aperture
+* `p` = Houdini pixel aspect ratio
+* `resx`, `resy` = Houdini X/Y resolution (pixels)
+
+The Houdini camera will always capture what is in the Maya camera's film gate. Changing the __Resolution__ on the Houdini camera is *not* equivalent to changing the __Resolution__ in Maya.
+
+* In Maya, changing the resolution may alter the aspect ratio and cause the Resolution Gate fit within the Film Gate to change.
+
+* Houdini will adjust the __Aperture__ and __Pixel Aspect Ratio__ using the equations above to make sure that the contents of the Film Gate are still displayed. Use the Houdini camera's __Crop__ parameters to mimic the relationship between the Maya Film and Resolution Gates. Negative crop (overscan) is not supported.
+
+Maya camera ||
+    Alembic equiv. ||
+        Houdini equiv. ||
+            Notes ||
+
+Focal length |
+    Focal length |
+        __Focal length__
+
+H. camera aperture |
+    H. aperture |
+        __Aperture__ |
+            * Measured in inches in Maya, cm in Alembic, and mm in Houdini.
+            * Combined with Lens squeeze to compute effective aperture in Houdini.
+
+V. camera aperture |
+    Vertical aperture |
+        None |
+            * Used to compute __Screen window Y__ and __Pixel aspect ratio__.
+
+H. film offset |
+    H. film offset |
+        __Screen window X__ |
+            * Absolute units in Maya, relative units in Houdini.
+            * Screen window X = H. Film Offset / H. Aperture.
+
+V. film offset |
+    V. film offset |
+        __Screen window Y__ |
+            * Absolute units in Maya, relative units in Houdini.
+            * Screen window Y = V. Film Offset / V. Aperture.
+
+Lens squeeze ratio |
+    Lens squeeze ratio |
+        None |
+            * Contributes to effective __Aperture__ and __Pixel aspect ratio__.
+
+Pre/Post/Camera scale |
+    FilmBackXformOps |
+        __Screen window size__ |
+            * Additional scale applied to the camera which depends upon the Lens Squeeze Ratio and the Resolution Gate fit is ignored.
+
+Shutter open/close |
+    Shutter open/close |
+        __Shutter time__ |
+            * Shutter close - shutter open
+
+F stop |
+    Same |
+        Same
+
+Focus distance |
+    Same |
+        Same
+
+Near clip plane |
+    Near clipping plane |
+        __Near clipping__
+
+Far clip plane |
+    Far clipping plane |
+        __Far clipping__
+
+== Tips ==
+
+* Alembic lights and materials are currently unsupported.
+
+* The Alembic import nodes can load Alembic geometry as bounding boxes or point clouds instead of the actual geometry. This is useful if you only need that much information, and also for visualizing very large files.
+
+* You can set the Alembic import nodes to only load certain geometry types, or only objects inside a certain bounding box, or only animated or not-animated objects. (The list of objects to load is updated at every frame, so for example objects can pop in and out as they move through the bounding box.)
+
+* Houdini normally creates _channel reference_ between the objects created by the Alembic Archive object. These channel references can be slow when working on very large Alembic files, and they recook every time you change certain parameters.
+  
+    When working with very large Alembic files, try turning off __Build hierarchy with channel references__ in the Alembic Archive object's parameters.
+    This builds the objects inside without channel references so they are faster to recook.
+    When you actually want to update the parameters on the child nodes,
+    click __Push parameters to children__ in the Alembic Archive node's parameters.
+
+* *Don't put your own objects* inside an Alembic Archive object. They will be deleted if the Alembic Archive node rebuilds the network.
+
+* After loading Alembic geometry as demand-loaded Alembic primitives, you can convert it later to Houdini geometry using the [Convert SOP|Node:sop/convert].
+
+* Use __Remap attributes__ on Alembic import nodes to change Alembic-specific attribute names to Houdini names.
+
+* Use the __Attribute file__ parameter on the [Alembic procedural shader|Node:shop/vm_geo_alembic] to pull certain geometry attributes from a separate Alembic file.
+
+== Open source ==
+
+Alembic support in Houdini is provided by several plug-ins (SOPs, OTLs, and so on). The Houdini install includes source code for the plug-ins. Side Effects Software Inc. is committed to feeding improvements back into the Alembic project.
+
+== Technical limitations == (limits)
+
+The following limitations apply to round-tripping Alembic geometry at the geometry (SOP) level.
+
+* During export, the [Alembic render node|Node:out/alembic] creates an Alembic node corresponding to the Houdini network hierarchy. This is where it puts shape nodes that don't have a `path` attribute. If all geometry has valid `path` values, this node will not be created.
+
+* When the Alembic render node writes [packed primitives|/model/packed], it inserts an extra transform object between the parent object and the geometry object to hold the packed geometry's local transform when "Packed Mode" is set to "Transformed Shape" or "Use Instancing WHere Possible" is enabled.

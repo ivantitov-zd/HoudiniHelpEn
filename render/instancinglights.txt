@@ -1,0 +1,63 @@
+= Instancing lights =
+
+"""You can instance lights onto points at render time just like instancing geometry."""
+
+
+== Overview ==
+
+[Instancing|/copy/instancing] involves creating copies of a source object _only as needed_ during rendering. It it much faster and uses less memory than creating a large number of "real" copies of an object.
+
+You can instancing to create a easily create large number of lights in the scene at render time based on the positions of points in a geometry object.
+
+[Image:/images/render/instancing_lights.jpg]
+
+
+== Basic setup ==
+
+# Create a "template" light to instance onto the points.
+
+# Create an [Instance subnetwork|Node:obj/instance]
+
+    On the Instance object's parameters:
+    
+    * Set the __Instance Object__ parameter to the path to the light (drag the light node from the network editor onto the parameter).
+    
+    * Set __Point instancing__ to "Full point instancing".
+
+# Inside the Instance subnetwork, generate the points you want to instance lights onto.
+
+    You can use an [Object Merge node|Node:sop/object_merge] inside the Instance object to grab the points from elsewhere if they already exist or it's inconvenient to keep them in the subnet.
+
+TIP:
+    Instanced objects apply the source object's transforms relative to the point position. If the source object isn't at the origin, this might give unexpected results.
+
+To prevent the template light from casting light, remove it from the __Candidate lights__ parameter on the render node:
+
+# In the main menus, choose __Render > Edit Render Node > <<your render node>>__.
+
+
+== Varying light parameters across instances ==
+
+You can vary light parameters based on attributes on the points. For example, you can color the points, and have the instanced lights use the point color as their light color.
+
+On the "template" light object, use a [Exp:point] expression to grab attribute values off the point being instanced. Use the path of the instanced points geometry as the <<node>> argument and use [Exp:instancepoint] as the <<point_number>> argument.
+
+:box:The point() expression function fetches an attribute value from some other geometry
+    #display: rounded gray
+    
+    [Include:/expressions/point#type=usage]
+
+For example, to use the instanced point's color as the light color, set the template light's __Color__ parameter to:
+
+Red ||
+    `point("/obj/instances", instancepoint(), "Cd", 0)`
+Green ||
+    `point("/obj/instances", instancepoint(), "Cd", 1)`
+Blue ||
+    `point("/obj/instances", instancepoint(), "Cd", 2)`
+
+
+
+
+
+

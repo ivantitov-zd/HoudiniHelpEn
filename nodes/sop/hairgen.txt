@@ -1,0 +1,303 @@
+#type:     node
+#context:  sop
+#internal: hairgen
+#icon:     FUR/hairgen
+
+= Hair Generate =
+
+"""Generates hair on a surface or from points."""
+
+Optionally uses curves as guides for shaping the generated hair.
+
+NOTE:
+    This node can generate stable output from just animated skin and guides, as long as both have a rest attribute. This can be used as an alternative to plugging in rest skin and guides to the first and second inputs and animated skin and guides into the third and forth inputs.
+
+@parameters
+
+== General ==
+
+=== Distribution ===
+
+Mode:
+    #id: mode
+
+    Scatter On Surface:
+	Scatter guides on the surface skin surface.
+
+    Per Point:
+	Generate a guide at each point of the skin geometry.
+
+
+Group:
+    #id: group
+    Generate curves for this group of skin primitives.
+
+
+Density:
+    #id: density
+    Scatter hair or guides at this density.
+
+    [Include:fur_common#parmoverride]
+
+Scatter Seed:
+    #id: scatterseed
+
+    The seed value used for scattering. Changing this generates a different
+    random distribution with the same density.
+
+Relax Iterations:
+    #id: scatterrelaxiterations
+
+    The number of times to relax guide locations after scattering. Higher
+    iterations result in a more even distribution of guides at the cost of more
+    computation time.
+
+Relax Using Normal Attribute:
+    #id: relaxusenormals
+
+    Takes the surface normal attribute into account when scattering.
+
+=== Optimization ===
+
+Prune:
+    #id: prune
+    Prune a percentage of hair to speed up cooking.
+
+Pruning Ratio:
+    #id: pruningratio
+
+    The percentage of curves to prune.
+
+Limit To Bounding Box:
+    #id: limittobbox
+
+    Only grow hair from root points that are within the bounding boxes defined
+    by the parameters below.
+
+Box Size:
+    #id: bboxsize
+
+    The size of the bounding box.
+
+Center:
+    #id: bboxcenter
+
+    The center of the bounding box.
+
+
+=== Guide Weights ===
+
+This node generates hair using by blending the shape of nearby curves.
+These parameters control how much each guide influences the shape of generated
+hair.
+
+Use Guides:
+    #id: useguides
+
+    Blend between the shape of nearby guide curves to determine the shape of
+    the each generated hair.
+
+Assume Uniform Segment Count & Length:
+    #id: uniformguidesegments
+
+    Use a faster guide interpolation algorithm, which requires that all guides
+    have the same segment count.
+
+Compute Weights Using Skin Coordinates:
+    #id: skininterp
+
+    Compute guide weights using the hair's position within its skin primitive.
+    This is robust and accurate, but can look less natural than weight
+    computation based on guide distance, which is used when this is disabled.
+
+    This can only be used when guides are located at each skin point.
+
+    TIP:
+	    Use the [Guide Groom Object|Node:obj/guidegroom]'s __Guide Per Point__ mode to create guides that work with this method.
+
+Blending Method:
+    #id: guideblendmethod
+
+    Controls how guides that influence a generated curve are blended.
+
+    Linear Blend:
+	Does a straight-forward linear blend between the guide curves.
+
+    Extrude And Blend:
+	Extrudes the curve along each guide and then blends those extruded curves.
+
+Guide Group:
+    #id: guidegroup
+
+    The group of guides to use.
+
+Influence Radius:
+    #id: influenceradius
+
+    The radius within which guides have influence over generated hair.
+
+    [Include:fur_common#parmoverride]
+
+Influence Decay:
+    #id: influencedecay
+
+    Controls how steeply the weight of a guide drops with distance. Higher
+    values cause guides to have less influence over distant hairs, resulting
+    in hair more closely following guides near them. Lower values tend to
+    result in a smoother look as the effect of all guides is averaged.
+
+    [Include:fur_common#parmoverride]
+
+Maximum Guide Count:
+    #id: maxguidecount
+
+    The maximum number of guides to take into account. Any excess guides found
+    within the __Influence Radius__ are ignored.
+
+    [Include:fur_common#parmoverride]
+
+Max Guide Angle:
+    #id: maxguideangle
+
+    Ignore guides that face away from the skin normal at the hair root by more
+    than this angle in degrees.
+
+    [Include:fur_common#parmoverride]
+
+Clump Crossover:
+    #id: clumpcrossover
+
+    Blends the shapes of clumps of guide hair. At a value of `0`, only the
+    clump that exhibits the greatest influence of the generated hair is taken
+    into account. Higher values cause surrounding clumps to be taken into account
+    as well.
+
+    TIP: Guide hair clumps can be created using the
+    [Hair Clump SOP|Node:sop/hairclump].
+
+    [Include:fur_common#parmoverride]
+
+Create Guide & Weight Attribs:
+    #id: createweightattribs
+
+    Outputs the guide indices and weights used for interpolation as array
+    attributes on the generated primitives.
+
+=== Unguided Hairs ===
+
+Grow Unguided Hair:
+    #id: growunguided
+
+    Grows hair at points that are outside of the influence radius of any guides.
+
+Use Initial Direction Attribute:
+    #id: useinitdirattrib
+
+    Grow hair in the direction of a vector attribute on the skin geometry.
+
+Initial Dir Attrib:
+    #id: initdirattrib
+
+    The name of a vector attribute on the skin geometry used as the initial
+    direction of unguided hair.
+
+Segments:
+    #id: unguidedsegments
+
+    Generate hairs with this segment count.
+
+    NOTE:
+	When there are any guides, this node generates hairs
+	with the same segment count as those guides and this parameter is
+	ignored.
+
+Length:
+    #id: unguidedlength
+
+    Generate unguided hair of this length.
+
+    [Include:fur_common#parmoverride]
+
+Minimum Length:
+    #id: unguidedminlength
+
+    The minimum length required to grow a hair. Any hair that would be shorter
+    than this value is not grown at all.
+
+== Attributes & Appearance ==
+
+=== Thickness ===
+
+Create Thickness Attribute:
+    #id: outputthicknessattrib
+
+    Add a thickness attribute to generated hair.
+
+Thickness Attribute:
+    #id: thicknessattrib
+
+    The name of the created thickness attribute.
+
+Thickness:
+    #id: thickness
+
+    The thickness of generated hair at it's thickest point.
+
+Hair Profile:
+    #id: hairprofile
+
+    The profile of thickness along the length of each hair.
+
+=== Source Attribute Transfer ===
+
+These parameters control how skin attributes are transferred from the skin
+to generated hair.
+
+Point Attributes:
+    #id: pointattribs
+
+    A list of attributes to transfer from the skin geometry's points to the
+    hair primitives.
+
+    Uses the interpolated value at the skin location closest to each hair root.
+
+Vertex Attributes:
+    #id: vertattribs
+
+    A list of attributes to transfer from the skin geometry's vertices to the
+    hair primitives.
+
+    Uses the interpolated value at the skin location closest to each hair root.
+
+Primitive Attributes:
+    #id: primattribs
+
+    A list of attributes to transfer from the skin geometry's primitives to the
+    hair primitives.
+
+    Uses the values of the primitive closest to the hair's root location.
+
+Detail Attributes:
+    #id: detailattribs
+
+    A list of attributes to transfer from the skin geometry's detail to the
+    hair primitives.
+
+=== Guide Attribute Transfer ===
+
+Point Attributes:
+    #id: guidepointattribs
+
+    A list of attributes to transfer from the guide points to the generate
+    hair points.
+
+Primitive Attributes:
+    #id: guideprimattribs
+
+    A list of attribute to transfer from the guide primitives to the generated
+    hair primitives.
+
+@related
+- [Node:sop/guideprocess]
+- [Node:sop/hairclump]
+- [Node:sop/guidedeform]

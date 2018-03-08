@@ -1,0 +1,220 @@
+﻿= Parameter Motion Effects =
+
+#bestbet: motionfx
+
+"""Motion Effects let you easily add _secondary motion_ to keyframed parameters (usually translate, rotate, or scale parameters), such as jitter or overshoot."""
+
+== Overview ==
+
+You can access the effects on the __Motion Effects__ submenu on the ((RMB)) context menu of parameters in the parameter editor, or of the timeline (for scoped parameters). You can also use the [Jiggle tool|/shelf/jiggleobject] or [Lag tool|/shelf/lagobject] on the __Modify__ tab of the shelf to set up motion effects. Overridden parameters have an orange background in the parameter editor.
+
+Behind the scenes, Motion Effects build networks of [CHOP (channel operator) nodes|/nodes/chop] that override the values of a parameter. Because the effects are procedural, you can edit, refine, and augment them by editing the CHOP network. You can apply multiple motion effects to the same parameter, and Houdini will simply merge them into the network. You can view the network and edit the CHOP nodes to change the effect.
+
+When you use Motion Effects, Houdini creates a CHOP network node called `motionfx` at the Scene level (`/obj/motionfx`) to contain the CHOP nodes it creates. You can double-click the `motionfx` node to go inside and inspect the nodes, or delete the `motionfx` network to remove all motion effects.
+
+
+== Available effects ==
+
+Advanced users can [edit and add to the list of available effects|#editmenu].
+
+[Cycle|Node:chop/cycle]:
+    Offsets and repeats keyframed values. For example, if you keyframe one cycle of a ball moving forward and bouncing, then apply Cycle to the translate parameter, the ball will continue to move forward and bounce after its keyframed animation runs out. See also Repeat below.
+    
+[De-spike|Node:chop/filter]:
+    Removes "spikes" (sudden large changes in the parameter value). This may be useful for cleaning up noisy animation data imported from somewhere else. (This applies a [Filter CHOP node|Node:chop/filter] set to "De-spike" mode.)
+
+[Lag|Node:chop/lag]:
+    Slows and overshoots animation, creating an appearance of heaviness.
+
+[Limit|Node:chop/limit]:
+    Clamps, loops, and/or quantizes parameter values. You can use this to keep an animated parameter from going outside certain limits, or snap continuous motion onto a grid.
+
+[Noise|Node:chop/noise]:
+    Adds animated noise to the parameter values. When added to translate parameters, this makes an object jittery.
+
+[Shift|Node:chop/shift]:
+    Time-shifts keyframed values, moving the start time and end time of a piece of animation. See also Stretch below.
+
+[Smooth|Node:chop/filter]:
+    Smooths out keyframed values, to remove jitter. (This applies a [Filter CHOP node|Node:chop/filter] set to "Gaussian" mode.)
+
+[Spring|Node:chop/spring]:
+    Adds overshoot and vibration to animation, as if the object was attached to its animated position by a spring.
+
+[Stretch|Node:chop/stretch]:
+    Time-compresses or expands keyframed values, making a piece of animation play slower or faster. See also Shift above.
+
+[Wave|Node:chop/wave]:
+    Overrides the value of a parameter with the result of a simple wave function. For example, you can apply the Wave effect to the Translate Y parameter of an object to make it bob up and down.
+
+== How to ==
+
+:task:Add a Motion Effect to a parameter:
+    # Right-click a parameter and open the __Motion Effects__ submenu.
+    # Choose an effect.
+    
+:task:Add a Motion Effect to the scoped parameters:
+    # Right-click the timeline and open the __Motion Effects__ submenu.
+    # Choose an effect.
+        
+        A floating parameter editor for the CHOP node will appear. You can use this to alter the effect.
+    
+:task:Edit an effect's parameters:
+    # Right-click a parameter and open the __Motion Effects__ submenu.
+    # Open the __Edit effect parameters__ submenu.
+    # Choose the effect.
+        
+        Houdini opens a pop-up parameter editor you can use to edit the parameters of the effect.
+    
+:task:Disable an effect:
+    # Right-click a parameter and open the __Motion Effects__ submenu.
+    # Turn off the __Enable effect__ checkbox item.
+    
+:task:Edit the CHOP network:
+    Adding effects to a parameter builds a network of CHOP (channel operator) nodes. You can jump to this network to edit node parameters, rearrange or delete nodes, and so on.
+        
+    # Right-click a parameter and open the __Motion Effects__ submenu.
+    # Choose __Jump to effect network__.
+        
+    TIP:
+            Press ((Space + G)) to center on the selected node.
+
+
+== Clips and poses ==
+
+The [Channel CHOP|Node:chop/channel] can hold channel animation which you can then manipulate using other CHOP nodes and export back onto the original parameters. The __Motion Effects__ sub-menu gives you quick access to create Channel CHOPs for parameters.
+
+:task:Start a new Channel CHOP for a parameter:
+        Right-click a parameter and open the __Motion Effects__ submenu and choose __Create clip__. See help for the options in the Create Clip dialog box below.
+            
+:task:Create a new Channel CHOP just with the current values of a parameter:
+    Right-click a parameter and open the __Motion Effects__ submenu and choose __Create pose__.
+
+TIP:
+    When you create a clip, Houdini will be clever and still allow you to modify handles on the original node but forward the parameter value changes onto the Channel CHOP instead.
+    
+    For example, if you create a clip from the __Transform__ parameter on a [Geometry container object|Node:obj/geo], if you move the transform handles for the Geometry node, the values are changed on the Channel CHOP you created, not on the Geometry node.
+    
+    To prevent this behavior (for example, to prevent artists from accidentally changing values on the Channel CHOP by manipulating handles on an object), turn on __Lock clip__ in the dialog box that appears when you choose __Create clip__.
+
+=== Create clip dialog box ===
+
+Clip name:
+    The name for the [Channel CHOP|Node:chop/channel] to create. To add a new channel to an existing Channel CHOP, enter its name here and turn off __Create new CHOP node__.
+    
+Location:
+    The CHOP network in which to create the [Channel CHOP|Node:chop/channel] (or in which it already exists if __Create new CHOP node__ is off). The default is the `/obj/motionfx` CHOP network created by other motion effects commands.
+    
+Channels:
+    The channels to add to the Channel CHOP. The default value corresponds to the parameter you right-clicked, but you are free to edit and expand the list of channels.
+    
+Channel range:
+    The range of frames from which to copy animation on the channels.
+    
+Create new CHOP node:
+    If this option is off and the Channel node named in __Clip name__ exists, Houdini will add the channels to the existing node. If the option is on, Houdini will always create a new Channel node in the CHOP network.
+    
+Apply immediately:
+    Turns on the export flag on the Channel node, so that the parameters are immediately overridden by the CHOP network. If this option is off, you have to manually turn on the export flag of a node in the CHOP network to override the parameters.
+    
+Remove original animation:
+    After copying the parameter's channel animation into the Channel CHOP, delete the animation on the parameter.
+    
+Lock clip:
+    Lock the parameters on the Channel CHOP that contain the copied values. This prevents Houdini from forwarding changes to handles on the original node to the corresponding parameters on the Channel CHOP.
+
+
+== Example ==
+
+# [Use the shelf|/shelf/sphere] to create a sphere, and [animate it|/anim/basics]. Try to add some sharp turns and direction reversals.
+
+    For example, move the sphere, set a keyframe with ((K)), go to frame 24, move the sphere to a new location, set a keyframe, go to frame 48, move the sphere, set a keyframe, go to frame 72, move the sphere, set a keyframe.
+
+# Select the sphere object. In the parameter editor, right click the __Translate__ parameter.
+
+    Right click the _label_. If you right click one of the individual X, Y, or Z text boxes, the context menu will only apply to that component, not all three components.
+    
+# Open the __Motion Effects__ submenu and choose __Spring__.
+
+# In the floating parameter editor for the [Spring CHOP node|Node:chop/spring], decrease the __Spring constant__. This will exaggerate the "springiness" of the effect.
+
+# [Rewind and play|/anim/playbar] the animation. The sphere will appear to be attached to its original animated position by a spring. It will overshoot and vibrate when it changes direction.
+
+# Close the floating parameter editor window. Right click the __Translate__ label again and choose __Motion Effects > Cycle__.
+
+# Rewind and play the animation again. The animation will cycle past the last keyframe you set, offsetting from the last keyframed position. This effect is very useful for setting up walk and bounce cycles.
+
+
+== Next steps ==
+
+CHOP (channel operator) nodes let you grab keyframed parameter values, procedurally manipulate them using the nodes in the network, and then override the original parameter with the changed value. The Motion Effects menu items make it easy to set up a quick, powerful CHOP network automatically, but you may also want to explore the full power of CHOP networks. CHOP nodes exist for many functions from math to time, audio, and frequency manipulations, letting advanced users achieve very complex effects on top of simple keyframed animations.
+
+See [the list of CHOP nodes|/nodes/chop/] available.
+
+
+== Advanced: editing the effects menu == (editmenu)
+
+The `$HFS/houdini/MotionEffectsMenu.xml` file defines the contents of the __Motion Effects__ submenu (on the ((RMB)) context menu for parameters). It is an XML file, where the XML defines the structure of the menu, and embedded Python scripts define the action of each menu item.
+
+See [how to customize the main menus|/basics/config_menus] for general details on how Houdini's menu configuration files work. Instead of `<mainMenu>`, the __Motion Effects__ submenu configuration file uses `<menuDocument>` as the root element.
+
+The basic structure is:
+
+{{{
+#!xml
+<?xml version="1.0" encoding="UTF-8" ?>
+<menuDocument>
+    <menu>
+        <subMenu id="motion_effects_menu">
+            <label>Motion Effects</label>
+            
+            <actionItem id="action_id">
+                <label>Menu item label</label>
+            </actionItem>
+            
+            <scriptItem id="item_id">
+                <label>Menu item label</label>
+                <scriptCode>
+                    <![CDATA[
+                    
+                    Python script to run when the menu
+                    item is chosen.
+                    
+                    ]]>
+                </scriptCode>
+            </scriptItem>
+            
+            <separatorItem />
+            
+            ...
+        </subMenu>
+    </menu>
+</menuDocument>
+}}}
+
+- `actionItem` nodes reference built-in houdini functionality.
+
+- The script contained in the `scriptCode` element of a `scriptItem` node automatically has the `hou` module imported. It also has a predefined dictionary named `kwargs`, containing the following keys:
+
+        `parms (list)`:
+                A list of `hou.Parm` objects representing the parameter(s) the user right-clicked.
+        
+        `toolname (str)`:
+                The menu item's hotkey id (the element's id prefixed with `h.pane.parms.`).
+        
+        `altclick, ctrlclick, shiftclick, cmdclick (boolean)`:
+                True if the user held the given key while selecting the menu item. You can use this to provide alternate "power-user" behavior based on modifier keys. Note that `cmdclick` is only possible on Mac OS X.
+
+- The value of the `id` attribute corresponds to a Houdini hotkey action starting with `h.pane.parms`. For `actionItem` nodes this is what defines the action to run when the menu item is selected. For `scriptItem` nodes this lets you assign a hotkey to the menu item.
+
+        For example, an item with ID `revert_to_prev_val` refers to the `h.pane.parms.revert_to_prev_val` action in the [hotkeys manager|/ref/windows/hotkey].
+
+@related
+
+- [CHOP nodes|/nodes/chop]
+- [Jiggle tool|/shelf/jiggleobject]
+- [Lag tool|/shelf/lagobject]
+
+
+
+

@@ -1,0 +1,392 @@
+= hou.NodeType =
+#type: homclass
+#cppname: HOM_NodeType
+#group: nodes
+
+"""Information common to all instances of a type of node, such as the parameters."""
+
+For example, the [Geometry object|Node:obj/geo] and [Subdivide SOP|Node:sop/subdivide]
+are node types.  `/obj/geo1` and `/obj/geo2`, on the other hand, are
+[Node|Hom:hou.Node] instances of the Geometry object node type.
+
+A digital asset defines a node type.  The nodes contained inside the
+asset's definition implement the node type's algorithm, and you can customize
+the parameters in the node type using the __Type Properties__ dialog,
+
+You can get a NodeType object from a Node object with [Hom:hou.Node#type].
+For example, if `/obj/geo1` is a geometry object,
+`hou.node("/obj/geo1").type()` will return the NodeType corresponding to all
+geometry objects.
+
+All the node types in Houdini are organized into categories, and a node type is
+uniquely identified by its category and node type name.  For example, objects,
+SOPs, POPs, etc. are node type categories.  You can also access a NodeType
+object from a category with [Hom:hou.NodeTypeCategory#nodeTypes].  Similarly,
+you can call [Hom:hou.nodeType_] with the category and node type name.
+
+See also [Hom:hou.Node] and [Hom:hou.NodeTypeCategory].
+
+@methods
+
+::`name(self)` -> `str`:
+    #cppname: HOM_NodeType::name
+    #replaces: Cmd:optype, Exp:optypeinfo
+    Return the name of this node type.  For example, for the geometry
+    object type, the name is "geo".  The name and the node type category
+    together uniquely identify a node type.
+
+::`nameComponents(self)` -> `tuple` of `str`:
+    #cppname: HOM_NodeType::nameComponents
+    Returns a tuple of node type name components that constitute the full node
+    type name. The components in the tuple appear in the following order:
+    scope network type, node type namespace, node type core name, and version.
+
+
+    {{{
+    #!pycon
+    # parse the full name into components
+    >>> node_type = hou.nodeType(hou.dopNodeTypeCategory(), 'pyrosolver::2.0')
+    >>> node_type.nameComponents()
+    ('', '', 'pyrosolver', '2.0')
+    }}}
+
+
+::`nameWithCategory(self)` -> `str`:
+    #cppname: HOM_NodeType::nameWithCategory
+    Return the name of the node type, prefixed with the name of the node
+    type category. For example, for the geometry object, this function
+    returns `"Object/geo"`.  The category name and type name together
+    uniquely identify a node type.
+
+    {{{
+    #!pycon
+    >>> hou.nodeType(hou.objNodeTypeCategory(), "geo").nameWithCategory()
+    'Object/geo'
+    }}}
+
+::`namespaceOrder(self)` -> `tuple` of `str`:
+    #cppname: HOM_NodeType::namespaceOrder
+    Returns a node type name list sorted in the descending namespace precedence 
+    order. The node types in the list have the same base type as this node type.
+    They have different namespace and/or version. 
+    
+    Houdini uses this list when resolving an unqualified type name in 
+    `hou.Node.createNode()`; it will use the first entry in that list that 
+    matches the name specified in the function.
+
+    {{{
+    #!pycon
+    # parse the full name into components
+    >>> node_type = hou.nodeType(hou.dopNodeTypeCategory(), 'pyrosolver')
+    >>> node_type.namespaceOrder()
+    ('pyrosolver::2.0', 'pyrosolver')
+    }}}
+
+::`description(self)` -> `str`:
+    #cppname: HOM_NodeType::description
+    #replaces: Cmd:optype, Exp:optypeinfo
+    Return the description of this node type that appears in the tab menu.
+    For example, for the geometry object, the description is `"Geometry"`.
+    This description is also called the operator label in Houdini.
+
+::`instances(self)` -> `tuple` of [Hom:hou.Node]:
+    #cppname: HOM_NodeType::instances
+    #replaces: Cmd:opstat, Cmd:otinuse
+    Return a tuple of all the nodes of this type in the current scene.
+
+::`category(self)` -> [Hom:hou.NodeTypeCategory]:
+    #cppname: HOM_NodeType::category
+    #replaces: Exp:optypeinfo
+    Return the node type category for this node type.  For example, for
+    the geometry object, the result is the object returned by
+    [Hom:hou.objNodeTypeCategory].
+
+::`parmTemplateGroup(self)` -> [Hom:hou.ParmTemplateGroup]:
+    #cppname: HOM_NodeType::parmTemplateGroup
+    Return the group of parm templates corresponding to this node type's
+    parameter interface.
+
+    See [Hom:hou.ParmTemplateGroup] for more information on parm template
+    groups.  To change the parameter interface for a node type defined by a
+    digital asset, see [Hom:hou.HDADefinition#setParmTemplateGroup].
+
+::`parmTemplates(self)` -> `tuple` of [Hom:hou.ParmTemplate]:
+    #cppname: HOM_NodeType::parmTemplates
+    Return a tuple of parm templates for the parameters on this node type.
+    Note that spare parameters on individual node instances are not included
+    in this tuple, since they are independent from the node type.
+
+::`definition(self)` -> [Hom:hou.HDADefinition]:
+    #cppname: HOM_NodeType::definition
+    #replaces: Cmd:otgetotl
+    If this node type corresponds to a digital asset, return the
+    [Hom:hou.HDADefinition].  Otherwise, return None.
+
+::`allInstalledDefinitions(self)` -> `tuple` of [Hom:hou.HDADefinition]:
+    #cppname: HOM_NodeType::allInstalledDefinitions
+    #replaces: Cmd:otls
+    Search all installed operator type libraries and return a tuple of
+    available [Hom:hou.HDADefinition] objects providing definitions for
+    this node type.
+
+    Houdini allows multiple otl files to be loaded at the same time that each
+    contain definitions for the same node type.  The definition in use is
+    called the current definition.  See also [Hom:hou.HDADefinition#isCurrent].
+
+::`hdaModule(self)` -> [Hom:hou.HDAModule]:
+    #cppname: HOM_NodeType::hdaModule
+    Return the HDAModule object for this node type.  If the type is not
+    for a digital asset, the module is empty.  Otherwise, the module contains
+    the functions, constants, classes, etc. in the user-defined "PythonModule"
+    section of the digital asset.
+
+    You can use [Hom:hou.Node#hdaModule] as a shortcut to access the HDAModule
+    from a node instance.
+
+    See [Hom:hou.HDAModule] for more information.
+
+::`aliases(self)` -> `tuple` of `str`:
+    #cppname: HOM_NodeType::aliases
+    #replaces: Cmd:opalias
+    Return all current aliases for this node type.  See
+    [Hom:hou.NodeType#addAlias] for an example.
+
+::`addAlias(self, alias)`:
+    #cppname: HOM_NodeType::addAlias
+    #replaces: Cmd:opalias
+    Add an alias for this node type.  You can use this alias when creating
+    new nodes.
+
+    {{{
+    #!pycon
+    >>> geo_type = hou.nodeType(hou.objNodeTypeCategory(), "geo")
+    >>> geo_type.addAlias("transformable")
+    >>> geo_type.aliases()
+    ('transformable',)
+    >>> hou.node("/obj").createNode("transformable")
+    <hou.ObjNode of type geo at /obj/geo1>
+    }}}
+
+::`removeAlias(self, alias)`:
+    #cppname: HOM_NodeType::removeAlias
+    #replaces: Cmd:opalias
+    Remove an alias for this node type.
+
+::`hidden(self)` -> bool:
+    #cppname: HOM_NodeType::hidden
+    Return whether or not this node type appears in the tab menu.  See also
+    [Hom:hou.NodeType#setHidden].
+
+::`setHidden(self, hidden)`:
+    #cppname: HOM_NodeType::setHidden
+    #replaces: Cmd:ophide
+    Set whether or not this node type appears in the tab menu.  See also
+    [Hom:hou.NodeType#hidden].
+
+::`deprecated(self)` -> bool:
+    #cppname: HOM_NodeType::deprecated
+    Return whether or not this node type has been marked deprecated. See also 
+    [Hom:hou.NodeType#deprecationInfo].
+
+::`deprecationInfo(self)` -> `dict` of `str` to `str` or [Hom:hou.NodeType]:
+    #cppname: HOM_NodeType::deprecationInfo
+    If the node type has been marked deprecated, this call will return 
+    the deprecation information as a dictionary. 
+    
+    The currently supported keys are:
+    
+    `'version'`:
+        The version of Houdini where this operator got deprecated. The form
+        is either major.minor, or major.minor.build (e.g. 14.0 or 14.5.122).
+        This item is always present.
+        
+    `'new_type'`:
+        The new node type this node was replaced with. This can be used to
+        create a system of automatic node replacement.
+        
+    `'reason'`:
+        This lists the reason given for the deprecation, in case there is no
+        new node to replace with.
+    
+::`minNumInputs(self)` -> `int`:
+    #cppname: HOM_NodeType::minNumInputs
+    Return the minimum number of inputs that nodes of this type can have.  If
+    these inputs are not connected, the node will generate an error.
+
+::`maxNumInputs(self)` -> `int`:
+    #cppname: HOM_NodeType::maxNumInputs
+    Return the maximum number of inputs that nodes of this type can have.
+    Return 9999 if this node type can accept an unlimited number of inputs
+    (e.g. the merge SOP).
+
+::`maxNumOutputs(self)` -> `int`:
+    #cppname: HOM_NodeType::maxNumOutputs
+    Return the maximum number of outputs that nodes of this type can have.
+    Most node types have only one output, but some, like the split dop, can
+    have multiple.
+
+::`hasPermanentUserDefaults(self)` -> `bool`:
+    #cppname: HOM_NodeType::hasPermanentUserDefaults
+    Returns whether a user has set permanent defaults for this node type.
+    
+    See also [Hom:hou.Parm#hasTemporaryDefaults]
+
+::`hasUnorderedInputs(self)` -> `bool`:
+    #cppname: HOM_NodeType::hasUnorderedInputs
+    Return whether it is impossible for this node type to have gaps in its
+    connected inputs.  For example, the cookie SOP has two inputs, and it's
+    possible for only the second input to be connected, so this method would
+    return False.  However, the merge SOP cannot have any gaps in its inputs,
+    so this method would return True.
+
+    See also [Hom:hou.Node#inputs], [Hom:hou.Node#inputConnections], and
+    [Hom:hou.Node#inputConnectors].
+
+::`isGenerator(self)` -> `bool`:
+    #cppname: HOM_NodeType::isGenerator
+    Return if this node type has been flagged as a generator.  For example,
+    a grid SOP generates new geometry, while a subdivide SOP does not, and
+    instead processes the geometry passed into it.  See also
+    [Hom:hou.NodeType#minNumInputs].
+
+::`isManager(self, include_management_types=True)` -> `bool`:
+    #cppname: HOM_NodeType::isManager
+    Return whether this NodeType is a manager.  The manager node instances are
+    `/obj`, `/out`, `/part`, `/ch`, `/shop`, `/img`, and `/vex`.
+
+    If `include_management_types` is set to True then this method will
+    additionally return True if this node type is a management node type such
+    as a SHOP network, or VOP network, etc.
+
+::`icon(self)` -> `str`:
+    #cppname: HOM_NodeType::icon
+    Return the name or path of the icon for this node type.  Note that node
+    types that ship with Houdini use a name instead of a full path, and
+    Houdini uses its search path to locate the icon with that name.
+
+::`source(self)` -> [Hom:hou.nodeTypeSource] enum value:
+    #cppname: HOM_NodeType::source
+    #replaces: Cmd:dsoinfo
+    Return a [Hom:hou.nodeTypeSource] enumerated value to indicate if this
+    node type is implemented in VEX, RSL, or the HDK (in C++), or if it is
+    a built-in node type that ships with Houdini.
+
+    {{{
+    #!pycon
+    >>> obj_cat = hou.objNodeTypeCategory()
+    >>> sop_cat = hou.sopNodeTypeCategory()
+    >>> hou.nodeType(obj_cat, "biped_auto_rig").source()
+    nodeTypeSource.Subnet
+    >>> hou.nodeType(sop_cat, "mountain").source()
+    nodeTypeSource.VexCode
+    }}}
+
+::`sourcePath(self)` -> `str`:
+    #cppname: HOM_NodeType::sourcePath
+    #replaces: Cmd:dsoinfo
+    Return the path to the source for this node type, or `"Internal"` if it
+    is a built-in node type.  If the node was created using the HDK, return
+    the path to the shared object/dll for the node type.
+
+    {{{
+    #!pycon
+    >>> obj_cat = hou.objNodeTypeCategory()
+    >>> hou.nodeType(obj_cat, "biped_auto_rig").sourcePath()
+    'oplib:/Object/biped_auto_rig?Object/biped_auto_rig'
+    >>> hou.nodeType(obj_cat, "geo").sourcePath()
+    'Internal'
+    }}}
+
+::`sourceNetwork(self)` -> [Hom:hou.Node] or `None`:
+    #cppname: HOM_NodeType::sourceNetwork
+    If this node type is a digital asset, return the Node instance whose
+    contents define the digital asset.  Otherwise, return None.
+
+::`uninstallFromPath(self)`:
+    #cppname: HOM_NodeType::destroy
+    #replaces: Cmd:optypeuninstall
+    Remove this node and any references to it from a particular filesystem
+    installation path.  For example, this method will remove vex files, icons,
+    dialog scripts, help cards, etc. for custom installed old-style non-otl
+    node types.
+
+    If you call this method on built-in node types, it will have no effect.
+
+    {{{
+    #!python
+    node_type.uninstallFromPath(hou.homeHoudiniDirectory())
+    }}}
+
+    See also [Hom:hou.hda#uninstallFile] and [Hom:hou.HDADefinition#destroy].
+
+::`isReadable(self)` -> `bool`:
+    #cppname: HOM_NodeType::isReadable
+    Return True if this node type is readable and False otherwise.  A readable
+    node type is one that you can create node instances from.
+
+::`isWritable(self)` -> `bool`:
+    #cppname: HOM_NodeType::isWritable
+    Return True if this node type is writable and False otherwise.  A writable
+    node type is one that you can make changes to.
+
+::`areContentsViewable(self)` -> `bool`:
+    #cppname: HOM_NodeType::isWritable
+    Return True if the node network contained in the node type is viewable and
+    False otherwise.
+
+::`containedNodeTypes(self)` -> `tuple` of `str`:
+    #cppname: HOM_NodeType::containedNodeTypes
+    Return a tuple of all NodeType names of the contents of an HDA.
+
+::`childTypeCategory(self)` -> [Hom:hou.NodeTypeCategory] or `None`:
+    #cppname: HOM_NodeType::childNodeType
+    Return the NodeTypeCategory for this NodeType's children, or `None` if
+    this NodeType doesn't allow children.
+
+::`embeddedHelp(self)` -> `str`:
+    #cppname: HOM_NodeType::embeddedHelp
+    Return the help text embedded in this node type. Return an empty string
+    if no embedded help exists.
+
+    The embedded help is searched for in two different places in the following
+    order:
+    - If an HDK node, the text given by its `OP_Operator::getHDKHelp()` override
+    - If an HDA node, the corresponding result of hou.HDADefinition.embeddedHelp()
+
+::`helpUrl(self)` -> `str`:
+    #cppname: HOM_NodeType::helpUrl
+    #replaces: Cmd:optype, Exp:optypeinfo
+    Return the URL where the node type stores the documentation, e.g., a file 
+    name or an HDA section path.  May return an empty string if node type
+    does not know where the documentation is.
+
+::`defaultHelpUrl(self)` -> `str`:
+    #cppname: HOM_NodeType::defaultHelpUrl
+    #replaces: Cmd:optype, Exp:optypeinfo
+    Return a generic URL that the help system will try to resolve to
+    the actual location that stores the node type documentation.
+    The generic URL is in the form "operator:table/optypename" and may include
+    additional information such as a namespace or a version.
+
+::`defaultColor(self)` -> [Hom:hou.Color]:
+    #cppname: HOM_NodeType::defaultColor
+    Return the color used to display a node of this type in the
+    network view if the node's [Hom:hou.nodeFlag.ColorDefault] flag is set.
+
+::`setDefaultColor(self, color)`:
+    #cppname: HOM_NodeType::setDefaultColor
+    Set the color used to display a node of this type in the
+    network view if the node's [Hom:hou.nodeFlag.ColorDefault] flag is set.
+    Pass None as the `color` parameter to remove the type-specific default.
+
+::`defaultShape(self)` -> `str`:
+    #cppname: HOM_NodeType::defaultShape
+    Return the name of the shape used to display a node of this type in the
+    network view if no shape is explcictly assigned to the node.
+
+::`setDefaultShape(self, shape)`:
+    #cppname: HOM_NodeType::setDefaultShape
+    Set the name of the shape used to display a node of this type in the
+    network view if no shape is explcictly assigned to the node.
+    Pass None as the `shape` parameter to remove the type-specific default.
+

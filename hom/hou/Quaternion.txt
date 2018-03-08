@@ -1,0 +1,293 @@
+= hou.Quaternion =
+#type: homclass
+#cppname: HOM_Quaternion
+#group: utility
+
+"""A representation of a 3D rotation (or orientation).  You can smoothly
+interpolate between two rotation values by interpolating between two
+quaternions."""
+
+Quaternions provide an easy way to nicely interpolate between two rotation
+values, and avoid the gimbal lock and direction changes caused by interpolating
+Euler angles.  They can easily be converted to and from rotation matrices, Euler
+angles, and angle-axis rotations.
+
+A quaternion is represented by a vector of 4 floats (x, y, z, and w).  Any
+rotation in three dimensions is a rotation by some angle about some axis,
+and you can think of the (x, y, z) portion of the quaternion as storing
+the axis and the w portion as storing a (representation of) the angle.
+
+See [Wikipedia's Quaternion page|Wp:Quaternion]
+and its [Quaternions and space rotation page|Wp:Quaternions_and_spatial_rotation]
+for more information.
+
+@methods
+
+::`__init__(self)`:
+    #cppname: HOM_Quaternion::HOM_Quaternion
+    You can construct a quaternion from a 3x3 rotation matrix, a 4x4 rotation
+    matrix, a rotation about an axis, Euler angles, or an (x, y, z, w) tuple.
+    Note that rotations are represented as unit quaternions (i.e. quaternions
+    of length 1), so constructing a quaternion from an arbitrary (x, y, z, w)
+    tuple will not necessarily give a unit quaternion.
+
+    {{{
+    #!python
+    # Construct a quaternion from a rotation matrix.
+    hou.Quaternion(matrix3)
+    hou.Quaternion(matrix4)
+
+    # Construct a quaternion from a rotation about an arbitrary axis.
+    hou.Quaternion(90, (1, 1, 0))
+
+    # Construct a quaternion from Euler angles.
+    quaternion = hou.Quaternion()
+    quaternion.setToEulerRotates((rx, ry, rz), rotate_order="xyz")
+
+    # Another way to construct a quaternion from Euler angles by first
+    # constructing a matrix.
+    hou.Quaternion(hou.hmath.buildRotate((rx, ry, rz), "xyz"))
+
+    # Construct a quaternion with specific x, y, z, and w values.
+    hou.Quaternion(x, y, z, w)
+
+    # Construct a quaternion with x, y, z, set to zero and w set to one.
+    # This quaternion corresponds to the identity quaternion (i.e. no
+    # rotation).
+    hou.Quaternion()
+    }}}
+
+    See also [Hom:hou.hmath#buildRotate], [Hom:hou.hmath#buildRotateAboutAxis],
+    and [Hom:hou.Matrix4#extractRotationMatrix3].
+
+::`extractRotationMatrix3(self)` -> [Hom:hou.Matrix3]:
+    #cppname: HOM_Quaternion::extractRotationMatrix3
+    Return a 3x3 rotation matrix corresponding to the rotation in the
+    quaternion.
+
+    To create a [Hom:hou.Matrix4] instead of a [Hom:hou.Matrix3], you can
+    easily create a Matrix4 from the Matrix3:
+    {{{
+    #!python
+    hou.Matrix4(quaternion.extractRotationMatrix3())
+    }}}
+
+    If the quaternion is the zero quaternion, this method does not raise an
+    exception.  Instead, it returns the identity matrix.
+
+    See also [Hom:hou.Quaternion#setToRotationMatrix].
+
+::`extractAngleAxis(self)` -> (`float`, [Hom:hou.Vector3]):
+    #cppname: HOM_Quaternion::extractAngleAxis
+    Return an axis and a rotation about that axis corresponding to the rotation
+    in the quaternion.  The return value is a 2-tuple containing a float
+    and a [Hom:hou.Vector3].  The returned axis vector is normalized.
+
+    If this quaternion is the zero quaternion, the angle returned is zero and
+    the vector is the zero vector.  Otherwise, if it is not normalized, the
+    return values will correspond to the rotation represented by the normalized
+    quaternion.
+
+    See also [Hom:hou.Quaternion#setToAngleAxis].
+
+::`extractEulerRotates(self, rotate_order="xyz")` -> [Hom:hou.Vector3]:
+    #cppname: HOM_Quaternion::extractEulerRotates
+    Return the Euler rotations (the x, y, and z rotation values, in degrees,
+    about the coordinate axes) corresponding to the rotation in the quaternion.
+
+    This method can also be implemented as follows:
+    {{{
+    #!python
+    def extractEulerRotates(self, rotate_order="xyz"):
+	return hou.Matrix4(self.extractRotationMatrix3()).explode(rotate_order=rotate_order)["rotate"]
+    }}}
+
+    See also [Hom:hou.Quaternion#setToEulerRotates].
+
+::`rotate(self, vec)` -> [Hom:hou.Vector3]:
+    #cppname: HOM_Quaternion::rotate
+
+    Rotates the given [Hom:hou.Vector3] by this quaternion and returns the result.
+
+::`slerp(self, other, fraction)` -> [Hom:hou.Quaternion]:
+    #cppname: HOM_Quaternion::slerp
+    Perform spherical linear interpolation between this quaternion and another,
+    returning a new quaternion.  `fraction` is a float from 0.0 to 1.0, where
+    0.0 gives this quaternion and 1.0 gives the other quaternion.  This method
+    is very useful to smoothly interpolate between two different rotations.
+
+    See [Wikipedia's Slerp|Wp:Slerp] page for more
+    information.
+
+    The following example will nicely interpolate between two sets of Euler
+    rotations.
+    {{{
+    #!python
+    def interpolateEulerRotations(rotation1, rotation2, fraction, rotate_order="xyz"):
+	quaternion1 = hou.Quaternion()
+	quaternion1.setToEulerRotates(rotation1, rotate_order)
+	quaternion2 = hou.Quaternion()
+	quaternion2.setToEulerRotates(rotation2, rotate_order)
+
+	return quaternion1.slerp(quaternion2, fraction).extractEulerRotates(rotate_order)
+    }}}
+
+::`setToRotationMatrix(self, matrix3_or_matrix4)`:
+    #cppname: HOM_Quaternion::setToRotationMatrix
+    Set this quaternion to contain the rotation component of the transformation
+    in a [Hom:hou.Matrix3] or [Hom:hou.Matrix4].
+
+    See also [Hom:hou.Quaternion#extractRotationMatrix3].
+
+::`setToAngleAxis(self, angle_in_deg, axis)`:
+    #cppname: HOM_Quaternion::setToAngleAxis
+    Set this quaternion to contain the rotation about an axis by the given
+    angle.  `angle_in_deg` is in degrees and `axis` is a sequence of 3 floats.
+
+    This method can also be implemented as follows:
+    {{{
+    #!python
+    def setToAngleAxis(self, angle_in_deg, axis):
+	self.setToRotationMatrix(
+	    hou.hmath.buildRotateAboutAxis(axis, angle_in_deg))
+    }}}
+
+    See also [Hom:hou.Quaternion#extractAngleAxis].
+
+::`setToVectors(self, a, b)`:
+    #cppname: HOM_Quaternion::setToVectors
+    Sets this quaternion to the quaternion which rotates the [Hom:hou.Vector3] `a` onto the vector `b`.
+
+::`setToEulerRotates(self, angles_in_deg, rotate_order="xyz")`:
+    #cppname: HOM_Quaternion::setToEulerRotates
+    Set this quaternion to contain the rotation specified by Euler rotations
+    about the x, y, and z coordinate axes.
+
+    This method can also be implemented as follows:
+    {{{
+    #!python
+    def setToEulerRotates(self, angles_in_deg, rotate_order="xyz"):
+	self.setToRotationMatrix(
+	    hou.hmath.buildRotate(angles_in_deg, rotate_order))
+    }}}
+
+    See also [Hom:hou.Quaternion#extractEulerRotates] and
+    [Hom:hou.hmath#buildRotate].
+
+::`setTo(self, tuple)`:
+    #cppname: HOM_Quaternion::setTo
+    Set the quaternion's 4 float values (x, y, z, and w).  `tuple` must be
+    a sequence of 4 floats.
+
+    This method will modify an existing quaternion object.  Use
+    [Hom:hou.Quaternion#__init__] to construct a new quaternion from these four
+    values.
+
+    See also [Hom:hou.Quaternion#__setitem__].
+
+::`isAlmostEqual(self, quaternion, tolerance=0.00001)` -> `bool`:
+    #cppname: HOM_Quaternion::isAlmostEqual
+    Returns whether this quaternion is equal to another, within
+    a numerical tolerance.
+
+::`conjugate(self)` -> [Hom:hou.Quaternion]:
+    #cppname: HOM_Quaternion::conjugate
+    Return a quaternion containing the opposite rotation of that stored in
+    this quaternion.  Intuitively, for unit length quaternions, the quaternion
+    returned contains a rotation by the same angle about an axis pointing in
+    the opposite direction.
+
+::`inverse(self)` -> [Hom:hou.Quaternion]:
+    #cppname: HOM_Quaternion::inverse
+    Return a quaternion containing the multiplicative inverse of this
+    quaternion.  For unit quaternions, the inverse is the same as the
+    conjugate.
+
+    See also [Hom:hou.Quaternion#conjugate].
+
+::`normalized(self)` -> [Hom:hou.Quaternion]:
+    #cppname: HOM_Quaternion::normalized
+    Return a normalized version of this quaternion (i.e. a version of this
+    quaternion whose length is one).  Quaternions that represent rotations are
+    always normalized.
+
+    Normalizing a quaternion whose length is zero or near zero will return
+    a new quaternion with the same values.
+
+    This method can be implemented as follows (for non-zero length quaternions):
+    {{{
+    #!python
+    def normalized(self):
+        return self * (1.0 / self.length())
+    }}}
+
+::`length(self)` -> float:
+    #cppname: HOM_Quaternion::length
+    Return the length of the quaternion.  When quaternions represent rotations,
+    their length is one.
+
+    A quaternion's length is compute the same as a Vector4's:
+    `hou.Vector4(self).length()`
+
+::`dot(self, other)` -> `float`:
+    #cppname: HOM_Quaternion::dot
+    Return the dot product of this quaternion with another one.
+
+::`__getitem__(self, index)` -> float:
+    #cppname: HOM_Quaternion::__getitem__
+    Return one of the four float values stored in the quaternion.  This method,
+    along with [Hom:hou.Quaternion#__setitem__] and
+    [Hom:hou.Quaternion#__len__], make quaternions behave like sequences of 4
+    floats so you can use Python's square bracket notation, sequence iteration,
+    etc.
+
+    {{{
+    #!pycon
+    >>> q = hou.Quaternion(1, 2, 3, 4)
+    >>> for value in q:
+    ...     print value
+    1
+    2
+    3
+    4
+    >>> q[2]
+    3
+    >>> len(q)
+    4
+    }}}
+
+::`__setitem__(self, index, value)`:
+    #cppname: HOM_Quaternion::__setitem__
+    Set one of the four float values stored in the quaternion.  See
+    [Hom:hou.Quaternion#__getitem__] for more information.
+
+::`__len__(self)` -> int:
+    #cppname: HOM_Quaternion::__len__
+    Return 4, the number of float elements in the quaternion.  See
+    [Hom:hou.Quaternion#__getitem__] for more information.
+
+::`__add__(self, quaternion)` -> [Hom:hou.Quaternion]:
+    #cppname: HOM_Quaternion::__add__
+    Return a new quaternion containing the sum of this quaternion and another.
+    This method lets you write `quaternion1 + quaternion2`.
+
+    The sum of two quaternions is defined to be the vector containing
+    the pairwise sum of their elements.
+
+::`__sub__(self, quaternion)` -> [Hom:hou.Quaternion]:
+    #cppname: HOM_Quaternion::__sub__
+    Return a new quaternion containing the result of subtracting another
+    quaternion from this one.  This method lets you write `quaternion1 -
+    quaternion2`.
+
+::`__mul__(self, quaternion_or_scalar)` -> [Hom:hou.Quaternion]:
+    #cppname: HOM_Quaternion::__mul__
+    Multiply this quaternion by either another quaternion or a scalar.  This
+    method lets you write `quaternion1 * quaternion2` and `quaternion *
+    scalar`.  This method returns a new [Hom:hou.Quaternion] and does not
+    change this object's value.
+
+    The product of two quaternions is defined to be the vector containing
+    the pairwise product of their elements.  Multiplying a quaternion by
+    a scalar multiplies each of the elements by that scalar.
+

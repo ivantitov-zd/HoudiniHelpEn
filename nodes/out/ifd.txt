@@ -1,0 +1,415 @@
+= Mantra =
+
+#type: node
+#context: out
+#internal: ifd
+#icon: ROP/mantra
+
+"""Renders the scene using Houdini’s standard mantra renderer and generates IFD files."""
+
+== Overview ==
+
+The mantra output driver node uses mantra (Houdini's built-in renderer) to render your scene. You can create a new mantra node by choosing __Render > Create render node > Mantra__ from the main menus. You can edit an existing render node with __Render > Edit render node > <<node name>>__. To see the actual network of render driver nodes, click the path at the top of a network editor pane and choose __Other networks > out__.
+
+You can add and remove [properties|/props] from the output driver just like you can for objects. If you add object properties to the render driver, they define defaults for all objects in the scene. Select a render node, and in the parameter editor click the [Icon:BUTTONS/gear] Gear menu and choose __Edit rendering parameters__ to edit the properties on the node. For more information on properties, see [properties|/props]. For more information on adding properties to a node see the [Edit Parameter Interface|/ref/windows/edit_parameter_interface].
+
+For complex scenes involving multiple render passes, separate lighting and shadow passes, and so on, you can set up dependency relationships between render drivers by connecting driver nodes together. See [render dependencies|/render/batch].
+
+
+== User guide ==
+
+* [Sampling and noise|/render/sampling]
+* [Noise reduction|/render/noise]
+* [Motion blur|/render/blur]
+
+
+== Mantra Attributes ==
+
+The following [attributes|/model/attributes] on geometry control how mantra renders the geometry.
+
+`orient`:
+    Orientation of curve/point primitives. Curves and points will be
+    oriented so that their normals point in the direction of the
+    orient vector attribute.
+`v`:
+    (velocity) Used for velocity motion blur computations.
+`uv`:
+    Default attribute for the `-u` command-line option.
+
+`vm_photon`, `vm_surface`, `vm_displace`, `shop_vm_photon`
+`shop_vm_surface`, `shop_vm_displace`:
+    Shader overrides (per primitive).
+`width`, `pscale`:
+    Controls width of curve/point primitives (see below).
+`scale`:
+    Not used by mantra.
+
+NOTE:
+    When mantra decides the size of point primitives, it looks for the
+    following attributes in order:
+
+    # Point attribute `width`
+
+    # Point attribute `pscale`
+
+    # Detail attribute `width`
+
+    # Detail attribute `pscale`
+
+    To decide the width of curve primitives, mantra looks for the
+    following attributes in order:
+
+    # Vertex attribute `width`
+
+    # Point attribute `width`
+
+    # Primitive attribute `width`
+
+    # Detail attribute `width`
+
+    # Point attribute `pscale`
+
+The first attribute mantra finds controls the size/width of the
+point/curve.
+
+
+@parameters
+
+Render to File:
+    Renders with the last render control settings, using the path specified in __Output Picture__.
+
+Render to MPlay:
+    Renders with the last render control settings, redirecting rendered frames to [MPlay|/mplay], instead of the specified path. 
+    NOTE:
+        If enabled, deep images and cryptomatte images will still be written out to their specified output path.
+
+Render Control:
+    Opens the render control dialog to allow adjustments of the render parameters before rendering.
+
+Valid Frame Range:
+    Controls whether this render node outputs the current frame (__Render any frame__) or the image sequence specified in the __Start/End/Inc__ parameters (__Render Frame Range__).
+
+    __Render Frame Range (strict)__ will render frames START to END when it is rendered, but will not allow frames outside this range to be rendered at all. __Render Frame Range__ will allow outside frames to be rendered. This is used in conjunction with render dependencies. It also affects the behavior of the 'Override Frame Range' in the Render Control dialog.
+
+    Two possible cases where you'd want the strict behavior:
+    
+    - A 60 frame walk cycle written out to a geo, but part of a larger ROP net to render out a larger frame range.
+
+    - A texture loop from 1-20.
+
+    Otherwise, you will usually set this to non-strict.
+
+    Render Current Frame: 
+        Renders a single frame, based on the value in the playbar or the frame that is requested by a connected output render node.
+
+    Render Frame Range:
+        Renders a sequence of frames. If an output render node is connected, this range is generally ignored in favor of frames requested by the output render node.
+    
+    Render Frame Range (Strict):
+        Renders a sequence of frames. If an output render node is connected, this range restricts its requested frames to this frame range.
+
+Start/End/Inc:
+    Specifies the range of frames to render (start frame, end frame, and increment). All values may be floating point values. The range is inclusive. 
+
+    These parameters determine the values of the local variables for the output driver.
+        `$NRENDER`:
+            The number of frames to be rendered by the output driver.
+        `$N`:
+            The current frame being rendered (starting at 1 and going to `$NRENDER`).
+    
+    For example, if the parameters are set to:
+    
+    Start ||
+        End ||
+            Inc ||
+    10.5 |
+        12 |
+            0.5 |
+
+    ...there will be 4 frames rendered (10.5, 11, 11.5, and 12), so `$NRENDER` will have a value of 4. `$N` will have the following values at each frame:
+    
+    Frame ||
+        `$N` ||
+    10.5 |
+        1
+    11 |
+        2
+    11.5 |
+        3
+    12 |
+        4
+
+Render With Take:
+    The output driver will switch to this take before rendering and then restore the current take when rendering is done.
+
+    TIP:
+        use `chs("take")` to use this value in other parameters. See the [Exp:chs] expression function for more information.
+
+Camera:
+    The path the to camera object to use to render the scene, for example `/obj/cam1`.
+
+* [IncludeProp:override_camerares]
+* [IncludeProp:res_fraction]
+* [IncludeProp:res_override]
+* [IncludeProp:aspect_override]
+
+
+== Images ==
+
+* [IncludeProp:vm_picture]
+* [IncludeProp:vm_device]
+* [Include:standard#soho_mkpath]
+* [Include:standard#soho_skip_path]
+
+
+=== Output ===
+
+* [IncludeProp:vm_pfilter]
+* [IncludeProp:vm_sfilter]
+* [IncludeProp:vm_quantize]
+* [IncludeProp:vm_gamma]
+* [IncludeProp:vm_subpixel]
+* [IncludeProp:vm_tile_render]
+* [IncludeProp:vm_tile_count_x]
+* [IncludeProp:vm_tile_count_y]
+* [IncludeProp:vm_tile_index]
+* [IncludeProp:render_viewcamera]
+* [IncludeProp:render_any_shadowmap]
+* [IncludeProp:render_any_envmap]
+* [IncludeProp:render_any_photonmap]
+
+
+=== Extra image planes === (extra_image_planes_tab)
+
+* [IncludeProp:vm_exportcomponents]
+
+* [IncludeProp:vm_quickplane_P]
+* [IncludeProp:vm_quickplane_Pz]
+* [IncludeProp:vm_quickplane_N]
+* [IncludeProp:vm_quickplane_all_comp]
+* [IncludeProp:vm_quickplane_direct_comp]
+* [IncludeProp:vm_quickplane_indirect_comp]
+* [IncludeProp:vm_quickplane_all_emission]
+* [IncludeProp:vm_quickplane_direct_noshadow]
+* [IncludeProp:vm_quickplane_direct_samples]
+* [IncludeProp:vm_quickplane_indirect_samples]
+* [IncludeProp:vm_quickplane_sss]
+* [IncludeProp:vm_quickplane_basecolor]
+* [IncludeProp:vm_quickplane_diffcolor]
+* [IncludeProp:vm_quickplane_speccolor]
+* [IncludeProp:vm_quickplane_emitcolor]
+* [IncludeProp:vm_quickplane_ssscolor]
+* [IncludeProp:vm_quickplane_metallic]
+* [IncludeProp:vm_quickplane_specrough]
+
+* [IncludeProp:vm_numaux]
+
+
+=== Deep output ===
+
+* [IncludeProp:vm_deepresolver]
+* [IncludeProp:vm_dcmfilename]
+* [IncludeProp:vm_dcmcompositing]
+* [IncludeProp:vm_matchdeeppixelfilter]
+
+
+=== Meta data ===
+
+* [IncludeProp:vm_image_artist]
+* [IncludeProp:vm_image_comment]
+* [IncludeProp:vm_image_hostname]
+* [IncludeProp:vm_image_mplay_direction]
+* [IncludeProp:vm_image_mplay_label]
+* [IncludeProp:vm_image_mplay_gamma]
+* [IncludeProp:vm_image_jpeg_quality]
+* [IncludeProp:vm_image_tiff_compression]
+* [IncludeProp:vm_image_exr_compression]
+
+
+== Rendering ==
+
+* [IncludeProp:vm_renderengine]
+* [IncludeProp:vm_dof]
+* [IncludeProp:allowmotionblur]
+* [IncludeProp:xform_motionsamples]
+* [IncludeProp:geo_motionsamples]
+* [IncludeProp:shutteroffset]
+
+
+=== Sampling === (sampling_tab)
+
+* [IncludeProp:vm_samples]
+* [IncludeProp:vm_colorspace]
+* [IncludeProp:vm_dorayvariance]
+* [IncludeProp:vm_minraysamples]
+* [IncludeProp:vm_maxraysamples]
+* [IncludeProp:vm_variance]
+* [IncludeProp:vm_diffusequality]
+* [IncludeProp:vm_reflectionquality]
+* [IncludeProp:vm_refractionquality]
+* [IncludeProp:vm_decoupleindirect]
+* [IncludeProp:vm_volumesteprate]
+* [IncludeProp:vm_volumeshadowsteprate]
+* [IncludeProp:vm_transparent]
+* [IncludeProp:vm_transparentsamples]
+* [IncludeProp:vm_samplelock]
+* [IncludeProp:vm_randomseed]
+* [IncludeProp:vm_imageblur]
+
+
+=== Limits === (limits_tab)
+
+* [IncludeProp:vm_reflectlimit]
+* [IncludeProp:vm_refractlimit]
+* [IncludeProp:vm_diffuselimit]
+* [IncludeProp:vm_volumelimit]
+* [IncludeProp:vm_opacitylimit]
+* [IncludeProp:vm_colorlimit]
+* [IncludeProp:vm_colorlimitdecay]
+* [IncludeProp:vm_raylimiteval]
+
+
+=== Shading ===
+
+* [IncludeProp:vm_pbrreflectratio]
+* [IncludeProp:vm_raybias]
+* [IncludeProp:vm_biasnormal]
+* [IncludeProp:vm_nesteddielectric]
+* [IncludeProp:vm_pbrpathtype]
+* [IncludeProp:vm_constrainmaxrough]
+* [IncludeProp:vm_refractcomponents]
+* [IncludeProp:vm_diffusecomponents]
+* [IncludeProp:vm_volumecomponents]
+* [IncludeProp:vm_ssscomponents]
+
+
+=== Render ===
+
+* [IncludeProp:vm_bucketsize]
+* [IncludeProp:vm_usemaxthreads]
+* [IncludeProp:vm_threadcount]
+* [IncludeProp:vm_usecacheratio]
+* [IncludeProp:vm_cacheratio]
+* [IncludeProp:vm_octreestyle]
+* [IncludeProp:vm_kdmemfactor]
+* [IncludeProp:vm_uvobject]
+* [IncludeProp:vm_uvattribute]
+* [IncludeProp:vm_hidden]
+* [IncludeProp:vm_otlfullpath]
+* [IncludeProp:vm_embedvex]
+* [IncludeProp:vm_otlfullpath]
+* [IncludeProp:declare_stylesheets]
+* [IncludeProp:apply_stylesheets]
+* [IncludeProp:declare_all_shops]
+
+
+=== Dicing ===
+
+* [IncludeProp:vm_shadingfactor]
+* [IncludeProp:vm_motionfactor]
+* [IncludeProp:vm_measure]
+* [IncludeProp:vm_measurezimportance]
+* [IncludeProp:vm_measureoffscreenquality]
+
+
+== Objects == (objects_tab)
+
+The parameters on this tab determine which objects and lights are included in the IFD.
+
+Mantra processes these parameters in the following order:
+
+# Candidate objects/lights are selected.
+# Forced objects/lights are added. 
+# Objects/Lights matching the exclusion parameter are removed.
+
+Candidate Objects:
+    The geometry objects in this parameter will be included in the IFD if their display flags are turned on and their display channel is enabled.
+
+Force Objects:
+    Objects in this parameter are added to the IFD regardless of the state of their display. Objects can only be added to the IFD once.
+
+Forced Matte:
+    Objects forced to be output as matte objects.
+
+Forced Phantom:
+    Objects forced to be output as phantom objects.
+
+Exclude Objects:
+    Objects in this parameter are excluded from the scene, regardless of whether they are selected in the __Candidate Objects__ or __Force Objects__.
+
+Solo Light:
+    Only lights in this parameter will be included in the IFD. This includes shadow map generation and illumination. If this parameter is set, the candidate, forced, and exclusion parameters are ignored.
+
+    Using this parameter in conjunction with the `render_viewcamera` property provides a quick way of generating shadow maps for selected lights.
+
+Candidate Lights:
+    Each light in this parameter is added to the IFD if the dimmer channel of the light is not 0. The standard light sets the dimmer channel to 0 when the light is not enabled.
+
+Force Lights:
+    The lights in this parameter are added to the IFD regardless of the value in their dimmer channels.
+
+Exclude Lights:
+    These lights will be excluded from the scene, even if they are selected in __Candidate Lights__ or Force Lights__.
+
+Headlight Creation:
+    If there are no lights in the scene, a headlight is created by default. To disable, turn off this checkbox.
+
+Visible Fog:
+    The fog/atmosphere objects in this parameter are included in the IFD if their display flags are turned on and their display channel is enabled.
+
+
+== Scripts == (scripts_tab)
+
+Each script command refers to an hscript command which will be run, regardless of the expression language selected for the parameter. The resulting string will be run as an hscript command. It is possible to use the python, unix or source hscript commands to perform complex processing.
+
+The commands are always run when rendering occurs. The command checks the parameters of the output driver when it is rendering a range or sending output to a command.
+
+Before the render occurs, Houdini will automatically set the current hscript directory to point to the output driver.
+
+Pre-Render Script:
+    This command is run before any IFDs are generated. It is only run once per render.
+
+Pre-Frame Script:
+    This command is run before each IFD is generated.
+
+Post-Frame Script:
+    This command is run after each IFD is generated. Although the IFD may have been generated, this does not necessarily mean that mantra has finished rendering the image when this command is run.
+
+Post-Render Script: 
+    This command is run one time, after all IFDs have been generated. Although the IFD may have been generated, this does not necessarily mean that mantra has finished rendering the image when this command is run.
+
+
+== Driver == (driver_tab)
+
+Command:
+    The command (i.e. mantra) where the IFD file is sent. This will be disabled if the IFD file is saved to disk.
+    
+    NOTE:
+        The Mantra ROP will not automatically gzip based on the file extension of the `.ifd` file. The file `.ifd.gz` will contain uncompressed data. However, you can set your render command to something like `gzip > foo$F4.ifd.gz` to compress the file.
+
+Disk File:
+    The location where the IFD file is saved to disk. You must turn on the Disk File checkbox to enable this parameter.
+
+Block Until Render Complete:
+    When sending the output to a command, Houdini will normally return control after it is finished writing the IFD. This allows the render process to complete in the background. Turning on this parameter will force Houdini to block until the mantra finishes rendering the frame.
+
+    When rendering a frame range, this option is automatically turned on. However, the option is not automatically turned on when rendering in an hscript or python loop construct. Therefore caution must be used or it is possible to end up starting multiple background renders.
+
+    NOTE:
+        The rps and rkill hscript commands can be used to query or kill background renders. 
+    
+        See the [Troubleshooting|#trouble] section for more information.
+           
+Initialize Simulation OPs:
+    If this option is turned on, POP and DOP simulations will be initialized before rendering.
+
+Show In Viewport:
+    Enabling this checkbox will cause the driver to show up in the viewport menu. By default, SOHO output drivers to not appear in the viewport menu.
+
+* [IncludeProp:vm_binarygeometry]
+
+
+@related
+
+- [RenderMan|Node:out/rib]
+- [How to render wireframes|/render/renderwireframes]

@@ -1,0 +1,147 @@
+= Creep =
+
+#type: node
+#context: sop
+#internal: creep
+#icon: SOP/creep
+#tags: reshape, deform, surface
+
+"""Deforms and animates a piece of geometry across a surface."""
+
+This operator changes each of the source input geometry points into a
+new space. The X and Y components of the source points will become the U
+and V positions on the surface. The Z component becomes a displacement
+along the surface's normal at the (U, V) position.
+
+[Include:/shelf/creepmodel#includeme]
+
+== Inputs / Geometry Types ==
+
+The geometry of the Source op is crept along the path of the Path
+op. The path type can be any primitive, but should define a surface
+(e.g. NURBS surface, primitive tube, etc.). Curve paths (circles,
+polygons, etc.) will squash the source geometry's height. This op
+will transform all vector attributes, even of particles. The
+velocities will be altered to reflect the transformation that creep
+does.
+
+NOTE:
+    NURBS surfaces might distort the crept geometry due to the
+    non-uniformity of their U and V knot sequence. If the knots are
+    not laid out uniformly (as in the case of a NURBS spline), knots
+    closer together will squash the crept geometry in the
+    corresponding surface region.
+
+The [Grid SOP|Node:sop/grid], [Skin SOP|Node:sop/skin], [Sweep
+SOP|Node:sop/sweep], [Tube SOP|Node:sop/tube], and [Sphere
+SOP|Node:sop/sphere] (with __Unique Points at Poles__ on for
+polygons) are some of the ops that produce usable Meshes.
+
+The Source Input op's geometry is wrapped onto the Path's, and the
+position and orientation of the Source on the Path is controlled by
+the nine fields that appear at the bottom of the op: Translate,
+Rotate, and Scale xyz.
+
+The Z translate, Z scaling and X/Y rotation of the Source to the
+Path depends on the surface normals of the Path's geometry.
+
+== Uses / Works in Relation With ==
+
+Creeping the starting profile for a filleted tube onto a surface can
+be accomplished with this op. Use a [Transform SOP|Node:sop/xform]
+or [Copy SOP|Node:sop/copy] to scale and translate the crept profile
+generating a series of cross-sections to skin with the [Skin
+SOP|Node:sop/skin].
+
+@parameters
+Group:
+Subset of points to creep onto the path.
+Path Group:
+Primitive to creep on.
+
+== Creep ==
+
+Initialize:
+
+    Fill Path:
+        Values are computed that stretch or shrink the Source
+        geometry to the full dimensions of the Path geometry.
+    Keep Proportions:
+        Similar to above, but the values are initialized so as
+        to minimize distortion of object geometry.
+Translate:
+    #id: t
+
+    Translate source geometry over the creep surface.
+Rotate:
+    #id: r
+
+    Rotate source geometry on the creep surface.
+Scale:
+    #id: s
+
+    Scale source geometry on the creep surface.
+Pivot:
+    #id: p
+
+    Local pivot point for transformations. 
+
+== Attribute ==
+
+The parameters on this tab control how attributes on the creep
+surface affect the geometry being crept.
+
+Set Creep UV Attribute:
+    Store the parametric coordinates that the source points are
+    crept onto in the specified point attribute.
+    
+Set Point Attributes From Path:
+    #id: doattr
+
+    Copy attributes from the path geometry to the points of the
+    source geometry, according to the values in the attribute
+    fields below.
+
+Attribute fields:
+    (Available when __Set Point Attributes From Path__ is on
+    above.)
+
+    The _columns_ represent _possible ways of combining the
+    attributes_ from the path geometry with the point attributes
+    from the source geometry.
+
+    Set:
+        Copy the path attributes onto the points.
+    Mult:
+        Multiply the source point attributes by the
+        corresponding path attributes.
+    Add:
+        Add the path attributes to the corresponding source
+        point attributes.
+    Sub:
+        Subtract the path attributes from the corresponding
+        source point attributes.
+    
+    The _rows_ represent _the different entities you can copy
+    attributes from_: points, primitives, and vertices.
+
+    At the _intersection_ of each column and row, you can enter
+    a list/pattern of attributes.
+
+    For example:
+
+    * To copy all attribute values from the path primitive
+      attributes to the point attributes of the source, set the
+      field at __Set/From Prim__ to `*`.
+
+    * To multiply source point colors by the path's primitive
+      colors, set the field at __Mult/From Prim__ to `Cd`.
+
+    * To add the point texture coordinates of the path geometry
+      to the coordinates of the source, set the field at
+      __Add/From Point__ to __uv__.
+
+@related
+
+- [Node:sop/paste]
+- [Node:sop/ray]

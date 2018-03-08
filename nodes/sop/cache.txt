@@ -1,0 +1,107 @@
+= Cache =
+
+#type: node
+#context: sop
+#internal: cache
+#icon: MISC/generic
+#tags: tech, optimize, anim
+
+"""Records and caches its input geometry for faster playback."""
+
+Use this when [cook|/basics/cooking] times for a chain of ops is long
+and you need quicker playback, at the expense of using more memory.
+
+Once cached, the geometries can be accessed in any order. This is
+better than a 2D flipbook or scene render since the geometry is
+still three dimensional. It is also ideal for pop networks since once
+it's cached you can play it forward or backward.
+
+This lets you scrub otherwise sluggish animations in real time,
+play pop networks backwards, etc. because the animation is
+precomputed and stored in memory.
+
+You can automate invalidation of the cache by connecting a node to the second
+reference input of this SOP.  Any modification of parameters in the reference
+input chain will clear the cache, however updates to the parameters due to time changes
+will not. The first and second inputs can be connected to the same or different nodes.
+
+NOTE:
+    This node can also be used a sliding cache around the current frame
+    by putting expressions such as `$F-3` and `$F+3` in the `Start/End`
+    parameters.  A sliding cache can greatly accelerate calculations that
+    involve multiple time-shifting nodes, such as calculating point velocities with a
+    [Trail SOP|Node:sop/trail] from geometry interpolated by a [TimeBlend SOP|Node:sop/timeblend].
+
+@parameters
+
+Cache Any Frame:
+    #id: anyframe
+
+    When enabled, there is no frame range limitation or granularity limitation on which frames will be cached.
+    Instead, there is just a __Max Frames to Cache__ parameter.
+
+Max Frames to Cache:
+    #id: maxframes
+
+    When __Cache Any Frame__ is enabled, this indicates the maximum number of different frames of geometry to keep cached.
+    Lower this to reduce the risk of running out of memory.
+    Raise it if more frames need to stay cached.
+
+Clear Cache when Change Upstream:
+    #id: clear on change
+
+    When enabled, if a parameter or connection is explicitly changed upstream,
+    i.e. excluding changes that are just due to time changing, the cache is cleared.
+    If the second input is used, this parameter is ignored, and the cache will
+    always be cleared when that input has such an upstream change.
+
+Start/End/Inc:
+    #channels: /range
+
+    A range of values at which to set the the index and param name
+    when caching.
+Index:
+    #channels: /index
+
+    Set to each value within the range for each geometry cached.
+Index Param Name:
+    #channels: /param
+
+    A stampable parameter set to the index during caching.
+Set Frame to Index When Caching:
+    #channels: /indextime
+
+    Set the local time to the index for each geometry cached.
+Load:
+    #channels: /loadmethod
+
+    The loading behavior.
+Reload All Cache:
+    #channels: /reload
+
+    Clear the cache and reload everything.
+Clear Cache:
+    #channels: /clear
+
+    Delete all the stored cache.
+Cache Points Only:
+    #channels: /cachepoints
+
+    Store a single topology for the first cached geometry and only
+    point data for the remaining geometries.
+Blend Position:
+    #channels: /blendpos
+
+    Interpolate points between geometries.
+    
+    To use this option, replace the __Index__ with the floating point
+    frame number `$FF`.
+    
+    To check that you are blending subframe, use the playbar options to
+    turn off integer frame values, and scrub the playbar slowly between
+    frames.
+
+@related
+    - [Node:sop/trail]
+    - [Node:sop/timeshift]
+

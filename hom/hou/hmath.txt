@@ -1,0 +1,372 @@
+﻿= hou.hmath =
+#type: hommodule
+#cppname: HOM_hmath
+#group: general
+
+"""Houdini and 3D related math functions."""
+
+@functions
+
+::`buildTranslate(values)` -> [Hom:hou.Matrix4]:
+    #cppname: HOM_hmath::buildTranslate
+    #replaces: Exp:translate
+    Return a transformation matrix containing only a translation.  You can
+    build more complex transformations by multiplying the result with
+    another transformation matrix.
+
+    values:
+	A sequence of 3 floats representing the translation in x, y, and z.
+
+    See [Hom:hou.Geometry#transformPrims] and [Hom:hou.Matrix4#explode] for
+    examples.
+
+::`buildRotateAboutAxis(axis, angle_in_deg)` -> [Hom:hou.Matrix4]:
+    #cppname: HOM_hmath::buildRotateAboutAxis
+    #replaces: Exp:rotaxis
+    Return a transformation matrix containing only a rotation, given
+    an axis and a rotation amount.  You can build more complex transformations
+    by multiplying the result with another transformation matrix.
+
+    See [Hom:hou.Geometry#transformPrims] and [Hom:hou.Matrix4#explode] for
+    examples.
+
+    If you want to convert Euler angles into a corresponding axis and angle,
+    you can use the following code:
+    {{{
+    #!python
+    def extractAxisAndAngleFromRotateMatrix(m):
+        '''Given a matrix, return an (Vector3, float) tuple containing the
+           axis and angle.  See Wikipedia's rotation represention page for
+           more details.'''
+        import math
+
+        acos_input = (m.at(0, 0) + m.at(1, 1) + m.at(2, 2) - 1.0) * 0.5
+        if acos_input < -1.0 or acos_input > 1.0:
+            return None
+
+        angle = math.acos(acos_input)
+        if angle >= -1e-6 and angle <= 1e-6:
+            # There is no rotation.  Choose an arbitrary axis and a rotation of 0.
+            return hou.Vector3(1, 0, 0), 0.0
+
+        inv_sin = 1.0 / (2.0 * math.sin(angle))
+        axis = hou.Vector3(
+            (m.at(1, 2) - m.at(2, 1)) * inv_sin,
+            (m.at(2, 0) - m.at(0, 2)) * inv_sin,
+            (m.at(0, 1) - m.at(1, 0)) * inv_sin)
+        return axis, hou.hmath.radToDeg(angle)
+
+    def eulerToAxisAndAngle(angles):
+        return extractAxisAndAngleFromRotateMatrix(hou.hmath.buildRotate(angles))
+    }}}
+
+    See [Wikipedia's axis angle
+    page|Wp:Axis_angle] and [rotation representation
+    page|Wp:Rotation_representation_(mathematics)]
+    for more information.
+
+::`buildRotate(values, order="xyz")` -> [Hom:hou.Matrix4]:
+    #cppname: HOM_hmath::buildRotate
+    #replaces: Exp:rotate
+    Return a transformation matrix containing only a rotation, given a sequence
+    of Euler angles.  You can build more complex transformations by multiplying
+    the result with another transformation matrix.
+
+    values:
+	A sequence of 3 floats representing the rotations about each of
+	the x, y, and z axes.  Each rotation value is in degrees.
+
+    order:
+	A string containing a permutation of the letters `x`, `y`, and `z`
+	that determines the order in which rotations are performed about
+	the coordinate axes.
+
+    See [Wikipedia's Euler angles
+    page|Wp:Euler_angles] for more information.
+
+    See [Hom:hou.Matrix4#explode] for an example.  See also
+    [Hom:hou.hmath#buildRotateAboutAxis] and [Hom:hou.hmath#radToDeg].
+
+::`buildRotateToFrame(new_z_axis, new_y_axis)` -> [Hom:hou.Matrix4]:
+    #cppname: HOM_hmath::buildRotateToFrame
+    #replaces: Exp:morient
+    #status: ni
+
+::`buildScale(values)` -> [Hom:hou.Matrix4]:
+    #cppname: HOM_hmath::buildScale
+    #replaces: Exp:scale
+    Return a transformation matrix containing only a scale, given a sequence
+    of scale values for x, y, and z.  You can build more complex transformations
+    by multiplying the result with another transformation matrix.
+
+    To apply a uniform scale, use the same value for x, y, and z.
+
+    See [Hom:hou.Geometry#createNURBSSurface] and [Hom:hou.Matrix4#explode] for
+    examples.
+
+::`buildShear(values)` -> [Hom:hou.Matrix4]:
+    #cppname: HOM_hmath::buildShear
+    Return a transformation matrix containing only a shear, given a sequence
+    of shear values for x, y, and z.  You can build more complex transformations
+    by multiplying the result with another transformation matrix.
+
+    See [Wikipedia's shear matrix
+    page|Wp:Shear_matrix] for more information.
+
+    See [Hom:hou.Matrix4#explode] for an example.
+
+::`buildTransform(values_dict, transform_order="srt", rotate_order="xyz")` -> [Hom:hou.Matrix4]:
+    #cppname: HOM_hmath::buildTransform
+    Given a set of translate, rotate, scale, shear, pivot, and pivot_rotate
+    values; and transform rotate orders, return a corresponding matrix.  This
+    function is the inverse of [Hom:hou.Matrix4#explode].
+
+    values_dict:
+	A dictionary whose keys are one of the strings "translate",
+	"rotate", "scale", "shear", "pivot", "pivot_rotate" and whose values
+        are sequences of three floats.  Note that the rotate values are Euler
+        angles about the `x`, `y`, and `z` axes, in degrees.
+
+    transform_order:
+	A string containing a permutation of the letters `s`, `r`, and `t`.
+	The rotate, scale, and translate results are dependent on the order in
+	which you perform those operations, and this string specifies that
+	order.
+
+    rotate_order:
+	A string containing a permutation of the letters `x`, `y`, and `z`
+	that determines the order in which rotations are performed about
+	the coordinate axes.  This does not apply to the "pivot_rotate"
+        angles, which are always applied in `"xyz"` order.
+
+    This function can be approximately implemented as follows:
+    {{{
+    #!python
+    def buildTransform(values_dict, transform_order="srt", rotate_order="xyz"):
+	# Take the return value from explode, along with the transform and
+	# rotate order, and rebuild the original matrix.
+	result = hou.hmath.identityTransform()
+	for operation_type in transform_order:
+	    if operation_type == "t":
+		result *= hou.hmath.buildTranslate(values_dict["translate"])
+	    elif operation_type == "s":
+		result *= hou.hmath.buildScale(values_dict["scale"])
+		if "shear" in values_dict:
+		    result *= hou.hmath.buildShear(values_dict["shear"])
+	    elif operation_type == "r":
+		result *= hou.hmath.buildRotate(values_dict["rotate"], rotate_order)
+	    else:
+		raise ValueError("Invalid transform order")
+	return result
+    }}}
+
+::`identityTransform()` -> [Hom:hou.Matrix4]:
+    #cppname: HOM_hmath::identityTransform
+    #replaces: Exp:identity
+    Returns the identity matrix.  This is the same as calling `hou.Matrix4(1)`.
+
+    {{{
+    #!pycon
+    >>> hou.hmath.identityTransform()
+    <hou.Matrix4 [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]]>
+    }}}
+
+    See also [Hom:hou.Matrix4#__init__].
+
+::`degToRad(degrees)` -> `float`:
+    #cppname: HOM_hmath::degToRad
+    #replaces: Exp:rad
+    Given a value in degrees, return the corresponding value in radians.
+
+    This function is equivalent to `degrees * math.pi / 180.0`.
+
+::`radToDeg(radians)` -> `double`:
+    #cppname: HOM_hmath::radToDeg
+    #replaces: Exp:deg
+    Given a value in radians, return the corresponding value in degrees.
+
+    This function is equivalent to `radians * 180.0 / math.pi`.
+
+::`clamp(value, min, max)` -> `float`:
+    #cppname: HOM_hmath::clamp
+    #replaces: Exp:clamp
+    Returns the value clamped to the range `min` to `max`.  See also
+    [Hom:hou.hmath#wrap].  This function is useful in expressions to prevent
+    a value from going outside the specified range.
+
+::`wrap(value, min, max)`:
+    #cppname: HOM_hmath::wrap
+    #replaces: Exp:wrap
+    Similar to the [Hom:hou.hmath#clamp] function in that the resulting value
+    will always fall between the specified minimum and maximum value.  However,
+    it will create a saw-tooth wave for continuously increasing or decreasing
+    parameter values.
+
+::`sign(value)` -> `int`:
+    #cppname: HOM_hmath::sign
+    #replaces: Exp:sign
+    Returns 1.0 if `value` is positive, -1.0 if negative and 0.0 if `value` is
+    zero.
+
+    Note that you can achieve the same effect with Python's built-in `cmp`
+    function: `float(cmp(value, 0))`.
+
+::`smooth(value, min, max)` -> `float`:
+    #cppname: HOM_hmath::smooth
+    #replaces: Exp:smooth
+    Takes a value and range and returns a smooth interpolation between 0
+    and 1.
+    
+    When `value` is less than `min`, the return value is 0.
+    If `value` is greater than `max`, the return value is 1.
+    
+    {{{
+    #!pycon
+    >>> hou.hmath.smooth(5, 0, 20)
+    0.15625
+    >>> hou.hmath.smooth(10, 0, 20)
+    0.5
+    >>> hou.hmath.smooth(15, 0, 20)
+    0.84375
+    }}}
+
+    {{{
+    #!python
+    # Visualize the output of this function by positioning geometry objects at  various locations.
+    def createSpheres(num_spheres=40):
+        for i in range(num_spheres):
+            sphere = hou.node("/obj").createNode("geo").createNode("sphere")
+            sphere.parmTuple("rad").set((0.1, 0.1, 0.1))
+            sphere.setDisplayFlag(True)
+
+            # Given a value between 0 and 5, we'll call smooth with a range
+            # of 0 to 3, and the resulting y value will be between 0 and 1.
+            x = 5.0 * i / num_spheres
+            y = hou.hmath.smooth(x, 0, 3)
+            sphere.parent().setParmTransform(hou.hmath.buildTranslate((x, y, 0)))
+    }}}
+
+::`fit(value, old_min, old_max, new_min, new_max)` -> `float`:
+    #cppname: HOM_hmath::fit
+    #replaces: Exp:fit
+    Returns a number between `new_min` and `new_max` that is relative to
+    the `value` between the range `old_min` and `old_max`.  If the value
+    is outside the `old_min` to `old_max` range, it will be clamped to the new
+    range.
+
+    {{{
+    #!pycon
+    >>> hou.hmath.fit(3, 1, 4, 5, 20)
+    15.0
+    }}}
+
+::`fit01(value, new_min, new_max)` -> `float`:
+    #replaces: Exp:fit01
+    #cppname: HOM_hmath::fit01
+    Returns a number between `new_min` and `new_max` that is relative to
+    the `value` between the range 0 and 1.  If the value is outside the 0
+    to 1 range, it will be clamped to the new range.
+
+    This function is a shortcut for
+    `hou.hmath.fit(value, 0.0, 1.0, new_min, new_max)`.
+
+::`fit10(value, new_min, new_max)` -> `float`:
+    #cppname: HOM_hmath::fit10
+    #replaces: Exp:fit10
+    Returns a number between `new_min` and `new_max` that is relative to
+    the `value` between the range 1 to 0.  If the value is outside the 1 to 0
+    range, it will be clamped to the new range.
+
+    This function is a shortcut for
+    `hou.hmath.fit(value, 1.0, 0.0, new_min, new_max)`.
+
+::`fit11(value, new_min, new_max)` -> `float`:
+    #cppname: HOM_hmath::fit11
+    #replaces: Exp:fit11
+    Returns a number between `new_min` and `new_max` that is relative to
+    the `value` between the range -1 to 1.  If the value is outside the
+    -1 to 1 range, it will be clamped to the new range.
+
+    This function is a shortcut for
+    `hou.hmath.fit(value, -1.0, 1.0, new_min, new_max)`.
+
+::`modularBlend(value1, value2, modulus, blend_factor)`:
+    #cppname: HOM_hmath::modularBlend
+    #replaces: Exp:modblend
+    #status: ni
+
+::`rand(seed)` -> `float`:
+    #cppname: HOM_hmath::rand
+    #replaces: Exp:rand
+    Returns a pseudo-random number from 0 to 1.  Using the same `seed` will
+    always give the same result.
+
+::`noise1d(self, pos)` -> `float`:
+    #cppname: HOM_hmath::noise1d
+    #replaces: Exp:noise
+    Given a sequence of 1 to 4 floats representing a position in
+    N-dimensional space, return a single float corresponding to 1 dimensional
+    noise.
+
+    This function matches the output of the [Vex:noise] function from VEX.
+
+::`noise3d(self, pos)` -> [Hom:hou.Vector3]:
+    #cppname: HOM_hmath::noise3d
+    Given a sequence of 1 to 4 floats representing a position in
+    N-dimensional space, return a [Hom:hou.Vector3] object representing the
+    vector noise at the given position.
+
+    This function matches the output of the [Vex:noise] function from VEX.
+
+::`sparseConvolutionNoise(pos3)` -> float:
+    #cppname: HOM_hmath::sparseConvolutionNoise
+    #replaces: Exp:snoise
+    #status: ni
+
+::`sparseConvolutionTurbulantNoise(pos3, depth)` -> float:
+    #cppname: HOM_hmath::sparseConvolutionTurbulantNoise
+    #replaces: Exp:sturb
+    #status: ni
+
+::`turbulantNoise(pos3, depth)` -> float:
+    #cppname: HOM_hmath::turbulantNoise
+    #replaces: Exp:turb
+    #status: ni
+
+::`orient2d(pa, pb, point)` -> `float`:
+    #cppname: HOM_hmath::orient2d
+
+    Performs an adaptive exact sidedness test of the 2d point against the line
+    defined by `pa` and `pb`.
+
+    See http://www.cs.cmu.edu/~quake/robust.html for details of the
+    implementation.
+
+::`orient3d(pa, pb, pc, point)` -> `float`:
+    #cppname: HOM_hmath::orient3d
+
+    Performs an adaptive exact sidedness test of the 3d point against the plane
+    defined by `pa`, `pb`, and `pc`.
+
+    See http://www.cs.cmu.edu/~quake/robust.html for details of the
+    implementation.
+
+::`inCircle(pa, pb, pc, point)` -> `float`:
+    #cppname: HOM_hmath::inCircle
+
+    Performs an adaptive exact inside test of the 2d point against the circle
+    defined by `pa`, `pb`, and `pc`.  `pa`, `pb`, and `pc` must be in counter-clockwise
+    order to get a positive value for interior points.
+
+    See http://www.cs.cmu.edu/~quake/robust.html for details of the
+    implementation.
+
+::`inSphere(pa, pb, pc, pd, point)` -> `float`:
+    #cppname: HOM_hmath::inSphere
+
+    Performs an adaptive exact inside test of the 3d point against the sphere
+    defined by `pa`, `pb`, `pc`, and `pd`.   Note that inconsistent orientation of the
+    four sphere defining points will reverse the sign of the result.
+
+    See http://www.cs.cmu.edu/~quake/robust.html for details of the
+    implementation.

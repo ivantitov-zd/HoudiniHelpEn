@@ -1,0 +1,113 @@
+= Render quality and speed =
+
+In addition to the controls below, mantra gives you specific controls for _volume rendering_ quality.
+See [rendering volumes|volumes] for information specific to volumes.
+
+== General quality controls ==
+
+The parameters on the mantra node's __Properties > Sampling__ sub-tab are the most important for increasing quality (or decreasing quality to speed up rendering).
+
+* The __Properties > Sampling > Pixel samples__ property is the _global baseline quality control_ for mantra rendering. This is the minimum number of rays fired to shade each pixel. Increasing this, for example from 3x3 to 5x5, will increase the overall quality of the render.
+
+    (This property has two numbers -- 3x3 instead of just 3 -- for mostly historical reasons. Just increase both numbers at the same time to increase quality.)
+    
+    The _practical_ upper limit for pixel samples is probably 12x12, for surfaces with displacements, _very_ fine details, motion blur and depth of field. Otherwise, 5x5 or 6x6 is usually sufficient.
+
+* Set pixel samples just high enough to resolve small details in the image -- this represents the "fixed" image-wide rendering cost. *Then*, turn on __Ray variance anti-aliasing__.
+
+    This makes mantra loop, firing extra rays to get extra shading samples if necessary until the variance is less than or equal to the allowed _noise level_, or until the __Max ray samples__. Turn up __Max ray samples__ for more rays in problem areas.
+    
+    You can export the direct and indirect ray samples (the number of times this loop ran for a given pixel) as an [extra image plane|deeprasters]. This lets you identify slow areas of the image.
+
+* You can [add sampling properties|/props/] to an object to get separate _per-object pixel settings_. This lets you specify very high ray samples for a single "hero" or problematic object instead of increasing pixel samples globally.  Note that the pixel samples cannot be changed on a per-object basis - only the ray samples.
+
+* __Properties > Shading > Shading quality multiplier__ controls the amount of [refinement|understanding]. In PBR and raytracing, this can increase fidelity of very fine geometry detail. In micropolygon rendering, this increases shading resolution.
+
+* You can increase the limits on the mantra node's __Properties > Shading__ tab to increase the maximum number of rays shaders can send. This will usually increase the shading quality.
+
+    To get irradiance (let light bounce into dark areas), add an [Indirect light|Node:obj/indirectlight] and turn up the __Diffuse limit__. This allows more diffuse bounces, increasing the realism. However setting the diffuse limit greater than `4` generally has diminishing returns.
+
+* For PBR rendering, you can increase __Properties > PBR > Min reflect ratio__ to send more rays in dark areas. If you're using PBR, you should try this before increasing the diffuse limit since it's more efficient. You should stick to values less than `0.5`.
+
+== Decreasing PBR noise == (noise)
+
+* While PBR rendering gives you shadows, reflections, irradiance, and so on "for free",
+  the drawback of its stochastic nature is _noise_.
+  Even uniformly colored surfaces will render with subtle color differences between pixels.
+
+* Avoid judging PBR noise based on low-resolution test renders.
+  The same amount of noise that looks bad at 640x400 will probably not be noticeable at 2K.
+  Note that the default __Noise level__ is `0.05`,
+  while analog film grain probably corresponds to a noise level of approximately `0.08`.
+
+* There are two main controls on the mantra node for decreasing noise in PBR renders.
+  [Pixel samples|Mantra:vm_samples] and [Noise level|Mantra:vm_variance]
+  (on the __Properties > Sampling__ tab).
+  
+* As explained above, [Pixel samples|Mantra:vm_samples] is a _global_ control.
+  Increasing it will increase the number of _all kinds_ of samples in the renderer.
+  Increasing it will decrease noise, but you should use it to set the _accuracy_ (resolving geometry),
+  and then use __Noise level__ to specifically control noise.
+
+* Decreasing [Noise level|Mantra:vm_variance] will... decrease the noise level.
+  It forces mantra to keep sampling (sending out rays) until the variance is less than this value,
+  up to [Max ray samples|Mantra:vm_maxraysamples] times.
+
+  This tends to increase render time in "problem areas" rather than globally.
+  It helps in dark areas such as contact shadows that can have a lot of noise.
+  However, decreasing noise level makes the render _much slower_.
+
+  This setting is about _how much noise you can live with_.
+  If you're doing "test" renders, you can jack it up.
+  If you're rendering at very high resolution, the noise will be lost anyway (like film grain).
+  If you're rendering overnight on a render farm, you can pay the brute force cost for a low noise level.
+
+* If you have bright speckles in PBR renders, try decreasing the
+  [Color limit|Mantra:vm_colorlimit] on the __Properties > PBR__ sub-tab.
+  This decreases the maximum amount of light allowed in the system.
+
+* Remember that you can [add properties to objects|/props] (and even primitives)
+  to give them customized values for these properties.
+  For example, you can set a lower noise level for an important object.
+
+* We recommend that you work in a linear color space
+  (gamma = 2.2, [more information|tips]).
+  This helps makes the noise slightly less visible.
+
+== Managing memory ==
+
+* Use procedural shaders such as [Mantra Delayed Load|Node:shop/vm_geo_file] and [Alembic Geometry|Node:shop/vm_geo_alembic] to replace proxy geometry with more complex geometry at render time. Render full-resolution geometry in mantra archive format or Alembic format to allow mantra to demand-load small parts of the geometry file at a time.
+
+* When rendering on computers with different amounts of RAM (for example, a mix of new and older computers), you can set __Properties > Render > Cache limit__ to a _percentage_ of physical memory instead of fixed size.
+
+* Micropolygon rendering: the __Properties > Render > Tile size__ property is by default low to prevent the renderer from using large amounts of memory. Houdini renders a tile at a time and throws away many per-tile structures between tiles to reclaim memory. So, if you have a lot of memory you can increase tile size to use more memory to render faster. (On a machine with tons of memory, you could calculate the tile size to make the number of tiles equal to the number of rendering threads for ideal performance.) This has little effect on ray tracing or PBR.
+
+== Optimization tips ==
+
+* By default, Houdini uses all processors to speed up rendering time. If you do not want to use all processors you can turn off the __Use Max Processors__ checkbox on the __Render__ sub-tab of the __Properties__ tab of the render node. Once this option is turned off, you can set the __Thread Count__ to specify how many processors to use.
+
+* Reducing the [Volume Step Rate|Mantra:vm_volumesteprate] (on the __Properties > Sampling__ sub-tab [mantra|/nodes/out/ifd] render node) speeds up rendering but decreases mantra's ability to resolve fine detail in volumes.
+
+* If you are using either depth of field and/or motion blur you can try altering the __Motion Factor__ value, which is located on the __Sampling__ sub-tab of the __Properties__ tab of the [mantra|/nodes/out/ifd] output node. This parameter controls the shading quality dynamically.  Depending on the level of depth of field and/or motion blur, you can decrease the shading quality which will use less memory and result in faster render time.
+
+* With micropolygon rendering, each shader call will loop through all the lights illuminating the current mircopolygon in the volume, limiting the number of lights to look up will proportionally decrease render times. 
+
+    Additionally, having fewer lights generating and using deep shadow maps will also speed up render times. Deep shadows give you depth, so you may only want one or two lights with this option turned on, and the rest of the lights to not use shadows.
+    
+    Using [the Environment Light from the shelf|Node:obj/envlight] with your volume objects will slow down your volume rendering because each shaded micropolygon will cause an awful lot of rays to be generated due to the raytraced ambient occlusion. Manually controlling lights will give you more control and be less costly.
+
+* For lights that only affect part of the rendered scene, it is possible to speed up renders by enabling the __Active Radius__ parameter on the light object and setting it to the maximum radius of effect for that light.  When shaders are executed outside the active radius, they will ignore that light source entirely - improving rendering performance.  This option is particularly useful for scenes with many small light sources, such as a scene with many outdoor street lights.
+
+* When you are rendering geometry with a certain amount of transparency, you can use the opacity limit to stop the current ray if the opacity threshold is met. The __Opacity Limit__ parameter is located on the __Render__ sub-tab of the __Properties__ tab of the [mantra|/nodes/out/ifd] output node.
+
+    If used too aggressively, you will see flickering and strange banding in your volume over a sequence of renders if the camera is moving or the smoke is evolving. This is the varying opacity thresholds in the volume, which is most evident if your volumes are more wispy and transparent.
+    
+    By altering the __Opacity Limit__, you will only get a 1-5% decrease in render time. The default value is already pretty aggressive, so be careful to avoid adding unwanted artifacts.
+
+* Mantra specifically optimizes the rendering performance (both ray tracing and micropolygon rendering) for shaders that it knows are fully opaque.  To improve rendering performance, ensure that opaque shaders either assign a constant `{1,1,1}` to the opacity (`Of`) VEX variable or that any shader/material parameters that would make the shader transparent are disabled.
+
+* Use velocity motion blur instead of deformation blur to reduce IFD generation time and size.
+
+@related
+
+* [Rendering in a workflow|batch]

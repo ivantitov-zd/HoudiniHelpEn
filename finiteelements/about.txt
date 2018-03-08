@@ -1,0 +1,77 @@
+= About <| finite elements =
+
+"""Finite element methods (FEM) let you simulate solid objects, that is, objects with "stuff inside"."""
+
+
+== Overview ==
+
+Normally 3D models consist of just the outer shell of an object, and techniques like [voronoi fracturing|shatter] "fake" internal matter by creating extra surfaces between pieces when needed.
+
+In contrast, _finite element solids_ represent an object as a solid mass of small 3D _tetrahedrons_ (four sided pyramids). This lets the solver realistically simulate bending, elasticity, internal mass, chipping, crumbling, and shattering.
+
+Solid objects can simulate stiff materials (like metal or wood), or elastic, rubbery, fluid, and floppy objects (like muscle and fat).
+
+In the simulation network, the [Solid Object node|Node:dop/solidobject] creates a solid simulation object, and feeds into a [Finite Element Solver|Node:dop/finiteelementsolver].
+
+In contrast to many other solvers, Houdini's finite element solver is _resolution independent_: the way an object moves and deforms is to a large degree independent of the density of tetrahedrons. In particular, the same settings on a Solid Object have similar results when applied to meshes of increasingly high resolution. There is a point at which adding more tetrahedrons to a tet mesh does not significantly affect the simulated results.
+
+
+== Tetrahedral solids ==
+
+Houdini uses meshes of _tetrahedrons_ or _tets_ (four-sided pyramids) to represent finite element solids.
+
+The complexity and the quality of the used tetrahedral mesh has a large impact on the efficiency of a simulation. Generally, the more tets, the higher the simulation time. Generally, 10 times more tets will translate to a simulation that is at least 10 times slower (possibly more than that).
+
+For fast simulations, use as few tets as possible while still retaining enough mesh resolution to accurately represent the desired motion. The setup created by the Solid Object shelf tool should be a good starting point. You can tweak the Tet Size parameters on the [Solid Embed SOP|Node:sop/solidembed] to influence the mesh resolution.
+
+For very high-quality character simulations, you may want to replace Solid Embed with a [Remesh|Node:sop/remesh] -> [Solid Conform|Node:sop/solidconform] SOP chain.
+
+Simulations with lower-resolution tet meshes are good approximations of high-resolution tet meshes, as long as the overall shapes are similar.
+
+In addition to the number of tets, the shapes of the tets may have a significant effect on efficiency of the simulation. Ideally, all tetrahedrons should be close to a regular tetrahedron. Tetrahedrons that are very small, very large, very flat or very thin will slow down a finite element simulation. The Solid Embed and Solid Conform tools are designed to generate good quality tetrahedrons.
+
+
+== Embedding == (embedding)
+
+Render-quality models tend to have much more detail than is necessary for a good simulation. A model might have holes and self-intersections. If you can get a tet mesh from a high-resolution model, it will be slow due to the large number of tets and poor quality tets.
+
+For these reasons, Houdini supports "embedding" a high-res model in a solid object. Houdini runs the simulation on the low-res tet mesh, and then applies the simulated deformations and/or fracturing to the high-res model. This affects point positions, velocities, and point/vertex normals (if the embedded geometry has the normal (`N`) attribute).
+
+The deformation is smooth (better than barycentric) to ensure that there are no visible discontinuities when the embedded geometry is much more detailed than the simulated geometry.
+
+You can use the node setup created by the Solid Object shelf tool as an example for more customized embedded simulations.
+
+* It is important that the primitives of the embedded hi-res geometry lie inside the tetrahedral mesh, preferably with a small margin, otherwise it may slow down the simulation or produce inferior results.
+
+    If any embedded primitives and/or points are outside the simulated tetrahedron mesh, the Solid Object node will display a warning. A primitive group `fe_outlier_primitives` and a point group `fe_outlier_points` may be generated on the embedded geometry, containing the primitives and points that were outside the simulated mesh.
+
+* The embedded geometry may consist of tetrahedrons and polygons or a mix of these two. If you want internal fracture surfaces, the embedded geometry must have tetrahedrons or polygons near the regions where the simulated geometry fractures.
+
+* If the `fracturepart` primitive attribute exists on the simulation tets, an attribute with the same name may be added on the embedded geometry as well to control how the embedded geometry fractures.
+
+
+== Finite elements vs. springs ==
+
+The Finite Element solver simulates the motion of deformable solids. The solver treats the simulated shape as a solid continuum, as opposed to a collision of particles. This means the internal mass and the internal forces are distributed over the entire shape, including the interiors of the tetrahedra.
+
+The finite-element simulation is based on internal stresses and strains that occur within the simulated body. This contrasts with other types of solvers, such as particle-based mass-spring systems, where the mass is concentrated in the vertices and where internal forces are generated by springs between these vertices.
+
+The solid continuum approach of the finite element solver has several advantages over particle-based solvers:
+
+* The simulation behavior stays very consistent if the mesh resolution changes. This makes presets predictable. A simulation with a low-res mesh (cheap) is a good prediction of a simulation with a higher-res mesh.
+
+* The results of finite element simulation are realistic. The results of a finite element sim is based on solid mechanics.
+
+* Finite element systems tend to be more efficient at simulating stiff objects than position-based particle systems.
+
+
+== Finite elements vs. grains == (PBDvsFEM)
+
+The Particle Based Dynamics grain solver uses a set of constraints between pairs of grains. These constraints express the rest distance between pairs of points, and PBD enforces these constraints to preserve their shape during the simulation. The solver works primarily in terms of point positions. The main advantages of the PDB approach are the consistently fast solve speed and the ability to change point positions directly. You would primarily want to use this for simulating bouncy objects with elastic energy, or background objects.
+
+The finite element solver is based on a physical model, which includes stresses based on strain and volume preservation. The solver works primarily by solving systems of forces and partial derivatives of forces. The main advantages of the finite element approach are the realism of the physically-based simulation and the predictability of the material behavior for varying mesh resolutions and substep sizes. You would primarily want to use this for detailed, physically accurate objects.
+
+ 
+@related
+
+* [/cloth/]

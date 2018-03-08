@@ -1,0 +1,100 @@
+#type: node
+#context: sop
+#internal: solidify
+#icon: SOP/solidify
+#tags: polygons, topology, cleanup
+
+= Solidify =
+
+"""Converts a polygonal mesh into a self-intersection free and watertight polygonal surface mesh."""
+
+Solidify is designed to aid the artist in tetrahedralizing a surface mesh using
+the [Tetrahedralize SOP|Node:sop/tetrahedralize].
+
+In particular, solidify converts a polygonal surface mesh into a self-intersection free and watertight polygonal surface mesh.
+
+Another useful property of the resulting topology is that it is decomposable into manifold patches.
+
+@parameters
+
+Group:
+    The primitive group to use for solidification.  Only the polygons within the group will be used to approximate the resultant solid.
+    
+== Options ==
+
+Batch:
+    Determines which pieces of the input to treat individually.  This allows Solidify to process pieces separately, which is useful when fracturing.
+    
+    Entire:
+        Solidify the input as a whole.
+
+    Connected Components:
+        Automatically determine pieces of the input, and solidify each piece individually.
+
+    Attribute:
+        Use __Piece Attribute__ and solidify each group of polygons with the same attribute value as one.
+
+Piece Attribute:
+    Name of an attribute used to determine independent pieces of geometry (if __Batch__ is set to __Attribute__), or to output automatically determined pieces (if __Batch__ is set to __Connected Components__).
+    
+Random Seed:
+    This number affects the order in which the input polygons are addressed internally.  Changing this number may produce slightly different results.
+    
+Usage Mode:
+    Exposes two different interfaces giving different levels of control.
+
+    Basic:
+        Exposes only the __Use High Precision__ toggle.
+
+    Advanced:
+        Exposes a more powerful interface for more control over the SOPs behavior.
+
+Use Original Positions:
+    Since the solidification process perturbs the input based on the precision used, this option snaps points on the output to their original input positions.
+
+    NOTE:
+	    Snapping points to their original positions may introduce new intersections in the output geometry, which is undesirable when using this SOP with the [Tetrahedralize SOP|Node:sop/tetrahedralize].
+
+Dissolve Inplane Edges:
+    When enabled, this option will insure that coplanar polygons sharing an edge will be consolidated. Equivalently, any edge between two coplanar polygons is dissolved.  This option dissolves edges like the [Dissolve SOP|Node:sop/dissolve].
+
+Use Exact Arithmetic:
+    When enabled, this option allows you to keep a larger number of bits (via the __Precision Bits__ option) before solidification.  This produces a better approximation to the input geometry.  
+    
+    NOTE:
+        This improves the result at the cost of performance.
+
+Precision Bits:
+    Number of bits of floating point precision to keep on the input before solidification. 19 bits is the largest value you should use if __Use Exact Arithmetic__ is enabled.  If __Use Exact Arithmetic__ is disabled, 10 is the recommended largest value. Any larger values may result in unpredictable artifacts in the output geometry.
+
+Divisions:
+    Number of initial axis aligned partitions to make to aid solidification.  A larger number improves performance when solidifying complex models.
+
+== Tolerances ==
+
+    Options in this tab should only be used when the default settings produce undesirable results.  In order to make use of these options, you must understand the underlying algorithm used during solidification.
+
+    In particular, Solidify partitions the 3D space into cells using planes of input polygons, and determines which cells are inside the solid and which are outside.  Then it outputs just the faces (cell boundaries) that lie between an inside cell and an outside cell, providing the final watertight mesh.
+
+BSP Precision Tolerance:
+    Tolerance used when computing the Binary Space Partition (BSP) in the first stage of the algorithm.  This value will affect the correctness of the resultant mesh.  It should be kept close to the default value.
+    
+Output Precision Tolerance:
+    Tolerance used when computing the final output mesh in the final stage of the algorithm.  Here, a larger value may reduce the number of small features in the resultant mesh at the cost of possibly introducing degenerate polygons and slightly intersecting features into the resulting mesh.
+
+Planarity Offset Tolerance:
+    Tolerance used when grouping coplanar polygons, measuring the distance between two planes.  This value should be kept small, however a larger value may reduce the number of internal degeneracies at the cost of accuracy of the final result.
+
+Min Cell Surface Area:
+    Tolerance representing the minimum allowed surface area of a cell.  If a cell is found with a smaller surface area than this value, it will be considered to have zero surface area.  A larger value here may improve the performance of the "Solving for Solidity" part of the whole solidification at the cost of correctness of the final mesh.
+
+@related
+
+- [Node:sop/tetrahedralize]
+- [Node:sop/solidembed]
+- [Node:sop/solidconform]
+- [Node:sop/remesh]
+- [Node:sop/divide]
+- [Node:sop/polyreduce]
+- [Node:sop/triangulate2d]
+- [Node:sop/pointcloudiso]

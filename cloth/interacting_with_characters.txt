@@ -1,0 +1,63 @@
+= Interacting with character animations =
+
+== Continuous collision detection ==
+
+Houdini's [Cloth Solver|Node:dop/clothsolver] uses geometry-based collision detection. The polygons on the collision geometry are used to collide against all cloth simulation objects. It is much more accurate than using the SDF (signed distance function) collision volumes. This collision model correctly deals with the case where the collider passes clear through the cloth between frames and it does not require you to substep the cloth simulation to detect these types of collisions. The [Cloth Solver|Node:dop/clothsolver] considers the movement of the collision geometry over time to solve the collisions. 
+
+Here is an example that shows an extreme case where a cloth body collider is clearly traveling through a cloth across two frames, yet the collision still works without any user intervention. 
+
+    <!--
+        TODO: add in ContinuousCollisionDetection example
+    -->
+
+== Thickness ==
+
+Collisions work with the cloth thickness. Each cloth object has a thickness. The default thickness is 1 mm when using meters as your default units. The collision shape that is used by the cloth is a rounded layer around the cloth. There is a similar rounded layer around any collision objects set up with the [Deforming Collider|/shelf/clothbodycollider]. You can visualize the thickness on the cloth along with inter-penetration and velocity using the parameters on the [Cloth Object|Node:dop/clothobject]'s __Visualization__ tab.
+
+The thickness layer around the [Cloth Object|Node:dop/clothobject] can be visualized using the __Visualization__ settings.
+
+== Cloth body collider ==
+
+The [Deforming Collider|/shelf/clothbodycollider] shelf tool puts down a [Static Object|/shelf/staticobject] that is configured to use geometry-based collisions for deforming geometry. Set up an object that will collide with cloth with the [Deforming Collider|/shelf/clothbodycollider] shelf tool or equivalent. This shelf tool creates the correct collision geometry with the correct attributes. 
+
+Using RBD active and passive objects will impart collisions on cloth. RBD objects are not affected by cloth objects. To simulate these types of interactions, convert your RBD objects to cloth simulation objects and increase the stiffness parameters. 
+
+== Interpolation at sub-step times ==
+
+To ensure smooth interactions with the animated character, the cloth solver uses a non-linear interpolation scheme that takes into account both the positions and the velocities of the animation points. Therefore, it is important that the animated character geometry has accurate instantaneous point velocities before it goes into DOPs. The [Trail SOP|Node:sop/trail] can be used for this purpose. A correctly configured [Trail SOP|Node:sop/trail] is automatically inserted for you if you use the [Deforming Collider|/shelf/clothbodycollider] shelf tool to create your character in the cloth simulation.
+
+    <!--
+    TODO: external, cloth, and self-collisions
+    
+    TODO: locally disallowing collisions
+    -->
+
+== Pinch handling ==
+
+In some cases, it is impossible to resolve collisions for the [Cloth Solver|Node:dop/clothsolver]. For example, when cloth becomes trapped between parts of animated geometry that start to self-intersect. In those cases, a dedicated solution kicks in to handle cloth that self-penetrates itself and the collision bodies. Re-emergence of the cloth from the inter-penetration is handled with care keeping the integrity of the cloth intact. One test case that clearly demonstrates this is animating a character skin such that the elbow of the arm passes through the body. The body collider with clothing riding on top of the arm passes through the cloth on the body. The forced intersected cloth on both sides are forced to go to the mid position and then is dragged along until it no longer self intersects and re-joins the cloth simulation. This transition is handled with care as to not introduce artifacts that can cause cloth instability resulting in noise or spikes. 
+
+== Accuracy ==
+
+The __Accuracy__ tab on the [Cloth Solver|Node:dop/clothsolver] contains the parameters that control the accuracy which is used by the geometry-based swept collision algorithms. These parameters are in place to control and decouple the collision passes from the cloth sub-step passes, allowing you to tune collisions separately from the cloth integrator to a degree. As with most of the [Cloth Solver|Node:dop/clothsolver] settings, it is recommended to leave these parameters at their defaults for most cases. 
+
+== Simulating a character grabbing a piece of cloth ==
+
+There are a several ways you can simulate a character grabbing a piece of cloth. The following are examples of different approaches.
+
+table>>
+    tr>>
+        td>> Rely on collision detection
+        td>> You can make simple proxy geometry that actually grabs the cloth and pulls on it. However, make sure that the proxy geometry does not pinch the cloth. Leave some room for the cloth to move.
+
+    tr>>
+        td>> Attach spring constraints
+        td>> You can add springs between some of the cloth points and points on the hand. These springs should be activated only when the hand holds the cloth.  You can do this by animating the __Active__ parameter on the [spring constraints|Node:dop/sbdspringconstraint].
+
+    tr>>
+        td>> Manually animate a subset of the cloth points
+        td>> You can use the `pintoanimation` point attribute to animate a subset of the cloth points. Set that attribute to 1 for all points that need to be animated along with the geometry in __SOP Path__. The other points should have the value 0. You can temporarily animate these points in SOPs.
+    
+            Alternatively, you can use a combination of proxy geometry and spring constraints, where there are temporarily active spring constraints between the cloth geometry and the proxy geometry.
+        
+            TIP:
+                To get a stable rest position, simulate your original geometry until it stops moving. Write out the geometry to a geo file. Then point the cloth object's __SOP Path__ to this geo file and make sure that `restP` has the original point positions.

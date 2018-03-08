@@ -1,0 +1,63 @@
+﻿= Writing PBR shaders in VEX =
+
+#tags: shading, pbr
+
+To build materials using VOPs instead, see [building materials in VOPs|/shade/build].
+
+
+== Overview ==
+
+Writing a PBR surface shader involves designing a _bidirectional scattering distribution function_ (BSDF) for the surface. This function describes how light scatters when it hits the surface. BSDFs are an opaque data type in VEX that you can store and operate on much like other primitive types.
+
+You output the final BSDF for the the shader through a new global variable `F`. In VOPs, you connect a BSDF to the `F` connection of the output node (see VOPs below).
+
+The BSDF is a self-contained description of how a surface reflects light. With PBR, you don't need to compute illumination (for example, using 
+[Vex:illuminance]loops or `trace()` calls). You only need to provide a `bsdf`.
+
+You don't write the scattering function yourself. You create BSDFs by combining primitive BSDFs using addition, multiplication, and scalar multiplication. See "primitive BSDFs" and "combining BSDFs" below. 
+
+Depending on the settings selected for the render, mantra can use the BSDFs calculated by your shader in many different ways. For example, it may perform direct lighting, indirect lighting, or evaluate lighting in reverse for algorithms like photon mapping.
+
+You can design shaders that support both traditional and physically based rendering. You just need to assign values to both types of output variables (`Cf`, `Of`, and `Af` for traditional rendering, `F` for PBR rendering) in your shader.
+
+
+== Primitive BSDFs ==
+
+* [Vex:phong]
+* [Vex:phonglobe]
+* [Vex:ashikhmin]
+* [Vex:blinn]
+* [Vex:matchvex_blinn]
+* [Vex:specular]
+* [Vex:matchvex_specular]
+* [Vex:cone]
+* [Vex:diffuse]
+* [Vex:wireblinn]
+* [Vex:wirediffuse]
+
+
+== Combining BSDFs ==
+
+* `bsdf +(bsdf, bsdf)`
+
+      Sum together two bsdfs. Summing bsdfs allows you to include more than one type of component, such as summing together a diffuse() and a phong().
+
+* `bsdf *(float scale, bsdf)`
+* `bsdf *(vector scale, bsdf)`
+
+      Scale a bsdf by a color or a scale factor. Scaling a bsdf can allow you to incorporate surface colors (such as texturing) into the bsdf.
+
+* `bsdf *(bsdf, bsdf)`
+
+      Create the produce of two bsdfs. This function is most useful for scaling a specular bsdf by a diffuse().
+
+* `vector albedo(bsdf)`
+
+      Return the portion of reflected light for a `bsdf`. The return value should be between 0 and 1 for bsdfs that conserve energy. The albedo for a default diffuse `bsdf` is 0.5, but will change based on vector scale factors and other `bsdf` components.
+
+
+
+
+
+
+

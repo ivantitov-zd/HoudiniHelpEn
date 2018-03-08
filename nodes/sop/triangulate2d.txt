@@ -1,0 +1,347 @@
+#type: node
+#context: sop
+#internal: triangulate2d
+#icon: SOP/triangulate2d
+#version: 2.0
+
+#tags: polygons, topology, cleanup, cloth
+
+= Triangulate 2D =
+
+"""Connects points to form well-shaped triangles."""
+
+Triangulate 2D connects 2D points in the input geometry to create
+a 2D triangle mesh which is as "well-shaped" as possible 
+(avoiding acute angles as much as possible). 
+
+Since it works on points in a plane, Triangulate 2D needs to assign 
+a 2D position to each 3D input point. This can be done in three ways:
+
+* The points are projected into a plane that best fits the 3D point set,
+
+* The user chooses a plane into which the points are projected, or
+
+* The user provides a point attribute consisting of the 2D coordinates 
+  for each point.
+
+Triangulate 2D can ensure that certain pairs of points appear as edges
+(or subdivisions of edges when refinement is performed) in the output
+mesh. These edges are called "constraints". You can specify constraints
+by providing either an edge group or a primitive group (or both) under 
+the __Constraints__ tab. 
+
+* To make sure certain boundary edges are present in the final
+  triangulation, enter the primitive number(s) of the edge(s) in the
+  __Constraint primitives__ parameter or list the edges you want as 
+  an edge group in the __Constraint edges__ parameter.
+
+Triangulate 2D can also remove triangles deemed as belong to the outside
+of the intended area in various ways which are specified under the 
+__Outside Removal__ tab.
+
+You can also improve how well shaped the triangles are by allowing 
+Triangulate 2D to add additional points under __Refine__ tab. 
+
+* To triangulate the input without adding new points, turn off
+  __Refine__ and leave __Constraint primitives__ empty.
+
+* To increase the number of points to allow better triangles, turn on
+  __Refine__. You can control the triangle quality with the __Maximum
+  Area__ (controls triangle size) and __Minimum Angle__ (larger values
+  prevent long skinny triangles with acute angles) parameters. You can 
+  limit refinement to large triangles by setting __Minimum Edge Length__
+  parameter.
+
+TIP:
+    To introduce randomness into the triangulation, pipe the original
+    geometry through a [Scatter SOP|Node:sop/scatter] to add extra
+    points at random locations.
+
+Technically, Triangulate 2D produces a _constrained Delaunay
+triangulation_, which has the largest minimum angle among all possible 
+triangulations for the same set of points, and the refinement process 
+is _Delaunay refinement_.
+  
+
+@parameters
+    Points:
+        #channels: /points
+
+        Subset of points to use for triangulation.
+
+    2D Positions: 
+        #channels: /planepossrc
+ 
+        Determines the method for determining the 2D positions of the 
+        points used in triangulation. 
+        
+        Fit Plane:
+            Obtains 2D positions of the points by projecting them into 
+            a plane that best fits the 3D point set. 
+            
+        Select Projection Plane:
+            Allows the user to specify a projection plane, into which the 
+            3D points are projected.
+            
+        Origin:
+            #channels: /origin
+            
+            When __Select Projection Plane__ is used, the projection plane is
+            determined relative to this point which is treated as "origin".
+        
+        Distance:
+            #channels: /dist
+            
+            When __Select Projection Plane__ is used, this parameter determines the 
+            distance between the projection plane and the point specified by __Origin__.
+            
+        Direction:
+            #channels: /dir
+            
+            When __Select Projection Plane__ is used, this vector determines the
+            direction along which the projection plane is shifted away from
+            the point specified by __Origin__. 
+            
+        Use Attribute:
+            Reads the 2D position of each point from a supplied point
+            attribute (the attribute must be a floating point vector 
+            with at least two components).
+            
+        Attribute Name:
+            #channels: /pos2attrib
+                
+            When __Use Attribute__ is used,, the 2D position 
+            of the points are read from the attribute with this name.
+
+    Restore Original Point Positions:
+        #channels: /restorepos
+        
+        If selected, triangles of the generated triangulation are 
+        transformed to use the original 3D positions of the input 
+        points. Newly generated points (for refinement or constraint
+        conflict resolution) are accordingly assigned interpolated 
+        positions based on the 3D positions of the input points. 
+    
+    Keep Primitives:
+        #channels: /keepprims
+
+        Keep all input primitives (except the constraint primitives) in
+        the output in addition to new primitives created during
+        triangulation. When this option is off, the input primitives do 
+        not appear in the output.
+ 
+    Recompute Point Normals:
+        #channels: /updatenmls
+
+        Recomputes point normals (if they exist).
+                
+    Remove Unused Points:
+        #channels: /removeunusedpoints
+        
+        If selected, points outside the input point group are deleted from
+        the output.
+        
+    Remove Duplicate Points from Triangulation:
+        #channels: /removeduplicatepoints
+        
+        For any given 2D position only one point can be inserted into the 
+        triangulation. If multiple points have the same 2D position
+        only one of them is inserted into the triangulation and the others
+        are ignored. If this option is selected, these duplicate points are
+        deleted from the output, otherwise, they are left in as isolated
+        points.
+        
+    Random Seed:
+        #channels: /randseed
+        
+        The triangulation and refinement algorithm implemented by this node
+        is "randomized" in nature, meaning that its peek performance is expected 
+        with high probability only if the input points are processed in "random" 
+        order. Since Houdini node outputs must be deterministic, a fixed random-like 
+        reordering of the input points, determined by this parameter, is used. In 
+        the majority of cases, this fixed reordering should perform close to optimal 
+        but it is theoretically possible for any fixed reordering to perform poorly 
+        for a specific point set. Changing the seed value in such case may have 
+        tangible effects on the speed of the triangulation although it might affect
+        the generated output, particularly in terms of the point and primitive 
+        numbers. 
+        
+==Constraints==
+    Using constraints you can enforce certain pairs of points to be connected 
+    by edges, aka. _constrained edge_, in the output triangulation. You can 
+    specify constraints using a constraint primitives group (consisting of 
+    polygons or polygonal curves all whose edges are treated as constraints), 
+    or using an edge group, or both. 
+    
+    Constraint Primitives:
+        #channels: /conprims
+        
+        All edges of each polygon or polygonal curve in this primitive group
+        will be treated as a constraint and are forced upon to the output 
+        triangulation. 
+        
+    Constraint Edges:
+        #channels: /conedges
+        
+        All edges in the supplied edge group are enacted as constraints in
+        the output triangulation. Note that edge groups edges need not exist 
+        as primitive edges in the input. As an example, using the expression 
+        "p10-20 p16-24" as the constraint edge group ensures that points 10
+        and 20 are connected with an edge in the output as are point 16 and 24.        
+        
+    No New Points on Constraints:
+        #channels: /nonewconpts
+        
+        It is not possible to simultaneously enforce two constraints if their
+        corresponding 2D line segments intersect. Such constraints are said to be in
+        "conflict" with one another. If this option is selected, one of each pair of 
+        conflicting constraints is dropped so that the other one can be enforced. 
+        Otherwise, conflicts are resolved by splitting constraints into smaller
+        ones by introducing new points at intersections.
+        
+
+    Create Group for New Points on Constraints:
+        #channels: /makenewconptgrp
+        
+        If selected, a point group is created for the points the are added 
+        in order to resolve conflicts in constraints. 
+        
+    Group Name:
+        #channels: /newconptgrp
+        
+        When __Create Group for New Constraint Points on Constraints__ is on,
+        Triangulate 2D creates a group with this name to contain points
+        created on the constrained edges.
+            
+
+    Create Group for Output Constraint Edges:
+        #channels: /makenewconedgegrp
+        
+        If selected, an edge group is created which will contain all constraint
+        edge in the output triangulation.
+
+    Group Name:
+        #channels: /outconedgegrp
+        
+        When __Create Group for Output Constraint Edges__ is on,
+        an edge group is created with this name to contain the output 
+        constrained edges.
+        
+            
+==Outside Removal==
+    This node can optionally remove a subset of the generated triangles which can be 
+    interpreted as belonging to the *exterior* determined by the constraints. This is 
+    done through a series of *flooding* operations in which, starting from an initial 
+    set of exterior triangles, the flood successively extends to neighboring triangles 
+    that are *not* separated from the currently flooded set by constrained edges. In
+    other words, the removal flood is only blocked by constrained edges. 
+    
+    ==Remove Triangles==
+        Reachable From Convex Hull Boundary:
+            #channels: /removeconvhull
+        
+            If selected, a removal flood is started from the outer boundary of the
+            triangulation (coinciding with the boundary of the convex hull of 
+            the point set) and is propagated through unconstrained edges of the 
+            triangulation. 
+        
+            For example, on the following constrained triangulation:
+        
+            [Image:../images/tri2d_outside_1.png]
+        
+            removing triangles __Reachable From Convex Hull Boundary__ 
+            will produce this result:
+        
+            [Image:../images/tri2d_outside_2.png]
+
+        Outward Reachable From Constraint Primitives:
+            #channels: /removeoutcons
+        
+            If selected, a removal flood is started right outside the boundary of each 
+            closed constraint primitive. 
+        
+            For example, removing triangles __Outward Reachable From Constraint Primitives__ on the
+            previous example will produce this result:
+        
+            [Image:../images/tri2d_outside_3.png]
+            
+        
+    ==But Keep Triangles==
+        Inward Reachable From Constraint Primitives:
+            #channels: /dontremoveincons
+        
+            This option cancels removal of a triangle in a flooding initiated outside
+            of a constraint primitive whenever the same triangle can be reached via
+            flooding from inside the boundary of another constraint primitive. 
+        
+            Removing triangles __Outward Reachable From Constraint Primitives__ while 
+            keeping triangles __Inward Reachable From Constraint Primitives__ on the
+            previous example will produce this result: 
+        
+            [Image:../images/tri2d_outside_4.png]
+
+== Refinement ==
+    Refine:
+        #channels: /refine
+
+        Improves the quality of the triangulation by adding new points.
+        The triangulation will include some new points beyond the ones
+        in the input, but the triangles will have better shapes.
+        
+        If you start with the following points:
+
+        [Image:../images/tri2d_refine_original.png]
+
+        With __Refine__ off, Triangulate 2D will create triangles using
+        the available points, and may in the process introduce
+        undesirable long skinny triangles:
+
+        [Image:../images/tri2d_refine_off.png]
+
+        With __Refine__ on, Triangulate 2D will add points to create
+        better triangles conforming to the __Maximum Area__, 
+        __Minimum Angle__, and __Minimum Edge Length__ parameters.
+
+        [Image:../images/tri2d_refine_on.png]
+
+    Maximum Area:
+        #channels: /maxarea
+
+        The maximum area for the interior of each triangle. Decrease
+        this value to get smaller and more similarly sized triangles.
+        Very small values can make the triangulation take a long time.
+    Minimum Angle:
+        #channels: /minangle
+
+        The minimum angle, in degrees, for the interior of each
+        triangle. Increasing this value to get more symmetrical
+        triangles and eliminate long skinny triangles. Values larger
+        than 30 degrees cannot be guaranteed and often force the 
+        refinement to go for ever, and only stopped by the reaching the 
+        maximum allowed number of points (__Maximum New Points__)
+        
+    Minimum Edge Length:
+        #channels: /minedgelength
+        
+        To avoid over-refinement in a local area, you can specify 
+        a minimum length for the longest edge of a triangle that is allowed 
+        to be further refined. Once all edges of a triangle become shorter
+        than the specified length, no further attempts are made to 
+        improve the shape of the triangle. 
+
+    Maximum New Points:
+        #channels: /maxnewpts
+
+        Limits the number of new points that can be added during
+        triangulation. New points might be added to satisfy constraints
+        or during refinement, up to this limit. This is mostly useful to
+        ensure that the triangulation doesn't run forever, and should
+        usually be set to a value much larger than the number of points
+        you expect to generate.
+        
+        
+@related
+    - [Node:sop/divide]
+    - [Node:sop/polyreduce]
+    - [Node:sop/tetrahedralize]
+

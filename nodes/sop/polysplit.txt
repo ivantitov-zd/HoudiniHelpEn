@@ -1,0 +1,151 @@
+= PolySplit =
+
+#type: node
+#context: sop
+#internal: polysplit
+#icon: SOP/polysplit
+#tags: polygons, split, model
+#version: 2.0
+
+"""Divides an existing polygon into multiple new polygons."""
+
+== Overview ==
+
+PolySplit has two different modes of operation, controlled by the __Path type__ parameter. The two modes have their own tools on the __Polygon__ shelf:
+
+[Icon:SOP/polysplit] |
+    Inserting individual new edges into existing polygons. You can insert a chain of cuts (possibly self-intersecting) across multiple polygons. You can insert cuts between polygons without shared edges.
+    
+    [Image:/images/nodes/sop/polysplit_edge_end.png]
+
+[Icon:SHELF/edgeloop] |
+    Inserting edge loops.
+    
+    [Image:/images/nodes/sop/polysplit_loop.png]
+
+This node preserves vertex and primitive attributes as well as group memberships on newly created polygons.
+
+== How to ==
+
+:task:Insert a new edge:
+    # Select the polygonal surface you want to edit.
+    
+    # On the __Polygon__ shelf tab, click the [Icon:SOP/polysplit] PolySplit tool.
+    
+    # Click to insert new points.
+    
+        [Image:/images/nodes/sop/polysplit_edge_start.png]
+    
+        Drag along an edge to snap a point to the edge. (You can press ((Ctrl)) and move off the edge to escape the snapping.)
+        
+    # Press ((Enter)) to finish inserting edges.
+    
+    When you finish inserting points, the tool will insert edges along the _shortest path_ between each point. You can click ((Shift + LMB)) in the tool to edit the points again. 
+    
+:task:Insert an edge loop:
+    # Select the polygonal surface you want to edit.
+    
+    # On the __Polygon__ shelf tab, click the [Icon:SHELF/edgeloop] Edge Loop tool.
+    
+    # Click an edge to insert an edge loop at that point.
+
+:task:Insert multiple edge loops at regular intervals:
+    # Select the polygonal surface you want to edit.
+    
+    # On the __Polygon__ shelf tab, click the [Icon:SHELF/edgeloop] Edge Loop tool.
+    
+    # In the parameters, change the __Number of loops__.
+    
+    # Click an edge to insert regularly spaced edge loops along the edge.
+    
+    [Image:/images/nodes/sop/polysplit_multi_edgeloops.png]
+
+== Tips ==
+
+* The [Icon:SHELF/edgeloop] Edge Loop tool on the shelf just inserts a PolySplit with __Path type__ automatically set to "Edge Loop".
+
+* Turn on __Edge snap__ in the toolbar at the top of the view, or click ((MMB)), to turn on snapping to edge divisions. Change the __Divisions__ in the toolbar or use the ((MOUSE_WHEEL)) mouse wheel to change the number of divisions.
+
+    You can increase the number of divisions up to 10 with the ((MOUSE_WHEEL)) mouse wheel. To get more than 10 divisions, enter the number in the __Divisions__ box on the operation toolbar.
+
+* You can insert a "cut" between the ends of an open polygon to close the polygon.
+
+* You can only insert new points in the interior of a polygon if the polygon is closed.
+
+@parameters
+
+Split Locations:
+    The chain of locations along which to make cuts, using the following codes.
+
+    `<<a>>v<<b>>`:
+        Cut at vertex <<b>> of primitive <<a>>, where <<a>> and <<b>> are integers.
+        
+    `<<a>>e<<b>>`:
+        Cut at the midpoint of edge <<b>> of primitive <<a>>, where <<a>> and <<b>> are integers.
+        
+    `<<a>>e<<b>>:<<t>>`:
+        Cut at <<t>> percent along edge <<b>> of primitive <<a>>, where <<a>> and <<b>> are integers and <<t>> is a real number from `0.0` to `1.0`.
+        
+    `<<a>>f:<<u>>,<<v>>`:
+        Cut at the given `(u,v)` location on primitive <<a>>, where <<a>> is an integer and <<u>> and <<v>> are real numbers from `0.0` to `1.0`.
+        
+    `p<<a>>-<<b>>`:
+        Cut at the midpoint of the edge between points <<a>> and <<b>>,
+        where <<a>> and <<b>> are integers.
+        
+    `p<<a>>-<<b>>:<<t>>`:
+        Cut at <<t>> percent along the edge between points <<a>> and <<b>>, where <<a>> and <<b>> are integers and <<t>> is a real number from `0.0` to `1.0`.
+        
+Path Type:
+    Whether to insert edges along the shortest path between cut points, or insert edge loops.
+
+Close Path:
+    Causes an extra cut to be made from the last split location to
+    the first.
+
+Allow split points on faces:
+    By default, the node lets you insert points in the interior of existing faces, to cut pieces out of the faces, producing N-sided polygons. To prevent accidental creation of these kinds of cuts, turn this parameter off. This will only allow insertion of points on edges.
+    
+    [Image:/images/nodes/sop/polysplit_interior_point.png]
+
+Quad autocompletion:
+    Inserts an extra cut to produce quads in two common cases where a split across the corner of a quad would create an N-sided polygon.
+    
+    In the following illustration, the red dotted lines are new edges that __Quad autocompletion__ will automatically insert if you make the yellow cuts, to prevent the larger area from becoming an N-sided polygon.
+    
+    [Image:/images/nodes/sop/polysplit_quad_autocompletion.svg]
+    
+    These are the only cases where this option will insert extra cuts.
+
+Number of loops:
+    When __Path type__ is "Edge Loop", the number of evenly spaced edge loops to insert along the selected edges.
+    
+    [Image:/images/nodes/sop/polysplit_multi_edgeloops.png]
+
+Match Profile:
+    Causes the edge loop to cross each edge at a fixed distance along it's length instead of a percentage.
+
+Switch Profile:
+    Causes the edge loop to measure the fixed distance from the other side of each edge it crosses. If __Match Profile__ is off, this option is ignored.
+
+Edge percentage:
+    Turn this parameter on and set a value from `0-1` to specify exactly the positions of all cut points. For example, setting this to `0.5` will lock all cut points to the midpoint of each edge. This is useful for making exact straight or diagonal cuts.
+    
+    [Image:/images/nodes/sop/polysplit_edge_pct.png]
+
+Update Point Normals:
+    Update point normals if they exist.
+
+Edge group:
+    When __Create edge group__ is on, the node will put new edges it creates into this group.
+
+Append to group:
+    Put any new edges created by this node into an edge group with the name specified in __Path edge group__ below.
+
+Tolerance:
+    If you are working at very small scales, or if this node generates bad geometry where the split path is very close to corners, you can try decreasing the tolerance.
+
+@related
+
+- [Node:sop/subdivide]
+

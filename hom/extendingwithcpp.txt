@@ -1,0 +1,1429 @@
+= Extending the hou Module Using C++ =
+
+== Overview ==
+
+Houdini provides a module named `inlinecpp` that lets you write functions in
+C++ that are accessible from Python.  Your C++ source code appears inline in
+your Python source code, and is automatically compiled into a library for you.
+This library is automatically loaded, and has the benefits that the code won't
+be compiled when the library already exists, and the library won't be reloaded
+when it's already loaded.
+
+The `inlinecpp` module provides easy access to the C++ HDK (Houdini Development
+Kit) from Python with only a minimal amount of code.  Consider this example
+that allows you to call `UT_String`'s `multiMatch` method from Python:
+
+{{{
+#!pycon
+>>> import inlinecpp
+>>> mymodule = inlinecpp.createLibrary(
+...     name="cpp_string_library",
+...     includes="#include <UT/UT_String.h>",
+...     function_sources=[
+... """
+... bool matchesPattern(const char *str, const char *pattern)
+... {
+...     return UT_String(str).multiMatch(pattern);
+... }
+... """])
+...
+>>> string = "one"
+>>> for pattern in "o*", "x*", "^o*":
+...     print repr(string), "matches", repr(pattern), ":",
+...     print mymodule.matchesPattern(string, pattern)
+...
+'one' matches 'o*' : True
+'one' matches 'x*' : False
+'one' matches '^o*' : False
+}}}
+
+This module also allows you to convert between Python objects in the [Hom:hou]
+module and the corresponding C++ HDK objects, giving you access to methods
+available in the HDK but not in [Hom:hou].  In this example, a
+[Hom:hou.Geometry] object is automatically converted to `const GU_Detail *`:
+
+{{{
+#!pycon
+>>> geomodule = inlinecpp.createLibrary("cpp_geo_methods",
+...     includes="#include <GU/GU_Detail.h>",
+...     function_sources=["""
+... int numPoints(const GU_Detail *gdp)
+... { return gdp->getNumPoints(); }"""])
+...
+>>> geo = hou.node("/obj").createNode("geo").displayNode().geometry()
+>>> geomodule.numPoints(geo)
+80
+}}}
+
+This module also lets you extend [Hom:hou] classes using C++:
+
+{{{
+#!pycon
+>>> inlinecpp.extendClass(hou.Geometry, "cpp_geo_methods", function_sources=["""
+... int numPoints(const GU_Detail *gdp)
+... { return gdp->getNumPoints(); }"""])
+...
+>>> geo = hou.node("/obj").createNode("geo").displayNode().geometry()
+>>> geo.numPoints()
+80
+}}}
+
+TIP:
+    Be careful extending the [Hom:hou] classes, since users of your extensions
+    may not differentiate between methods provided by Houdini and methods
+    provided by your extensions, and may be confused when using Houdini without
+    your extensions.  You may want to name the methods you add with a common
+    prefix to make it clear they are extensions.
+
+== Usage == (usage)
+
+The following functions are available in the `inlinecpp` module:
+
+{{{
+#!python
+createLibrary(name, includes="", function_sources=(), debug=False,
+              catch_crashes=None, acquire_hom_lock=False, structs=(),
+              include_dirs=(), link_dirs=(), link_libs=())
+}}}
+
+This returns a module-like object.
+
+Create a library of C++ functions from C++ source, returning it if
+it's already loaded, compiling it only if it hasn't already been compiled.
+
+`name`:
+    A unique name used to build the shared object file's name.  Be careful
+    not to reuse the same name, or inlinecpp will delete the library when
+    it encounters Python code that creates another library with the same name,
+    leading to wasted time because of unnecessary recompilations.
+`includes`:
+    A string containing #include lines to go before your functions.  You
+    can also put helper functions in this string that can be called from
+    your functions but are not exposed to Python.
+`function_sources`:
+    A sequence of strings, with each string containing the source code
+    to one of your functions.  The string must begin with the signature
+    for your function so it can be parsed out.
+`debug`:
+    If True, the code will be compiled with debug information.  If True
+    and you do not specify a value for catch_crashes, Houdini will also
+    attempt to convert crashes in your C++ code into Python RuntimeError
+    exceptions.
+`catch_crashes`:
+    If True, Houdini will attempt to catch crashes in your C++ code and
+    convert them into Python RuntimeError exceptions containing a C++ stack
+    trace.  There is no guarantee that Houdini can always recover from
+    crashes in your C++ code, so Houdini may still crash even if this
+    parameter is set to True.  Setting this parameter to None (the default)
+    will make it use the same setting as the debug parameter.
+`acquire_hom_lock`:
+    If True, the code will be automatically modified to use a HOM_AutoLock,
+    to ensure threadsafe access to the C++ object when the Python code
+    is being run in a separate thread.  If your code modifies Houdini's
+    internal state, set this parameter to True.
+`structs`:
+    A sequence of descriptions of C structures that can be used as return
+    values.  Each structure description is a pair, where the first element
+    is the name of the structure and the second is a sequence of member
+    descriptions.  Each member description is a pair of strings containing
+    the member name and type.
+
+    Note that, instead of a sequence of member descriptions, the second
+    element of a struct description may be a string.  In this case,
+    the type will be a typedef.  These typedefs are useful to create
+    type names for arrays of values.
+
+    The details of this parameter are discussed
+    [below|/hom/extendingwithcpp#custom_return_types].
+`include_dirs`:
+    A sequence of extra directory paths to be used to search for include
+    files.  These paths are passed as -I options to the hcustom command
+    when compiling the C++ code.
+`link_dirs`:
+    A sequence of extra directory paths to be used to search for shared or
+    static libraries that the C++ code links against.  These paths are
+    passed as -L options to the hcustom command.
+`link_libs`:
+    A sequence of names of extra libraries that the C++ code needs to link
+    against.  These library names are passed as -l options to the hcustom
+    command.
+
+`extendClass(cls, library_name, includes="", function_sources=(), debug=False, catch_crashes=None, structs=(), include_dirs=(), link_dirs=(), link_libs=())`
+
+Extend a hou class by adding methods implemented in C++.
+
+cls is the hou module class you're extending.  The rest of the arguments
+are the same as for createLibrary, except `acquire_hom_lock` is always `True`.
+Note that this function automatically adds a `#include` line for the underlying
+C++ class.
+
+The first parameter to your C++ functions must be a pointer to a C++ object
+corresponding to the hou object.
+
+== Compiler Errors and Warnings == (errors_and_warnings)
+
+`inlinecpp` uses the `hcustom` HDK tool to compile and link your C++ code.  If
+your C++ code fails to compile, it raises an `inlinecpp.CompilerError`
+exception containing the full output from `hcustom`, including the compiler
+errors.
+
+Since `inlinecpp` uses `hcustom`, you must have set up your environment to use
+the HDK.  On Windows, you need to have Microsoft Visual Studio C++ (either
+Express or Professional Edition) installed.  You can optionally have the
+`MSVCDir` environment variable set to control which compiler `inlinecpp` uses,
+but if it is not set `inlinecpp` will try to automatically set it for you.  On
+Linux and Mac, you should not need to do anything to set up the compiler
+environment.
+
+If your code compiled, you can check to see if there were any compiler warnings
+by calling the `_compiler_output` method on the object returned by
+`createLibrary`.  For example:
+
+{{{
+#!pycon
+>>> mymodule = inlinecpp.createLibrary("test", function_sources=["""
+... int doubleIt(int value)
+... {
+...     int x;
+...     return value * 2;
+... }
+... """])
+...
+>>> print mymodule._compiler_output()
+Making /home/user/houdiniX.Y/inlinecpp/test_Linux_x86_64_10.5.313_PM3a6t3irKe+jdb113yHpw.o and
+/home/user/houdiniX.Y/inlinecpp/test_Linux_x86_64_10.5.313_PM3a6t3irKe+jdb113yHpw.so from
+/home/user/houdiniX.Y/inlinecpp/test_Linux_x86_64_10.5.313_PM3a6t3irKe+jdb113yHpw.C
+/home/user/houdiniX.Y/inlinecpp/test_Linux_x86_64_10.5.313_PM3a6t3irKe+jdb113yHpw.C: In function int doubleIt(int):
+/home/user/houdiniX.Y/inlinecpp/test_Linux_x86_64_10.5.313_PM3a6t3irKe+jdb113yHpw.C:8: warning: unused variable x
+}}}
+
+Note that if `createLibrary` did not need to compile the library because it was
+already compiled, calling `_compiler_output` will force the library to compile.
+
+
+== Allowed Parameter Types == (parm_types)
+
+Your C++ functions may only use certain parameter types.  Valid parameter types
+are:
+
+`int`:
+    pass something that can be converted to a Python int
+`float`:
+    pass something that can be converted to a Python float
+`double`:
+    pass something that can be converted to a Python float
+`const char *`:
+    pass a Python str object
+`bool`:
+    pass something that can be converted to a Python bool (supported in Python
+    2.6 and up only)
+`GU_Detail *`:
+    pass a [Hom:hou.Geometry] object from inside a Python SOP
+`const GU_Detail *`:
+    pass a [Hom:hou.Geometry] object
+`OP_Node *`:
+    pass a [Hom:hou.Node] object
+`CHOP_Node *`:
+    pass a [Hom:hou.ChopNode] object
+`COP2_Node *`:
+    pass a [Hom:hou.CopNode] object
+`DOP_Node *`:
+    pass a [Hom:hou.DopNode] object
+`OBJ_Node *`:
+    pass a [Hom:hou.ObjNode] object
+`POP_Node *`:
+    pass a [Hom:hou.PopNode] object
+`POPNET_Node *`:
+    pass a [Hom:hou.PopNetNode] object
+`ROP_Node *`:
+    pass a [Hom:hou.RopNode] object
+`SHOP_Node *`:
+    pass a [Hom:hou.ShopNode] object
+`SOP_Node *`:
+    pass a [Hom:hou.SopNode] object
+`VOP_Node *`:
+    pass a [Hom:hou.VopNode] object
+`VOPNET_Node *`:
+    pass a [Hom:hou.VopNetNode] object
+`OP_Operator *`:
+    pass a [Hom:hou.NodeType] object
+`OP_OperatorTable *`:
+    pass a [Hom:hou.NodeTypeCategory] object
+`PRM_Tuple *`:
+    pass a [Hom:hou.ParmTuple] object
+`CL_Track *`:
+    pass a [Hom:hou.Track] object
+`SIM_Data *`:
+    pass a [Hom:hou.DopData] object
+`UT_Vector2D *`:
+    pass a [Hom:hou.Vector2] object
+`UT_Vector3D *`:
+    pass a [Hom:hou.Vector3] object
+`UT_Vector4D *`:
+    pass a [Hom:hou.Vector4] object
+`UT_DMatrix3 *`:
+    pass a [Hom:hou.Matrix3] object
+`UT_DMatrix4 *`:
+    pass a [Hom:hou.Matrix4] object
+`UT_BoundingBox *`:
+    pass a [Hom:hou.BoundingBox] object
+`UT_Color *`:
+    pass a [Hom:hou.Color] object
+`UT_QuaternionD *`:
+    pass a [Hom:hou.Quaternion] object
+`UT_Ramp *`:
+    pass a [Hom:hou.Ramp] object
+
+The following details are important to note:
+
+- `bool` parameter types are only supported in Python 2.6 and up.  To emulate
+  a `bool` parameter type, though, use an `int` parameter type and pass in
+  a Python `bool` object.
+- If your function receives a `GU_Detail *`, you must pass in a
+  [Hom:hou.Geometry] object that is not read-only, otherwise `inlinecpp` will
+  raise a [Hom:hou.GeometryPermissionError] exception when you call your
+  function.  In other words, only use a `GU_Detail *` for functions being
+  called from a Python SOP where you can modify the geometry.  For functions
+  that do not modify the geometry, use a `const GU_Detail *` parameter.
+- If you use a parameter type other than the ones listed above, inlinecpp
+  will convert the Python object passed in to a `void *`.  For example,
+  if you have a parameter type of `int *` you may pass in a Python integer
+  containing an address of an integer array.
+- Do not modify the contents of a Python string from C++ code by receiving a
+  string as a `char *` and changing the data.  Strings in Python are immutable,
+  and changing a string's contents risks invalidating Python's internal state
+  and crashing Houdini.
+
+
+== Allowed Return Types == (return_types)
+
+The following return types are provided by default:
+
+`void`:
+    converted to `None`
+`int`:
+    converted to a Python `int`
+`float`:
+    converted to a Python `float`
+`double`:
+    converted to a Python `float`
+`const char *`:
+    converted to a Python `str` (return a null-terminated string that will not
+    be freed
+`char *`:
+    converted to a Python `str` (return a null-terminated string that will be
+    freed with `free()`)
+`bool`:
+    converted to `True` or `False` (supported in Python 2.6 and up only)
+`inlinecpp::BinaryString`:
+    converted to a Python `str` (construct with a `std::string`)
+
+The following details are important to note:
+- `bool` return types are only supported in Python 2.6 and up.  To emulate
+  a `bool` return type, however, your C++ function can return an int and you
+  can convert the result to a `bool` from Python.
+- The best way for your functions to return a string is to return an
+  inlinecpp::BinaryString (see [below|/hom/extendingwithcpp#returning_strings]
+  for details).  However, your functions can also return strings by returning
+  pointers to a null-terminated character array.  The return type of your
+  function determines if the array is freed after converting it to a Python
+  string.  If the return type is `const char *`, the array is not freed.  If it
+  is `char *`, the array is freed using `free()`.  There is no way to free the
+  character array with `delete []`, so if the array was allocated with `new`,
+  return the `strdup`'d result and `delete` the array from your function.
+
+You may also easily create your own return types.  See
+[below|/hom/extendingwithcpp#custom_return_types] for details.
+
+== Returning Strings == (returning_strings)
+
+The easiest way to return a string is for your C++ function to return an
+inlinecpp::BinaryString and then construct that BinaryString from a
+std::string.  The following example returns a string containing a node's
+deletion script:
+
+{{{
+#!python
+node_utilities = inlinecpp.createLibrary("node_utilities",
+    acquire_hom_lock=True,
+    includes="#include <OP/OP_Node.h>",
+    function_sources=["""
+inlinecpp::BinaryString deletion_script(OP_Node *node)
+{
+    return node->getDelScript().toStdString();
+}
+"""])
+}}}
+
+Sometimes your C++ code will need to return a null-terminated C-style string.
+If this C-style string is owned by local variables inside the function and
+will be freed when the function returns, you need to return a copy of the
+string.  There are a two ways to return such a copy.  The first is simply to
+construct a std::string from the C-style string, and return an
+inlinecpp::BinaryString.  The second is to return an inlinecpp::BinaryString
+and construct it using the inlinecpp::as_binary_string function, avoiding
+the construction of the std::string, as illustrated below:
+
+{{{
+#!python
+node_utilities = inlinecpp.createLibrary("node_utilities",
+    acquire_hom_lock=True,
+    includes="#include <OP/OP_Node.h>",
+    function_sources=["""
+inlinecpp::BinaryString deletion_script(OP_Node *node)
+{
+    return inlinecpp::as_binary_string(node->getDelScript().nonNullBuffer());
+}
+"""])
+}}}
+
+
+If your C++ code needs to return a C-style string that will not be freed when
+the function returns and does not need to be returned by the caller, you
+can simply use a return type of `const char *` (not `char *`).  When returning
+large strings, this approach is more efficient than returning
+inlinecpp::BinaryString because it avoids an unnecesary copying of the data.
+Note that Python will create a copy of the string, so it's ok if the C-style
+string's contents change after your function returns.  Here is an example:
+
+{{{
+#!python
+example_lib = inlinecpp.createLibrary("example_lib",
+    includes="#include <unistd.h>",
+    function_sources=["""
+const char *user_name()
+{
+    return getlogin();
+}
+"""])
+}}}
+
+Finally, if your C++ code needs to return a C-style string that does need to
+be freed, use a return type of `char *` (not `const char *`).  Note that
+inlinecpp will call `free()` on the data, not delete `[]`; if you need to delete
+the array, create a copy of it into a std::string, delete the array, and return
+the std::string as an inlinecpp::BinaryString.  The following (artificial)
+example illustrates how to return a string that will be freed:
+
+{{{
+#!python
+example_lib = inlinecpp.createLibrary("example_lib",
+    function_sources=["""
+char *simple_string()
+{
+    return strdup("hello world");
+}
+"""])
+}}}
+
+== Returning Binary Data == (returning_binary_data)
+
+If your C++ code needs to return arbitrary binary data, you can return
+an `inlinecpp::BinaryString` that is converted into a Python `str`.  For example,
+if you need to return a string that may contain null characters, you can
+call the `set` method of an `inlinecpp::BinaryString` object, passing in a
+`const char *` pointer to the data and the size in bytes.  Here is an example:
+
+{{{
+#!python
+example_lib = inlinecpp.createLibrary("example_lib",
+    function_sources=["""
+inlinecpp::BinaryString build_binary_data()
+{
+    char binary_data[] = "embedded\0null\0characters";
+    inlinecpp::BinaryString result;
+    result.set(binary_data, 24);
+    return result;
+}
+"""])
+}}}
+
+You can also use `inlinecpp::BinaryString` to return the binary representation
+of an array of ints, floats, or doubles.  Simply store the values in a
+`std::vector` of the appropriate type and construct the `inlinecpp::BinaryString`
+from the `std::vector` by calling `inlinecpp::as_binary_string`, as in the
+following example.  Using Python's `array` module you can easily convert the
+string back into an array of the appropriate type.  (Note that it is possible
+to return an array without having to use `inlinecpp::BinaryString` by using
+[array return types|/hom/extendingwithcpp#returning_arrays].)
+
+{{{
+#!python
+import array
+
+example_lib = inlinecpp.createLibrary("example_lib",
+    function_sources=["""
+inlinecpp::BinaryString build_int_array()
+{
+    std::vector<int> values(10);
+    for (int i=0; i<10; ++i)
+        values[i] = i;
+    return inlinecpp::as_binary_string(values);
+}
+"""])
+
+>>> data = example_lib.build_int_array()
+>>> int_array = array.array("i", data)
+>>> for value in int_array:
+...     print value
+}}}
+
+Finally, if you need to return a dynamically-allocated array of ints, floats,
+or doubles, simply call inlinecpp::BinaryString's `set` method using a pointer
+to the first element in the array and the size of the array, in bytes.
+(Note that a simpler approach is possible is possible with [array return
+types|/hom/extendingwithcpp#returning_arrays].)
+
+{{{
+#!python
+example_lib = inlinecpp.createLibrary("example_lib",
+    function_sources=["""
+inlinecpp::BinaryString build_int_array()
+{
+    int *values = new int[10];
+    for (int i=0; i<10; ++i)
+        values[i] = i;
+
+    inlinecpp::BinaryString result;
+    result.set((const char *)values, 10 * sizeof(int));
+    delete [] values;
+    return result;
+}
+"""])
+}}}
+
+== Custom Return Types == (custom_return_types)
+
+In addition to the [default return types|/hom/extendingwithcpp#return_types]
+and [string return types|/hom/extendingwithcpp#returning_strings] listed above,
+it is possible to return structures and arrays that are nicely converted into
+objects and sequences in Python.
+
+To use such return types, pass the `structs` parameter into
+[createLibrary|/hom/extendingwithcpp#usage] with a description of the C++
+structures you would like to return from the functions in your library.  Set
+this parameter to a sequence of descriptions, where each element in the
+sequence is a pair of values.  The first element in the pair is the name of the
+structure, and the second is a sequence of member descriptions.  Each member
+description is a pair of strings containing the member name and type.  Member
+types may be one of the format characters used by Python's
+[struct|http://docs.python.org/library/struct.html] module (e.g.  `i` for
+integer, `d` for double, `f` for float, `c` for character, etc.).
+
+The following example creates a structure named `Position2D` with two double
+members named `x` and `y`, and returns the position of a node.
+
+{{{
+#!pycon
+>>> node_utilities = inlinecpp.createLibrary(
+...     acquire_hom_lock=True,
+...     name="node_utilities",
+...     includes="#include <OP/OP_Node.h>",
+...     structs=[("Position2D", (
+...         ("x", "d"),
+...         ("y", "d"),
+...     ))],
+...     function_sources=["""
+... Position2D node_position(OP_Node *node)
+... {
+...     Position2D result;
+...     result.x = node->getX();
+...     result.y = node->getY();
+...     return result;
+... }
+... """])
+...
+>>> geo_node = hou.node("/obj").createNode("geo")
+>>> geo_node.setPosition((3.5, 4.5))
+>>> print geo_node.position()
+[3.5, 4.5]
+>>> position = node_utilities.node_position(geo_node)
+>>> print position
+<inlinecpp.Position2D object at 0x7f10e7cf0d90>
+>>> print position.x
+3.5
+>>> print position.y
+4.5
+}}}
+
+From the previous example, note that structs are initialized in C++ by creating
+a struct instance and assigning to the individual members.
+
+=== Returning Structs With Array Members === (returning_structs_with_array_members)
+
+Member type strings may also be preceded by a `*`, to indicate an array of
+those elements.  For example, `*i` is an array of integers.  The following
+example shows how to return two arrays of numbers:
+
+{{{
+#!python
+example_lib = inlinecpp.createLibrary(
+    "example_lib",
+    structs=[("ArrayPair", (
+        ("ints", "*i"),
+        ("doubles", "*d"),
+    ))],
+    function_sources=["""
+ArrayPair build_array_pair()
+{
+    std::vector<int> ints;
+    ints.push_back(2);
+    ints.push_back(4);
+
+    std::vector<double> doubles;
+    doubles.push_back(1.5);
+    doubles.push_back(3.5);
+
+    ArrayPair result;
+    result.ints.set(ints);
+    result.doubles.set(doubles);
+    return result;
+}
+"""])
+
+>>> array_pair = example_lib.build_array_pair()
+>>> print array_pair.ints[0]
+2
+>>> print array_pair.doubles[1]
+3.5
+>>> print zip(array_pair.ints, array_pair.doubles)
+[(2, 1.5), (4, 3.5)]
+}}}
+
+The above example called the set method of the array members, passing in
+a std::vector.  You can pass the following values into the set method:
+- a std::vector
+- a pointer and a number of elements
+- a std::string (only if the array is an array of characters)
+- a std::vector of std::vectors (only if the array is an array of arrays)
+- a std::vector<std::string> (only if the array is an array of arrays of
+  characters)
+
+=== Returning Arrays === (returning_arrays)
+
+Instead of a sequence of member descriptions, the second element of a structure
+description pair may also be a string.  In this case, inlinecpp creates a
+typedef, and such typedefs are useful when returning arrays of values.  The
+following example shows how to return an array of integers corresponding to
+the node ids of the global node selection:
+
+{{{
+#!python
+node_utilities = inlinecpp.createLibrary(
+    "node_utilities",
+    acquire_hom_lock=True,
+    includes="#include <OP/OP_Director.h>",
+    structs=[("IntArray", "*i")],
+    function_sources=["""
+IntArray ids_of_selected_nodes()
+{
+    std::vector<int> ids;
+    OPgetDirector()->getPickedNodeIds().toStdVector(ids);
+    return ids;
+}
+"""])
+
+def selected_nodes():
+    return [hou.nodeBySessionId(node_id)
+        for node_id in node_utilities.ids_of_selected_nodes()]
+}}}
+
+Note that the above example did not create an IntArray object, call the
+set method on it, and return it.  Instead, you can simply construct the
+IntArray object from a std::vector.  Any set of parameters that can be passed
+into the set method of an array may also be passed into the constructor.
+(Structs that are not arrays, however, do not have constructors, so you must
+assign to each element of the struct.)
+
+Note that you can also call the `set` method on an array object, passing in
+a pointer to the first element and the number of elements:
+
+{{{
+#!python
+example_lib = inlinecpp.createLibrary("example_lib",
+    structs=[("IntArray", "*i")],
+    function_sources=["""
+IntArray build_int_array()
+{
+    int *values = new int[10];
+    for (int i=0; i<10; ++i)
+        values[i] = i;
+
+    IntArray result;
+    result.set(values, 10);
+    delete [] values;
+    return result;
+}
+"""])
+}}}
+
+The following example illustrates how to return an array of strings by
+returning an array of arrays of characters:
+
+{{{
+#!python
+example_lib = inlinecpp.createLibrary("example_lib",
+    structs=[("StringArray", "**c")],
+    function_sources=["""
+StringArray build_string_array()
+{
+    std::vector<std::string> result;
+    result.push_back("one");
+    result.push_back("two");
+    return result;
+}
+"""])
+
+>>> example_lib.build_string_array()
+('one', 'two')
+}}}
+
+=== Nesting Structures and Arrays === (nesting_structures_and_arrays)
+
+In addition to format characters, member types may use the name of an earlier
+type in the sequence of structs, or an array of such types.  With this
+approach, you can nest structs or arrays of structs inside other structs.
+
+For example, the following sequence creates a `Point` struct with two
+integer members `x` and `y`, and a `Data` struct containing members named
+`tolerance` (a double), `single_point` (a Point), and `points` (an
+array of Points.  A C++ function returns a `Data` value that is automatically
+converted into a Python object.
+
+{{{
+#!python
+example_lib = inlinecpp.createLibrary(
+    "example_lib",
+    structs=(
+        ("Point", (
+            ("x", "i"),
+            ("y", "i"),
+        )),
+        ("Data", (
+            ("tolerance", "d"),
+            ("single_point", "Point"),
+            ("points", "*Point"),
+        )),
+    ),
+    function_sources=["""
+Data build_nested_struct()
+{
+    std::vector<Point> points;
+    for (int i=0; i<5; ++i)
+    {
+        Point point;
+        point.x = i;
+        point.y = i + 1;
+        points.push_back(point);
+    }
+
+    Data result;
+    result.tolerance = 0.01;
+    result.single_point.x = 4;
+    result.single_point.y = 6;
+    result.points.set(points);
+    return result;
+}
+"""])
+
+>>> result = example_lib.build_nested_struct()
+>>> print result.tolerance
+0.01
+>>> print result.single_point.x
+4
+>>> print result.points[2].y
+3
+}}}
+
+You can also create typedefs that are arrays of structs, or even arrays of
+arrays of structs.  The following example shows how to return an array of array
+of structures, where each structure contains two integers named `prim_id` and
+`vertex_id`.  It creates a function that receives a [Hom:hou.Geometry] object
+and, for each point in it, returns the vertices (as primitive and vertex ids)
+that reference that point.
+
+{{{
+#!python
+point_ref_utils = inlinecpp.createLibrary(
+    "point_ref_utils",
+    acquire_hom_lock=True,
+    structs=(
+        ("ReferencingVertex", (
+            ("prim_id", "i"),
+            ("vertex_id", "i"),
+        )),
+        ("ReferencesToPoint", "*ReferencingVertex"),
+        ("ReferencesToAllPoints", "*ReferencesToPoint"),
+    ),  
+    includes="""
+#include <GU/GU_Detail.h>
+#include <GB/GB_PointRef.h>
+        
+int vertex_index(GB_Vertex &vertex, GB_Primitive &prim)
+{   
+    GEO_Vertex &geo_vertex = dynamic_cast<GEO_Vertex &>(vertex);
+    GEO_Primitive &geo_prim = dynamic_cast<GEO_Primitive &>(prim);
+    int num_vertices = geo_prim.getVertexCount();
+    for (int i=0; i<num_vertices; ++i)
+        if (&geo_prim.getVertex(i) == &geo_vertex)
+            return i; 
+    return -1;
+}   
+""",
+    function_sources=["""
+ReferencesToAllPoints vertices_referencing_points(const GU_Detail *gdp)
+{   
+    GB_PointRefArray point_ref_array(gdp, /*group=*/NULL);
+
+    std::vector<ReferencesToPoint> references_to_points;
+    for (int i=0; i<point_ref_array.entries(); ++i)
+    {       
+        std::vector<ReferencingVertex> referencing_vertices;
+        for (const GB_PointRef *ref = point_ref_array(i); ref; ref=ref->next)
+        {   
+            ReferencingVertex referencing_vertex;
+            referencing_vertex.prim_id = ref->prim->getNum();
+            referencing_vertex.vertex_id = vertex_index(*ref->vtx, *ref->prim);
+            referencing_vertices.push_back(referencing_vertex);
+        }
+        references_to_points.push_back(referencing_vertices);
+    }
+    return references_to_points;
+}
+"""])
+
+def vertices_referencing_points(geo):
+    """Return a list of values, with one entry per point in the geometry.
+    Each entry in the list is a list of vertices, each of which references
+    the corresponding point.
+    """
+    vertices_for_each_point = []
+    for references_to_point in point_ref_utils.vertices_referencing_points(geo):
+	vertices = []
+	for reference_to_point in references_to_point:
+	    prim = geo.iterPrims()[reference_to_point.prim_id]
+	    vertices.append(prim.vertex(reference_to_point.vertex_id))
+	vertices_for_each_point.append(vertices)
+    return vertices_for_each_point
+
+>>> geo = hou.node("/obj").createNode("geo").createNode("box").geometry()
+>>> for point, vertices in zip(geo.points(), vertices_referencing_points(geo)):
+...     print point
+...     for vertex in vertices:
+...         print "    ", vertex
+}}}
+
+== Array Parameters == (array_parameters)
+
+=== Filling Arrays === (filling_arrays)
+When using inlinecpp, you will often you will use C++ code to fill the contents
+of an array for later use in Python.  For example, a generator COP using
+Python might use C++ to compute the contents of all pixels and use Python
+to evaluate node parameters and store the pixels into the COP.
+
+{{{
+#!python
+cpp_lib = inlinecpp.createLibrary("example", function_sources=["""
+void fill_array(float *array, int length)
+{
+    for (int i=0; i<length; ++i)
+	array[i] = i;
+}
+"""])
+
+length = 10
+
+# The following code illustrates how to use the array module that ships with
+# Python to create an array and then pass it into the C++ function.
+import array
+a = array.array("f", [0] * length)
+cpp_lib.fill_array(a.buffer_info()[0], len(a))
+print a
+
+# The following code shows how to use Python's numpy module to do the
+# same thing:
+import numpy
+a = numpy.zeros(length, dtype=numpy.float32)
+cpp_lib.fill_array(a.ctypes.data, len(a))
+print a
+
+# Since the C++ code does not require the array contents to be initialized,
+# it is faster with very large arrays to use numpy.empty instead of numpy.zero:
+a = numpy.empty(length, dtype=numpy.float32)
+cpp_lib.fill_array(a.ctypes.data, len(a))
+print a
+}}}
+
+Note the following:
+- The numpy module has many more features than the array module.  However, the
+  array module ships with all Python distributions while numpy does not.  You
+  may need to install numpy to use it.
+- For many operations, you can use numpy to modify the contents of the array,
+  and you may not need to use inlinecpp at all.
+- numpy.zeros will initialize all entries in the array to zero, while
+  numpy.empty will leave the array contents uninitialized.
+- `"f"` tells the array module to create an array of 32-bit floats.  Similarly,
+  `numpy.float32` (or `"f4"`) tells numpy to create an array of 32-bit floats.
+  `"d"` tells the array module to use 64-bit doubles, and `numpy.float64` (or
+  `"f8"`) tells numpy to do the same.
+- The buffer_info method on an array.array returns a tuple of two integers: the
+  address of the raw array and its size in bytes, so you can pass the first
+  value of the tuple into a C++ function expecting a pointer to the array.
+  Similarly, the ctypes.data attribute on a numpy.array object contains a
+  pointer to the raw data in a numpy array.
+- The C++ function cannot tell the length of the array from just the pointer to
+  the first element, so you must pass in the length as a parameter.
+- For large arrays, the numpy module is more efficient than the array module
+  because the latter does not provide an efficient way to create an array of
+  zeros or an array with uninitialized values.  Instead, the array module
+  needs you to first construct a temporary list by writing `[0] * length` and
+  then initialize the array with the contents of the list.  While Python is
+  optimized to contruct lists of small integers (like zero), it is still
+  time consuming to do so and then construct array objects from them when
+  working with very large arrays.
+
+TIP:
+    On Linux and Mac OS, Houdini tries to use the Python distribution available
+    on your computer.  So, to install numpy you should only need to install
+    it on your system's Python distribution and Houdini will pick it up.
+    However, on Windows Houdini uses a Python distribution that ships with
+    Houdini.  To use numpy from Houdini you must install it into the
+    appropriate Python directory in $HFS (for example, $HFS/python26).
+
+Both array.arrays and numpy.arrays behave like Python sequences: you can
+iterate over them and index into them from Python.  If necessary, you can
+convert them into binary strings, too.  With array.arrays, write
+
+{{{
+#!python
+a.tostring()
+}}}
+
+and with numpy.arrays, write
+
+{{{
+#!python
+str(a.data)
+}}}
+
+You can pass these strings into methods such as
+[Hom:hou.CopNode#setPixelsOfCookingPlaneFromString],
+[Hom:hou.Geometry#setPointFloatAttribValuesFromString], and
+[Hom:hou.Volume#setAllVoxelsFromString].  However, note that you can also
+pass in array.array or numpy.array objects into these methods directly, without
+first converting them to strings.  Doing so is more efficient because it avoids
+unnecessarily allocating memory and copying the data.
+
+=== Constructing Arrays From Binary Data === (constructing_arrays_from_binary_data)
+
+You can easily construct arrays from binary string data returned by Houdini.
+For example, using the array.array function you might write:
+{{{
+#!python
+a = array.array("f", geo.pointFloatAttribValuesAsString("P"))
+}}}
+
+and using the numpy.frombuffer function you might write:
+
+{{{
+#!python
+a = numpy.frombuffer(geo.pointFloatAttribValuesAsString("P"), dtype=numpy.float32)
+# Note that a is read-only.
+}}}
+
+or
+
+{{{
+#!python
+a = numpy.frombuffer(geo.pointFloatAttribValuesAsString("P"), dtype=numpy.float32).copy()
+# The contents of a may be modified.
+}}}
+
+Note the following:
+- arrays created with the array module are always readable and writable.
+  However, arrays created with numpy are sometimes both readable and writable
+  and at other times only readable.  When creating an array with numpy.zeros
+  or numpy.empty, or by calling the copy method on an existing array, the
+  returned array is always writable.  However, when creating a numpy array
+  using frombuffer, numpy does not create a copy of the data and the array
+  is read-only.
+
+=== Modifying Arrays === (modifying_arrays)
+
+The following example Python SOP shows how to create an array from binary data
+returned by Houdini, modify the contents of the array in C++, and then send the
+data back to Houdini:
+
+{{{
+#!python
+import inlinecpp
+cpp_module = inlinecpp.createLibrary("example", function_sources=["""
+void modify_point_positions(float *point_positions, int num_points)
+{
+    // Add 0.5 to the y-component of each point.
+    for (int point_num=0; point_num < num_points; ++point_num)
+    {
+	point_positions[1] += 0.5;
+	point_positions += 3;
+    }
+}
+"""])
+
+geo = hou.pwd().geometry()
+num_points = len(geo.iterPoints())
+
+# The following code uses the array module to modify the positions:
+import array
+positions = array.array("f", geo.pointFloatAttribValuesAsString("P"))
+cpp_module.modify_point_positions(positions.buffer_info()[0], num_points)
+geo.setPointFloatAttribValuesFromString("P", positions)
+
+# The following code uses numpy to modify the positions again:
+import numpy
+positions = numpy.frombuffer(geo.pointFloatAttribValuesAsString("P"), dtype=numpy.float32).copy()
+cpp_module.modify_point_positions(positions.ctypes.data, num_points)
+geo.setPointFloatAttribValuesFromString("P", positions)
+}}}
+
+=== Arrays of Structures === (arrays_of_structures)
+
+Numpy's structured arrays provide a mechanism to pass an array of structures
+to a C++ function that can be received as an array of structs.  The following
+example evaluates the P (position) and Cd (diffuse color) attributes of all
+points into two numpy arrays, combines the arrays into one, and passes the raw
+array data into a C++ function.  The C++ function receives it as an array of
+structures where each array element contains x, y, z, red, green, and blue
+float values.
+
+{{{
+#!python
+import numpy
+import inlinecpp
+
+geo = hou.pwd().geometry()
+num_points = len(geo.iterPoints())
+
+positions_array = numpy.frombuffer(
+    geo.pointFloatAttribValuesAsString("P"), dtype="f4,f4,f4")
+positions_array.dtype.names = ("x", "y", "z")
+
+colors_array = numpy.frombuffer(
+    geo.pointFloatAttribValuesAsString("Cd"), dtype="f4,f4,f4")
+colors_array.dtype.names = ("red", "green", "blue")
+
+attribs_array = numpy.empty(num_points, dtype="f4,f4,f4,f4,f4,f4")
+attribs_array.dtype.names = ("x", "y", "z", "red", "green", "blue")
+for component in "x", "y", "z":
+    attribs_array[component] = positions_array[component]
+for component in "red", "green", "blue":
+    attribs_array[component] = colors_array[component]
+
+cpp_lib = inlinecpp.createLibrary("example",
+    includes="""
+#pragma pack(push, 1)
+struct AttribValues {
+    float x;
+    float y;
+    float z;
+    float red;
+    float green;
+    float blue;
+};
+#pragma pack(pop)
+""",
+    function_sources=["""
+void process_attribs(AttribValues *attrib_values_array, int length)
+{
+    for (int i=0; i<length; ++i)
+    {
+	AttribValues &values = attrib_values_array[i];
+
+	// Do something here to analyze the attribute values.
+	cout << values.x << ", " << values.y << ", " << values.z << " "
+	     << values.red << ", " << values.green << ", " << values.blue
+	     << endl;
+    }
+}
+"""])
+
+cpp_lib.process_attribs(attribs_array.ctypes.data, len(attribs_array))
+}}}
+
+Note the following:
+- If the dtype parameter to numpy.frombuffer is a comma-separated string,
+  numpy will create a structured array.  `"f4"` is equivalent to
+  `numpy.float32`.
+- numpy.empty allocates an array of the correct size and with the correct
+  fields, but will not initialize the data.
+- You can create a view on one field of the array by using the field name as
+  the index into the array.  Using these views, you can assign from an
+  array containing all values for one field into one field in the destination
+  array.
+- If you create an inlinecpp C++ function with a parameter type it does not
+  know, it will treat the type as a pointer.  So, By passing in the address
+  of numpy array data containing 24 bytes per element, you can receive it
+  as a C++ array of those elements by creating a C++ struct that is 24 bytes
+  in size and whose field line up with the numpy fields.
+- The C++ compiler may add padding between structure elements to make them
+  line up to particular byte boundaries.  Use the #pragma pack macros above
+  to ensure that no padding is added to the structures.
+- Numpy's structured arrays provide nice sorting mechanisms that let you
+  order elements according by the different field values.
+
+== Python SOPs == (python_sops)
+
+`inlinecpp` is very useful when writing a Python SOP, since it gives you
+access to high level operations available in the C++ GU_Detail class.
+As well, it can be used to accelerate slow loops by re-implementing them
+in C++.  This approach combines the benefits of using the Type Properties
+dialog to create your parameters (so you do not have to use C++
+`PRM_Templates`) with the performance of a C++ implementation.
+
+Here is an example of the code inside a Python SOP that clips geometry along
+a plane.  It assumes a parameter for the normal (a vector of 3 floats called
+`normal`) and a parameter for the distance along that normal (a float
+called `distance`) and it creates a plane with that normal, offset from the
+origin by that distance, and clips the geometry with the plane.
+
+{{{
+#!python
+import inlinecpp
+
+geofuncs = inlinecpp.createLibrary(
+    "example_clip_sop_library",
+    acquire_hom_lock=True,
+    includes="""
+#include <GU/GU_Detail.h>
+#include <GQ/GQ_Detail.h>
+""",
+    function_sources=["""
+void clip(GU_Detail *gdp, float nx, float ny, float nz, float distance)
+{
+    GQ_Detail *gqd = new GQ_Detail(gdp);
+    UT_Vector3 normal(nx, ny, nz);
+    gqd->clip(normal, distance, 0);
+    delete gqd;
+}
+"""])
+
+nx, ny, nz = hou.parmTuple("normal").eval()
+geofuncs.clip(hou.pwd().geometry(), nx, ny, nz, hou.ch("distance"))
+}}}
+
+Also see the HDK for examples comparing the same SOP written using pure Python
+code, Python with `inlinecpp`, and pure C++ using the HDK.  In those examples,
+the `inlinecpp` version is just as fast as the HDK version but requires much
+less code and is much easier to use because of automatic compilation.
+
+Here is another example that adds a `destroyMe` method to [Hom:hou.Attrib]
+(note that [Hom:hou.Attrib#destroy] already exists):
+
+{{{
+#!python
+import types
+
+geomodule = inlinecpp.createLibrary("geomodule",
+    acquire_hom_lock=True,
+    includes="""
+        #include <GU/GU_Detail.h>
+
+        template <typename T>
+        bool delete_attribute(T &attrib_dict, const char *name)
+        {
+            GB_Attribute *attrib = attrib_dict.find(name);
+            if (!attrib)
+                return false;
+            attrib_dict.destroy(name, attrib->getSize(), attrib->getType());
+            return true;
+        }
+    """, function_sources=[ """
+        int delete_point_attribute(GU_Detail *gdp, const char *name)
+        { return delete_attribute(gdp->pointAttribs(), name); }
+    """, """
+        int delete_prim_attribute(GU_Detail *gdp, const char *name)
+        { return delete_attribute(gdp->primitiveAttribs(), name); }
+    """, """
+        int delete_vertex_attribute(GU_Detail *gdp, const char *name)
+        { return delete_attribute(gdp->vertexAttribs(), name); }
+    """, """
+        int delete_global_attribute(GU_Detail *gdp, const char *name)
+        { return delete_attribute(gdp->attribs(), name); }
+    """])
+
+attrib_type_to_delete_function = {
+    hou.attribType.Point: geomodule.delete_point_attribute,
+    hou.attribType.Prim: geomodule.delete_prim_attribute,
+    hou.attribType.Vertex: geomodule.delete_vertex_attribute,
+    hou.attribType.Global: geomodule.delete_global_attribute,
+}
+
+def destroyAttrib(attrib):
+    return attrib_type_to_delete_function[attrib.type()](attrib.geometry(), attrib.name())
+
+hou.Attrib.destroyMe = types.MethodType(destroyAttrib, None, hou.Attrib)
+}}}
+
+== Extending [Hom:hou.Node] Classes == (extending_hou_classes)
+
+The following examples illustrate how to extend the [Hom:hou.Node] class or
+its subclasses:
+
+This first example adds a method called expandGroupPattern that receives
+a pattern string and returns a comma-separated list of names of children
+nodes in groups matching that pattern.
+
+{{{
+#!pycon
+>>> inlinecpp.extendClass(hou.Node, "cpp_node_methods", function_sources=["""
+... inlinecpp::BinaryString expandGroupPattern(OP_Node *node, const char *pattern)
+... {
+...     UT_String result;
+...     node->expandGroupPattern(pattern, result);
+...     return result.toStdString();
+... }"""])
+...
+>>> hou.node("/obj").expandGroupPattern("@group1")
+'geo1,geo2,geo3'
+}}}
+
+
+This second example adds a setSelectable method to object node objects.  (Note
+that this method is already available as
+[Hom:hou.ObjNode#setSelectableInViewport]).
+
+{{{
+#!python
+inlinecpp.extendClass(
+    hou.ObjNode,
+    "node_methods",
+    includes="#include <UT/UT_UndoManager.h>",
+    function_sources=["""
+void setSelectable(OBJ_Node *obj_node, bool selectable)
+{
+    if (!obj_node->canAccess(PRM_WRITE_OK))
+        return;
+
+    UT_AutoUndoBlock undo_block("Setting selectable flag", ANYLEVEL);
+    obj_node->setPickable(selectable);
+}
+"""])
+}}}
+
+
+== Python COPs == (python_cops)
+
+For examples of how to use inlinecpp in Python COPs, see
+[Writing Part of the COP in C++|/hom/pythoncop#using_cpp] in the Python
+COPs|/hom/pythoncops] section.
+
+
+== Raising Exceptions == (raising_exceptions)
+
+Your C++ source code cannot raise exceptions to Python.  However, one technique
+to raise exceptions is to have your C++ functions return a code, and then
+create a wrapper Python function that checks the code and raises an exception
+if necessary.  Here is the same example from above that raises a
+[Hom:hou.PermissionError] exception.
+
+{{{
+#!python
+import types
+
+cpp_node_methods = inlinecpp.createLibrary(
+    "node_methods",
+    acquire_hom_lock=True,
+    includes="""
+#include <OBJ/OBJ_Node.h>
+#include <UT/UT_UndoManager.h>
+""",
+    function_sources=["""
+bool setObjectSelectable(OBJ_Node *obj_node, bool selectable)
+{
+    if (!obj_node->canAccess(PRM_WRITE_OK))
+        return false;
+
+    UT_AutoUndoBlock undo_block("Setting selectable flag", ANYLEVEL);
+    obj_node->setPickable(selectable);
+    return true;
+}
+"""])
+
+def setObjectSelectable(obj_node, selectable):
+    if not cpp_node_methods.setObjectSelectable(obj_node, selectable):
+        raise hou.PermissionError()
+
+hou.ObjNode.setSelectable = types.MethodType(setObjectSelectable, None, hou.ObjNode)
+}}}
+
+
+== Returning hou Objects == (returning_hou_objects)
+
+You cannot return something from your C++ function that gets automatically
+convert to a corresponding [Hom:hou] object.  However, you can use a Python
+wrapper function to do the conversion for you.
+
+For example, `OP_Node::getParmsThatReference` takes a parameter name and
+returns a `UT_PtrArray` of `PRM_Parm` pointers.  You can create a Python
+function that receives a [Hom:hou.Parm] object and returns a sequence of
+[Hom:hou.ParmTuple] objects as follows:
+
+{{{
+#!python
+parm_reference_lib = inlinecpp.createLibrary(
+    "parm_reference_lib",
+    acquire_hom_lock=True,
+    structs=[("StringArray", "**c")],
+    includes="""
+#include <OP/OP_Node.h>
+#include <PRM/PRM_Parm.h>
+
+// This helper function is not called from Python directly:
+static std::string get_parm_tuple_path(PRM_Parm &parm_tuple)
+{
+    UT_String result;
+    parm_tuple.getParmOwner()->getFullPath(result);
+    result += "/";
+    result += parm_tuple.getToken();
+    return result.toStdString();
+}
+""",
+    function_sources=["""
+StringArray get_parm_tuples_referencing(OP_Node *node, const char *parm_name)
+{
+    std::vector<std::string> result;
+    UT_PtrArray<PRM_Parm *> parm_tuples;
+    UT_IntArray component_indices;
+    node->getParmsThatReference(parm_name, parm_tuples, component_indices);
+
+    // Even though we're returned an array of component indices, they'll often
+    // be -1, so we can't use them.
+    for (int i=0; i<parm_tuples.entries(); ++i)
+        result.push_back(get_parm_tuple_path(*parm_tuples(i)));
+
+    return result;
+}
+"""])
+
+def parm_tuples_referencing(parm):
+    return [hou.parmTuple(parm_tuple_path)
+        for parm_tuple_path in parm_reference_lib.get_parm_tuples_referencing(
+            parm.node(), parm.name())]
+}}}
+
+The C++ function in this example returns a space-separated string that is
+split into a list of strings, and then converted into a list of
+[Hom:hou.ParmTuple] objects.
+
+Note that this example creates a helper function that is not exposed to Python
+by putting its source code in the `includes` parameter.
+
+
+== Distributing Your Compiled Library == (distributing)
+
+If you want to distribute your compiled library without worrying whether the
+user has a proper compiler environment set up, simply distribute the shared
+object (`.so`/`.dll`/`.dylib`) file from your `$HOME/houdiniX.Y/inlinecpp`
+directory that `inlinecpp` created.  As long as the user doesn't modify your
+C++ source code, the checksum will be the same and the file name of the shared
+object file file will be the same.
+
+Houdini will look in all inlinecpp subdirectories of `$HOUDINI_PATH` when
+looking for the shared object, so you can put the shared library at any point
+in your `$HOUDINI_PATH`.
+
+To determine the path to the shared file, you can call the `_shared_object_path`
+method of the module-like object.  For example:
+
+{{{
+#!pycon
+>>> mymodule = inlinecpp.createLibrary("test", function_sources=["""
+... int doubleIt(int value) { return value * 2; }"""])
+...
+>>> mymodule._shared_object_path()
+'/home/user/houdiniX.Y/inlinecpp/test_Linux_x86_64_11.0.313_3ypEJvodbs1QT4FjWEVmmg.so'
+}}}
+
+The library will have different names for different platforms and
+architectures, so you can distribute multiple shared objects to support
+multiple platforms without having to worry about conflicts between shared
+object names.
+
+== Storing your Code Outside a Digital Asset == (external_source)
+
+See the [Python SOP|pythonsop#external_source] documentation for an example of
+how to store your Python source code outside of a digital asset, to make it
+easier to edit and manage under a version control system.
+
+== Fixing Crashes == (external_source)
+
+Your C++ code runs inside the Houdini process, so a bug in your code can easily
+crash Houdini.  By passing `debug=True` when creating your library, Houdini
+will compile your code without optimization and with debug symbols, making it
+easier for you to debug your code by attaching a standard debugger to Houdini.
+
+By default, if you pass `debug=True` and do not specify a value for the
+`catch_crashes` parameter, Houdini will attempt to recover from a crash in
+your C++ source code and convert it into a Python `RuntimeError` exception
+containing a C++ stack trace.  For example, the following code crashes because
+it dereferences a null pointer:
+
+{{{
+#!pycon
+>>> mymodule = inlinecpp.createLibrary("crasher", debug=True, function_sources=["""
+... void crash()
+... {
+...     int *p = 0;
+...     *p = 3;
+... }
+... """])
+>>> mymodule.crash()
+Traceback (most recent call last):
+  File "<console>", line 1, in <module>
+  File "/opt/hfs/houdini/python2.6libs/inlinecpp.py", line 620, in __call__
+    return self._call_c_function(*args)
+  File "/opt/hfs/houdini/python2.6libs/inlinecpp.py", line 589, in call_c_function_and_catch_crashes
+    return hou.runCallbackAndCatchCrashes(lambda: c_function(*args))
+RuntimeError: Traceback from crash:
+pyHandleCrash
+UT_Signal::UT_ComboSignalHandler::operator()(int, siginfo*, void*) const
+UT_Signal::processSignal(int, siginfo*, void*)
+_L_unlock_15 (??:0)
+crash (crasher_Linux_x86_64_10.5.313_fpk9yUhcRwBJ8R5BAVtGwQ.C:9)
+ffi_call_unix64+0x4c
+ffi_call+0x214
+_CallProc+0x352
+<unknown>
+}}}
+
+Note that the Python portion of the traceback has the most recent call last
+followed by the exception, and the exception contains the C++ stack trace
+with the most recent call first.
+
+The relevant line of the trace is `crash
+(crasher_Linux_x86_64_10.5.313_fpk9yUhcRwBJ8R5BAVtGwQ.C:9)`, telling you to
+look at line 9 of `$HOME/houdiniX.Y/inlinecpp/crasher_Linux_x86_64_10.5.313_fpk9yUhcRwBJ8R5BAVtGwQ.C`.  If you look at that file you'll see something like:
+
+{{{
+#!cpp
+#include <UT/UT_DSOVersion.h>
+#include <HOM/HOM_Module.h>
+
+extern "C" {
+
+void crash()
+{
+    int *p = 0;
+    *p = 3;
+}
+
+}
+}}}
+    #display: numbered
+    #hl_lines: [9]
+
+The statement on line 9 is a null pointer dereference.
+
+By by default, crash handling is enabled if and only if `debug=True`.  You can
+control whether crash handling is enabled independent of the `debug` setting
+by passing a value for the `catch_crashes` parameter.
+

@@ -1,0 +1,264 @@
+#type: include
+
+== Impact ==
+
+Parameters on this tab control when the object to which this data is
+applied can fracture.
+
+Impact Group:
+    An impact with objects in the specified group can potentially
+    cause this object to fracture.
+
+Min/Max Impact:
+    The minimum impact impulse that can cause this object to fracture.
+    Any impact over the minimum can cause a fracture; the range is
+    used in conjunction with the __Radius Scale__ parameter, allowing
+    heavier impacts to map to a larger impact radius.
+
+    The minimum impact gets mapped to the minimum impact radius scale, and the maximum impact force gets mapped to the maximum impact scale. Having a maximum ensures that values are clipped so that really strong impacts from creating huge impact zone.
+    
+Minimum Volume:
+    The minimum volume an object must have to be eligible for
+    fracturing.  The object's volume is calculated by dividing its
+    mass by its density.
+
+    NOTE:
+        This volume only work this way if you turn on __Compute Mass__ on your RBD Objects. If you don't, the volume will not be what you expect and you may have to just set it to 0.
+
+Re-fracture Delay:
+    The interval (in seconds of simulation time) after an object
+    fractures before it can be eligible for fracturing again.
+    
+Fracture From Magnet Force Metaballs:
+    Use the metaball geometry associated with any [Magnet
+    Forces|Node:dop/magnetforce] applied to the object as a source for
+    potential fracturing.  This can be used to cause explosion-type
+    effects, where the magnet force itself causes the fracture.
+    
+Minimum Magnet Volume:
+    The minimum ratio of the object's collision volume that must be
+    overlapped by the magnet metaball before fracturing can occur.
+    It can be useful to delay the fracturing until the metaball overlaps much of the object's volume when using animated metaball geometry.
+
+Maximum Fractures:
+    Controls how many times the object can break. A maximum fracture of 1 will break on the first impact, but the resulting pieces won't break again. A maximum fracture of 2 will allow all the pieces from the first fracture to break.
+
+    NOTE:
+        When some pieces break off the main chunk, the main chunk is still considered a "piece", which means it will lose one of its max fractures. 
+    
+Impact Radius:
+    The radius of the metaball to be copied to each impact point.  
+
+Min/Max Scale:
+    Scale the impact radius by this amount, based upon the ranges
+    specified in the __Minimum Impact__ parameter. __Radius scale__ multiplies the __Impact Radius__ gives you the size of metaball around each impact point. So given a single point of impact, it is roughly your crater radius. There are two values for the min/max.
+    
+    
+== Points ==
+
+Parameters on this tab control the generation of fracture points from
+the eligible impacts.  See the [Voronoi Fracture
+Points SOP|Node:sop/voronoifracturepoints] help for more information.
+
+Compute Number of Fracture Points:
+    Calculates the number of points to scatter in each fracture region
+    based on its surface area.
+
+Points Per Area:
+    The number of points per unit of surface area.  This can be scaled
+    by the __Point Density__ parameter for each region.
+
+Number of Points:
+    The number of points to generate.
+    
+Per Impact:
+    Whether the __Number of Points__ parameter specifies the total
+    number of generated points or the number of generated points for
+    each impact point.
+        
+Show Fracture Points:
+    Displays the generated points. Yellow is for the surface region, red for the interior, and blue for the exterior.
+    
+=== Surface === (surface)
+
+Point Density:
+    The density of point generation for this region.  If __Compute
+    Number Of Points__ is enabled, this parameter is a multiplier of
+    the __Points Per Area__ value. If an explicit __Number of Points__
+    value is being used, this parameter determines the proportion of
+    those points allocated to this region.
+    
+Surface Offset:
+    The amount to offset the generated points from the object surface.
+    Offsetting by a small amount can cause smaller, more debris-like
+    fractured pieces from the Surface region.
+    
+Radius Scale:
+    The amount to scale the impact radius before calculating the Surface region.
+    
+Clustering:
+    Use Fracture Settings:
+	Use the parameters on the [Cluster|#clustering] tab to control
+	the size of the clustered pieces.
+    Disabled:
+        Disable clustering for every fractured piece from this region.
+    Single Piece:
+        Cluster all pieces in this region together as a single piece.
+    
+=== Interior === (interior)
+
+Point Density:
+    The density of point generation for this region.  If __Compute
+    Number Of Points__ is enabled, this parameter is a multiplier of
+    the __Points Per Area__ value. If an explicit __Number of Points__
+    value is being used, this parameter determines the proportion of
+    those points allocated to this region.
+    
+Clustering:
+    Use Fracture Settings:
+	Use the parameters on the [Cluster|#clustering] tab to control
+	the size of the clustered pieces.
+    Disabled:
+        Disable clustering for every fractured piece from this region.
+    Single Piece:
+        Cluster all pieces in this region together as a single piece.
+
+        
+=== Exterior === (exterior)
+
+Point Density:
+    The density of point generation for this region.  If __Compute
+    Number Of Points__ is enabled, this parameter is a multiplier of
+    the __Points Per Area__ value. If an explicit __Number of Points__
+    value is being used, this parameter determines the proportion of
+    those points allocated to this region.
+    
+Scatter Location:
+    At Impact:
+        Scatter points at the boundary of the Interior and Exterior regions.
+    Exterior Volume:
+        Scatter points throughout the exterior volume.
+    Both:
+        Scatter points at both of the above locations.
+        
+Impact Offset:
+    The offset of the Interior / Exterior boundary when scattering
+    using the __At Impact__ or __Both__ setting above.
+    
+Clustering:
+    Use Fracture Settings:
+	Use the parameters on the [Cluster|#clustering] tab to control
+	the size of the clustered pieces.
+    Disabled:
+        Disable clustering for every fractured piece from this region.
+    Single Piece:
+        Cluster all pieces in this region together as a single piece.
+
+    
+== Fracture ==
+
+Parameters on this tab control the fracturing of the geometry from the
+generated fracture points.  See the [Voronoi
+Fracture SOP|Node:sop/voronoifracture] help for more information.
+
+[Include:/nodes/sop/voronoifracture#cuspnormals]
+[Include:/nodes/sop/voronoifracture#cuspangle]
+[Include:/nodes/sop/voronoifracture#cuspouternormals]
+[Include:/nodes/sop/voronoifracture#cuspouterangle]
+
+=== Cut ===
+    
+Cut Plane Offset:
+    Offsets the cut plane between adjacent cell points before cutting.
+    Increasing this has the effect of putting space between each fractured
+    piece.
+    
+    NOTE: 
+        Setting this parameter to a non-zero value disables __Clustering__.
+        
+=== Cluster === (clustering)
+
+Cluster Pieces:
+    Fuse the individual pieces into larger clusters based on their
+    input points sharing a common, non-zero cluster attribute value.
+    Values for this attribute can come from the generated fracture points,
+    or from noise as specified below.
+        
+Size:
+    The size of the cells for the noise added to the input points.  This 
+    roughly corresponds to the size of the clusters.
+
+Offset:
+    The offset of the cellular noise added to the interior points.
+
+Jitter:
+    The jitter of the cellular noise added to the interior points.
+    
+Random Detachment:
+    Randomly detach pieces from clusters.
+    
+Detach Seed:
+    The random seed used for detachment.
+    
+Detach Ratio:
+    The probability that a particular piece will be detached.
+    
+=== Interior Detail ===  (interiordetail)
+
+Add Interior Detail:
+    Adds additional polygons to the interior surfaces of pieces.
+
+Detail Size:
+    The size of the polygons added to the interior surfaces.
+    
+Noise Type:
+    The type of noise added to the interior points.
+    
+Frequency:
+    The frequency of the noise added to the interior points.
+
+Offset:
+    The offset of the noise added to the interior points.
+    
+Turbulence:
+    The turbulence of the noise added to the interior points.
+    
+Depth / Noise Scale Bias:
+    The value for the bias curve that maps depth within the surface to
+    the amplitude of the noise applied.
+
+== Velocity Transfer == (velocity)
+
+Parameters on this tab control how velocity is transferred from the
+intact object to the fractured pieces at the time of impact.
+Fractured pieces can inherit velocity from the intact object's pre-
+and post-impact velocity.  At the time of fracture, a velocity impulse
+is also calculated for each fracturing impact, and is added to the
+pieces' point velocities with a user-specified strength and falloff.
+This impulse can add velocity to the pieces even when the intact
+object has no velocity before or after impact.
+
+Pre/Post Velocity Bias:
+    The amount of pre- or post-impact velocity that the fractured
+    pieces should inherit.  
+
+    Setting this to a low value (biased towards pre-impact velocity) makes the pieces inherit little of the object's collision response, and the object will appear brittle, with little internal strength.  
+
+    Setting this to a high value (biased towards post-impact velocity) causes the pieces to inherit much of the object's collision response, and the object will appear harder, with more internal strength.
+    
+Impulse Distance:
+    The distance over which the velocity impulse falls off from each
+    impact.  The impulse will have no effect past this distance.
+
+Radial Impulse Scale:
+    A scale for the radial component of the velocity impulse.
+    Increasing this value will give velocity in an outwards direction
+    from the fracturing impacts to the pieces within the Impulse
+    Distance.
+    
+Normal Impulse Scale:
+    A scale for the normal component of the velocity impulse.
+    Increasing this value will give velocity (in the direction of the
+    collision response) to the pieces within the __Impulse Distance__, even
+    if the velocity bias for the entire object is towards pre-impact
+    velocities.

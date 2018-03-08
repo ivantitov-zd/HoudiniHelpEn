@@ -1,0 +1,77 @@
+﻿#type: hscript
+
+= unix =
+
+"""Starts a host system command."""
+
+:usage: `unix [-s shell] [-q] <<command>>`
+
+NOTE:
+    Despite its name, the `unix` command works on non-UNIX operating
+    systems. This is an alias to the [system|Cmd:system] command.
+
+Houdini runs the commands using the value of the $SHELL variable, using the
+command `$SHELL -c <<command>>`.  If the `$SHELL` variable is either `csh` or `zsh`,
+Houdini will also use the -f option (preventing sourcing of the .cshrc/.zshrc
+files).
+
+Houdini passes any global HScript variables to the external process as
+environment variables, and sets the `status` variable to the exit code of the
+command.
+
+If the `HOUDINI11_COMPATIBILITY` environment variable is set, the `$SHELL` variable
+is ignored and the shell defaults to `csh`.  The -s option can be used to
+override the shell even when `HOUDINI11_COMPATIBILITY` is set.
+
+== Tips ==
+
+* Houdini includes dedicated HScript commands to call typical host
+  system commands, such as [Cmd:uls] to list the contents of a
+  directory, [Cmd:urm] to remove a file, and [Cmd:upwd] to
+  print the current directory.
+
+  To make your code portable to non-UNIX systems such as Windows, use
+  these HScript commands instead of explicitly calling the equivalent
+  UNIX utility (`ls`, `rm`, `pwd`, etc.).
+
+* To redirect in the external shell (such as `>&`), enclose the
+  argument in single quotes to prevent the Houdini command interpreter
+  from acting on the redirection before the external shell can see
+  it.
+
+  {{{
+  #!hscript
+  unix myscript.pl '>output.txt'
+  }}}
+
+* In most cases, the `-q` option should be used to preserve quoted arguments.
+  However, for backward compatibility with existing scripts, the option is
+  disabled by default.  The `-q` option simplifies quoting issues.
+  
+  {{{
+  #!hscript
+  # This command will fail since hscript strips the quotation marks from the
+  # argument "Hello world"
+  unix hwatermark -x 10 10 -m "Hello world" foo.pic foo.pic font.ttf 12
+  # Adding the -q option preserves quotes and passes "Hello world" as a
+  # single argument to hwatermark.
+  unix -q hwatermark -x 10 10 -m "Hello world" foo.pic foo.pic font.ttf 12
+  }}}
+
+@options
+
+`-q`:
+	Preserve quotation marks when passing arguments to the shell.
+
+`-s <<string>> `:
+    Override the value of the `$SHELL` variable.
+
+@related
+
+- [system|Cmd:system]
+- [java|Cmd:java]
+- [ucd|Cmd:ucd]
+- [upwd|Cmd:upwd]
+- [uls|Cmd:uls]
+- [umkdir|Cmd:umkdir]
+- [urm|Cmd:urm]

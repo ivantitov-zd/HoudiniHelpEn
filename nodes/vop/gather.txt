@@ -1,0 +1,126 @@
+﻿#type: node
+#context: vop
+#internal: gather
+#icon: VOP/gather
+
+= RSL Gather Loop =
+
+"""Sends rays into the scene and contains a subnetwork of VOPs to operate on the information gathered from the shaders of surfaces hit by the rays."""
+
+== Overview ==
+
+The Gather VOP sends rays into the scene (the number of rays is controlled by the `samples` input). You specify the information you want from the hit surfaces by adding inputs to the gather node (see below). The gather node contains a subnetwork (double-click the node to go inside). You can wire up VOPs in the subnet to operate on the input values, for example to sum up the colors (`Ci` attributes) of the hit surfaces.
+
+The gather VOP acts like a loop. The subnet inside is run for every sample. You can connect additional inputs to specify the values to import from the hit surfaces or to use as variables in the loop (for example, as an accumulator for a value imported from each hit surface).
+
+== Adding inputs and importing values from hit surfaces ==
+
+Adding inputs and importing values to the Gather VOP is slightly unintuitive.
+
+# To simply add an input variable to the gather node, wire a VOP (such as a [Constant VOP|Node:vop/constant]) into the `next` input on the gather VOP to add the input.
+
+    Add inputs representing variables you intend to import from surface shaders before any other inputs.
+    
+    TIP:
+        The gather VOP uses the output label of the incoming wire to label its inputs. So, to give the inputs meaningful names, in the Constant VOP's parameters, set the __Constant name__ parameter.
+        
+        For example, if you are connecting a Constant VOP to create an input that you will use to import `Ci`, in the Constant VOP's parameters, set __Constant name__ to something like `Ci_import`.
+
+# Use the __Number of imports__ parameter in the gather VOPs parameter interface to set the number of inputs that represent imports from the hit surfaces.
+
+    For example, if you connect 5 additional inputs, and set __Number of inputs__ to `3`, the first three added inputs would represent imports, and the last two would be non-imported variables.
+
+# For each of the imported variables, in the gather VOP's parameter interface, set the corresponding text box (e.g. __Import 0__, __Import 1__, etc.) to the name of the variable you want to import from the hit surface.
+
+    You can use "shadertype:varname" to import a variable from a shader.  For example "volume:Ci" or "surface:P".
+
+    You can use "primitive:varname" to retrieve the value of varname on the hit surface prior to shader execution.  For example "primitive:P".
+
+    You can use "attribute:name:value" to retrieve an attribute from the state bound to the hit primitive.  For example "attribute:user:myproperty".
+
+    You can use "ray:element" to retrieve details of the particular ray associated with the current sample.  For example "ray:origin".
+
+    Please see the RSL help on the gather() statement for further details.
+    
+    The menu button to the right of the text box lets you quickly select from a list of common imports:
+    
+    Surface color (`Ci`):
+        The `Ci` (diffuse color) of the hit surface.
+        
+    Surface opacity (`Of`):
+        The `Of` (opacity) of the hit surface.
+    
+    Ray origin (`ray:origin`):
+        The actual origin of the ray.
+        
+    Ray direction (`ray:direction`):
+        The actual direction of the ray (with the cone).
+        
+    Ray length (`ray:length`):
+        The length of the ray to the hit surface.
+
+== Subnetwork and outputs ==
+
+Double-click the gather VOP to go to the subnetwork inside. This subnetwork is run for every ray hit.
+
+- The `subinput` node provides the values from the gather VOP's inputs.
+
+- Connect VOPs to the `suboutput` node to make them available as outputs of the gather VOP.
+
+== Example ==
+
+To add up the colors of all hit surfaces:
+
+# Create two [Constant VOPs|Node:vop/constant]. In the parameter editor, set the __Constant type__ of both nodes to "Color".
+
+# Connect the two Constant nodes as additional inputs to the gather VOP (wire them into the gather VOP's `next` input).
+
+# In the parameters of the first Constant node, set __Constant name__ to `Ci_import`. In the parameters of the second Constant node, set __Constant name__ to `sum`.
+
+# In the gather VOP's parameters, set the __Number of imports__ to `1` and set __Import 0__ to `Ci`.
+
+# Double-click the gather VOP node to go into its subnetwork.
+
+# Create an [Add VOP|Node:vop/add].
+
+# Connect the `_Ci_import` and `_sum` of the `subinput` node into the Add.
+
+# Connect the Add node's `sum` output into the `suboutput` node's `_sum` connector.
+
+# Press ((U)) or click in the path control at the top of the network editor to go back up.
+
+    The gather node now has a `_sum` output.    
+
+== Missed rays ==
+
+Currently, missed rays cannot be handled in the Gather Loop VOP. If you need to handle missed rays, you will need to either create your own VOP or use an [Inline VOP|Node:vop/inline].
+
+@parameters
+
+Number of imports:
+    The number of additional inputs (that is, inputs you add by connecting VOPs to the `next` input) that get their value by importing variables from the hit surfaces.
+    
+    For example, if you connect 5 additional inputs, and set __Number of inputs__ to `3`, the first three added inputs would represent imports, and the last two would be non-imported variables.
+
+@inputs
+
+The gather loop has two sets of inputs, a fixed set and a variadic set. The fixed inputs are:
+
+`category`:
+    The ray category.  This defaults to "illumination".
+
+`P`:
+    The ray origin. Default is the global `P`.
+    
+`dir`:
+    The ray direction (this should be normalized). Default is the global N variable.
+
+`angle`:
+    The cone angle to sample. Default is `0`.
+
+`samples`:
+    The number of samples (rays) to send. Default is `1`.
+
+@outputs
+
+Outputs appear on the gather VOP for connected inputs to the `suboutput` node in gather node's subnetwork.

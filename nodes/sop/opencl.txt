@@ -1,0 +1,336 @@
+#type:     node
+#context:  sop
+#internal: opencl
+#icon:     SOP/opencl
+
+= OpenCL =
+
+"""Executes an OpenCL kernel on geometry."""
+
+The OpenCL SOP provides a general interface to create and run OpenCL
+kernels on geometry.  It allows binding of constants, attributes,
+and volume data to OpenCL parameters in the kernel.
+
+@parameters
+
+== Kernel ==
+
+Kernel Name:
+    #id: kernelname
+    
+    The name of the OpenCL kernel to execute with the loaded program.
+    
+Use Code Snippet:
+    #id: usecode
+    Use the code provided in the Kernel Code parameter rather than an external disk file.  This makes for quicker editing and creation of OpenCL SOPs.
+    
+    
+Kernel File:
+    #id: kernelfile
+    The path to OpenCL program file to compile. This can include a path to an on disk file or asset.
+    
+    
+Kernel Code:
+    #id: kernelcode
+
+    The OpenCL kernel to execute when in Code Snippet mode.
+    
+    
+Kernel Options:
+    #id: kerneloptions
+    Specify any desired compile flags for the kernel.
+
+    NOTE:
+        The Apple OSX OpenCL compiler requires only a single space between kernel options!
+    
+    
+Use Write Back Kernel:
+    #id: usewritebackkernel
+
+    After the kernel is executed, a second kernel may be immediately
+    executed with the same set of parameters bound to it.  You can avoid
+    race conditions where multiple threads want to write to the same data
+    by breaking it into a two-pass operation.
+    
+    
+Write Back Kernel Name:
+    #id: writebackkernelname
+
+    The name of the kernel to use in the write back operation.  It
+    will have the same function signature as the main operation.
+    
+    
+Generate Kernel:
+    #id: generatekernel
+    Creates a prototype for the required kernel function taking all 
+    of your current selected parameters into account.  This can be
+    used as a starting point or to update your interface when
+    new parameters are added or removed.
+    
+    
+Recompile Kernel:
+    #id: recompile
+    When loading kernels from disk the kernel is cached to avoid
+    regenerating it every solve.  Turning this on forces the re-loading
+    and recompiling of the kernel.  This is useful if #include files
+    refer to code that has changed, or the kernel file is changed
+    in an external text editor.
+
+    It should always be disabled when protoyping is complete.
+    
+    
+== Options ==
+
+Run Over:
+    #id: runover
+    
+    The provided OpenCL kernel is invoked once.  The number of global ids,
+    however, is controlled by this setting.  First Writeable attribute
+    sets it to the size of the first bound attribute that is marked writeable.
+    First Writeable Volume likewise sets it to the total voxels of the 
+    first bound volume that is marked writeable.
+
+    In workset mode, detail integer array attributes are used to determine
+    the number of worksets and the sizes of them.
+
+    NOTE:
+        The global ids will be rounded up to ensure efficient processing on the GPU, so you should always compare the `get_global_id(0)` with the actual length of the bound attribute.
+
+Iterations:
+    #id: iterations
+
+    The kernel can be re-executed a variable number of times.  This avoids
+    having to use more nodes to create a for loop, and ensures all data
+    remains on the video card during the successive evaluations.
+    
+Worksets Begin Attr.:
+    #id: worksets_begin
+    Detail integer array attribute specifying the start value of each
+    workset.
+
+Worksets Length Attr.:
+    #id: worksets_length
+    Detail integer array attribute specifying the length of each workset.
+    The kernel will be invoked for each of these sizes.  Zero sizes
+    will be skipped.
+
+Finish Kernels:
+    #id: finish
+    
+    When Finish Kernels is disabled, no attempt is to wait for the
+    OpenCL kernels to complete before continuing the next solver.
+    This lets them run in the background until their results
+    are actually needed.  To simplify debugging, it is useful
+    to ensure kernels are finished to make sure errors are detected
+    in the right spot.
+
+    
+Include Time:
+    #id: time
+    
+    Include the current time as a parameter.
+    
+Include Timestep:
+    #id: timeinc
+    Include the current timestep as a parameter. 
+    
+Timescale:
+    #id: timescale
+
+    A constant multiplier on the timestep.
+    
+    
+Time Method:
+    #id: timemethod
+    
+    For some operations you may wish to know the power of the timestep.
+    Rather than recomputing in the kernel, you can set this to `e^Timestep`
+    and have the exponentiation pre-computed.
+    
+Include Simplex Noise Data:
+    #id: xnoise
+    Include an opaque pointer that can be passed to the simplex noise
+    functions in <xnoise.h> to generate simplex noise and curlnoise from
+    OpenCL kernels.
+    
+    
+== Bindings ==
+
+=== OpenCL Parameters ===
+
+Each parameter can either be a fixed constant value, evaluated
+before kernel invocation, or read/write from a volume or
+geometry attribute.
+
+Parameter Name:
+    #id: bindings#_name
+    
+    The name of the parameter.  This is used in the `Generate Kernel`
+    button, but is otherwise only present as a comment.  The actual
+    binding to an OpenCL kernel is done by parameter order, not
+    by the name.
+    
+=== Options ===
+
+Parameter Type:
+    #id: bindings#_type
+    
+    The type of parameter to create and bind.
+
+    Integer:
+	A constant integer value, allowing you to bind channel references and expressions that are pre-computed.
+        
+    Float:
+	A constant float value.  Optionally you can scale it by the timestep.
+        
+    Float Vec4:
+	A constant tuple of four floats, binding to a `float4` OpenCL parameter.
+        
+    Ramp:
+	A scalar ramp.  Because evaluating a spline-based ramp inside of an OpenCL kernel is complex, the ramp is instead sampled into a uniform
+	array of floats.  The `Ramp Size` parameter controls the number of samples used.
+        
+    Attribute:
+	Bind a geometry attribute.
+        
+    Volume:
+	Bind a volume.
+        
+    
+Integer:
+    #id: bindings#_intval
+
+    Integer value to use integer mode.
+    
+    
+Float:
+    #id: bindings#_fval
+    
+    Float value to use float mode.
+    
+Float 4:
+    #id: bindings#_v4val
+
+    Float 4 value to use float 4 mode.
+    
+    
+Time Scale:
+    #id: bindings#_timescale
+
+    How to scale the provided float value by the timestep.  Because timeinc
+    may not be known at time of parameter evaluation, it can be computed
+    as a constant prior to evaluating the kernel and applied
+    to the float value.
+    
+Ramp:
+    #id: bindings#_ramp
+	
+    The ramp data to provide as a list of float values.
+    
+Ramp Size:
+    #id: bindings#_rampsize
+
+    The number of floating point values to evaluate the ramp in.
+    
+Volume:
+    #id: bindings#_volume
+
+    The name or number of the volume primitive to bind.
+    
+    
+Force Alignment:
+    #id: bindings#_forcealign
+    
+    To simplify kernels one may often assume all volumes are aligned
+    in resolution and transform.  If Force Alignment is set, this is
+    enforced and volumes that are misaligned generate errors.
+    
+    
+Voxel Resolution:
+    #id: bindings#_resolution
+
+    Add the resolution of the volume as a parameter.
+    
+    
+Voxel Size:
+    #id: bindings#_voxelsize
+
+    Add the size of the volume as a parameter, in SOP space.
+    
+    
+Volume Transform to World:
+    #id: bindings#_xformtoworld
+
+    Add a matrix transform that converts from the volume's voxel coordinates
+    to the SOP coordinates.
+    
+    
+Volume Transform to Voxel:
+    #id: bindings#_xformtovoxel
+    
+    Add a matrix transform that converts from SOP coordinates to the volume's voxel coordinates.
+    
+Attribute:
+    #id: bindings#_attribute
+
+    Which attribute to bind.  It is an error if it is missing, unless the optional flag is set.
+
+    Present for Attributes.
+    
+Class:
+    #id: bindings#_attribclass
+
+    The type of the attribute.  Since the first writeable attribute can determine the iteration order, this can determine the number of global
+    ids processed by the OpenCL solver.
+
+    Not all bound attributes need to be the same type, or even come from the same geometry data.
+
+    Present for Attributes.
+    
+Type:
+    #id: bindings#_attribtype
+    
+    What sort of attribute to bind.  Float and integer attributes are bound as single arrays containing all element values in order.  Tuples are
+    interleaved, ie, P will be bound as xyzxyzxyz.
+
+    Array attributes are bound as two arrays.  One array contains the offsets of each element's array data.  Thus, the difference of
+    a pair of offsets provides the elements array length.  The second array is the data of all elements' arrays concatenated into a single
+    array.
+
+    Present for Attributes.
+    
+Size:
+    #id: bindings#_attribsize
+    
+    Tuple size of the attribute to bind.  If greater than zero, the attribute must be able to provide this tuple size.  If zero, it will bind
+    automatically and an extra parameter will be generated storing the tuplesize.
+
+    Present for Attributes.
+
+    
+Readable:
+    #id: bindings#_readable
+    
+    Determines if the OpenCL kernel will read from this attribute or volume. If not set, the attributes values will not be copied onto the GPU.
+    This is useful for write-only attributes as it avoids an unnecessary copy, but requires care as uninitialized data will be present.
+    
+Writeable:
+    #id: bindings#_writeable
+    
+    Determines if the OpenCL kernel will write back to this attribute or volume.  Causes the CPU version of the attribute or volume to be
+    marked out of date so the next time it is needed it will be copied back from the GPU.
+
+    
+Optional:
+    #id: bindings#_optional
+
+    Marks the attribute or volume as not necessary.  If the attribute or volume isn't present in the geometry, rather than erroring, a #define is set in the kernel
+    options to disable the attribute.  Note that this also changes the parameter signature, so the __Generate Code__ button should be used
+    to verify the syntax.
+
+    NOTE:
+        The parameter name is used in the `#define`, so changing the parameter name requires changing the code.
+    
+@related
+- [Node:dop/gasopencl]
+

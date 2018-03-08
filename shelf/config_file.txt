@@ -1,0 +1,272 @@
+= Shelf configuration file format =
+
+NOTE:
+    It is much easier to [edit the shelf in Houdini|/shelf/customize]. However, in a large site it may be useful at times to batch edit/replace shelf files directly.
+    
+== Overview ==
+
+Houdini loads any files with a `.shelf` extension in the path specified by the `TOOLBAR_PATH` environment variable. By default this is `HOUDINI_PATH/toolbar`, so for example you can override the "factory" files in `$HFS/houdini/toolbar` using files in `$HOME/houdini<<X>>.<<x>>/toolbar`.
+
+Shelf configuration files are in XML format. See below for information about each tag. There is also an XSD schema file, `$HFS/houdini/toolbar/shelf.xsd`, you can use to validate your own XML shelf definition files. 
+
+{{{
+#!xml
+<?xml version="1.0" encoding="UTF-8"?>
+<shelfDocument>
+
+  <shelfSet name="some_shelf_set" label="Some Shelf Set">
+    <memberToolshelf name="some_shelf"/>
+  </shelfSet>
+
+  <toolshelf name="some_shelf" label="Some Shelf">
+    <memberTool name="some_tool"/>
+  </toolshelf>
+
+  <tool name="sample_tool" label="Sample Tool" icon="PLASMA_App">
+    <helpText><![CDATA[the main help]]></helpText>
+    <helpURL>help URL</helpURL>
+    <toolMenuContext name="viewer">
+      <contextNetType>OBJ</contextNetType>
+      <contextNetType>SOP</contextNetType>
+      <contextNetType>POP</contextNetType>
+      <contextNetType>DOP</contextNetType>
+    </toolMenuContext>
+    <toolMenuContext name="pop_viewer">
+      <contextNetType>POP</contextNetType>
+    </toolMenuContext>
+    <toolMenuContext name="cop_viewer">
+      <contextNetType>COP2</contextNetType>
+    </toolMenuContext>
+    <toolMenuContext name="network">
+      <contextOpType>table/operator</contextOpType>
+      <contextNetType>OBJ</contextNetType>
+      <contextNetType>SOP</contextNetType>
+      <contextNetType>POP</contextNetType>
+      <contextNetType>CHOP</contextNetType>
+      <contextNetType>ROP</contextNetType>
+      <contextNetType>SHOP</contextNetType>
+      <contextNetType>COP2</contextNetType>
+      <contextNetType>VOP</contextNetType>
+      <contextNetType>VOPNET</contextNetType>
+      <contextNetType>DOP</contextNetType>
+    </toolMenuContext>
+    <toolSubmenu>fist Submenu</toolSubmenu>
+    <toolSubmenu>second submenu</toolSubmenu>
+    <script scriptType="python"><![CDATA[script for the tool]]></script>
+  </tool>
+
+</shelfDocument>
+}}}
+
+== Tags ==
+
+`<shelfDocument>`:
+    This is the top-level element for a shelf configuration file. This element can contain any number of `shelfSet`, `toolshelf`, and/or `tool` elements.
+
+`<shelfSet>`:
+    Defines a set of shelf tabs the user can load as a group. Contains `memberToolshelf` elements.
+    
+    `name` attribute:
+        The internal name of the set. If a file later in the path has a set with the same name, it will replace this one.
+    
+    `label` attribute:
+        The human-readable label for the set in the user interface.
+        
+    You can optionally add a `<readOnly/>` sub-element to prevent users from editing the tab set in Houdini.
+
+`<memberToolshelf>`:
+    (zero or more sub-elements of `shelfSet`) Specifies a shelf tab as part of a set.
+    
+    `name` attribute:
+        The name of a shelf tab defined by a `toolshelf`. The named tab can be in this file or any other shelf configuration file on the path.
+
+`<toolshelf>`:
+    Defines the tools on a shelf tab. Contains `memberTool` elements.
+    
+    `name` attribute:
+        The internal name of the shelf tab. If a file later in the path has a tab with the same name, it will replace this one.
+    
+    `label` attribute:
+        The human-readable label for the tab in the user interface.
+    
+    You can optionally add a `<readOnly/>` sub-element to prevent users from editing the shelf tab in Houdini.
+    
+`<memberTool>`:
+    (zero or more sub-elements of `toolshelf`) Specifies a tool as part of a shelf tab.
+    
+    `name` attribute:
+        The name of a tool defined by a `tool` element. The named tool can be in this file or any other shelf configuration file on the path.
+
+`<tool>`:
+    Defines a shelf tool.
+    
+    `name` attribute:
+        The internal name of the tool. If a file later in the path has a tool with the same name, it will replace this one.
+
+    `label` attribute:
+        The human-readable label for the tool in the user interface.
+    
+    `icon` attribute:
+        (optional) The path to an image file (or an internal Houdini icon reference such as `SOP_copy`).
+    
+    This element _must_ have a `script` sub-element specifying the script to run when the user clicks the tool.
+    
+    You can optionally add a `<readOnly/>` sub-element to prevent users from editing the tool in Houdini.
+    
+    If you don't specify any `contextNetType` or `contextOpType` elements inside a `toolMenuContext` element inside the `tool`, the tool will not appear on any ((Tab)) menu.
+
+`<script>`:
+    (required sub-element of `tool`) A Python script or HScript to run when the user clicks the tool.
+    
+    It's usually a good idea to wrap the script in a `CDATA` tag to prevent `<`, `>`, and `&` characters in the script from causing XML errors.
+    
+    `scriptType` attribute:
+        Either `python` or `hscript`.
+    
+    {{{
+    #!xml
+    <shelfDocument>
+        <tool name="sample_tool" label="Sample Tool" icon="PLASMA_App">
+            <script scriptType="python"><![CDATA[
+            
+            hou.ui.displayMessage("Hello world!")
+            
+            ]]></script>
+        </tool>
+    </shelfDocument>
+    }}}
+
+`<helpText>`:
+    (optional sub-element of `tool`) [Wiki-formatted|/help/format] or HTML help to display in the browser when the user asks for help for the tool. This will be overridden by the `helpURL` tag.
+    
+    It's usually a good idea to wrap the help text in a `CDATA` tag to prevent `<`, `>`, and `&` characters in the help from causing XML errors.
+
+`<helpText>`:
+    (optional sub-element of `tool`) [Wiki-formatted|/help/format] or HTML help to display in the browser when the user asks for help for the tool. This will be overridden by the `helpURL` tag.
+    
+    It's usually a good idea to wrap the help text in a `CDATA` tag to prevent `<`, `>`, and `&` characters in the help from causing XML errors.
+
+`<helpURL>`:
+    (optional sub-element of `tool`) A URL to load in the browser when the user asks for help for the tool. If both `helpURL` and `helpText` are present and not empty, Houdini uses the `helpURL`.
+
+`<toolSubmenu>`:
+    (optional sub-element of `tool`) A list of menu labels, separated by `/` characters, specifying which sub-menu of the ((Tab)) menu the tool will appear in.
+    
+    For example, if `<toolSubmenu>My Tools/Shaping</toolSubmenu>` will make the tool appear in a __My Tools > Shaping__ submenu on the ((Tab)) menu.
+    
+    {{{
+    #!xml
+    <shelfDocument>
+        <tool name="sample_tool" label="Sample Tool" icon="PLASMA_App">
+            <script scriptType="python">...</script>
+            <toolSubmenu>Fee/Fi/Fo/Fum</toolSubmenu>
+            <toolMenuContext name="network">
+                    <contextNetType>OBJ</contextNetType>
+            </toolMenuContext>
+        </tool>
+    </shelfDocument>
+    }}}
+    
+    * Note that the tool must also have a `toolMenuContext` if you want the tool to appear in the ((Tab)) menu.
+    
+    * The label matching is case-sensitive.
+    
+    * Sub-menus that do not exist will be created.
+
+`<toolMenuContext>`:
+    (zero or more sub-elements of `tool`) Specifies in which contexts this tool should appear in the ((Tab)) menu.
+    
+    `name` attribute:
+        Which pane type whose ((Tab)) menu the tool will appear in. Valid values are `viewer` (user presses ((Tab)) in the viewer), `network` (user presses ((Tab)) in the network editor), `pop_viewer` (the viewer when viewing a particle network), or `cop_viewer` (the viewer when viewing a compositing network).
+        
+        Note that you need separate `toolMenuContext` elements for each pane type (specified by the `name` attribute) you want the tool to appear in. For example, if you want the tool to appear in the ((Tab)) menu in both the 3D viewer and the network editor, you need a `<toolMenuContext name="viewer">` element and a `<toolMenuContext name="network">` element.
+    
+`<contextNetType>`:
+    (zero or more sub-elements of `toolMenuContext`) The tool appears in the ((Tab)) menu only in networks of this type. You can specify multiple `contextNetType` elements to have the tool appear in multiple network types.
+    
+    The text of this element is a network type. Acceptable values are `OBJ` (the scene level), `SOP` (a geometry network), `POP` (particle network), `DOP` (dynamics network), `CHOP`, `ROP` (render network), `SHOP` (material network), `COP2` (compositing network), `VOP`, or `VOPNET`.
+    
+    For example, to make the tool appear in the network editor's ((Tab)) menu, but only when viewing an object, geometry, or particle network:
+    
+    {{{
+    #!xml
+    <toolMenuContext name="network">
+        <contextNetType>OBJ</contextNetType>
+        <contextNetType>SOP</contextNetType>
+        <contextNetType>POP</contextNetType>
+    </toolMenuContext>
+    }}}
+
+`<contextOpType>`:
+    (zero or more sub-elements of `toolMenuContext`) If you specify this as a sub-element of `toolMenuContext`, the tool will only appear in the ((Tab)) menu in networks where it is valid to create a node of this type.
+    
+    The text of this element is a node specification, such as `Object/geo` or `Sop/copy`.
+    
+    `contextOpType` overrides `contextNetType` if you specify both. In the example below, the tool would not appear in the ((Tab)) menu in a geometry (SOP) network, because even though the `contextNetType` matches, the `contextOpType` does not match.
+    
+    {{{
+    #!xml
+    <toolMenuContext name="network">
+        <contextOpType>Object/my_asset</contextOpType>
+        <contextNetType>OBJ</contextNetType>
+        <contextNetType>SOP</contextNetType>
+        <contextNetType>POP</contextNetType>
+    </toolMenuContext>
+    }}}
+
+`<readOnly>`:
+    You can add this as an empty element to a `shelfSet`, `toolshelf`, or `tool` element to prevent users from editing the tab set. 
+    
+    {{{
+    #!xml
+    <?xml version="1.0" encoding="utf-8" ?>
+    <shelfDocument>
+        <tool name="scribble" label="Scribble">
+            <readOnly/>
+            <script scriptType="python">
+            ...
+            </script>
+        </tool>
+    </shelfDocument>
+    }}}
+
+== Changing the default shelf tabs ==
+
+Shelf sets, shelves, and tools from files later in the path will replace earlier definitions _by the element's name attribute_. The file name of the shelf configuration file makes no different.
+
+You can only _replace_ a default shelf tab (by specifying a shelf tab with the same name in a user configuration file). It's not possible specify that certain tools should be added or removed from a default shelf tab.
+
+To modify one of the default shelf tabs: 
+
+# Find the default shelf file containing the `<toolshelf>` element defining the tab, either in `$HFS/houdini/toolbar/ShelfDefinitions.shelf` or `$HFS/houdini/toolbar/ShelfDefinitions.master_shelf`. Open the file in a text editor.
+
+# Select the `<toolshelf>` element defining the shelf tab and copy it to the clipboard.
+
+# Start a new file, fill in the XML declaration and the `<shelfDocument>` element, and paste in the copied `<toolshelf>` element.
+
+# Remove or add `<memberTool>` elements to change which tools are on the shelf tab.
+
+# Save the file somewhere in the Houdini `toolbar` path, for example `$HOME/houdini<<X>>.<<x>>/toolbar/mytools.shelf`.
+
+== Tips ==
+
+* To reload the shelf files without restarting Houdini, use [Hom:hou/shelves#reloadFiles]. To reload a single file, use [Hom:hou/shelves#loadFile].
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

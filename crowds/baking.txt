@@ -1,0 +1,71 @@
+= Baking agent data =
+
+== Overview ==
+
+You have a character with some animation cycles, and you want to use it as an agent in a crowd simulation. The crowd system doesn't work directly with characters. Instead, you first create an agent primitive from the character. The agent primitive contains the character information (such as the rig) as well as crowd-specific information.
+
+NOTE:
+    The crowds system generally assumes your characters are [digital assets|/assets/]. Character assets are a good idea and much easier to deal with than characters made of loose objects.
+
+When you're testing with a relatively small number of agents, you can configure the SOPs to grab the information it needs from within Houdini. However, this is inefficient since Houdini needs to cook the character's network to get the resulting geometry for the crowd sim.
+
+When you scale up to a larger crowd and render, you will need to _bake_ the agent data to a more efficient form on disk. This has several advantages over getting the information from within Houdini:
+
+* It's faster to get the agent information from the baked files than to recook the Houdini scene.
+
+* The renderer can efficiently load only the information it needs for each frame from the baked files.
+
+* The baked files can be shared between multiple IFDs, multiple renders, and multiple scenes.
+
+Once you bake the agent data, you work with those baked files in the crowd system rather than the original character, and you only need to re-bake the files if the source character or animation/mocap change.
+
+You probably want to create a scene file just for baking out characters, not do it as part of the actual crowd scene.
+
+You can generally treat baked agent files as you would textures. You create them once, possibly check them into a resource control system, re-use them across scene files, and only recreate them if something changes "upstream".
+
+See [setting up a simulation|setup] for how to use the agent files once they're baked out.
+
+== Set up a character for baking ==
+
+# Create an instance of the character asset, and set up the animation cycle.
+
+# In the __Crowds__ shelf tab, click [Icon:SHELF/bake_character][Bake Agent|/shelf/crowds_bakeagent].
+
+# Enter the name of the "agent class", for example `footsoldier`. This will be the same for the different animation cycles of the same character.
+    
+    Click __Accept__.
+
+# Enter the name of the current animation clip, for example `walk`. Click __Accept__.
+
+    * The tool creates a render network for baking agents if it doesn't already exist.
+
+    * Inside the render network, the tool creates a [render node|Node:out/agent] for baking this particular animation clip.
+
+== Bake the agent files ==
+
+# Go to the object level, and select the render network (`agent_bake`).
+
+# In the node's parameters, the __Cache directory__ controls where the render nodes inside will put their files. (The tools automatically set up channel references on the render nodes that look at this parameter.)
+
+    The default is `$HIP/agents`, meaning the files will be written to a folder next to the current scene file. You may want to change this to use `$JOB` if you're using [project management|/basics/project]. Or you can change it to a custom location for your project/site.
+
+# In the parameter editor, click __Render__ to bake out all clips.
+
+TIP:
+    You can dive inside the render network to re-render an individual clip.
+
+== Baking different animation clips ==
+
+You need to bake each animation clip (such as a walk cycle) of the agent. Different people have different philosophies of how to associate animation with characters, so it's impossible for the shelf tools to know how to set up the animation on your characters for you.
+
+You will need to make sure that when the agent render node bakes a certain clip, the character is performing the correct animation.
+
+* If your asset has a parameter that sets the character's animation cycle, you can create separate instances of the asset, set each to a different animation, and then bake each one.
+
+* You can set up each animation in a separate [take|/basics/takes], bake it, and then on the render node for the clip set it to render the take corresponding to the clip.
+
+
+
+
+
+

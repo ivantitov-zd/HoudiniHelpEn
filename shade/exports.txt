@@ -1,0 +1,44 @@
+= Material exports =
+
+"""How to export extra information from the shader and save it as part of the rendered image."""
+
+
+== Overview ==
+
+When rendering to "deep pixel" image formats that can store extra image information besides just color, mantra can save useful information about each pixel.
+
+The mantra renderer can output most of the extra image information you might want for compositing by default. Individual materials export component information that mantra will composite together to produce a final image plane (such as diffuse color). Materials can even export arbitrary per-pixel data to extra image planes for special use-cases.
+
+
+== Default mantra exports ==
+
+Mantra can save practically all the extra information you might need for compositing and relighting, such as separate color components (diffuse color, reflection color, and so on) and the rendered geometry's position, depth, and normal at each pixel.
+
+To enable extra image planes in the output image, use the checkboxes on the __Images > Extra image planes__ tab on the [Mantra render node|Node:out/ifd].
+
+You can check the extra planes in a Houdini image viewer by opening the top toolbar and using the plane pop-up menu to view different image planes.
+
+[Image:/images/shade/extra_image_planes.jpg]
+
+
+== Understanding components ==
+
+To generate its component image planes, such as `diffuse` and `reflect`, mantra composites together the component exports of the materials involved, based on the component name.
+
+For example, the [Principled shader VOP|Node:vop/principled] has an export named `diffuse` (among others) containing the diffuse color component (separate from any reflective component). The [mantra render node|Node:out/ifd]'s __Export components__ parameter (on the __Images > Extra image planes__ tab) controls which named component exports it gathers from the rendered materials and exports as extra image planes, including `diffuse`.
+
+Note that you have to turn on export categories such as __Direct lighting__ and __Indirect lighting__ on the __Extra image planes__ tab to have mantra actually generate the extra image planes. By default it does not add this information to the output image.
+
+The shader VOPs generate the appropriate component exports by default, so to get the generally useful exports, all you have to do is turn on the appropriate checkboxes on the __Extra image planes__ tab.
+
+For some special use cases, however, you might want to generate, for example, a _separate_ set of the diffuse and reflective planes for special compositing of certain parts of the scene (for example, ghostly characters). You can change the name of the component using the __Component label__ parameter on the node that generates the BSDF, such as [PBR Diffuse|Node:vop/pbrdiffuse] or [PBR Reflection|Node:vop/pbrnonmetallic]. For example, you can change `diffuse` to `ghost_diffuse`. Then add the extra names to the space separated list of components in the __Export components__ parameter (and remember to turn on the lighting exports with the checkboxes).
+
+
+== Arbitrary exports ==
+
+If, for some reason, you want to output arbitrary (non-shaded) per-pixel information from your material to the output image, you can create your own export in the material and tell mantra to output an extra image plane for it.
+
+# In your material network, add a [Bind Export VOP|Node:vop/bindexport]. Set its __Name__ to some descriptive value, and wire in the value you want to export.
+
+# On the [mantra render node|Node:out/ifd], click the __Images > Extra image planes__ sub-tab. Use the __Extra image planes__ multi-parm to add an extra plane for your export. Set the __VEX variable__ to the name you used in the Bind Export node, and set the __Channel name__ to the name to use for the extra plane in the output image.
+

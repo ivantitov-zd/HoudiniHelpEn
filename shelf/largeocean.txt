@@ -1,0 +1,56 @@
+#icon: SHELF/oceanwaves
+#tags: oceans
+
+= Large Ocean =
+
+"""Creates a large ocean complete with a material and depth information."""
+
+This tool is useful for creating a large ocean with no repeating tiles even over very large distances. However, it is not a simulation, it is a deformer that does not use DOPs at all. You can scrub through the timeline and watch the ocean evolve without any simulation.  For a simulated ocean, use the [Icon:SHELF/wave_tank][Wave Tank|/shelf/wavetank] tool on __Particle Fluids__ shelf tab.
+    
+== Using Large Ocean ==
+    
+        In the Oceans shelf tab, click [Icon:SHELF/oceanwaves] Large Ocean.
+    
+        The tool will create points scattered across a very large grid, and two separate [Ocean Spectrum|Node:sop/oceanspectrum] layers that will be instanced onto these points.  Each point will instance a patch of the specified ocean spectrum with a slight rotation and offset in space.  This variation usually defeats any tiling artifacts that might otherwise arise from re-using the same spectrum across a very large space.  Additionally, one of the spectrum layers has Noise enabled, which can mimic the localized effects of wind or depth variations.
+
+        The [Ocean Evaluate|Node:sop/oceanevaluate] SOP allows previewing of the resulting ocean.  This tool will also create an [Ocean Surface shader|/gallery/shop/vopmaterial/oceansurface] and attach it to the newly created `ocean_surface` object.
+        
+        The animation is driven by the __Time__ parameter on the [Ocean Evaluate|Node:sop/oceanevaluate] node. The default expression is `$T` (the current time). You can edit this expression to change the animation direction and speed (for example, `$T * 2` to make the ocean move twice as fast).
+    
+        [Image:/images/shelf/oceanwave.png]
+ 
+        TIP:
+                Change your [shading mode|/basics/view] to __Smooth Shaded Mode__ to get a better view of the deforming ocean surface.
+ 
+        The `ocean_preview` node is used to preview your ocean surface in the viewport. The `ocean_render` node is used by the [Ocean Surface shader|/gallery/shop/vopmaterial/oceansurface] at render time. 
+        
+        The [Ocean Spectrum|Node:sop/oceanspectrum] node has all of the tools for changing the look of your ocean. For example, on the __Wind__ tab, the __Speed__ will affect the amplitude of the waves, the __Directional Bias__ lets you create waves that move more or less in one direction, and the __Chop__ which allows you to create the sharp peaks on the waves. The __Wave Amplitude__ tab also has some very useful parameters, such as the __Scale__ which controls the size of the waves.
+
+
+== Tips ==
+
+* For rendering, this tool creates a [fetch node|Node:out/fetch] at the output level which is connected to the compositing network inside of the `ocean_render` node. If you would like to generate displacement maps at render-time, you can connect this node to the input of a [Mantra|Node:out/ifd] node. If you use the __Render__ button on this [Mantra|Node:out/ifd] node, you will cause the [Ocean Evaluate|Node:sop/oceanevaluate] node to generate the texture maps required by the [Ocean Surface shader|/gallery/shop/vopmaterial/oceansurface] for the specific frame you are viewing. 
+        
+        NOTE:
+                It is important to remember to use the __Reset Simulation__ button on the `ocean_render` node to make sure your ocean preview and ocean render nodes are synchronized.
+                
+* To generate spectrum geometry, click the __Save to Disk__ button on the `save_spectra` node in the `ocean surface` network.
+
+    NOTE:
+        Spectrum geometry will have to be re-generated if you alter the wave parameters.
+
+* A velocity attribute is added to the ocean surface to allow the use of motion-blur at render-time. This information is stored on the points of your input grid. If you feel that the motion-blur is not accurate enough, you can change the rows and columns on your grid to increase the number of points. Keep in mind that drastically increasing the point count on your grid could negatively affect the speed of your renders.
+	
+* If it is important for your scene to have information below your ocean surface, you can still optimize your renders by adjusting the __Volume Step Rate__ and __Volume Shadow Step Rate__ settings on the __Sampling__ tab of the [Mantra|Node:out/ifd] node. Often the volumetric element of the ocean is used for a general sub-surface scattering and attenuation effect and does not necessarily need to be highly detailed.
+
+* If the space below your ocean surface is not important in your final image, you could disable refraction on the [Ocean Surface shader|/gallery/shop/vopmaterial/oceansurface] and turn off visibility on the `ocean_interior` object. This will reduce the length of your render significantly.
+
+* Lowering the __Frequency__ on [Ocean Surface shader|/gallery/shop/vopmaterial/oceansurface] > __Foam__ > __Streaks__ subtab will create a more broken up effect of the foam.
+
+[Include:common_ocean#howto]
+    
+
+@related
+    - [Ocean Spectrum|Node:sop/oceanspectrum]
+    - [Ocean Evaluate|Node:sop/oceanevaluate]
+    - [Ocean Foam|Node:sop/oceanfoam]

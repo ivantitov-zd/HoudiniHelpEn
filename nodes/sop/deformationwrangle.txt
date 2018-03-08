@@ -1,0 +1,117 @@
+= Deformation Wrangle =
+
+#type: node
+#context: sop
+#internal: deformationwrangle
+#icon: SOP/deformationwrangle
+#tags: attrs, core, tech
+
+"""Runs a VEX snippet to deform geometry."""
+
+== Overview ==
+
+This node runs the snippet on point in the input geometry.  The code should
+update a vector `pos` variable to a new deformed location.  Optionally, a
+matrix3 `xform` variable can be setup with the derivatives of the deformation
+if known (see the Derivatives Method help for more details)
+
+You can read attributes using the `@` snippet syntax.  However, keep in
+mind that when computing derivatives the point number is constant over
+the region computed, so writing a function of `@P` will likely result
+in an inability to automatically rotate attributes.  Instead, always
+use `pos` for the local position being deformed.
+
+* Press ((MMB)) on the node to see any error output from the snippet.
+
+* You can use the VEX function `ch` to evaluate parameters.
+  The path is relative to this node (`ch("parm")` will evaluate the parameter `parm` on this node).
+  This evaluation will be done at the current time.
+
+[Include:wrangle_syntax]
+
+@parameters
+
+== Code ==
+
+Group:
+    A subset of points in the input geometry to run the program on.
+    Leave this blank to affect all points in the input.
+
+Group Type:
+    What the group is made of.
+
+[Include:pointwrangle#snippet]
+
+Attributes to Transform:
+	Point and Vertex attributes that match this pattern will be
+	transformed.  Their Type Info will be used to determine how
+	they should transform, as points, vectors, and normals
+	all need different operations.
+
+	If `P` matches this string, then primitive transforms will
+	also be rotated.
+
+Recompute Affected Normals:
+	Recomputes any normals that are affected by polygons that use both
+	transformed and untransformed points. When transforming the full
+	geometry or full connected components, the results should be the same
+	as when this option is off, i.e. the normals will just be transformed
+	and not recomputed. This does nothing if `P` is not being transformed.
+
+Preserve Normal Length:
+        Normal lengths remain unaffected.
+
+== Derivatives ==
+
+Method:
+    To transform attributes other than position, such as velocity or normals, how the deformation changes over space must be known, not just how the deformation treats a single point.  If you know how to compute this, you can write the derivative into the `xform` parameter and select `Explicitly Set Xform`.  Usually, however, deformations can have difficult to compute behavior, so it is best to let this node automatically compute the deformation behavior.
+
+    Four Points does, as its names suggests, three extra deformations to determine how the deformation changes in x, y, and z directions.  This is faster than Central Differences, but is biased as it only looks in one direction.
+
+    Central Differences does six extra deformations to find a balanced change in a neighborhood around the point being deformed.  This gives the best results for the automatic computation, but must invoke the deformer twice as often.
+
+Step Size:
+    A small step is taking in each direction to determine how the deformer is twisting space.  This must be small enough to pick up the key feature changes of your space, but not so small as to lead to numerical problems.  A good rule of thumb is half the inter-point spacing of your model.
+
+Rigid Projection:
+    The automatically computed or manually computed matrix may have scale or shear components in it.  This will project them out, forcing it to be a rotation matrix.  `polardecomp` is used for this purpose.
+
+Prevent Inversion:
+    The sign of the derivative matrix can flip in certain regions of the transform.  This will detect that and flip the sign back so the determinant of the matrix is always positive.
+
+== Bindings ==
+
+Attributes to Create:
+    Only create attributes if their names match this pattern.
+
+    The default is to not allow creation of any attributes.
+
+    Bound attributes, such as `vtxnum`, cannot be created and will be ignored.
+
+Enforce Prototypes:
+    Automatic binding with the `@` syntax can be convenient, but if your
+    system becomes more complex there is the risk that a typo in an `@` binding
+    will silently just bind a non-existent attribute.
+
+    This option forces all `@` bindings to be explicitly declared as
+    prototypes before use.
+
+Evaluation Node Path:
+    VEX functions like `ch()` usually evaluate with respect to this node.
+    Enter a node path here to override where the path search starts from.
+    This is useful for embedding in a digital asset, where you want searches
+    to start from the asset root.
+
+Export Parameters:
+    When a VEX parameter is exported, the bound attribute will be
+    created if it doesn't exist.  This pattern can be used to override
+    the export option on the VEX shader to avoid writing to or creating
+    certain attributes.  The pattern matches the VEX parameter, not
+    the bound attribute. The attribute will still be bound for reading.
+
+@related
+
+- [Node:sop/attribvop]
+- [Node:sop/attribwrangle]
+- [Node:sop/bend]
+- [Node:sop/volumewrangle]

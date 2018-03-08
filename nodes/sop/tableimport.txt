@@ -1,0 +1,76 @@
+﻿#type: node
+#context: sop
+#internal: tableimport
+#icon: tableimport
+#tags: io, import, file
+
+= Table Import =
+
+"""Reads a CSV file creating point per row."""
+
+This node will read in a csv (comma separated value) file, such as output from
+spreadsheet applications, and generate a point for each line of the csv file.
+The position and attributes of the resulting point cloud can be populated by
+the columns of the file.
+
+@parameters
+
+File:
+    The name of the file to read.  The file is a plain text file.  Each line of
+    the file is a sequence of values separated by commas.  The first value is
+    column 0, the next column 1, etc.
+
+Max Rows:
+    You may want to only load a portion to provide fast verification that the
+    parameters are set properly, since some data sets are very large.  Restricting the number of lines read can
+    speed up the processing significantly.
+
+Number of Attributes:
+    Each specified attribute will be created and populated from the values in
+    the file.  Out of bound columns will be treated as 0 or the empty string.
+    The special attribute `P` refers to point position and is 3 floats long.  `Pw`
+    refers to the point weight and is a single float.
+
+    Column Number:
+	Where to start reading this attribute's values from.  The first value
+	on a line is column 0, the second column 1, etc.
+
+    Translator:
+	Some simple conversions from likely external formats to more useful
+	coordinates for manipulation in SOPs are provided.  Note that SOPs
+	itself allows considerable additional translation, including by
+	creating your own python SOPs to do the post processing.
+
+	Lat/Long to Sphere:
+	    The first two columns are taking to be the latitude and longitude
+	    coordinates.  They are then translated into a y-up unit sphere's
+	    surface.
+
+	Date to Seconds:
+	    The value is interpreted as a string-date.  The __Format__ parameter
+	    describes the format in a fashion accepted by Python's
+	    time.strptime (http://docs.python.org/library/time.html).  The
+	    default value of %Y-%m-%d %H:%M:%S will correctly process something
+	    like 1999-03-25 12:55:21
+
+	    The time is then converted into epoch time, ie, the number of
+	    seconds since 1970, which is convenient for computing deltas.
+
+	    TIP: 
+            If you want to find the maximum/minimum time in a procedural
+	    manner use the [AttribPromote SOP|Node:sop/attribpromote] to promote to a Detail attribute.
+    
+    Name:
+	The name of the attribute to create.  The internal names `P` and `Pw` will
+	affect the point Position and weight respectively.
+
+    Attribute Type:
+	The kind of attribute to create.  The input file will attempt to
+	convert to this type.  If it the input is invalid, it will silently be
+	converted to 0 or the empty string.
+
+    Attribute Length:
+	The length of the attribute to create.  This number of columns will be
+	read from the input row.  Note that with the Lat/Long translator, the
+	length should be 3 but only two columns are used in generating the
+	result.

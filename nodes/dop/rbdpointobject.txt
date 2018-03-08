@@ -1,0 +1,256 @@
+#type: node
+#context: dop
+#internal: rbdpointobject
+#icon: DOP/rbdpointobject
+
+= RBD Point Object =
+
+"""Creates a simulation object at each point of some source geometry, similarly to how the Copy surface node copies geometry onto points."""
+
+:vimeo:RBD instancing
+    #id: 113103248
+
+The geometry for each of these objects depends on the instance attribute value of the point. The Position of the simulation object is set so that it is at the location and has the orientation of the source point. 
+
+This DOP can also inherit any other attributes from the source point. If the attribute names match the names of parameters in the [RBD State|Node:dop/rbdstate] data, the values can be used to set up these other aspects of the [RBD Object|Node:dop/rbdobject] (such as mass, bounce, and glue strength). Inherited attributes are imported as Position data, rather than Geometry data. They can be retrieved using [DOP Import Records SOP|Node:sop/dopimportrecords].
+
+NOTE: 
+    The angular velocity attribute is `w`, not `angvel`.
+
+[Include:/shelf/rbdpointobject#includeme]
+
+== Attributes ==
+
+You can  [create attributes|/model/attributes]  on the RBD object's
+geometry to influence its behavior. Most of these attributes allow
+fine-tuning of the RBD by overriding default values set in this
+node.
+
+[Include:standard_rbdphysparms_attribs]
+
+@parameters
+
+Parameter Use Menus:
+    Many of the parameters for this DOP have a menu that controls
+    how the values of that parameter are applied to the created RBD
+    objects. 
+    
+    The channel name for each of these menus is the word
+    `use` followed by the parameter name. So for the Position
+    parameter, the menu channel name is `uset`.
+
+    Use Point Value:
+        The value inherited from the source point is left
+        unchanged. The value of the parameter on this DOP is
+        ignored.
+    Add To Point Value:
+        The value of this DOP parameter is added to the value
+        inherited from the source point.
+    Override Point Value:
+        The value of this DOP parameter is used for the RBD object.
+        The source point attribute value is ignored.
+        
+Creation Frame Specifies Simulation Frame:
+    Determines if the creation frame refers to global Houdini
+    frames (`$F`) or to simulation specific frames (`$SF`). The
+    latter is affected by the offset time and scale time at the
+    DOP network level.
+    
+Creation Frame:
+    The frame number on which the object will be created. The
+    object is created only when the current frame number is equal to
+    this parameter value. This means the DOP Network must evaluate a
+    timestep at the specified frame, or the object will not be
+    created. 
+    
+    For example, if this value is set to 3.5, the
+    __Timestep__ parameter of the DOP Network must be changed to
+    `1/(2*$FPS)` to ensure the DOP Network has a timestep at frame
+    3.5.
+    
+Point SOP Path:
+    #channels: /sourcesoppath
+
+    The SOP containing the geometry whose points will be used to
+    create the RBD objects.
+    
+Geometry Path:
+    #channels: /geopath
+
+    By default, the `instance` point attribute (which can be
+    defined with the [Point SOP|Node:sop/point]) is used to
+    determine what geometry is instanced to each point. 
+    
+    This parameter can be used to override the `instance` attribute with
+    a specific SOP path.
+    
+Extra Attributes:
+    #channels: /extraattribs
+
+    A mask that specifies which point attributes should be
+    inherited from the source points. The position, rotation,
+    velocity and angular velocity attributes are always inherited.
+    
+Use Deforming Geometry:
+    #channels: /animategeo
+
+    Causes the geometry for the object to be pulled from the chosen
+    SOP at each timestep. If the SOP contains animated geometry, the
+    RBD object's geometry will also animate. 
+    
+    If this option is used,
+    the __Use Point Velocity__ parameter of the [RBD
+    Solver|Node:dop/rbdsolver] should also be turned on to take into
+    account the deformations when calculating collision responses.
+    
+Use Object Transform:
+    The transform of the object containing the chosen SOP is
+    applied to the geometry.
+    
+Rotate to Normal:
+    Determines if the position should be oriented to match the
+    source point's normal. If enabled, the point will determine an
+    orientation using the normal and up vector attributes, if
+    present. If no normal attribute is present, the velocity is
+    used. 
+    
+    The behavior of this option matches that of the [Copy
+    SOP|Node:sop/copy].
+    
+Use Particle Scale Attribute:
+    Scales the geometry of each RBD object by the `pscale`
+    attribute value on the source points. 
+    
+    Turning on this option
+    causes each RBD object to make its own copy of its instanced
+    geometry. Thus using this approach is much less efficient than
+    creating a few differently scaled copies of the instanced
+    geometry in SOPs, and having the source points instance those
+    prescaled geometries.
+
+Add Deformation Hint:
+Controls if the deformation hint_isgeometrydeforming is added to the
+geometry to store if the geometry is animated or not.  Enabling this
+makes it easier for external code to know if geometry will be constant
+over time or not. However, it also prevents the geometry from
+instancing.
+
+Create Active Objects:
+    #channels: /active
+
+    Sets the initial active state of the objects. An inactive
+    object doesn't react to other objects in the simulation.
+    
+Display Geometry:
+    Controls if the geometry is displayed in the viewport.  Does
+    not reset the simulation when it is changed.
+
+== Initial State ==
+
+Position:
+    #channels: /tx /ty /tz
+
+    Initial position in world space of the object.
+Rotation:
+    #channels: /rx /ry /rz
+
+    Initial orientation of the object. This is in RX/RY/RZ
+    format.
+Velocity:
+    #channels: /velx /vely /velz
+
+    Initial velocity of the object.
+Angular Velocity:
+    #channels: /angvelx /angvely /angvelz
+
+    Initial angular velocity of the object. This is the axis of
+    rotation times the rate of rotation. 
+    
+    Speed of rotation is
+    measured in degrees per second, so a multiplier of 360 will
+    cause the object to rotate once per second.
+
+== Glue ==
+
+Glue Object:
+    #channels: /glueobject
+
+    The name of an object to glue to. If this is blank, the
+    object is glued to no other object and acts normally. If it
+    is the name of another RBD Object which it mutually affects,
+    this object becomes glued to the other object. Its relative
+    position to the other object is maintained by the solver.
+Glue Strength:
+    #channels: /gluethreshold
+
+    The amount of accumulated force required to break a glue
+    bond. A value of -1 will prevent the bond from ever
+    breaking. A value of 0 will cause the bond to break with the
+    first external force.
+Glue Impulse HalfLife:
+    #channels: /glueimpulsehalflife
+
+    The number of seconds for the glue impulse to decay by one
+    half. Whenever a glued object gets hit, it accumulates a
+    glue impulse force. This controls how fast that force
+    decays.
+        
+[Include:standard_rbdvolume_parms]
+[Include:standard_bulletdata_parm]
+
+== Physical ==
+
+Compute Center of Mass:
+    Determines if the center of the object should be found
+    automatically from the object's volumetric representation
+    and glued sub-objects.
+    
+Center of Mass:
+    #channels: /px /py /pz
+
+    If the center of mass is not computed automatically, this
+    value becomes the center of the mass. The center of mass can
+    be thought of as the pivot point about which the object will
+    rotate.
+    
+Compute Mass:
+    Determines if the mass will be calculated automatically
+    from the object's volumetric representation and glued
+    sub-objects.
+    
+Density:
+    #channels: /density
+
+    The mass of an object is its volume times its density.
+    
+Mass:
+    #channels: /mass
+
+    The absolute mass of the object.
+    
+Rotational Stiffness:
+    #channels: /inertialtensorstiffness
+
+    When an object receives a glancing blow, it will often
+    acquire a spin. The amount of spin acquired depends on the
+    shape and mass distribution of the object, known as the
+    _inertial tensor_. 
+    
+    The Rotational Stiffness is a scale
+    factor applied to this. A higher stiffness will make the
+    object less liable to spinning, a lower value will make it
+    more ready to spin.
+
+[Include:standard_physparms]
+
+@outputs
+
+First:
+    The RBD objects created by this node are sent through the
+    single output.
+
+@locals
+
+[Include:standard_locals]
+
+

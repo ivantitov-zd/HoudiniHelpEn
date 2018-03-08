@@ -1,0 +1,37 @@
+= Interaction With Other Solvers =
+
+"""Tips on setting up interaction between agents and other types of dynamics."""
+
+== Overview ==
+
+Currently, Houdini only supports one-way interaction from agents to other solvers. For example, an agent can knock over an RBD object or splash through water, but an RBD object can't knock over an agent.
+
+== General Tips ==
+
+* On the [Agent ROP|Node:out/agent] or [Agent SOP|Node:sop/agent] that was used to create the agents, ensure that the __Generate Collision Layer__ parameter is enabled. This will create a layer that contains a low-res static shape for each bone in the rig, which can be used for efficient collision detection.
+
+* Use a [Delete SOP|Node:sop/delete] to remove distant agents that will not collide with any objects in the simulation.
+
+== Bullet Solver ==
+
+# Use the [Agent Edit SOP|Node:sop/agentedit] to switch the agents' current layers to their collision layer, and use an [Unpack SOP|Node:sop/unpack] to unpack the agents.
+
+# Use the [Icon:DOP/rbdfracturedobject][RBD Fractured Object|/shelf/rbdfracturedobject] shelf tool to create RBD objects for the shapes from the agents' collision layers.
+
+# On the newly-created [RBD Packed Object DOP|Node:dop/rbdpackedobject], set the __Initial Object Type__ parameter to __Create Animated Static Objects__. This will cause the RBD objects' transforms to be updated each frame to match the motion of the agents.
+
+* Consider changing the __Geometry Representation__ parameter to a primitive shape (such as __Capsule__ or __Box__), which can improve performance.
+
+== FLIP Solver and POP Solver ==
+
+# Use the [Unpack SOP|Node:sop/unpack] to unpack the agents.
+
+# Use the [Icon:SHELF/deforming_object][Deforming Object|/shelf/deformingobject] shelf tool to bring the collision geometry into the fluid or particle simulation.
+
+== Advanced: simulation on top of agents ==
+
+* If you want to create secondary simulation (for example, simulated clothing) on top of agent geometry, currently you must unpack the agent geometry.
+
+* You can use VEX or Python functions to calculate the positions of agent body parts (for example, if you want to generate particles flowing from the top of agent heads) from the agent attributes. You can see an example of this in this example scene file:
+
+    `$HH/Help/files/joint_positions.hip`.

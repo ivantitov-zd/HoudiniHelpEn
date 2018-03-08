@@ -1,0 +1,229 @@
+= 3D audio cookbook =
+
+== Simple Effects ==
+
+    These simple effects are quick to render and easy to use. The
+    advanced effects, listed in the next section, take longer to cook
+    and more effort to setup. All of these effects are optional. If all
+    effects are off, the Spatial Audio chop behaves like a regular
+    mixer.
+
+    == Distance Delay and the Doppler Effect ==
+
+        Sound does not travel instantly, so distant sounds have a
+        noticeable delay. This delay also causes the Doppler effect,
+        which is the shifting of pitch as a sound source rapidly passes
+        a listener (e.g. the pitch of an ambulance's siren lowers as it
+        passes).
+
+        The amount of delay is determined by the speed that sound
+        travels. Usually you will be using the speed of 331 m/s, which
+        is the speed of sound in air (at zero degrees Celsius, but room
+        temperature is very close to this also). Another useful speed to
+        know is 1452 m/s - the speed of sound in water (at 15 degrees
+        Celsius). The speed of sound is defined in the [Spatial Audio
+        CHOP|Node:chop/spatial]'s 'Speed of Sound' parameter in the
+        Environment page.
+
+        If you want to exaggerate the delay or the Doppler effect, lower
+        the speed of sound from its realistic value. A speed of 166 m/s
+        will double the delay and the Doppler shift in air.
+
+    == Volume Loss over Distance ==
+
+        Sound also loses intensity as it travels. The [Spatial Audio
+        CHOP|Node:chop/spatial] supports two methods for determining the
+        volume loss at any distance.
+
+        == Using Realistic Drop-off ==
+
+            This method is the easiest to set up, and produces a
+            realistic result. It is based on a physics equation,
+            `$$power = 1/[distance^2]$$`.
+            
+            To change how fast this drop-off occurs,
+            you can modify the '10m Distance Loss' parameter on the
+            [Spatial Audio CHOP|Node:chop/spatial]'s Effects page. This
+            parameter specifies the amount of sound intensity loss after
+            traveling 10 meters. A value of 0.4 means that the sound
+            will loss 40% of its intensity after 10 meters (because of
+            the drop-off curve, after 20 meters the sound loss will be
+            at 85%).
+
+        == Using a Drop-off Table ==
+
+            This method requires you to create a curve that represents
+            the drop-off of the sound as it travels farther. This curve
+            can be created with another CHOP and passed to [Spatial
+            Audio CHOP|Node:chop/spatial] by connecting it to its first
+            input.
+
+            The Volume Lookup Range parameter determines the range of
+            distances that this curve describes. If this parameter is
+            set to (5, 100), then the first value of the curve will be
+            the volume level at 5 meters, and the last value of the
+            curve will be the volume at 100 meters. Anything outside the
+            lookup range will be sampled in the curve's extend regions.
+
+            This method is a little more work to setup, but allows you
+            to create any kind of drop-off, even completely unrealistic
+            ones.
+
+    == Echoes ==
+
+        Echoes and environmental reverb can be produced with very little
+        effort. The [Spatial Audio CHOP|Node:chop/spatial] supports two
+        types of echoes; static environment echoes and dynamic echoes.
+        Static environment echoes are a good choice for enclosed areas,
+        while dynamic echoes simulate open areas well.
+
+        Both echo methods allow you to specify the number of echoes, the
+        echo delay (or the minimum echo delay), and the echo volume.
+
+        The echo drop-off is determined by the same drop-off method as
+        normal sounds. If the sound delay is 0.1 seconds, and the speed
+        of sound is 331m/s, the echo travels 33 meters farther than the
+        original sound, so the volume drops according. Each echo has the
+        same delay from the previous echo (so the 4th echo arrives 0.4
+        seconds after the original sound if the echo delay is 0.1
+        seconds).
+
+        If you find the echoes are too subtle, increase the Echo Volume
+        parameter.
+
+        == Using Static Environment Echoes ==
+
+            Static echoes always have the same delay between echoes,
+            regardless of the distance between the source and the
+            listener.
+
+        == Using Dynamic Echoes ==
+
+            Dynamic echoes base their echo delay on how far the original
+            sound traveled. Distant sounds will have longer pauses
+            between the echoes and close sounds will have almost no echo
+            delay.
+
+            The 'Dynamic Echo Effect' parameter determines the portion
+            of the traveling delay that is used as the echo delay. So,
+            if the Dynamic Echo Effect is set to 0.3, and the sound
+            traveled 4 seconds to reach the listener, the echo delay
+            will be 1.2 seconds (0.3x4).
+
+            To ensure a minimum echo delay, set the 'Echo Delay'
+            parameter to a non-zero value. This will add a static echo
+            delay to the dynamic echo delay. So an Echo Delay of 0.1,
+            Dynamic Echo Effect of 0.3 and a traveling time of 4 seconds
+            would produce an echo delay of 1.3 seconds (0.3 * 4 + 0.1).
+
+== Advanced Effects ==
+
+    These effects require  [filters|filters] . While most of the
+    simple effects are done by the Spatial Audio CHOP, these effects
+    require other objects and CHOPs, so they take slightly longer to set
+    up.
+
+    == Obstacle Occlusion ==
+
+        This effect allows you to create geometry object and use them to
+        block sound. "Blocked" sound can be completely blocked,
+        partially blocked or even amplified. A filter is used to
+        describe which frequencies are blocked by the object, and by how
+        much.
+
+        == Setting up an Object for 3D Audio ==
+
+            Any geometry can be used as an obstacle. Most obstacles
+            should be fairly low resolution geometry, since increasing
+            the resolution has little effect on the overall audible
+            result.
+
+            Each obstacle needs a Sound Material associated with it, to
+            describe how it affects the sound passing through it. If the
+            Sound Material includes a transmission filter, the filter is
+            used to filter the sound directly. Otherwise, the absorption
+            or reflection filter is used (but inverted to determine the
+            transmission filter). See the next section, Designing a
+            Filter, for details on filters.
+
+            To add the geometry as an obstacle to the [Spatial Audio
+            CHOP|Node:chop/spatial], turn on __Check For Obstacles__ on
+            the __Effects__ tab. Then add the geometry object to the
+            parameter 'Obstacles' (using the pull-down menu). Objects
+            without Sound Materials will be ignored.
+
+        == Tweaking the Occlusion Effect ==
+
+            The parameter 'Obstacle Softness' determines how soft the
+            obstacle is. Soft obstacles allow quite a lot of sound
+            around them, while hard obstacles do not (softness of zero).
+            Two of the main factors that affect how much sound get by
+            the obstacle are:
+
+            how far both the sound source and the microphone are from
+            the obstacle (more sound gets around the obstacle at longer
+            distances)
+
+            the size of the obstacle (larger objects allow less sound
+            around them)
+
+            So, an object between a sound source and the microphone that
+            are close together will block most of the sound, while the
+            same object roughly in the middle of a widely separated
+            source source and microphone will have little effect. A
+            larger object will always have more of an effect than a
+            smaller one in the same situation.
+
+            If you don't want any sound to get around the obstacles, set
+            the obstacle softness to zero.
+
+    == Microphone Filters ==
+
+        Each microphone listens to the full spectrum by default.
+        However, you can setup a microphone to only listen to a certain
+        parts of the spectrum. This allows you to create microphones
+        which create sub-woofer tracks, high frequency tracks, or
+        mid-range tracks. This effect is created by adding a filter to a
+        Microphone Object.
+
+        The Microphone object has a __Filter__ parameter on its
+        Microphone page which references a filter. The filter should be
+        created by an Acoustic CHOP, and it should be an Absorption
+        filter ("absorb").
+
+    == The Echo Filter ==
+
+        The echo filter is an optional filter that is applied to each
+        echo. This allows you to change the sound characteristics of the
+        echo.
+
+        The [Spatial Audio CHOP|Node:chop/spatial] must be generating
+        echoes for this filter to have any effect. To add an echo
+        filter, connect the CHOP containing the filter to the third
+        input (the 'Echo Filter' input).
+
+        The filter is applied more than once to higher numbered echoes.
+        The first echo has the filter applied to it once, the second has
+        the filter applied to it twice, the third three times, and so
+        on. Because of this, you should not make the filter block sound
+        too drastically (with values close to 0).
+
+    == The Environment Filter ==
+
+        The environment filter is an optional filter applied to all
+        sounds. The effect of the filter varies with distance, exactly
+        like 'Volume Loss over Distance'. It uses the same method to
+        calculate the volume loss. The filter is multiplied by the
+        calculated volume loss and applied to the sound.
+
+        When designing an environment filter, you can use either a
+        transmission or absorption filter to describe the volume loss.
+        You should not make the losses too large (not more than 0.5),
+        otherwise sounds will lose most of their intensity over a very
+        short distance.
+
+        To add an environment filter, connect the CHOP containing the
+        filter to the [Spatial Audio CHOP|Node:chop/spatial]'s second
+        input (the "Environment Filter" input).
+
+

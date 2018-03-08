@@ -1,0 +1,124 @@
+#type: node
+#context: dop
+#internal: rippleobject
+#icon: DOP/rippleobject
+
+= Ripple Object =
+
+"""Creates an object from existing geometry that will be deformed
+with the ripple solver."""
+
+== Overview ==
+
+This node takes existing geometry, usually from a Geometry container
+object, and configures it (using an internal
+[Ripple Configure Object node|Node:dop/rippleconfigureobject]) with
+the data needed by the [Ripple Solver|Node:dop/ripplesolver]. This
+lets the ripple solver deform the surface by simulating the
+propagation of waves across it.
+
+[Anim:/images/dynamics/ripple_height.gif]
+
+See the [Ripple Solver help|Node:dop/ripplesolver] for general information
+on ripple simulations.
+
+A Ripple Object consists of two surfaces:
+
+* The _rest_ surface. This is the "normal" shape of the surface without
+  any waves on it. Waves deform the surface up and down away from this
+  rest shape.
+  
+* The _initial_ surface. This is the starting state of the surface. The
+  difference between this surface and the rest surface causes the first
+  set of waves across the surface.
+
+The current ripple state and the rest geometry must have the same
+topology (number of points and connectivity) to get reasonable results.
+The surface will blow up into an interesting random wavy shape if
+the initial and rest surfaces don't have the same topology.
+
+(When you create a Ripple Object node using the [tab menu|/basics/tabmenu]
+in a dynamics network, it starts pre-configured with a pair of internal
+"demo" surfaces. Just change __Initial SOP Path__ and __Rest SOP Path__
+to point to your geometry.)
+
+The easiest way to set up a ripple object is to create surface geometry,
+deform it using surface nodes (for example, using
+[Edit surface nodes|Node:sop/edit]), and then point this node's
+__Rest SOP Path__ parameter to the surface containing the original
+surface, and __Initial SOP Path__ to the downstream node with the
+deformed surface.
+
+You can also specify the rest state by...
+
+* Putting `rest` and `rnml` [attributes|/model/attributes]
+  on the initial geometry with the
+  [Rest Position surface node|Node:sop/rest].
+  
+* Attach a piece of dynamics `Geometry` data containing the rest state.
+
+If you specify more than one rest surface in different ways, Ripple Object
+will prefer attached rest data because it provides greater flexibility.
+
+TIP:
+    The Ripple Object and [Ripple Solver|Node:dop/ripplesolver] have no relation to the [Ripple surface node|Node:sop/ripple].
+
+== Attributes ==
+
+You can  [create/paint attributes|/model/attributes] on the Ripple Object's
+initial geometry to influence its behavior. Most of these attributes allow
+fine-tuning of the Ripple Solver by _overriding this node's parameters_.
+
+You can paint "islands" of zero wave speed. Waves will bounce off these
+areas and the surface within the area will remain at rest.
+
+[Include:standard_wave_attribs]
+
+@parameters
+
+[Include:standard_objcreation]
+    
+Initial SOP Path:
+    The path to a SOP (or an Object, in which case the display SOP
+    is used) which will be the initial ripple geometry.
+    
+Rest SOP Path:
+    The path to a SOP which will be the rest state of the wave
+    equation.  
+    
+    Rest springs will pull the ripple geometry
+    towards this state, and the solver uses it to determine the
+    curvature for propagating ripples from point to point.
+    
+Use Deforming Rest:
+    Reloads the rest geometry every timestep.  By animating the
+    rest geometry, you can add new bumps to the system without
+    directly editing the current state.
+    
+Use Object Transform:
+    The transform of the object containing the chosen SOP is
+    applied to the geometry. This is useful if the initial location
+    of the geometry is defined by an object transform. 
+    
+    If you want
+    to transfer an object whose movement is defined at the object
+    level, you should use the [Object Position DOP|Node:dop/objpos] instead.
+    
+Position:
+    Position in world space of the object.  This can be animated.
+    
+Rotation:
+    Initial orientation of the object. This is in RX/RY/RZ
+    format.  You can animate this.
+
+Pivot:
+    Pivot in world space of the object.  You can animate this.
+
+@outputs
+
+First:
+    The Ripple object created by this node.
+
+@locals
+    [Include:standard_locals]
+

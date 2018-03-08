@@ -1,0 +1,196 @@
+= Setting up cameras =
+
+== Overview ==
+
+Houdini uses a mathematical _pinhole camera_ to simulate a camera. Because a pinhole camera does not have in-camera effects such as [depth of field|#dof] and [bokeh|#bokeh], you must be explicitly tell mantra to simulate them (see below).
+
+:vimeo:Create camera
+    #id: 116178120
+
+== Current view vs cameras ==
+
+Unlike some other packages, Houdini's viewport view does not necessarily correspond to a camera. You can lock the viewport to a camera (so changing the view moves/reorients the camera), but normally the current view in the viewport is separate from any cameras. There are also many options to render the current view without creating a camera.
+
+== How to ==
+
+:task:Create a camera/light:
+    On the shelf, click the __Lights and Cameras__ tab.
+    
+    * Hold ((Ctrl)) and click [Icon:OBJ/camera] Camera or a light to create a camera/light using the current view.
+    
+    * If you click [Icon:OBJ/camera] Camera or a light without ((Ctrl)), you can position the camera manually, then use the handles to move and point the camera/light.
+
+:task:Look through a camera/light:
+    Choose the camera from the [camera menu|/basics/view].
+    
+    [Image:/images/ui/viewport_menus_anno.png]
+
+:task:Lock a camera/light to the viewer:
+    # Look through the camera.
+    
+    # Click the [Icon:VIEW/display_lock_camera] Lock Camera/Light to the view button, which is located on the toolbar on the right side of the view. You can also lock the camera to view by by turning on __Tie Camera (or Light) to View__ in the [camera menu|/basics/view].
+    
+    # Use the [view keys|/basics/view] to change the view. The camera/light moves and rotates to match the view as long as __Tie Camera (or Light) to View__ is on.
+    
+    # When you've positioned the light/camera, click the [Icon:VIEW/display_lock_camera] icon again or turn off __Tie Camera (or Light) to View__ in the [camera menu|/basics/view].
+
+:task:Set depth of field:
+    See [Depth of Field|#dof].
+
+== Motion blur == (blur)
+
+There are three types of blur.
+
+*Transformation blur* blurs moving objects overall.
+
+To blur the moving pieces of deforming geometry, there are two options.
+
+*Velocity blur* uses the `v` velocity attribute on points in deforming geometry. This requires that the velocity attribute exist on the geometry. Since the attribute is not recalculated at each sub-frame, this method cannot blur deformation along a curve. This method works even if the topology of the geometry changes between frames (as with particle systems, where new points may be born or die between frames).
+
+*Geometry blur* sends separate copies of the geometry to mantra for each sub-frame. This requires that the topology of the geometry does not change between frames. Since this method requires sending multiple copies of the geometry to mantra, it is necessarily slower.
+
+TIP:
+    Motion is evaluated at sub-frame intervals. If you use [expressions|/expressions] to animate objects or deformations, you should use `$T` (floating point time) or `$FF` (fractional frame number) in the expressions instead of `$F` (integer frame number). Expressions that use `$F` will not show motion blur properly (since the expression will give the same result at every sub-frame).
+
+:task:Turn on motion blur:
+    In the parameter editor for the render node, go to the __Properties > Sampling__ sub-tab and turn on __Allow motion blur__.
+    
+    This enables transform motion blur for all objects.
+    
+    To enable motion blur on individual objects, [add|/props/] the [Allow motion blur|/props/mantra#allowmotionblur] property to the object and turn it on there, instead of on the render node.
+
+:task:Increase transform motion blur quality:
+    In the parameter editor for the render node, go to the __Properties > Sampling__ sub-tab and increase the __Xform Time Samples__ parameter. This blends between more sub-frame positions, giving more accurate but slower rendering of objects moving along a curve.
+
+    [Image:/images/render/motion_blur_1.jpg]
+    [Image:/images/render/motion_blur_2.jpg]
+    [Image:/images/render/motion_blur_3.jpg]
+    [Image:/images/render/motion_blur_5.jpg]
+    [Image:/images/render/motion_blur_20.jpg]
+
+:task:Turn on velocity blur for an object:
+    # Turn on motion blur on the render node (see above).
+    
+    # On the deforming object, you need to have `v` (velocity) attributes on the points. This attribute contains a vector describing the current velocity of the point.
+    
+        Particle systems have velocity attributes automatically. For other types of geometry, in the geometry network, connect a [Trail node|Node:sop/trail] and set its __Result type__ to "Compute velocity" to have it add the velocity attribute to the points.
+    
+    # In the parameters for the geometry object, click the __Render > Sampling__ sub-tab and turn on __Geometry velocity blur__.
+
+:task:Turn on geometry blur for an object:
+    # Turn on motion blur on the render node (see above).
+    
+    # On the deforming object, [add|/props/] the [Geo time samples|/props/mantra#geo_motionsamples] render property. Set it to the number of sub-frame samples of the geometry to calculate for each frame.
+
+:task:Use motion blur with volumes:
+    # Turn on motion blur on the render node (see above).
+    
+    # You must have a velocity vector field for the volume to use motion blur (`vel.x`, `vel.y`, and `vel.z`).
+    
+        For volumes imported from a simulation network, you can import the `Velocity` field from the DOP object into SOP as `vel`.
+        
+        For other volumes (for example, loaded from disk caches), you can use a [Volume Velocity node|Node:sop/volumevelocity] to calculate a velocity field for the volume.
+    
+    Volume shaders will recognize the `vel` field and use it to do motion blur at render time. It is not necessary to turn on the __Geometry velocity blur__ parameter on the object.
+
+See the parameter descriptions on the [mantra render node|Node:out/ifd] for more information.
+
+== Depth of field == (dof)
+
+:task:Turn on depth of field:
+    You can turn on depth of field by turning on __Enable Depth of Field__ on the __Sampling__ sub-tab of the __Properties__ tab in the parameter editor of a render node.
+
+:task:Control depth of field:
+    There are four parameters that control depth of field. The __Focal Length__ parameter is on the __View__ tab of the camera node. The __Focus Distance__, __F-Stop__, and __Bokeh__ parameters are on the __Sampling__ tab of the camera node.
+
+    Focal Length:
+        Camera focal length (zoom).
+        
+    Focus Distance:
+        The lens focal distance and distance from the camera at which objects will be in focus. If the fstop channel is also used, objects outside this distance will be blurred.
+        
+    F-Stop:
+        Determines blurriness of depth-of field effects.
+
+:task:Control optimized rendering of blurred imagery:
+    The __Motion Factor__ parameter on the render node can be used with extreme depth of field. This allows you to decrease the __Shading Quality__ based on how blurred the object is. Objects that are not out of focus will have their specified shading quality. Objects that are heavily out of focus will have their shading quality decreased. This will affect render times with little perceptual loss in image quality.
+
+=== F-stop ===
+
+The following images show the effect of changing F-Stop. The Focus Distance is set at 12, and the Focal Length is set at 200mm.
+
+F-stop ||
+    Result ||
+1.3 |
+    [Image:/images/render/fstop_1.png]
+0.8 |
+    [Image:/images/render/fstop_2.png]
+5.0 |
+    [Image:/images/render/fstop_3.png]
+
+=== Focus ===
+
+The following images show the effect of changing the focus. The Focal Length is set at 200mm, and the F-Stop is set at 1.
+
+Focal distance ||
+    Result ||
+7 |
+    [Image:/images/render/focus_1.png]
+20 |
+    [Image:/images/render/focus_2.png]
+3 |
+    [Image:/images/render/focus_3.png]
+
+== Bokeh == (bokeh)
+
+[Bokeh|Wp:Bokeh] simulates how different lenses, apertures, and reflections inside the camera body affect how elements blur outside the depth of field. It makes bright points in the out-of-focus background appear as large transparent discs, boxes, or hexagons (depending on the camera).
+
+Mantra lets you use radial (circular) or box bokeh, or specify an image representing the shape to use for blurred bright spots.
+
+To control bokeh on a camera:
+
+# Select the [camera object|Node:obj/cam].
+
+# In the parameter editor, click the __Sampling__ tab.
+
+# Use the bokeh parameters to control the look of the out of focus elements.
+
+    * [Mantra:vm_bokeh]
+    * [Mantra:vm_bokehfile]
+    * [Mantra:vm_bokehrotation]
+
+When specifying a bokeh image, it should be a gray scale image where white pixels are the shape and black pixels are the background. (You can use a color image, but mantra will automatically convert it to gray scale.)
+
+== Overlay geometry on the camera view ==
+
+This is useful for overlaying information, for example to display a slate over top of the view for flipbooking. _This does not actually gate or gobo the camera/light_, it only affects the viewer.
+
+# Create a geometry (SOP) network to generate the graphics.
+
+    Houdini scales the portion of the mask geometry between 0 and +1 X and Y to the viewport size to create the overlay.
+    
+# Create a camera and choose __Edit Rendering Parameters__ from the [Icon:BUTTONS/gear] gear drop-down menu.
+
+# In the Edit Parameter Interface window, expand the __Viewport Display__ folder, select the __View Mask__ folder, and click the [Icon:BUTTONS/move_to_right] add arrow. This will add the __View Mask__ tab to the [parameter editor|/ref/panes/parms].
+
+# In the [camera node|Node:obj/cam]'s parameter editor, click the __View Mask__ tab.
+
+# Set the __Mask aspect__ to control the gating of the view.
+
+# Set the __Mask opacity__.
+
+# If you created overlay geometry, click the + button next to the __Mask overlay SOP__ parameter and choose the node containing the overlay geometry.
+
+# To see the overlay, look through the camera or light, and turn on __Camera mask__ on the __Guides and Markers__ tab of the [display options window|/ref/windows/displayopts_3d].
+
+== Tips and Tricks ==
+
+* To make the camera appear to shake during an animation, try these expressions in the camera's Translate-Z parameter:
+
+    Shake on 2s:
+        `if($F%2, 1, -1) * easeout()`
+    
+    Shake on 4s:
+        `if( $F/2%2, if($F%2, 1, 0.5), if($F%2, -1, -0.5) ) * easeout()`
+
+

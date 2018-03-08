@@ -1,0 +1,216 @@
+= hou.Surface =
+#type: homclass
+#cppname: HOM_Surface
+#superclass: hou.Prim
+#group: geo
+
+"""A Surface is a kind of geometry primitive (Prim object) that contains a
+two dimensional grid of vertices (Vertex objects).  How these vertices are
+used depends on the type of surface: meshes, for example, use the vertices to
+define a quadrilateral mesh, while NURBS surfaces use them as control
+points."""
+
+A [Hom:hou.Face], on the other hand, stores a sequence of vertices, and might
+be a polygon or NURBS curve.
+
+@methods
+
+::`numCols(self)`:
+    #cppname: HOM_Surface::numCols
+    Return the number of columns in the 2D array of vertices.
+
+::`numRows(self)`:
+    #cppname: HOM_Surface::numRows
+    Return the number of rows in the 2D array of vertices.
+
+::`vertex(self, u_index, v_index)`:
+    #cppname: HOM_Surface::vertex
+    Return an element in the 2D array of vertices, given the u (column)
+    and v (row) indices into the array.
+
+    Negative indices are allowed, in which case Houdini will index starting
+    from the last vertex.
+
+    For non-negative indices, this method is roughly equivalent to writing
+    `surf.vertices()[v_index * surf.numCols() + u_index]`.
+
+    Raises [Hom:hou.OperationFailed] if the u or v indices are invalid.
+
+    {{{
+    #!python
+    # Use a grid SOP to create a NURBS grid with 3 rows and 2 columns.
+    geo = hou.node("/obj").createNode("geo").createNode("grid").geometry()
+    grid_node = geo.sopNode()
+    grid_node.setDisplayFlag(True)
+    for name, value in ("type", "nurbs"), ("rows", 5), ("cols", 4):
+	grid_node.parm(name).set(value)
+
+    # Print out the x positions of all the vertices in the surface.
+    surf = geo.iterPrims()[0]
+    for v_index in surf.numRows():
+	for u_index in surf.numCols():
+	    print surf.vertex(u_index, v_index).point().position()[0],
+	print
+    }}}
+
+    See also:
+    - [Hom:hou.Prim#vertices]
+    - [Hom:hou.Surface#verticesInCol]
+    - [Hom:hou.Surface#verticesInRow]
+    - [Hom:hou.Geometry#iterPrims]
+
+::`verticesInCol(self, u_index)`:
+    #cppname: HOM_Surface::verticesInRow
+    Given a u (i.e. column) index, return a tuple containing all the vertices
+    in that column.
+
+    See also [Hom:hou.Prim#vertices].
+
+::`verticesInRow(self, v_index)`:
+    #cppname: HOM_Surface::verticesInRow
+    Given a v (i.e. row) index, return a tuple containing all the vertices
+    in that row.
+
+    See also [Hom:hou.Prim#vertices].
+
+::`addCol(self, after=-1)`:
+    #cppname: HOM_Surface::addCol
+    Add a column of vertices after the given u (i.e. column) index.  You would
+    typically call this method from the code of a Python-defined SOP.
+
+    This method also adds one point per vertex added.  The new points are
+    located at the origin until you move them.
+
+    The u (i.e. column) index `after` may be negative, in which case the
+    indexing starts from the end.  By default, `after` is -1, meaning that
+    the new column will go after the last column.  Raises
+    [Hom:hou.OperationFailed] if the `after` index is invalid.
+
+    {{{
+    #!python
+
+    # This code will work from inside a Python SOP, but not from the Python
+    # shell.
+    def vertexPos(vertex):
+	return hou.Vector3(vertex.point().position())
+
+    # Build a NURBS surface.
+    geo = hou.pwd().geometry()
+    surf = geo.createNURBSSurface(10, 10)
+
+    # Add a new column, and set the new point positions to the average of
+    # the adjacent point positions.
+    surf.addCol(after=7)
+    for v_index in range(surf.numRows()):
+	vertex_before = surf.vertex(7, v_index)
+	vertex_after = surf.vertex(9, v_index)
+	surf.vertex(8, v_index).point().setPosition(
+	    (vertexPos(vertex_before) + vertexPos(vertex_after)) * 0.5)
+    }}}
+
+::`addRow(self, after=-1)`:
+    #cppname: HOM_Surface::addRow
+    Add a row of vertices after the given v (i.e. row) index.  The new
+    vertices are located at the origin until you move them.  You would
+    typically call this method from the code of a Python-defined SOP.
+
+    See [Hom:hou.Surface#addCol] for more information.
+
+::`positionAt(self, u, v)` -> [Hom:hou.Vector3]:
+    #cppname: HOM_Surface::positionAt
+    #replaces: Exp:primuv
+    Given normalized (i.e. from 0 to 1) u and v values, returns the position
+    of the surface at that parametric location.
+
+    See the [surface_wires cookbook example|/hom/cookbook/surface_wires] for
+    an example.
+
+::`normalAt(self, u, v)` -> Vector3:
+    #cppname: HOM_Surface::normalAt
+    #replaces: Exp:normal
+    Given normalized (i.e. from 0 to 1) u and v values, returns the normal
+    of the surface at that parametric location.  The normal is a vector that
+    is perpendicular to the surface at that location.
+
+    The normal vector is normalized (i.e. it is a unit vector, so its length
+    is 1).
+
+    See the [surface_wires cookbook example|/hom/cookbook/surface_wires] for
+    an example.
+
+::`attribValueAt(self, attrib_or_name, u, v, du=0, dv=0)` -> `int`, `float`, `str` or `tuple`:
+    #cppname: HOM_Surface::attribValueAt
+    #replaces: Exp:primuv, Exp:primduv
+    Return an attribute value at a normalized (u, v) parametric position on
+    the surface.  If du and dv are both 0, returns the interpolated attribute
+    value; otherwise, returns the (partial) derivative of the attribute value.
+
+    Raises [Hom:hou.OperationFailed] if the attribute is not a point or vertex
+    attribute.  If you want a primitive attribute value, it doesn't vary across
+    the surface, so use [Hom:hou.Prim#attribValue].
+
+::`isClosedInU(self)`:
+    #cppname: HOM_Surface::isClosedInU
+    #replaces: Exp:iswrapu
+    Return whether the first and last columns of vertices are connected.
+
+    A grid, for example, is open in both U and V.  A tube is open in one of
+    U or V and closed in the other.  A torus is closed in both U and V.
+
+::`isClosedInV(self)`:
+    #cppname: HOM_Surface::isClosedInV
+    #replaces: Exp:iswrapv
+    Return whether the first and last rows of vertices are connected.
+
+    See [Hom:hou.Surface#isClosedInU] for more information.
+
+::`uDegree(self)`:
+    #cppname: HOM_Surface::uDegree
+    #replaces: Exp:degree
+    #status: ni
+
+::`vDegree(self)`:
+    #cppname: HOM_Surface::vDegree
+    #replaces: Exp:degree
+    #status: ni
+
+::`curvature(self, u, v)`:
+    #cppname: HOM_Surface::curvature
+    #replaces: Exp:curvature
+    #status: ni
+
+::`curveOnSurfaceLength(self, u_start, v_start, u_end, v_end)`:
+    #cppname: HOM_Surface::curveOnSurfaceLength
+    #replaces: Exp:surflen
+    #status: ni
+
+::`knotValueU(self, knot_index)`:
+    #cppname: HOM_Surface::knotValueU
+    #replaces: Exp:spknot
+    #status: ni
+
+::`knotValueV(self, knot_index)`:
+    #cppname: HOM_Surface::knotValueV
+    #replaces: Exp:spknot
+    #status: ni
+
+::`parametricToUniformU(self, u)`:
+    #cppname: HOM_Surface::parametricToUniformU
+    #replaces: Exp:unituv
+    #status: ni
+
+::`parametricToUniformV(self, v)`:
+    #cppname: HOM_Surface::parametricToUniformV
+    #replaces: Exp:unituv
+    #status: ni
+
+::`uniformToParametricU(self, u)`:
+    #cppname: HOM_Surface::uniformToParametricU
+    #replaces: Exp:realuv
+    #status: ni
+
+::`uniformToParametricV(self, v)`:
+    #cppname: HOM_Surface::uniformToParametricV
+    #replaces: Exp:realuv
+    #status: ni
+

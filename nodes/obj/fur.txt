@@ -1,0 +1,860 @@
+#type: node
+#context: obj
+#internal: fur
+#icon: SOP/fur
+
+#tags: fur, curves
+
+= Fur =
+
+"""Creates fur geometry for rendering with a Mantra Fur Procedural."""
+
+== Overview ==
+
+The Fur object creates fur rooted on the specified skin geometry.
+
+NOTE:
+    You need UV coordinates when using any of the texture map parameters. See [UV Texture|Node:sop/texture].
+
+:vimeo: Hair transfer
+    #id: 116797623
+
+== Tips ==
+
+- Memory usage can be reduced by transferring values as primitive attributes from the skin instead of point/vertex attributes from the guides.
+
+- The __Radius__ parameter on the __Guide__ tab affects how big of an area is influenced by each guide hair. You can also create a primitive attribute called for more control. If this value is too small, some hairs might not have any guide hairs influencing them. If the value is too big, the effect of individual guide hairs will be difficult to see.
+
+- The `guides` subnet inside the [Fur Object|Node:obj/fur] creates the initial guide hair curves.  This network can be replaced with one defining hand-modeled guides.  There are a few items to keep in mind when creating this network:
+
+    - The guides are used as the rest pose of the wires and needs to be deformed to match animation on the skin.
+    - The guides should have a primitive attribute called `guideorigin` indicating where the guide attaches to the skin in its rest position.
+    - If you are adding dynamics, a point attribute called `pintoanimation` should be used to constrain the root point of each curve.
+
+@parameters
+
+== Basic ==
+
+Display:
+    #id: displayfur
+    Whether or not this object is displayed. Turn on the checkbox to
+    have Houdini use this parameter, then set the value to 0 to hide
+    the object, or 1 to show the object. If the checkbox is off,
+    Houdini ignores the value.
+
+Type:
+    #id: type
+    Type of geometry to create.
+
+    Polygon:
+        Create a polyline.
+    NURBS:
+        Create a NURBS curve.
+    Subdivision Curves:
+        Create a polygon curve. This is much faster than NURBS.
+
+Length:
+    #id: length
+    Specifies the length of the generated curves.
+
+Segments:
+    #id: segs
+    Number of segments in each generated curve (ignored if geometry is
+    provided by the __Guides__ input)
+
+Distribution Seed:
+    #id: seed
+    Seed value for the random number generator
+
+Display Density:
+    #id: displaydensity
+    The number of displayed curves is a result of the density
+    multiplied by the area of the skin polygons.  The value of this
+    parameter acts as a scalar multiplier to the optional `furdensity`
+    attribute to determine the curve density.
+
+Display Ratio:
+    #id: displayratio
+    Specifies a fraction of the curves to display.
+
+Render Density:
+    #id: renderdensity
+    The number of rendered curves is a result of the density
+    multiplied by the area of the skin polygons.  The value of this
+    parameter acts as a scalar multiplier to the optional `furdensity`
+    attribute to determine the curve density.
+
+Render Ratio:
+    #id: renderratio
+    Specifies a fraction of the hairs to render.
+
+Material:
+    #id: material
+    Path to the Material node.
+    
+Shade Fur in Viewport:
+    It enables shaded open curve rendering in the viewport, which draws the hair curves as ribbons (instead of lines) and uses a hair-based lighting model for shading those curves.
+
+== Guides ==
+
+Use Guides:
+    #id: useguides
+    When enabled, the shape of rendered hairs will be interpolated from the
+    guide hairs.
+
+Display:
+    #id: displayguides
+    Whether or not the guide hairs are displayed.
+
+Remove Unguided Hairs:
+    #id: removeunguidedhairs
+    Remove all hairs not influenced by a guide hair.
+
+Color:
+    #id: guidescolor
+    Color used to draw guide hairs.
+
+Guide Type:
+    Place At Every Surface Point:
+        Creates a guide at every point of the skin.
+    Scatter On Surface:
+        Indicates guide hairs should be scattered across the skin instead of
+        placed at points within the skin geometry.
+    Use External:
+        Fetches guides from an external geometry. In this mode, additional parameters will be displayed below, which can be useful for fixing common errors in imported guide curves.
+
+    NOTE:
+        These guides are expected to be static, so this is not the way to bring in simulated guides. To do this, please use the [Add Dynamics|/shelf/furdynamics] shelf tool, or manually add dynamics in `./guide_dynamics` within the Fur object.
+    Draw Guides Manually:
+        Doesn't generate any guides, instead allowing the user to create them from scratch, for example using tools on the [Grooming Shelf|/shelf/grooming].
+
+Geometry:
+    #id: guidegeo
+    Path to an object containing guide geometry.
+
+Resample To Match Fur Segments:
+    Resamples external guides to match the __Segments__ parameter.
+
+Reverse Curves:
+    When importing external guides, reverses the order of vertices within each each curve. This should be used when the root vertex is not the first vertex in the curve. 
+
+Snap To Skin:
+    Moves external guides so the root sits exactly on the skin.
+
+Distribution Seed:
+    #id: guideseed
+    The seed value for the random number generator.
+
+Density:
+    #id: guidedensity
+    The number of guide hairs is a result of the density multiplied by the area
+    of the skin polygons.  The value of this parameter acts as a scalar
+    multiplier to the optional `furdensity` attribute to determine the curve
+    density.
+
+Relax Iterations:
+    The number of relax iterations to perform when scattering guides. More
+    iterations result in a more even distribution of guides.
+
+Influence Radius:
+    #id: guideradius
+    Maximum distance a hair can be from a guide hair and still be influenced
+    by the guide hair.
+
+
+=== Attributes ===
+
+New Class:
+    #id: guideattribclass
+    The class for transferred attribute.
+
+Transfer Attributes:
+    #id: guidetextureattribs
+    Specifies a list of attributes from the guide and clump curves
+    that will be transferred to the generated curves.  The
+    resulting attribute values will contain any modifications made
+    by CVEX shaders.
+
+=== Length ===
+
+Length Map:
+    #id: guidelengthmap
+    Specifies a texture map used to modulate the length of guide hairs.
+
+Length Map Blend:
+    #id: guidelengthmapblend
+    Specifies how much the __Length Map__ can modulate the length of
+    each guide hair.
+
+=== Comb ===
+
+Comb Noise:
+    #id: combnoise
+    Specifies how much additive noise to apply to the direction of each guide
+    hair.
+
+Comb Noise Map:
+    #id: combnoisemap
+    Specifies a texture map used to modulate the amount of comb noise.
+
+Comb Noise Map Blend:
+    #id: combnoisemapblend
+    Specifies how much the __Comb Noise Map__ can modulate the amount of comb
+    noise.
+
+=== Bend ===
+
+Bend:
+    #id: bend
+    Specifies how much a guide hair will bend in the combed direction.
+
+    NOTE:
+    Guide hairs must be combed away from the normal or have comb noise applied for the bend direction to be well-defined.
+
+Bend Map:
+    #id: bendmap
+    Specifies a texture map used to modulate the bend of guide hairs.
+
+Bend Map Blend:
+    #id: bendmapblend
+    Specifies how much the __Bend Map__ can modulate the bend of each guide
+    hair.
+
+Bend Noise:
+    #id: bendnoise
+    Specifies how much additive noise to apply when bending each guide hair.
+
+Bend Noise Map:
+    #id: bendnoisemap
+    Specifies a texture map used to modulate the amount of bend noise.
+
+Bend Noise Map Blend:
+    #id: bendnoisemapblend
+    Specifies how much the __Bend Noise Map__ can modulate the amount of bend
+    noise.
+
+=== Twist ===
+
+Twist:
+    #id: twist
+    Specifies how much a guide hair will twist in the combed direction.
+
+Twist Map:
+    #id: twistmap
+    Specifies a texture map used to modulate the twist of guide hairs.
+
+Twist Map Blend:
+    #id: twistmapblend
+    Specifies how much the __Twist Map__ can modulate the twist of each guide
+    hair.
+
+Twist Noise:
+    #id: twistnoise
+    Specifies how much additive noise to apply when twisting each guide hair.
+
+Twist Noise Map:
+    #id: twistnoisemap
+    Specifies a texture map used to modulate the amount of twist noise.
+
+Twist Noise Map Blend:
+    #id: twistnoisemapblend
+    Specifies how much the __Twist Noise Map__ can modulate the amount of twist
+    noise.
+
+== Hair Types ==
+
+=== White ===
+
+Distribution Seed:
+    #id: whiteseed
+    Seed value for the random number generator.
+
+Ratio:
+    #id: whiteratio
+    Specifies a fraction of the hairs to become white hairs.
+
+White Map:
+    #id: whitemap
+    Specifies a texture map used to modulate the ratio of white
+    hairs.
+
+White Map Blend:
+    #id: whitemapblend
+    Specifies how much the __White Map__ will modulate the ratio of
+    white hairs.
+
+=== Guard ===
+
+NOTE:
+    Animals have a layer of longer coarse hairs which protect the softer fur underneath. These hairs are called guard hairs.
+
+Distribution Seed:
+    #id: guardseed
+    Seed value for the random number generator.
+
+Ratio:
+    #id: guardratio
+    Specifies a fraction of the hairs to become guard hairs.
+
+Guard Map:
+    #id: guardmap
+    Specifies a texture map used to modulate the ratio of guard
+    hairs.
+
+Guard Map Blend:
+    #id: guardmapblend
+    Specifies how much the __Guard Map__ will modulate the ratio of
+    guard hairs.
+
+Length Scale:
+    #id: guardhairlengthscale
+    Multiplier applied to the length of all guard hairs.
+
+Width Scale:
+    #id: guardhairwidthscale
+    Multiplier applied to the width of all guard hairs.
+
+Frizz Scale:
+    #id: guardhairfrizzscale
+    Multiplier applied to the frizz of all guard hairs.
+
+== Appearance ==
+
+=== Length & Density ===
+
+Length Map:
+    #id: lengthmap
+    Specifies a texture map used to modulate the length of hairs.
+
+Length Map Blend:
+    #id: lengthmapblend
+    Specifies how much the __Length Map__ can modulate the length of
+    each hair.
+
+Randomize Length:
+    #id: randomizelength
+    Specifies the amount each hair's length should be randomly
+    scaled.
+
+Density Map:
+    #id: densitymap
+    Specifies a texture map used to modulate the `furdensity`
+    attribute.
+
+Density Map Blend:
+    #id: densitymapblend
+    Specifies how much the __Density Map__ will modulate the
+    `furdensity` attribute.
+
+Cut Map:
+    #id: cutmap
+    Specifies a texture map used to cut the length of each hair.
+    This is similar to the __Length Map__ but will adjust the frizz to
+    match cut hair.
+
+Cut Map Blend:
+    #id: cutmapblend
+    Specifies how much the __Cut Map__ can affect each hair.
+
+Displacement Map:
+    #id: displacementmap
+    Specifies a texture map used to displace the position of each
+    hair.
+
+Displace Direction:
+    #id: offset
+    Specifies how to interpret values from the __Displacement Map__.
+
+Displacement Scale:
+    #id: displacementscale
+    Scales the amount each hair is displaced by the __Displacement
+    Map__.
+
+=== Thickness ===
+
+Thickness:
+    #id: furstyle_thickness
+    Specifies how the width of each hair varies from the root to
+    the tip.
+
+Minimum Thickness:
+    #id: thicknessmin
+    Specifies the minimum width of each hair.
+
+Maximum Thickness:
+    #id: thicknessmax
+    Specifies the maximum width of each hair.
+
+Thickness Map:
+    #id: thicknessmap
+    Specifies a texture map used to modulate the `width` attribute.
+
+Thickness Map Blend:
+    #id: thicknessmapblend
+    Specifies how much the __Thickness Map__ will modulate the `width`
+    attribute.
+
+=== Frizz ===
+
+Frizz:
+    #id: furstyle_frizz
+    Specifies how the amount of frizz applied to each hair varies
+    from the root to the tip.
+
+Minimum Frizz:
+    #id: frizzmin
+    Specifies the minimum amount of frizz applied to each hair.
+
+Maximum Frizz:
+    #id: frizzmax
+    Specifies the maximum amount of frizz applied to each hair.
+
+Amplitude Map:
+    #id: frizzmap
+    Specifies a texture map used to modulate the frizz amplitude.
+
+Amplitude Map Blend:
+    #id: frizzmapblend
+    Specifies how much the __Amplitude Map__ can modulate the frizz.
+
+Frequency:
+    #id: frizzfreq
+    Specifies the frequency of the frizz noise. Frequency and roughness are two properties of the frizz noise.  Frequency controls the number of oscillations of noise along a hair.  Higher frequency values result in more oscillations. The effect of this tool is easier to see when the number of segments per hair is increased.  
+
+    TIP:
+        Use the [Paint Frizz Frequency|/shelf/paintfurfrizzfrequency] tool if you want to change the number of noise oscillations along the length of hairs and use the [Paint Frizz Roughness|/shelf/paintfurfrizzroughness] if you want to change how smooth or rough each oscillation appears.
+
+Frequency Map:
+    #id: frizzfreqmap
+    Specifies a texture map used to modulate the frizz frequency.
+
+Frequency Map Blend:
+    #id: frizzfreqmapblend
+    Specifies how much the __Frequency Map__ can modulate the frizz.
+
+Roughness:
+    #id: frizzrough
+    Specifies the roughness of the frizz noise. Frequency and roughness are two properties of the frizz noise. Roughness can be thought of as a non-smooth component of the noise. The effect of this tool is easier to see when the number of segments per hair is increased.
+
+    TIP:
+        Use the [Paint Frizz Frequency|/shelf/paintfurfrizzfrequency] tool if you want to change the number of noise oscillations along the length of hairs and use the [Paint Frizz Roughness|/shelf/paintfurfrizzroughness] if you want to change how smooth or rough each oscillation appears.
+
+Roughness Map:
+    #id: frizzroughmap
+    Specifies a texture map used to modulate the frizz roughness.
+
+Roughness Map Blend:
+    #id: frizzroughmapblend
+    Specifies how much the __Roughness Map__ can modulate the frizz.
+
+Octaves:
+    #id: frizzoctaves
+    Specifies the octaves of the frizz noise.
+
+=== Clump ===
+
+Clump Fur:
+    #id: clumps
+    When enabled, all hairs are associated with the nearest clump
+    hair.
+
+Display:
+    #id: displayclumps
+    Whether or not the clump hairs are displayed
+
+Color:
+    #id: clumpscolor{rgb}
+    Color used to draw clump hairs
+
+Clump Geo Source:
+    Controls how clump guides are generated.
+
+    Scatter:
+        Scatter clump guides on the skin geometry.
+    Use Guide Curves:
+        Reuse the guide curves for clumping.
+    Use External:
+        Use An External SOP.
+
+Geometry:
+    #id: clumpgeo
+    Path to an object containing clump geometry.
+
+Distribution Seed:
+    #id: clumpseed
+    Seed value for the random number generator.
+
+Density:
+    #id: clumpdensity
+    The number of clump hairs is a result of the density
+    multiplied by the area of the skin polygons.  The value of this
+    parameter acts as a scalar multiplier to the optional
+    `furdensity` attribute to determine the curve density.
+
+Radius:
+    #id: clumpradius
+    Maximum distance a hair can be from a clump and still be a
+    member of the clump.
+
+Tightness:
+    #id: clumptightness
+    The amount each hair is pulled towards its associated clump.
+
+Clump Profile:
+    #id: clumpstyle_clumpprofile
+    The profile shape for each clump.
+
+Clump Map:
+    #id: clumpmap
+    Specifies a texture map used to clump hairs.
+
+Clump Map Blend:
+    #id: clumpmapblend
+    Specifies how much the __Clump Map__ can affect each hair.
+
+Use Closest Clump:
+    #id: useclosestclump
+    Associates each hair with its closest clump.
+
+Remove Unclumped Hairs:
+    #id: removeunclumpedhairs
+    Remove all hairs not associated with a clump.
+
+=== Parting ===
+
+Part Fur:
+    #id: partinglines
+    When enabled, only guide hairs on the same side of parting
+    lines are used influence the shape of hairs.
+
+Display:
+    #id: displaypartinglines
+    Whether or not parting lines are displayed in the viewport.
+
+Color:
+    #id: partinglinescolor
+    The color used to draw parting lines.
+
+Radius:
+    #id: partingradius
+    Maximum distance rest skin can be from a parting line and
+    still be affected.
+
+== Dynamics ==
+
+Use Ramps To Control Stiffness:
+    #id: usestiffnessramp
+    Enables stiffness controls.
+
+=== Bend ===
+
+Stiffness:
+    #id: physical_bendstiffness
+    Specifies how the stiffness of each hair varies from the root
+    to the tip.
+
+Minimum Stiffness:
+    #id: bendstiffnessmin
+    Specifies the minimum stiffness of each hair.
+
+Maximum Stiffness:
+    #id: bendstiffnessmax
+    Specifies the maximum stiffness of each hair.
+
+=== Stretch ===
+
+Stiffness:
+    #id: physical_stretchstiffness
+    Specifies how the stiffness of each hair varies from the root
+    to the tip.
+
+Minimum Stiffness:
+    #id: stretchstiffnessmin
+    Specifies the minimum stiffness of each hair.
+
+Maximum Stiffness:
+    #id: stretchstiffnessmax
+    Specifies the maximum stiffness of each hair.
+
+== Skin ==
+
+Display Offset:
+    #id: displayoffset
+    Displacement offset used when displaying skin geometry.
+
+New Class:
+    #id: skinattribclass
+    Class for transferred attribute.
+
+Transfer Attributes:
+    #id: skintextureattribs
+    Specifies a list of attributes from the skin geometry that will be
+    transferred to the generated curves.  The resulting attribute
+    values will contain any modifications made by CVEX shaders.
+
+Set Hair ID:
+    #id: setid
+    Creates a `hairid` attribute containing a unique value for each
+    generated curve.
+
+Groom Frame:
+    #id: groomframe
+    Specifies the frame used to compute the skin's rest position.
+
+Skin:
+    #id: skin
+    Path to an object containing skin geometry.
+
+Complete Group:
+    #id: group
+    Primitives in the skin geometry from which to groom hair.
+
+Visible Group:
+    #id: visiblegroup
+    Primitives in the skin geometry from which to grow hair.
+
+=== Transfer Groom To New Skin ===
+
+:vimeo:Hair transfer
+    #title: 116797623
+
+Method:
+    The method to use for updating to a new skin. Use the __Update From SOP__ button below to initiate the update.
+
+    NOTE:
+        The Recache Strokes method below does not leave any record of the original skin, and it'll appear like the groom was started on the current skin.
+
+    Recache Strokes (Changed Topology, Small Position Changes):
+        Performs the update by re-applying all recorded grooming strokes to guides generated on the new skin. This is the simplest method, and should be used if there have only been topology changes and the skin is otherwise very similar.
+
+    NOTE:
+        The methods below will leave a clear history of updates in the guides subnet, where all grooming happens.
+
+    Transfer Direct (Changed Position):
+        Use this if there has been a change in position/scale/sculpting while the topology has remained unchanged.
+
+        Uses the Transfer Guides SOP to transfer an existing groom to a new skin. Existing grooming nodes are collapsed into a subnet and can still be edited.
+
+    Transfer By UV (Changed Position and Topology):
+        Use this if their has been a change in position/scale/sculpting and topology. This relies on a matching UV set between the current and new skin.
+
+        This is the same as __Transfer Direct__, except it does the transfer using a UV set that exists on both the old and new model. This means that in addition to position changes, the topology can also be dramatically different between models.
+
+UV Attribute:
+    The UV Attribute to use when __Method__ is set to `Transfer By UV`.
+
+Update From SOP:
+    Update to a new skin geometry, using the options set above. This let's you pick a SOP to use as the new geometry.
+
+== Render ==
+
+Render Style:
+    Controls how the fur is rendered in mantra.
+
+    Procedural:
+        Generate curves at render time using the fur procedural.
+    Direct:
+        Generate curves in Houdini before rendering and send the generated
+        curves to mantra.
+
+Phantom:
+    #id: vm_phantom
+    If enabled, this object will only cast shadows and reflections.
+
+=== Mantra ===
+
+Bounding Box:
+    #id: vmproc_boxstyle
+    The bounding box controls let you specify a bounding box for
+    the referenced geometry. Only when this bounding box is "on
+    screen" will mantra load the referenced geometry. You can set
+    __Bounding box__ to __No bounding box required__, in which
+    case mantra will always load the references geometry
+    regardless. You can also specify the bounding box by
+    referencing the SOP's bounding box in the __SOP Bounds__
+    parameter.
+
+SOP Bounds:
+    #id: vmproc_soppath
+    The geometry whose bounding box you want to reference.
+
+Min Bounds:
+    #id: vmproc_minbound
+    The minimum bounding box dimensions, when setting explicit
+    bounds.
+
+Max Bounds:
+    #id: vmproc_maxbound
+    The maximum bounding box dimensions, when setting explicit
+    bounds.
+
+Expand Bounds:
+    #id: expandbounds
+    Allows you to adjust the bounds of the bounding box to
+    compensate for any fur that may have been moved outside of
+    the original bounds by a shader.
+
+=== Shading ===
+
+Categories:
+    #id: categories
+    The categories defining the set membership of this object.
+
+Reflection Mask:
+    #id: reflectmask
+    Space-separated list of objects to appear in reflections on this
+    object. You can use wildcards (for example, `prop_*`) and
+    [bundle references|/basics/bundles]  to specify objects.
+
+    You can also use the  [link editor
+    pane|/ref/panes/linker]  to edit the
+    relationships between objects using a graphical interface.
+
+
+Refraction Mask:
+    #id: refractmask
+    Objects that will be refracted on this object.
+
+Light Mask:
+    #id: lightmask
+    Space-separated list of names of lights that illuminate this
+    object. You can use wildcards (for example, `key_*`) and
+    [bundle references|/basics/bundles]  to specify objects.
+
+    You can also use the  [link editor
+    pane|/ref/panes/linker]  to edit the
+    relationships between lights and objects using a graphical
+    interface.
+
+Matte shading:
+    #id: vm_matte
+    Render the object as a cut-out matte.
+
+Raytrace Shading:
+    #id: vm_rayshade
+    Shade every sample rather than shading micropolygon vertices.
+    This setting enables the raytrace rendering engine on a
+    per-object basis.
+
+=== Sampling ===
+
+Geometry Velocity Blur:
+    #id: geo_velocityblur
+    If enabled, this object's rendered motion blur will be based
+    upon the vector attribute named `v` in the geometry. The units
+    of the attribute are in (1 unit/sec).
+
+    Velocity motion blur should be used if it contains changing
+    point counts since it cannot be rendered correctly with
+    deformation motion blur. For example, a particle system with
+    changing particle counts should use this option.
+
+    You can use Velocity blur on these types of objects as long as
+    they have valid `v` attributes. Particles automatically have
+    the `v` attribute so if you are rendering particles, simply
+    enable this parameter.
+
+=== Dicing ===
+
+Shading Quality:
+    #id: vm_shadingquality
+    Shading Quality is used by micropolygon rendering to control
+    the shading resolution. A value of 1 means that approximately
+    1 micropolygon will be used per pixel. A higher value will
+    generate smaller micropolygons meaning more shading and
+    sampling will occur, but the quality will be higher.
+
+Ray Shading Quality:
+    #id: vm_rayshadingquality
+    Ray Shading Quality is used by raytracing when rendering. When
+    raytracing subdivision surfaces or patch surfaces (eg. NURBS),
+    geometry dicing will occur similar to micropolygon rendering.
+    This value functions similar to __Shading Quality__ for these
+    primitives when raytracing.
+
+    NOTE:
+        Only when rendering subdivision surfaces and patch surfaces
+        (eg. NURBS) will this setting have an effect.
+
+Geometry Filter Width:
+    #id: vm_geofilterwidth
+    Geometry Filter Width sets a minimum rendering width in raster
+    space for curves.  Any curve segment smaller than this value at
+    the projected point will instead have its opacity scaled down as
+    a ratio of the minimum width and the actual width.  This helps
+    rendering very thin curves without having to adversely increase
+    the pixel samples to compensate.
+
+Dicing Flatness:
+    #id: vm_flatness
+    This property controls the tesselation levels for nearly flat
+    primitives. By increasing the value, more primitives will be
+    considered flat and will be sub-divided less.
+
+Ray Predicing:
+    #id: vm_raypredice
+    This property will cause this object to generate all the
+    micro-polygons before the render begins. Ray tracing can be
+    significantly faster at the cost of potentially huge memory
+    requirements.
+
+Shade Curves As Surfaces:
+    #id: vm_curvesurface
+    When rendering a curve, turns the curve into a surface and dices
+    the surface, running the surface shader on multiple points across
+    the surface. This may be useful when the curves become curved
+    surfaces, but is less efficient. The default is to simply run the
+    shader on the points of the curve and duplicate those shaded
+    points across the created surface.
+
+=== Geometry ===
+
+Backface Removal:
+    #id: vm_rmbackface
+    If enabled, geometry that are facing away from the camera are
+    not rendered.
+
+Polygons As Subdivision:
+    #id: vm_rendersubd
+    If enabled, polygon geometry rendered from this object will be
+    rendered as a subdivision surface. 
+
+Render As Points:
+    #id: vm_renderpoints
+    By default, points within particle system primitives are
+    rendered as sphere primitives. If a point is not
+    part of a particle system primitive, then it is not rendered.
+    If this parameter is enabled, then all points (regardless if
+    they are part of a particle system) from this object's geometry
+    will be rendered as point (circle) primitives facing the camera
+    plane.
+
+Coving:
+    #id: vm_coving
+    Coving is the process of filling cracks in diced geometry
+    at render time, where different levels of dicing side-by-side
+    create gaps at T-junctions.
+
+    The default setting, __Coving for displacement/sub-d__, only
+    does coving for surfaces with a displacement shader and
+    subdivision surfaces, where the displacement of points can
+    potentially create large cracks. This is sufficient for more
+    rendering, however you may want to use __Coving for all
+    primitives__ if you are using a very low shading rate or see
+    cracks in the alpha of the rendered image.
+
+    Do not use __Disable coving__. It has no performance
+    benefit, and may actually harm performance since Houdini has to
+    render any geometry visible through the crack.
+
+    This setting only applies to micropolygon rendering.
+
+Automatically Compute Normals:
+    #id: vm_computeN
+    If enabled, smooth normals will we computed at render time if
+    the normal (`N`) vector attribute does not exist.
+
+@related
+
+- [Node:sop/fur]
+- [Node:shop/vm_geo_fur]

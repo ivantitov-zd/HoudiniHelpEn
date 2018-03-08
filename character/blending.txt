@@ -1,0 +1,214 @@
+= Blending =
+
+== Blend between IK and rotations ==
+
+When you animate a bone chain you sometimes want to use bone rotations
+to drive the motion while other times you want to use an IK goal.
+
+Houdini's IK set-up lets you smoothly transition between the two control
+schemes with a _blend_ attribute you can set with an interactive handle
+in the [Pose tool|/shelf/pose].
+
+
+TIP:
+    The blend handle and Snap to IK/Rotates menu items mentioned below
+    are available when using the default, single goal setup. If you
+    change the default setup to blend between multiple goals, these UI
+    convenience features will not work. See  [approaches to
+    rigging|riggingapproaches]  for details.
+
+
+:task:Blend/switch between IK and rotations:
+    # Use the  [tab menu|/basics/tabmenu]  to choose the [Pose
+      tool|/shelf/pose].
+
+    # Click an IK bone chain. The goal lets you move the end of the
+      chain. Press ((R)) to show rotation manipulators for the
+      bones. Because the IK solver is controlling the chain, the
+      rotation handles have no effect.
+
+      [Image:/images/fk_ik_start.jpg]
+
+    # In the  [operation control toolbar|/basics/tools]  at the top of
+      the viewer, make sure __Handle Mode__ is set to __Object
+      specific handles__.
+
+    # Select the last bone.
+
+    # Press ((RMB)) on the goal handle and choose __Show Blend
+      Handle__.
+
+      A new handle appears at the bottom of the chain's axis line.
+
+    # Drag the blend handle back along its slider line. The closer
+      it is to the root end of the line, the more joint rotations
+      affect the chain.
+
+      [Image:/images/fk_ik_blend.jpg]
+
+    # You can now select joints and use the rotate manipulator
+      (((R))) to rotate them.
+
+      The rotations are proportionally modified by the blend handle.
+      Large rotations will have a small effect if the blend factor
+      is low. If you then go back and turn up the blend factor, the
+      effect of the rotation will magnified.
+
+:task:Reset the bones to match the IK or rotations:
+    # Use the  [tab menu|/basics/tabmenu]  to choose the [Pose
+      tool|/shelf/pose].
+
+    # Select the last bone.
+
+    # Press ((RMB)) on the goal handle and choose __Snap to IK__ or
+      __Snap to Rotations__.
+
+:task:Keyframe IK/rotation blending setups:
+    * See  [keyframe character animation|pose#pose] .
+
+NOTE:
+    The blend parameter is part of the kinematics channel operation
+    (kin_chop) that is driving the Inverse Kinematics solution. When you
+    adjust this value using the handle, Houdini updates the parameter on
+    the channel operator.
+
+== Blend parenting of objects ==
+
+In Houdini, you can parent an object to multiple parents and blend
+between their influence using a [Blend node|Node:obj/blend]. This has
+several important uses, and depending on which way you want to use the
+feature, you will use different user interface tools:
+
+* Parenting parts of a character in different spaces depending on
+  different animation needs at different moments. For example, you can
+  set up a character's head to be pose-able in character space or
+  shoulder space, depending on what kind of movements you're animating
+  at the time.
+
+* To animate characters picking up, putting down, or handing off
+  objects, you can keyframe parenting relationships. For example, to
+  animate a character picking up an object, you would make the
+  character's hand become the parent of the object at the moment the
+  character touches it. Then the object will stick with the hand as the
+  character moves.
+
+You can set up dynamic parenting in different ways, which are suited for
+different uses:
+
+* You can set up the parents and Blend node manually in the network
+  editor. For dynamic parenting that will be set up once (as in
+  character rigging), this is easier than using the interactive Dynamic
+  Parent tool.
+
+* The Dynamic Parent tool lets you animate switches between parentage,
+  and automatically creates the needed Blend nodes and expressions to
+  support the transitions. For animating multiple switches, this can be
+  more convenient than setting up the nodes manually.
+
+=== Set up a blend manually ===
+
+    steps>>
+        # In the network editor, use the  [tab menu|/basics/tabmenu]  to
+          create a [Blend node|Node:obj/blend].
+
+        #  [Connect|/ref/panes/network]  the parents to the Blend node's
+          inputs.
+
+        # In the Blend node's parameters, choose which parameters you
+          want to import from the various parents. If you used the
+          character root Null as one of the dynamic parents, you
+          probably want to turn off importing its translate parameters
+          (`tx`, `ty`, and `tz`).
+
+        # The Blend node has separate __Weight__ sliders for each input,
+          letting you mix them arbitrarily. In a two-parent scenario
+          however, you probably only want one slider control that blends
+          between the two inputs. To do that, you need to link the
+          second slider to the first slider so it automatically goes
+          down/up as the other goes up/down.
+
+          Press ((RMB)) on the first slider's value and choose __Copy
+          Parameter__. Then press ((RMB)) on the second slider's value
+          and choose __Paste Relative Reference__. Houdini inserts a
+          parameter reference expression to the first slider. Finally,
+          to make the second slider invert the value of the first
+          slider, insert `1-` in front of the expression.
+
+    NOTE:
+        In some cases, blending between different parents will introduce
+        unwanted rotations, because the parents have different
+        orientations.
+
+        To correct for this, create a new Null and parent it to one of
+        the dynamic parents you want to use, then add counter-rotations
+        to the new Null to correct for the orientation. Finally, wire
+        the new Null into the Blend instead of the original dynamic
+        parent.
+
+        For example, if you draw a head bone and dynamically parent it
+        to both the character root Null and a neck bone root, the head
+        may rotate 90 degrees in Z as it blends because the bone is
+        oriented differently from the character root Null. To correct
+        for this, create a new Null parented to the character root, set
+        its Z rotation to -90, then connect the new Null into the blend
+        instead of the character root.
+
+
+
+    TIP:
+        Make the first __Weight__ slider into a  [HUD slider|/basics/handles]
+        to make it easily available as a control for animators.
+
+=== Use the Dynamic parent tool ===
+
+    :task:Set up for dynamic parenting:
+        # Use the  [tab menu|/basics/tabmenu]  to choose the [Dynamic
+          Parent tool|/shelf/dynamicparent].
+
+        # Select the object(s) you want to dynamically parent (for
+          example, the object that will be picked up or handed off),
+          then click ((RMB)) to finish the selection.
+
+          At this point nothing has changed. To actually parent the
+          object, you need to specify _transitions_ (see below).
+
+    :task:Dynamically change an object's parent:
+        # Move the  [time slider|/anim/playbar]  to the frame where
+          you want the object to be parented.
+
+        # Click __Add Transition__ in the operator toolbar at the
+          top of the viewer.
+
+        # Select the new parent (for example, the goal of a bone
+          chain), then click ((RMB)) to finish the selection.
+
+    :task:Dynamically unparent an object:
+        # Move the  [time slider|/anim/playbar]  to the frame where
+          you want the object to be unparented.
+
+        # Click __End Transition__ in the operator toolbar at the
+          top of the viewer.
+
+
+    TIP:
+        A chain's goal is not the ideal parent object because it
+        generally remains oriented to world space while the arm rotates.
+        In a real setup you will probably parent some control object
+        into the hand that will rotate with the arm setup.
+
+=== How it works ===
+
+    Houdini creates a _blend_ node to parent the child to both a
+    hidden null object (which controls the child's stationary pose)
+    and the dynamic parent. Keyframes are set on the _blend_
+    operator's __Sequence__ parameter which controls which parent is
+    used.
+
+== Misc ==
+
+* In Houdini, you generally use the [Blend Object|Node:obj/blend] or the [Blend Sticky Object|Node:obj/blendsticky] if you want to target onto a uv set on geometry. 
+
+* There are many ways to create parameter relationships in Houdini, such as a maya-like set driven key tool called [Blend Pose|/shelf/blendpose] to help you set up the `ch()` parameter references (equivalent to mel).
+
+@related
+- [How to cycle animation|/character/cycling]

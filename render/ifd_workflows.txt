@@ -1,0 +1,246 @@
+= IFD Workflows =
+
+"""A quick overview of how to reduce the size of IFD files when rendering with Mantra. How to use procedurals, Alembic archives, and packed primitives to make IFDs smaller, and how IFDs work with HQueue."""
+
+== Before you begin ==
+
+Writing IFDs to disk requires a Houdini, Houdini FX, or Education, license. Indie files cannot generate IFDs.
+
+While apprentice users cannot generate IFDs directly, using these workflows can still improve your render times in some circumstances. For example, Mantra renders will start more quickly if you make the behind-the-scenes IFD faster to generate.
+
+== Why IFDs matter == (why)
+
+When rendering with Mantra, Houdini writes the contents of your scene file to a scene description file which Mantra reads. This is the *IFD* file, which stand for Instantaneous Frame Description.
+
+Usually when you render with Mantra, you simply render, and Houdini does the work of generating an IFD and sending it to Mantra to render it to an image on disk. Not only can this process be lengthy and result in large IFD files (especially for complex and long shots), it consumes a Houdini or Houdini Engine (Houdini Batch) license.
+
+Financially, this is significant because a Full commercial license of Houdini comes with _unlimited_ Mantra tokens. This means you can use as many machines as you have access to for rendering, while keeping your Houdini and Engine licenses free for working and running simulations. So being able to generate IFDs as fast as possible to render is very important.
+
+Leveraging light-weight IFDs is also significant from a pipeline perspective. Even if the animation department updates a performance, or the modelling department modifies a set, or a TD tweaks a simulation, you only need to update the IFD if the materials or lights change. Otherwise, Mantra will simply pick up any changes to the on-disk geometry the next time it renders the IFDs.
+
+(Education licenses are available for schools, and are functionally equivalent to a commercial Houdini FX license, except they save to the non-commercial format. For more information see the _Houdini for Education_ document below.)
+
+See also:
+
+* [IFD file format|/render/ifd]
+
+* [Houdini Licensing and Pricing|http://www.sidefx.com/index.php?option=com_content&task=view&id=385&Itemid=190]
+
+* [Houdini for Education|http://www.sidefx.com/images/ifd_workflows/stories/learning/education/houdini_education.pdf] (PDF)
+
+
+== Blosc compression == (blosc)
+
+Since version 14.0, Houdini supports Blosc-compressed IFDs. This is a convenient and very easy way to get smaller, but still fast, IFDs. Blosc compression is also supported by bgeo, vdb, rat.
+
+At the end of the [HQueue and Rendering IFDs|#hq] section, there is a comparison of .ifd vs .ifd.sc, so you can get an idea of the size differences.
+
+(If you find any bugs with blosc compressed IFDs (or anything else in Houdini), please log a bug with support online: [Submit Bugs and RFEs|https://www.sidefx.com/index.php?option=com_content&task=view&id=768&Itemid=239]. Anyone can log a bug, you don't have to be a large and/or commercial customer!)
+
+== Generating Compact IFDs == (genifd)
+
+In Mantra rendering, a "procedural" is geometry generated at render-time by a special material. This means it's not stored in the IFD file. An example of a procedural is a material used to render fur. The material uses a set of guide hairs help inform Mantra how and where to interpolate thousands more hairs than are currently in the scene file. Another kind of procedural references an external geometry file on disk when rendering.
+
+The best way to keep IFDs small is to reference *external geometry* or *procedurally generating* geometry using procedurals instead of baking geometry into the IFD file.
+
+[Image:/images/ifd_workflows/rendering_workflow.png]
+
+TIP: 
+    While this example uses polygons, packed primitives, and Alembic caches, you can apply the same principles to volumetric geometry.
+
+
+=== Example file ===
+
+The sections below refer to an example file. You can load this example file if you want to follow along:
+
+{{{
+$HFS/houdini/help/files/ifd_workflows/ifd_workflows.hipnc
+}}}
+
+Copy the `ifd_workflows` directory out of `$HFS` to somewhere in under you user directory so Houdini can write IFD files inside it.
+
+=== Alembic and Packed Primitives === (abcpackprims)
+
+Houdini has some of the best support for Alembic caches in the industry, including fast and flexible Bullet solver support for packed primitives. Given this support, artists are creating more and more geometry in their workflows. Even motion graphics and set-dressing benefit from streamlined geometry formats. These formats are well suited to fast IFD workflows.
+
+There are several varieties of Packed Primitives:
+
+Packed Geometry | 
+    Built from "live" geometry in a Houdini session.
+Packed Disk Primitive | 
+    Packed Primitives streamed from a file on-disk.
+Packed Fragments |
+    Are also built from "live" geometry.
+    
+(See [Packed Primitives|/model/packed] for more information.)
+
+This section will use Packed Disk Primitives as an example, but you can also use Alembic primitives. We use Alembic in the section below on motion blur.
+
+You can often interchange Packed Primitives and Alembic primitives when working in Houdini; not always, but usually. This is because a Packed Primitive is a generalization of Alembic primitives, but can be made up of all types of geometry, _including_ Alembic primitives. For more information, see the [Packed Primitives|/model/packed] page.
+
+Because Packed Disk Primitives by their nature are geometry streamed from a file, similar to Alembic primitives, we don't have to use a special procedural to get smaller IFDs.
+
+[Image:/images/ifd_workflows/pack_network.png]
+
+In the example file, look inside the `packed_pig` Geometry Object. It contains a geometry network with a few nodes, all wired into a Copy SOP. If we look at the File SOP, it's pointed to `pig.bgeo.sc`. To avoid duplicating our geometry on-disk, the File SOP offers the option to load the geometry as a Packed Disk Primitive; if you set the __Load__ parameter to "Packed Disk Primitive", Houdini doesn't load the Full Geometry and instead streams Pig from disk.
+
+(Because it is Packed Geometry, the File SOP gives us some nice options both for managing how much Houdini has to display. This has no bearing on the IFDs, sine we are loading the bgeo as a Packed Disk Primitive, but it does make working interactively more pleasant.)
+
+[Image:/images/ifd_workflows/packed_file_sop.png]
+
+If you render the `mantra_pig_packed` ROP and look at the IFD file, it's only 15Kb! Even though we're copying our packed Pig to several points, and varying the color of each one, the IFD is still tiny. Using Packed Disk Primitives make uses less disk space and network IO.
+
+[Image:/images/ifd_workflows/pack_render.png]
+
+Material Stylesheets are extremely useful with on-disk geometry. Stylesheets let you assign and vary shaders without having to load the geometry and bind to it. See [Material Stylesheets|/shade/stylesheets].
+
+
+=== Generating the IFD ===
+
+In the network editor, go to `/out`, and look at our ROPs. We're using the __Force Objects__ parameters to make sure each ROP only dumps a specific part of our scene into the IFD.
+
+To make sure the IFDs get the materials, each ROP has __Declare materials__ (on the __Render > Render_) tab set to "All SHOPs". Since the geometry only references a material but doesn't include it, we need that material to be included in the IFD. Declaring all SHOPs forces all materials to be included in the IFD, so they are available for any procedurals to use.
+
+[Image:/images/ifd_workflows/declare_mtls.png]
+
+You'll notice neither `pig` or `procedural_pig` have a material assigned at the Object level or at SOP level. Both have an attribute called `shop_materialpath`. As long as the current hip file has a material that matches that attribute, and we declare the materials on the ROP, everything will render.
+
+On the `mantra_pig_packed` ROP, go to _Driver_ tab. The __Disk file__ checkbox is on. If you click __Render to Disk__, nothing will appear to happen, but the ROP will generate an IFD file (instead of generating a temporary IFD file and automatically rendering it). Render IFDs for both `mantra_pig` and `mantra_pig_packed`. Note how much faster the procedural ROP runs.
+
+If you go inside the `ifd` folder where you opened the project, you'll see the IFD sizes are drastically different:
+
+File ||
+    Size ||
+
+`mantra_pig.ifd.sc` |
+    4.3 MB
+
+`mantra_pig_packed.ifd.sc` |
+    10 _KB_
+
+The benefits are obvious: the IFD file that references packed geometry instead of including it is 0.2% the size, and you don't have to regenerate the IFD if the geometry file changes. 
+
+Imagine you're rendering a shot with _hundreds of gigabytes_ in cars, windows, and other props. In a shot that's 600 frames long. A shot accessed by many computers at once. You can see why a studio would prefer to work this way. Even to a lone artist, or a school with more modest resources, saving disk space, and using Mantra tokens instead of Houdini licenses, are huge wins.
+
+
+=== Delayed Load procedural === (geoproc)
+
+Another method for importing external geometry at render time is the [Delayed Load Procedural|Node:vop/file]. The Delayed Load Procedural is a shader that fetches an object's renderable geometry from disk at render time, replacing whatever geometry was inside the object (meaning the object can be empty, or contain simple proxy geometry).
+
+NOTE:
+    This workflow is largely obsoleted by Alembic files and packed primitives. In the future, the Geometry Procedural process may change significantly, or no long exist.
+
+In the example file, there is a Geometry object called `pig` and one called `procedural_pig`. If you hold ((MMB)) on each node, you'll see that `pig` has 1 child SOP (a File SOP pointing to `$HIP/geo/pig.bgeo.sc`), and `procedural_pig` has _no_ child nodes.
+
+Select the `procedural_pig` node. In the parameters, click the __Render > Geometry__ tab. A parameter called __Procedural Shader__ points to a Delayed Load procedural. If you jump to that node, you'll see that its __File__ parameter points to the `pig.bgeo.sc` file on disk.
+
+[Image:/images/ifd_workflows/proc_shdr_prm.png]
+
+If you click the Render View, and set the ROP to `mantra_pig_procedural`, you'll see our pig statue render. You can even render `mantra_pig`, to visually compare.
+
+[Image:/images/ifd_workflows/pig_proc_render.png]
+
+(With Auto-Update on, sometimes you'll get old geometry still rendering; just click the 'Render' button again, or 'Refresh', to flush the stale IFD and generate a new one.)
+
+Like with the packed primitive workflow above, the generated IFD is _much_ smaller because it references the pig geometry instead of including it:
+
+File ||
+    Size ||
+
+`mantra_pig.ifd.sc` |
+    4.3 MB
+
+`mantra_pig_packed.ifd.sc` |
+    8 KB
+
+
+=== Animated Geometry === (animgeo)
+
+Motion blur requires Mantra to capture models over an interval of time, thus requiring the geometry at the current frame, and also geometry from _at least_ one other point in time. If you're including the geometry in the IFD file, this will balloon the size of the IFD even more. Yikes!
+
+This example will show how referencing external Alembic animation caches allows us to use motion blur while keeping the IFD small.
+
+Open the example `.hip` file, and select the object called `alembic_bear`. The object itself is pretty simple, with only a plastic material. Inside, an Alembic SOP points to the external Alembic file. This is very similar to what we did with Packed Primitives in the previous section.
+
+[Image:/images/ifd_workflows/bear_geo.png]
+
+Navigate to the `/out` network, and select the ROP called `mantra_alembic_bear`. On the __Rendering__ tab, __Geo Time Samples__ is set to `2`. Because we're using an external Alembic cache, this parameter tells Mantra to sample the same cache at two different points in time, but it doesn't have to copy the geometry to the IFD.
+
+[Image:/images/ifd_workflows/bear_geosamples.png]
+
+If you render this node, the bear has proper motion blur. You can compare this to the other motion-blur ROPs that don't reference external files: `mantra_bgeo_bear` and `mantra_bear_vel`. The `mantra_bgeo_bear` node is simply rendering bgeo geometry, thus for each Geo Time Sample, a copy of the geometry is included in the IFD. The `mantra_bear_vel` nbode also uses BGEOs, but has velocity baked to the points as the *v* attribute.
+
+[Image:/images/ifd_workflows/bear_render.png]
+
+All three nodes render a motion-blurred bear, but the sizes of the IFDs the produce are very different:
+
+File ||
+    Size ||
+
+`mantra_bear_alembic.ifd.sc` |
+    11 KB
+`mantra_bear__geosamples_2.ifd.sc` |
+    67 KB
+`mantra_bear__geosamples_3.ifd.sc` |
+    101 KB
+`mantra_bear_samples_vel.ifd.sc` |
+    49 KB
+
+Because the bear only has 626 points, the differences aren't as dramatic as with the Pig IFDs. But you can still see a significant advantage to using the Alembic cache. And as the geometry gets more complex, the advantage only gets bigger.
+
+(You can also generate per-frame `.bgeo` files of Packed Primitives to get light-weight IFDs, but your farm's network IO capabilities might be less overwhelmed by a single Alembic cache. This isn't going to always be the case -- every network is different. But if renders seem to pick up slowly with one type of geometry, try using the other.)
+
+See also:
+
+* [Alembic files|/io/alembic]
+* [Alembic Geometry SHOP|Node:shop/vm_geo_alembic]
+* [Rendering with a large number of polygons|/render/renderingmanypolys]
+
+
+== HQueue and Rendering IFDs == (hq)
+
+If you have access to multiple machines, HQueue lets you simulate and render across multiple computers. HQueue has built-in support for using a dedicated machine (or group of machines) to generate IFDs, while others render the IFDs directly. This means Houdini/Engine licenses are only needed by the IFD generators. The rest will use Mantra render tokens. And now that you're using external geometry to optimize your IFDs, the generation part is very fast and doesn't require a large a number of machines.
+
+[Image:/images/ifd_workflows/hq_frames.png]
+
+NOTE: 
+     To render the HQueue examples below, you must first set up an HQueue farm and change __HQueue Server__ parameter to the server on your network. You'll also need to set __Target HFS__ to the `$HFS` value your clients are configured for. If you don't have HQueue set up, check out the links to HQueue documentation at the end of this section.
+
+The `mantra_bear_alembic_hq` ROP is identical to `mantra_bear_alembic`, except it's set to render a Frame Range, and the __Disk file__ checkbox on the _Driver_ tab is off. The `mantra_bear_alembic_hq` is wired to an [HQueue Render|/nodes/out/] node.
+
+[Image:/images/ifd_workflows/hq_rops.png]
+
+On the Hqueue node's __Mantra Options__ tab, the __Generate IFDs__ parameter is on, with an output path relative to `$HIP`. We've also changed __Assign IFD Job To__ from generating on the rendering client to be "Clients from Listed Groups". In this example, the group of IFD-generating machines is called `ifd-maker`. On the __Advanced__ tab, we assign the render jobs to "Clients from Listed Groups", but here we specify the group `ifd-render`. So clients in the the `ifd-render` group will render the IFDs as they are generated by the clients in the `ifd-maker` group.
+
+[Image:/images/ifd_workflows/hq_parms.png]
+
+If you render this node and open your HQueue Dashboard, there is a single job called _Generate IFDs_, and the rest are of the nodes are rendering. And if you want, take a look at your license manager; you'll see that none of these machines are using a Houdini or Houdini-Engine license; they're all using Render tokens.
+
+[Image:/images/ifd_workflows/hq_dash.png]
+
+You can render the the other HQueue nodes of the bear (bgeo, and vel) to compare. Each node renders 24 frames of animation, and once they all finish, you can compare the total size of 24 IFDs for each method:
+
+Job ||
+    Size ||
+        Size (`.sc` compressed) ||
+
+`mantra_bear_alembic_hq` | 
+    484Kb |
+        *328Kb*
+`mantra_bear_geo_samples_hq` | 
+    3.1Mb |
+        *1.8Mb*
+`mantra_bear_vel_hq` | 
+    1.9Mb | 
+        *1.3Mb*
+
+See also:
+
+* [HQueue Overview|/ref/hqueue]
+* [HQueue Help|http://www.sidefx.com/docs/hqueue/help/] (the [HQueue FAQs|http://www.sidefx.com/docs/hqueue/help/faqs.html] are particularly helpful)
+
+== Acknowledgements == (thnx)
+
+* Ari Danesh, Aliza Astrachan, Robert Vinluan, Mark Elendt, and everyone else part of SESI Support/Development for loads of patience, advice, and fixes
+* Batiste Perron for sharing his bear animation cycles
+* Alen Warren for the mimetype icons

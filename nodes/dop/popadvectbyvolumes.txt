@@ -1,0 +1,118 @@
+#type: node
+#context: dop
+#internal: popadvectbyvolumes
+#icon: POP/advectbyvolumes
+
+= POP Advect by Volumes =
+
+"""A POP node that uses velocity volumes to move particles."""
+
+The Advect by Volumes POP is designed to make it easy to advect a particle system by a fluid simulation.  Often the fluid simulation will be simulated as a separate pass and the velocity fields read off disk. However, the particles can be live-linked to an existing simulation.
+
+This operator modifies the `force`, `vel`, and `P` attributes.
+
+@parameters
+    [Include:standard_pop_parms#commonMain/]
+
+    == Parameters ==
+
+    Velocity Source:
+        The source of the velocity volumes.  The context geometry refer to the inputs of this DOP Network.
+    
+    SOP:
+        The SOP path which has three volumes to be interpreted as the x, y, and z components of the velocity field.  These are often the result of importing a velocity field from a fluid simulation.  You can directly link to a fluid simulation with something like `/obj/AutoDopNetwork:smoke/vel`.
+    
+    DOP Object:
+        The name of a DOP Object in the same simulation as this.
+    
+    Field Name:
+        The name of the velocity field in the DOP object.
+    
+    Velocity Scale:
+        A uniform scale to apply to the velocity field before any of the force applications.
+    
+    Advection Type:
+        There are several different ways to update a particle system in response to an external velocity field.  They are broadly categorized as Force, Velocity, and Position updates.
+
+        The __Update Force__ will adjust the acceleration of the particles according to the force scale, and the velocity field.  This acts like the [Force POP|Node:dop/popforce].
+
+        __Update Velocity__ directly changes the velocity of the particles by blending in the velocity field, causing them to swiftly match the velocity field.
+
+        __Update Position__ directly moves the particle positions.  This is useful as it allows the particles own velocity to be considered independently of the bulk fluid velocity.  __Update Position__ is similar to what the [Gas Advect DOP|Node:dop/gasadvect] would perform.
+
+    [Include:standard_pop_parms#treataswindParms/]
+    
+    Force Scale:
+        Scales the force for force update.
+    
+    [Include:standard_pop_parms#airresistanceParms/]
+
+    Remap Force:
+        Scale the force value by the force ramp, according to the `forceramp` variable in the VEXpression.
+
+    Force Ramp:
+        The ramp that is evaluated according to each particle's `forceramp` variable in the VEXpression.  This value should be in the range 0-1.
+
+    Velocity Blend:
+        In __Update Velocity__ mode, the amount to mix in the field velocity every timestep.
+    
+    Velocity Update:
+        In __Update Position__ mode it is possible to read in the velocity from the velocity field.
+        
+        NOTE:
+            The resulting velocity will be used by the particle integrator, so unless something special is done, this could result in double-moving the particle.
+
+    Advection Method:
+        The method used for advecting the particles.  The __Single Step__ method takes only a single
+        step in the velocity field, but the various __Trace__ methods can take multiple steps
+        within a voxel to avoid violating the __CFL Condition__.  These methods
+        are more accurate but take multiple velocity samples per step and are more expensive to evaluate.
+
+    CFL Condition:
+        When tracing the particles, this controls how many voxels may be stepped in a single iteration. Higher
+        values will result in faster tracing, and hence faster advection, but more errors.
+
+    [Include:popCommonParms#massParms/]
+
+    == Guide ==
+
+    Show Guide:
+        Controls if the guide geometry for this node should be shown. 
+    
+        NOTE:
+            This can also be disabled by using the __Hidden__ flag on the DOP Node.
+
+    Plane:
+        What axis to extract from the volume.
+
+    Offset:
+        Where the plane should be positioned inside the volume.  This is a
+        relative coordinate, with -1..1 being the total range, so 0 means the
+        center of the volume.
+
+    Resolution:
+        The resolution of the visualization relative to the source velocity field.
+
+    Range:
+        The speeds that correspond to the beginning and end of the visualization colors.
+
+    == Bindings ==
+
+    [Include:standard_pop_parms#bindingsParms/]
+
+@inputs
+    [Include:standard_pop_inputs]
+
+@outputs
+    [Include:standard_pop_outputs]
+
+@locals
+    [Include:standard_data_locals]
+
+    [Include:standard_locals]
+
+
+
+@related
+    - [Node:dop/poplocalforce]
+    - [Node:dop/popspinbyvolumes]

@@ -1,0 +1,211 @@
+= hou.Selection =
+#type: homclass
+#cppname: HOM_Selection
+#group: geo
+
+"""A class that represents a geometry component selection."""
+
+Component selections are not tied to any specific [Hom:hou.Geometry].
+Therefore most method on this class must be passed a Geometry object to look
+up information about individual components. This explicit separation allows
+the selection class to be used as a utility class for processing geometry
+topology (growing the set of components, shrinking it, finding the boundary,
+etc.). This separation also avoids any expectations that changing the
+contents of a selection object might be expected to update the selection
+visible on some goemetry in the viewport. Setting the visible viewport
+selection must always be an explicit operation on a [Hom:hou.SopNode] in order
+for Houdini to be able to track changes properly.
+
+If a selection object is returned from a call to [Hom:hou.Geometry#selection],
+[Hom:hou.GeometrySelection#selections], or a [Hom:hou.SopNode#selection], the
+selection cannot be modified. A copy of the selection must be made first with
+the `freeze()` method. This new selection can be modified, and passed back into
+a [Hom:hou.SopNode#setSelection] if desired. Because each SOP has a selection
+for each component type, when you set a new selection it will replace the
+existing selection of that component type. Note that this may not result in
+the visible selection in the viewport changing if the viewport is not
+currently configured to select that component type. The viewport selection
+type can be controlled with the [Hom:hou.SceneViewer] class. A selection
+created by calling any of the `hou.Selection()` initializer methods are
+created in a modifiable state, so a call to `freeze()` is not required.
+
+A selection returned from a [Hom:hou.Geometry] or a [Hom:hou.SopNode] is a
+reference to the source selection, and so will change if the selection on the
+source geometry is changed. This seems like a departure from the separation of
+selection objects from any particular geometry, however it matches the
+behavior of the [Hom:hou.Geometry] class returned from a SOP node. This is
+because the underlying selection data is shared with the SOP rather than
+copied. The `freeze()` method can be used to force a copy of the selection
+data that is disconnected from any particular SOP (as well as allowing the
+selection contents to be modified).
+
+@methods
+
+::`__init__(self, selection_type)`:
+    #cppname: HOM_Selection::HOM_Selection
+    Creates a new empty Selection object with one of the [Hom:hou.geometryType]
+    values passed as the `selection_type` to control the type of component
+    that can be part of this selection.
+
+::`__init__(self, geo, selection_type, selection_string)`:
+    #cppname: HOM_Selection::HOM_Selection
+    Creates a new Selection object with initial contents defined by a group
+    string evaluated on a particular Geometry object.
+
+    geo:
+	A [Hom:hou.Geometry] object that is used when evaluating the selection
+	string.
+
+    selection_type:
+	A [Hom:hou.geometryType] value to indicate the type of component that
+	will appear in this Selection.
+
+    selection_string:
+	Any string that might appear in a SOP Group parameter that describes
+	which components to include in the selection. This string may include
+	any features supported by SOP group parsing, such as group names,
+	numeric ranges, and attribute value tests.
+
+::`__init__(self, prims)`:
+    #cppname: HOM_Selection::HOM_Selection
+    Creates a new primitive component selection from the passed in sequence of
+    [Hom:hou.Prim] objects.
+
+::`__init__(self, points)`:
+    #cppname: HOM_Selection::HOM_Selection
+    Creates a new point component selection from the passed in sequence of
+    [Hom:hou.Point] objects.
+
+::`__init__(self, vertices)`:
+    #cppname: HOM_Selection::HOM_Selection
+    Creates a new vertex component selection from the passed in sequence of
+    [Hom:hou.Vertex] objects.
+
+::`__init__(self, edges)`:
+    #cppname: HOM_Selection::HOM_Selection
+    Creates a new edge component selection from the passed in sequence of
+    [Hom:hou.Edge] objects.
+
+::`freeze(self)` -> [Hom:hou.Selection]:
+    #cppname: HOM_Selection::freeze
+    Returns a copy of the Selection object. This copy can be modified with any
+    of the functions that alter the selection.
+
+::`invert(self, geo)`:
+    #cppname: HOM_Selection::invert
+    Using the supplied [Hom:hou.Geometry] object for reference, inverts the
+    current selection. The selection will contain only those components that
+    were not in the selection before this method call.
+
+::`convert(self, geo, selection_type)`:
+    #cppname: HOM_Selection::convert
+    Using the supplied [Hom:hou.Geometry] object for reference, converts the
+    current selection to the new [Hom:hou.geometryType].
+
+::`boundary(self, geo, uv_connectivity = False)`:
+    #cppname: HOM_Selection::boundary
+    Using the supplied [Hom:hou.Geometry] object for reference, changes the
+    selection to contain those components on the boundary of the current
+    selection. The `uv_connectivity` parameter controls whether to use
+    topology or uv attribute values to determine whether components are
+    connected.
+
+::`grow(self, geo, uv_connectivity = False)`:
+    #cppname: HOM_Selection::grow
+    Using the supplied [Hom:hou.Geometry] object for reference, adds to the
+    selection any components connected to the current selection. The
+    `uv_connectivity` parameter controls whether to use topology or uv
+    attribute values to determine whether components are connected.
+
+::`shrink(self, geo, uv_connectivity = False)`:
+    #cppname: HOM_Selection::shrink
+    Using the supplied [Hom:hou.Geometry] object for reference, removes from
+    the selection any components on the boundary of the current selection. The
+    `uv_connectivity` parameter controls whether to use topology or uv
+    attribute values to determine whether components are connected.
+
+::`combine(self, geo, selection, modifier)`:
+    #cppname: HOM_Selection::combine
+    Using the supplied [Hom:hou.Geometry] object for reference, combines this
+    selection with another.
+
+    geo:
+	A [Hom:hou.Geometry] object that is used when doing any selection
+	conversions.
+
+    selection:
+	A [Hom:hou.Selection] object that will be combined with the current
+	selection. If this selection does not have the same component type as
+	the current selection, an implicit conversion to the current component
+	type is performed before combining the selections.
+
+    modifier:
+	A [Hom:hou.pickModifier] value that controls how the selections will
+	be combined. This lets you perform a union, intersection, or other
+	operation on a pairs of selections.
+
+::`clear(self)`:
+    #cppname: HOM_Selection::clear
+    Removes all components from the current selection.
+
+::`selectionType(self)`:
+    #cppname: HOM_Selection::selectionType
+    Returns a [Hom:hou.geometryType] value indicating the type of component
+    referenced by this selection.
+
+::`numSelected(self)`:
+    #cppname: HOM_Selection::numSelected
+    Returns the number of components in the selection.
+
+::`prims(self, goe)` -> `tuple` of [Hom:hou.Prim]:
+    #cppname: HOM_Selection::prims
+    Returns a tuple of all primitives in the selection. If the selection does
+    not contain primitives, an implicit conversion to primitives is performed
+    to generate the return value.
+
+::`points(self, goe)` -> `tuple` of [Hom:hou.Point]:
+    #cppname: HOM_Selection::points
+    Returns a tuple of all points in the selection. If the selection does
+    not contain points, an implicit conversion to points is performed
+    to generate the return value.
+
+::`vertices(self, goe)` -> `tuple` of [Hom:hou.Vertex]:
+    #cppname: HOM_Selection::vertices
+    Returns a tuple of all vertices in the selection. If the selection does
+    not contain vertices, an implicit conversion to vertices is performed
+    to generate the return value.
+
+::`edges(self, goe)` -> `tuple` of [Hom:hou.Edge]:
+    #cppname: HOM_Selection::edges
+    Returns a tuple of all edges in the selection. If the selection does
+    not contain edges, an implicit conversion to edges is performed
+    to generate the return value.
+
+::`selectionString(self, geo, force_numeric = False, collapse_where_possible = True, asterisk_to_select_all = False)` -> `str`:
+    #cppname: HOM_Selection::selectionString
+    Returns a string that specifies the selected components. The format of
+    this string is appropriate for use in SOP Group parameter fields.
+
+    geo:
+	A [Hom:hou.Geometry] object that is used when generating the selection
+	string (such as determining if all components are selected).
+
+    force_numeric:
+	Set this to `True` to force the generated string to contain only numeric
+	ranges, even if the selection was constructed with group or attribute
+	based selection.
+
+    collapse_where_possible:
+	Set this to `True` to cause numeric ranges to be collapsed as much as
+	possible, regardless of the selection order. So for example if the
+	user selected primitive 3, then 2, then 1, the generated selection
+	string would either be '3 2 1' or '1-3' depending on this parameter.
+
+    asterisk_to_select_all:
+	When this parameter is set to `False`, if a selection contains all
+	components in the supplied geometry, the resulting value is an empty
+	string. This is appropriate when using the resulting string in a SOP
+	node Group parameter. If this parameter is set to `True`, a full
+	selection will return a value of '*' instead.
+
+

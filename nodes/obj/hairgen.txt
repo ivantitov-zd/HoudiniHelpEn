@@ -1,0 +1,410 @@
+#type:     node
+#context:  obj
+#internal: hairgen
+#icon:     OBJ/hairgen
+
+= Hair Generate =
+
+"""Generates hair from a skin geometry and guide curves."""
+
+Extracts the required skin and guide curves from a groom object such as a
+[Guide Groom|Node:obj/guidegroom], [Guide Deform|Node:obj/guidedeform] or
+[Guide Sim|Node:obj/guidesim]. These nodes can also write their groom data to
+files which can be imported by this node.
+
+The generated hair can be customized using tools from the __Guide Process__ and
+__Guide Brushes__ shelves.  These add SOP nodes to the editable network
+contained within this node.
+
+@parameters
+
+== Groom Source ==
+
+Loads the groom to generate hair for.
+
+[Include:/nodes/sop/fur_common#groomdata]
+
+[Include:/nodes/sop/fur_common#sourcemode]
+
+[Include:/nodes/sop/fur_common#sourcegroomobject]
+
+[Include:/nodes/sop/fur_common#sourcegroomfile]
+
+[Include:/nodes/sop/hairgen#group]
+
+[Include:/nodes/sop/fur_common#group]
+
+Use Animation:
+    #id: useanim
+
+    Generate hair using the input groom's animated skin and guides. When this is disabled, hair is generated in the rest position.
+
+Material:
+    #id: shop_materialpath
+
+    The material to render generated hair with. This is typically a [Hair Shader|Node:mat/hairshader]
+
+
+[Include:/nodes/sop/fur_common#skinvdb]
+
+== General ==
+
+=== Distribution ===
+
+[Include:/nodes/sop/hairgen#density]
+
+Seed:
+    #id: seed
+
+    The seed value used for scattering. Changing this generates a different
+    random distribution with the same density.
+
+[Include:/nodes/sop/hairgen#scatterrelaxiterations]
+
+
+=== Guide Interpolation ===
+
+[Include:/nodes/sop/hairgen#useguides]
+
+[Include:/nodes/sop/hairgen#uniformguidesegments]
+
+[Include:/nodes/sop/hairgen#skininterp]
+
+[Include:/nodes/sop/hairgen#guideblendmethod]
+
+[Include:/nodes/sop/hairgen#guidegroup]
+
+[Include:/nodes/sop/hairgen#influenceradius]
+
+[Include:/nodes/sop/hairgen#influencedecay]
+
+[Include:/nodes/sop/hairgen#maxguidecount]
+
+[Include:/nodes/sop/hairgen#maxguideangle]
+
+[Include:/nodes/sop/hairgen#clumpcrossover]
+
+=== Unguided Hairs ===
+
+[Include:/nodes/sop/hairgen#growunguided]
+
+[Include:/nodes/sop/hairgen#useinitdirattrib]
+
+[Include:/nodes/sop/hairgen#initdirattrib]
+
+[Include:/nodes/sop/hairgen#unguidedsegments]
+
+[Include:/nodes/sop/hairgen#unguidedlength]
+
+[Include:/nodes/sop/hairgen#unguidedminlength]
+
+=== Display ===
+
+Display As Subdivision Curves:
+    #id: displayassubd
+
+    Subdivide curves in the viewport for a smooth appearance.
+
+== Static Generation ==
+
+Perform Hair Generation and Editing at Rest:
+    #id: staticgen
+
+    Generate hair in the rest position, without time-dependency where possible.
+
+    When this is enabled, the editable SOP network contained in this operator
+    also operates on the hair at rest.
+
+    Deforms the hair using the guide curves afterward. This avoids any recooking of the contained groom operations with changing time. It is possible to cache a single frame using the __Rest Cache__ controls below.
+
+    Using this method, rendering can be performed by simply loading the rest
+    cache and deforming it using the stored weights.
+
+=== Capture ===
+
+[Include:/nodes/sop/guidedeform#guidecoverage]
+
+[Include:/nodes/sop/guidedeform#computeradius]
+
+[Include:/nodes/sop/guidedeform#radius]
+
+[Include:/nodes/sop/guidedeform#limitguidesegs]
+
+[Include:/nodes/sop/guidedeform#maxguidesegs]
+
+[Include:/nodes/sop/guidedeform#expandradius]
+
+[Include:/nodes/sop/guidedeform#expansioniters]
+
+[Include:/nodes/sop/guidedeform#expansionfactor]
+
+=== Rest Cache ===
+
+Load from Disk:
+    #id: loadresthairfromdisk
+
+    Load the rest hair from disk. This is stored with the capture weights
+    required for deformation.
+
+Geometry File:
+    #id: resthairfile
+
+    The file to the store rest cache in.
+
+Save to Disk:
+    #id: saveresthairfile
+
+    Save the rest cache to disk.
+
+=== Deform ===
+
+[Include:/nodes/sop/guidedeform#xformattribs]
+
+== Optimization ==
+
+=== General ===
+
+Bypass Editable SOP Network:
+    #id: bypasssopnetwork
+
+    Don't cook the editable SOP network contained in this node. Depending on
+    the SOPs contained inside, this can speed up hair generation substantially,
+    which can be useful while visualizing the effect of certain parameters or
+    changes in the groom source.
+
+Limit To Bounding Box:
+    #id: limittobbox
+
+    Only grow hair from root points that are within the bounding boxes defined
+    by the parameters below.
+
+Center:
+    #id: displaybboxcenter
+
+    The center of the bounding box.
+
+Size:
+    #id: displaybboxsize
+
+    The size of the bounding box.
+
+Prune:
+    #id: enablepruning
+    Prune a percentage of hair to speed up cooking.
+
+Pruning Ratio:
+    #id: pruneratio
+
+    The percentage of curves to prune.
+
+Thicken Remaining Hairs:
+    #id: prunethicken
+
+    Thicken the hairs left over after pruning to match the apparent density of
+    the unpruned hair.
+
+=== Adaptive Prune ===
+
+Adaptive Prune:
+    #id: aprune
+
+    Remove hair curves based on how large they are within a camera's view.
+
+    When elements become more distant, they are scaled down and eventually deleted.
+
+    Remaining elements are scaled up to preserve the visual density of the collection of elements as a whole.
+
+[Include:/nodes/sop/adaptiveprune#cam]
+
+[Include:/nodes/sop/adaptiveprune#screensizeunit]
+
+[Include:/nodes/sop/adaptiveprune#screensizethresh]
+
+[Include:/nodes/sop/adaptiveprune#screenagg]
+
+Seed:
+    #id: apruneseed
+
+    The seed value used in addition to the __Seed Attribute__ to randomize pruning per element.
+
+== Thickness ==
+
+Thickness:
+    #id: thickness
+
+    The thickness of generated hair at its thickest point.
+
+    [Include:fur_common#parmoverride]
+
+Thickness Ramp:
+    #id: thicknessramp
+
+    The profile of thickness along the length of each hair.
+
+== Attributes ==
+
+=== Skin Attribute Transfer ===
+
+[Include:/nodes/sop/hairgen#pointattribs]
+
+[Include:/nodes/sop/hairgen#vertattribs]
+
+[Include:/nodes/sop/hairgen#primattribs]
+
+[Include:/nodes/sop/hairgen#detailattribs]
+
+=== Guide Attribute Transfer ===
+
+[Include:/nodes/sop/hairgen#guidepointattribs]
+
+[Include:/nodes/sop/hairgen#guideprimattribs]
+
+=== Output Attributes ===
+
+Point Attributes:
+    #id: keeppointattribs
+
+    Point attributes to keep for rendering.
+
+Vertex Attributes:
+    #id: keepvertattribs
+
+    Vertex attributes to keep for rendering.
+
+Primitive Attributes:
+    #id: keepprimattribs
+
+    Primitive attributes to keep for rendering.
+
+Detail Attributes:
+    #id: keepdetailattribs
+
+    Detail attributes to keep for rendering.
+
+== Skin ==
+
+=== Subdivision ===
+
+Move Curves To Subdivision Surface:
+    #id: skinsubd
+
+    Moves the generated hair to subdivision limit surfaces. This should be
+    enabled when the underlying skin geometry is rendered as a subdivision
+    surface.
+
+Mode:
+    #id: skinsubdmode
+
+    Match Skin Object:
+	    Moves curves to the skin's limit surface when the skin geometry has subdivision rendering enabled.
+
+    Always On:
+	    Always move curves to the skin's subdivision limit surface, regardless of whether subdivision is enabled on the skin.
+
+=== Referenced Subdivision Values ===
+
+Enabled:
+    #id: skinsubdenabled
+
+    Displays whether subdivision is enabled on the skin geometry when subdivision mode is set to __Match Skin Object__.
+
+=== Displacement ===
+
+Displace Curves:
+    #id: displace
+
+    Apply displacement along the skin normal to the generated curves. This can
+    be used to match displacement shading applied to the skin geometry.
+
+    NOTE:
+	    Currently only __Displace Along Normal__ mode is supported.
+
+
+Mode:
+    #id: displacemode
+
+    Match Skin Shader (Only Supports Displace Along Normal):
+	    Attempts to find the skin shader referenced by this groom and uses it's displacement values.
+
+	    This is done by stepping along each referenced groom object to find a Guide Groom which has a reference to skin geometry. The shader assigned to the geometry's object is used to detect displacement values.
+
+    Match Specified Shader (Only Supports Displace Along Normal):
+	    Use the displacement values of a specified reference shader.
+
+    Displace Along Normal:
+	    Manually set displacement values.
+
+
+Reference Shader:
+    #id: displacerefshader
+    The shader used by __Match Specified Shader__ to find displacement parameter values.
+
+
+=== Displacement Values ===
+
+Texture:
+    #id: displacetex
+    The manually specified displacement texture.
+
+Offset:
+    #id: displaceoffset
+    The manually specified displacement texture value offset.
+
+Scale:
+    #id: displacescale
+    The manually specified displacement scale.
+
+
+=== Referenced Displacement Values ===
+
+Skin Shader:
+    #id: displaceskinshader
+    Displays the detected skin shader when __Mode__ is set to __Match Skin Shader__.
+
+Texture:
+    #id: displacereftex
+    Displays the referenced texture when a shader is detected or assigned and
+    when that shader has displacement set up and enabled.
+
+Offset:
+    #id: displacerefoffset
+    Displays the referenced offset when a shader is detected or assigned and
+    when that shader has displacement set up and enabled.
+
+Scale:
+    #id: displacerefscale
+    Displays the referenced scale when a shader is detected or assigned and
+    when that shader has displacement set up and enabled.
+
+== Render ==
+
+Hair Generation:
+    #id: vm_auto_engine_procedural
+
+    Use SOP Geometry:
+	    Render the same SOP geometry as the viewport.
+
+    Generate Geometry in Mantra:
+	    Generate hair geometry in the renderer. This allows rendering the full hair while using optimizations like __Limit to Bounding Box__ and __Pruning__ in the viewport.
+
+    NOTE:
+	    Generating hair in the renderer is only supported with Mantra.
+
+	    Rendering with 3rd party renderers is only possible when setting this parameter to __Use SOP Geometry__, which causes the full generated hair to be written prior to rendering.
+
+[IncludeProp:vm_rendervisibility]
+
+[IncludeProp:vm_rendersubd]
+
+[Include:common#render_tab]
+
+
+@locals
+
+
+@related
+- [Node:obj/guidegroom]
+- [Node:obj/guidedeform]
+- [Node:obj/guidesim]
+- [Node:obj/groommerge]
+

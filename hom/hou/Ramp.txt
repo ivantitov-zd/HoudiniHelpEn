@@ -1,0 +1,124 @@
+﻿= hou.Ramp =
+#type: homclass
+#cppname: HOM_Ramp
+#group: utility
+
+"""A Ramp represents a function that yields either floating point values or
+colors.  You can evaluate this function between 0.0 and 1.0, and the function's
+shape is determined by a sequence of values at key positions between 0.0 and
+1.0."""
+
+If you evaluate a ramp parameter on a node, Houdini will return a Ramp object.
+
+You can check the curve "basis" of a ramp you get from a parameter by calling
+the [Hom:hou.Ramp#basis] method,which returns a [Hom:hou.rampBasis] value.
+
+In the `Hermite` basis, the curve passes through the _odd_ control points,
+and the _even_ control points control the tangent at the previous point. See the
+[Wikipedia article on Hermite spline curves|Wp:Cubic_Hermite_spline]
+for more information.
+
+To get a smooth curve, you should evenly space the control points.
+
+@methods
+
+::`__init__(self, basis, keys, values)` -> `float`:
+    #cppname: HOM_Ramp::HOM_Ramp
+    #replaces: Cmd:opramp
+    `basis`:
+        A sequence of [Hom:hou.rampBasis] values, one for each key.  The
+        ramp basis for a key determines how Houdini interpolates from the
+        key up until the next key.  If there is no next key, Houdini will
+        hold the value constant until the end of the `[0,1]` domain, regardless
+        of the ramp basis.
+
+    `keys`:
+        A sequence of floats, one for each key, each between 0.0 and 1.0,
+        inclusive.  Each key represents the location in the `[0,1]` domain
+        of its corresponding value.
+
+    `values`:
+        A sequence of values, where each value corresponds to a key.  When
+        asked to evaluate at a value where there is no key, Houdini will
+	interpolate between adjacent values using the basis function for the
+	key on the left.
+
+        This sequence is _either_ a sequence of floats _or_ a sequence of
+        triples of floats.  In the former case, the newly-created ramp will
+        evaluate to a single floating-point value.  In the latter case, it
+        will evaluate to a color.
+
+    Raises [Hom:hou.InvalidSize] if the keys and values sequences are not
+    not same size, or if `values` contains subsequences of floats that are
+    not 3 elements long.
+
+    {{{
+    #!pycon
+    >>> lin = hou.rampBasis.Linear
+
+    # Create a ramp that linearly interpolates between 2.5 and 4.5.
+    >>> r = hou.Ramp((lin, lin), (0, 1), (2.5, 4.5))
+    >>> r
+    <hou.Ramp is_color=False num_keys=2 data=((t=0, 2.5), (t=1, 4.5))>
+    >>> r.lookup(0.0)
+    2.5
+    >>> r.lookup(0.5)
+    3.5
+    >>> r.lookup(1.0)
+    4.5
+
+    # Create a color ramp that linearly interpolates from black to red.
+    >>> hou.Ramp((lin, lin), (0, 1), ((0.0, 0.0, 0.0), (1.0, 0.0, 0.2)))
+    <hou.Ramp is_color=True num_keys=2 data=((t=0, rgb=(0, 0, 0)), (t=1, rgb=(1, 1, 1)))>
+    }}}
+
+::`isColor(self)` -> `bool`:
+    #cppname: HOM_Ramp::isColor
+    Return True if this is a color ramp, and False if it is a single float
+    ramp.
+
+::`colorType(self)` -> `colorType`:
+    #cppname: HOM_Ramp::colorType
+    If this is a color ramp, return the color space that is used during
+    interpolation.  The default is [Hom:hou.colorType#RGB].
+
+    Raises [Hom:hou.OperationFailed] if this ramp is not a color ramp.
+
+::`setColorType(self, hou.colorType)`:
+    #cppname: HOM_Ramp::setColorType
+    If this is a color ramp, set the color space that is used
+    during interpolation.  The default is [Hom:hou.colorType#RGB].
+    
+    To obtain a more perceptually uniform interpolation, use [Hom:hou.colorType#LAB].
+    To obtain a ramp that matches the rainbow, use [Hom:hou.colorType#HSV].
+
+    Raises [Hom:hou.OperationFailed] if this ramp is not a color ramp.
+
+::`lookup(self, interpolant)` -> `float` or `tuple`:
+    #cppname: HOM_Ramp::lookup
+    Return the value of the ramp at a specified position from 0.0 to 1.0,
+    inclusive.
+
+    Returns a float (for floating-point value ramps) or a tuple of 3 floats
+    (for color ramps).
+
+::`basis(self)` -> `tuple` of [Hom:hou.rampBasis] enum values:
+    #cppname: HOM_Ramp::basis
+    Return a tuple of [Hom:hou.rampBasis] enumeration values that determine how
+    Houdini interpolates between the keys in the ramp.  See
+    [Hom:hou.Ramp#__init__] for more information.
+
+::`keys(self)` -> `tuple` of `float`:
+    #cppname: HOM_Ramp::keys
+    Return a tuple of floats between 0.0 and 1.0 containing the ramp key
+    positions.  See [Hom:hou.Ramp#__init__] for more information.
+
+::`values(self)` -> `tuple` of `float` or `tuple` of `tuple` of `float`:
+    #cppname: HOM_Ramp::values
+    Return a tuple of floats (for a float ramp) or a tuple of tuples of 3
+    floats (for a color ramp) corresponding to the values in the ramp stored
+    at each key.  See [Hom:hou.Ramp#__init__] for more information.
+
+@related
+- [Vex:spline]
+

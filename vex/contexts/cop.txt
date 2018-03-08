@@ -1,0 +1,260 @@
+#type: vexcontext
+
+= cop2 =
+
+"""Define a custom COP operator with a program that sets RGBA or
+Cr,Cg,Cb,C4 values in an image."""
+
+The COP evaluation works by setting either the R, G, B, A or the Cr,Cg,
+Cb,C4 variables. The variables are initialized to the color of the first
+input (or zero for R, G, B and 1 for A if there is no input). It then
+calls the COP function. If any of the variables are modified, then they
+will be used to determine the new color for the current pixel.
+
+The RGBA variables are for programmer convenience; they read and write
+directly to the Color and Alpha planes. Reading from RGB and A will give
+you the value of the first input's color plane and alpha plane. If one
+or both of these planes do not exist, 0 will be returned. If you are
+writing to R, G, B or A and either Color and/or Alpha doesn't exist, the
+planes will be created for you. If you only write to R, a full Color
+plane will be created, but with the G and B channels set to 0.
+
+The channel variables, Cr to C4, are more flexible. They allow you to
+write to any plane's channels. If a channel of a plane does not exist
+and you write to it, nothing happens. For example, when cooking the
+Alpha plane (with only 1 channel), if Cg, Cb or C4 is written to, the
+data is lost; only Cr is valid. However, no error occurs, since it is
+possible to have planes with different sizes in the same sequence. You
+can read from a channel variable in exactly the same way as reading from
+the R,G,B and A variables. The channel variable will be filled with the
+pixel values from the plane in the first input corresponding to the one
+being cooked. You should not mix writing to R,G,B,A and Cr,Cg,Cb,C4 in
+the same VEX function. While it will not harm anything, it can lead to
+confusing results if you are writing different things to R and Cr and
+the function is cooking the Color plane.
+
+
+@globals
+
+::XRES:
+    #type: int
+    #mode: r
+    
+    Horizontal resolution (in pixels) of the image being processed.
+
+::YRES:
+    #type: int
+    #mode: r
+    
+    Vertical resolution (in pixels) of the image being processed.
+
+::AR:
+    #type: float
+    #mode: r
+    
+    Aspect ratio of the image being processed.
+
+::R:
+    #type: float
+    
+    Red value of the current pixel, a floating point number between 0
+    and 1. If the COP does not have a color plane (C), one will be
+    created.
+
+::G:
+    #type: float
+    
+    Green value of the current pixel, a floating point number between 0
+    and 1. If the COP does not have a color plane (C), one will be
+    created.
+
+::B:
+    #type: float
+    
+    Blue value of the current pixel, a floating point number between 0
+    and 1. If the COP does not have a color plane (C), one will be
+    created.
+
+::A:
+    #type: float
+    
+    Alpha value of the current pixel, a floating point number between 0
+    and 1. If the COP does not have an alpha plane (A), one will be
+    created.
+
+::Cr:
+    #type: float
+    
+    Value of plane component 1. Unlike R, this represents the current
+    plane's values.
+
+::Cg:
+    #type: float
+    
+    Value of plane component 2. Unlike G, this represents the current
+    plane's values.
+
+::Cb:
+    #type: float
+    
+    Value of plane component 3. Unlike B, this represents the current
+    plane's values.
+
+::C4:
+    #type: float
+    
+    Value of plane component 4. Unlike A, this represents the current
+    plane's values.
+
+::PNAME:
+    #type: string
+    #mode: r
+    
+    Name of the current plane being cooked.
+
+::PL:
+    #type: int
+    #mode: r
+    
+    Index of the current plane being cooked.
+
+::NP:
+    #type: int
+    #mode: r
+    
+    Number of planes in the image (for example, for an RGBA image this
+    would be 2 since the COP contains 2 planes, Color and Alpha).
+
+::PS:
+    #type: int
+    #mode: r
+    
+    Size of the current plane being cooked (the number of channels).
+
+::AI:
+    #type: int
+    #mode: r
+    
+    Array index of the current plane that is being cooked (from 0 to
+    AS-1).
+
+::AS:
+    #type: int
+    #mode: r
+    
+    Array size of the current plane.
+
+::I:
+    #type: int
+    #mode: r
+    
+    Index number of the current image, starting at 0.
+
+::NI:
+    #type: int
+    #mode: r
+    
+    Number of images in the sequence.
+
+::H:
+    #type: float
+    #mode: r
+    
+    Hue of the current pixel, a floating point number from 0 to 1. HSV
+    is calculated based on the Color plane (C), not the current plane.
+
+::S:
+    #type: float
+    #mode: r
+    
+    Saturation of the current pixel, a floating point number from 0 to
+    1.
+
+::V:
+    #type: float
+    #mode: r
+    
+    Value (or intensity) of the current pixel, a floating point number
+    from 0 to 1.
+
+::X:
+    #type: float
+    #mode: r
+    
+    Horizontal location of the center of the current pixel being shaded
+    in the range 0 to 1. Zero being the left hand side of the image, and
+    1 being the right hand side.
+
+::Y:
+    #type: float
+    #mode: r
+    
+    Vertical location of the center of the current pixel being shaded in
+    the range 0 to 1. Zero being the bottom of the image, and 1 being
+    the top.
+
+::IX:
+    #type: int
+    #mode: r
+    
+    Horizontal position of the pixel currently being shaded. This will
+    be in the range of (0, XRES-1).
+
+::IY:
+    #type: int
+    #mode: r
+    
+    Vertical position of the pixel currently being shaded. This will be
+    in the range of (0, YRES-1).
+
+::SF:
+    #type: int
+    #mode: r
+    
+    Starting frame of the current sequence.
+
+::EF:
+    #type: int
+    #mode: r
+    
+    End frame of the current sequence.
+
+::F:
+    #type: int
+    #mode: r
+    
+    Frame number of the current image.
+
+::FR:
+    #type: int
+    #mode: r
+    
+    Frame rate of the current sequence.
+
+::TIME:
+    #type: float
+    #mode: r
+    
+    Time of the current image.
+
+::TINC:
+    #type: float
+    #mode: r
+    
+    Time increment between frames at the global frame rate.
+
+::PXSC:
+    #type: float
+    #mode: r
+
+    The pixel scale that is currently being used in the cook. At 50%
+    resolution, this global will have a value of 0.5. This is useful for
+    scaling any kernels, pixel translations and lengths so that proxy
+    images look similar to the full resolution result.
+
+
+@subtopics Functions
+
+:list:
+    #query: type:vex (context:cop2 OR context:cop)
+

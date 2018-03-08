@@ -1,0 +1,86 @@
+= Constraints =
+
+#bestbet: constraints
+
+The most common way to create constraints is using the [Constraint shelf tools|/shelf/constraints]. These tools will create a constraint network where you can constrain objects to each other in the scene view.
+
+* [Look At|/shelf/lookat] will modify the orientation of an object to make it point at at target. 
+* [Follow Path|/shelf/constraintpath] will position an object on a curve or path and orient it following the path direction, picking up twist or other attributes from the path.
+* [Blend|/shelf/constraintblend] will blend the current object transform with other objects.
+* [Parent Blend|/shelf/constraintparentblend] will blend the transform of the current parent with other objects and apply the current local object local transform on top.
+* [Points|/shelf/constraintpoints] will position and orient the current object using point attributes from a SOP node. It can also be used to get the closest point on geometry.
+* [Surface|/shelf/constraintsurface] will position and orient the current object using interpolated surface attributes from a SOP node. It can use UV space, parametric coordinates, or closest distance to the geometry surface.
+* [Blend Pose|/shelf/blendpose] will create a series of relationships between several objects, where target objects will react to driver objects.
+
+You can also access the tools on the [Constraint shelf|/shelf/constraints] by using the Rigging radial menu.
+
+# Select __Rigging__ from the radial menu dropdown list.
+# Press ((C)) in the viewport.
+# Hover over __Constraints__ and select one of the tools.
+
+[Image:/images/constraints/radial1.png]
+
+[Image:/images/constraints/radial2.png]
+
+== Using the constraint shelf tools ==
+
+* Clicking a shelf tool will start a picking session. The first pick is always to select the object on which you want to create the constraint (the object you want to modify).
+
+* If you select multiple objects at the same time on this first pick session, a new constraint will be created on each object.
+
+* If you already have a selection when you trigger a shelf tool, these objects will be used as the first pick session.
+    
+* If you used the Constraints drop down button, the first pick session is filled automatically by nodes selected in the parameter panel.
+
+* Some shelf tools, such as [Look At|/shelf/lookat] and [Follow Path|/shelf/constraintpath], have optional picking sessions. You can simply press ((Enter)) to continue to the next session.
+
+* The shelf tools always append new nodes after the node with the Output flag.
+
+* All shelf tools have a __Keep Position__ mode where the constraint is applied in such a way that the object doesn't move on creation. See [Object Offset|Node:chop/constraintobjectoffset] for more information.
+
+* Check the [Constraint shelf tools|/shelf/constraints] Toolbox parameters for more options, such as the blend mask controls, blend mode, weight, keep position, and add keyframe.
+
+* If the __Constraint Path__ is empty when a constraint is first created, a `constraints` CHOP network is created and a [Get World Space CHOP|Node:chop/constraintgetworldspace] node is created inside.
+
+== Creating an empty constraint ==
+
+Select an object and use the [tab menu|/basics/tabmenu] to create a __Constraints Network__. If the object node already has a valid __Constraints Network__, the network editor syncs to the node with the Output Flag.
+
+== Useful CHOPs ==
+
+* [Get Local Space CHOP|Node:chop/constraintgetlocalspace] to access local transformations on objects.
+
+* Transform CHOP nodes to apply local transformation on top of an existing constraint.
+
+* [Simple Blend CHOP|Node:chop/constraintsimpleblend] isolates the blending of transform in those nodes.
+
+* [Object(Constraints) CHOP|Node:chop/constraintobject] to pull a transform from an external object.
+* [Pose CHOP|Node:chop/pose] to capture/lock a transform in a pose and use it later. This can also be used to lock a rig controller like a twist affector in world space.
+
+* [Null CHOP|Node:chop/null] nodes as markers in your Network.
+
+* [Fetch CHOP|Node:chop/null] nodes to carefully query another constraint network marker instead of fetching the final transform. This is really important to avoid introducing evaluation cycles when you start stacking constraints on multiple objects. For example, first a hand picks a prop and then you want the prop to drive the hand.
+
+NOTE:
+    Make use of the secondary inputs such as __Lookat__, __Up__, and __Pivot__ to create procedural setups.
+    
+TIP:
+    You can use more than one surface constraint, and mix the results together to get an average position.
+
+== Using Constraints with locked digital assets ==
+
+You can still apply object constraint to object nodes that are part of a locked digital asset. If the default constraint path points to a locked digital asset, a CHOP network named after the digital asset will be created to hold constraints for object nodes.  An [Export CHOP|Node:chop/export] constraint is created next to the usual CHOP constraint nodes and uses CHOP exports to override the __Enable Constraints__ toggle and the __Constraints__ path parameter inside of the digital asset. 
+
+NOTE:
+    [Export CHOPs|Node:chop/export] can override parameter values inside locked HDAs.
+        
+If the object node inside of the digital asset already has a constraint network, a new constraints network will also be created, but it will start with a [Fetch CHOP|Node:chop/fetch] rather than a [Get World Space CHOP|Node:chop/constraintgetworldspace] node. This way, if the constraint inside of the rig changes, the external constraint will pick the change and continue to work.
+
+== Tips and Notes ==
+
+* The [Channel Wrangle CHOP|Node:chop/channelwrangle] gives you a quick way to write custom constraints in VEX.
+
+* By default, constraints nodes are created in __Use Current Frame__ mode, which makes the node evaluate a single frame at a time. In some situations you may want to switch the nodes to  __Full Animation Range__ mode and apply time based CHOP effects, such as [Filter CHOP|Node:chop/filter] or [Lag CHOP|Node:chop/lag] to smooth animation paths or save animation clips to file.
+
+* By default, constraints nodes are created using a sampling rate that matches the current FPS of the __Global Animation Range__. It's important to correctly set the sampling rate if you want motion blur to work properly at render time. For example, set it to 240 instead of 24.
+

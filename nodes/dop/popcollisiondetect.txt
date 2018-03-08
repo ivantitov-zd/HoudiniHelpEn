@@ -1,0 +1,179 @@
+#type: node
+#context: dop
+#internal: popcollisiondetect
+#icon: POP/collision
+
+= POP Collision Detect =
+
+"""A POP node that detects and reacts to collisions."""
+
+== Overview ==
+
+The POP Collision Detect node finds collisions between particles and geometry.  It stores the resulting collision information in a set of hit attributes:
+
+`i@hittotal`:
+    The cumulative total of particle hits.
+`i@hitnum`:
+    The number of times the particle hit in this detection node.
+`s@hitpath`:
+    A path to the object it hit.  This is an op: path so it can be used directly by VEX.
+`i@hitprim`:
+    The primitive the object hit.  Can be -1 if the specific primitive could not be resolved.
+`v@hituv`:
+    The parameteric location on the primitive of the hit.  This is not texture uvs.  The `primuv()` VEX function can be used to recover information about the hit location.
+`v@hitpos`:
+    The location in space of the collision.  Often does not correspond to the current location of the particle as it usually passes through the collision.  Also may not correspond to the evaluated location of the `hitpath` since intra-frame collisions use swept geometry.
+`v@hitnml`:
+    The normal of geometry at the time of the collision.
+`v@hitv`:
+    The velocity of the geometry at the time and position of the collision.
+`@hittime`:
+    When, in seconds, the collision occurred.
+
+You can read the hit attributes directly, or use the [POP Collision Behavior|Node:dop/popcollisionbehavior] node to transform them in some common ways.
+
+== Tips and notes ==
+
+* For simple RBD collisions, you can use the controls on the __Collision Behavior__ tab of the [POP Solver|Node:dop/popsolver].
+
+* This node detects collisions of all particles in the __Group__ field, _even if they already collided_. So if you're sticking particles, this node will update the `hittime` of stuck particles at each time step.
+
+    To avoid this, you can specify the __Group__ as `@stuck=0`, so the node only affects particles that aren't stuck.
+
+* In SOP mode, this node only supports collisions with triangles and quads. You can detect collisions with SDFs using the Relationship or DOP Objects and pointing to Static Objects.
+
+* This does not handle dynamic collision response, such as bouncing. Instead, [static|Node:dop/staticobject] or [RBD objects|Node:dop/rbdobject] should be added to the system.
+
+This operator modifies the `hitnum`, `hitpath`, `hitprim`, `hituv`, `hitv`, `hitpos`, `hitnml`, `hittime`, `P`, `Cd`, `stopped`, `stuck`, `sliding`, `pospath`, `posuv`, and `posprim` attributes.
+
+For more information see [Particle Collisions|/dopparticles/collisions].
+
+[Include:/shelf/dynamics_popcollision#includeme]
+
+@parameters
+
+[Include:standard_pop_parms#commonMain/]
+
+[Include:standard_pop_parms#guideParms/]
+
+== Collision ==
+
+Collision Target:
+    What geometry to do collision detection with.  This must be a quad and tri mesh.  The mesh can be deforming, in which case its connectivity must remain constant.
+
+    Relationship:
+        All DOP Objects with this relationship (as usually defined by Merge DOPs) to this object will be tested.
+
+    DOP Objects:
+        A specific list of DOP objects within _this_ simulation will be tested.
+
+    SOP:
+        Use specific SOP.
+
+    Use Xth Context Geometry:
+        Use one of the SOPs wired into this DOP network.
+
+Relationship:
+    The type of relationship to do collision detection with.
+
+DOP Objects:
+    A list of DOP Objects.  Patterns like `*` can be used to match multiple objects.  These refer to objects inside of this simulation.
+
+SOP Path:
+    The path to a SOP to fetch geometry from.
+
+Use Deforming Geometry:
+    The geometry at the beginning and ending of the particle's motion will be fetched and swept to allow proper collision during the geometry's motion.  However, if the geometry has changing point counts this cannot be done, and instead only a single frame should be used.
+
+Default Particle Size:
+    To allow robust collision detection the particles are treated as finite-sized spheres.  By default `pscale` is used, but if the `pscale` attribute is missing then this size is used.
+
+== Behavior ==
+
+Accumulate Hits:
+    Normally the hit attribute, `@numhit`, will be zeroed out before collision detection is performed.  If this is set, it will not be cleared, allowing you to count the total number of hits over a lifetime of a particle.  However, this will cause the other options, such as __Group__, to continue to see the particle as hitting every frame since they use this variable to detect if any hits occurred.  Another option is to use a [POP Wrangle|Node:dop/popwrangle] with `i@totalhit += i@numhit;` to create a total hit attribute that accumulates.
+
+Group Name:
+    All particles that just hit, ie, `@numhit>0`, will be added to this group.
+Preserve Group:
+    If the group isn't preserved, it is cleared out first so the only particles in the group will be those that just hit. If it is preserved, the group will accumulate all particles that ever hit.
+Color Hits:
+    Particles that are just hit will have their `Cd` attribute set to this value.  This is useful for quick visualization of hits.
+Add Hit Total:
+    Adds to the integer `hittotal` attribute any hits that occurred due to this collision detection.
+Move to Hit:
+    Often if you want to trigger an effect off a particle's collision, such as birthing more particles, you want the particle at its hit location, not where it ended up at the
+    end of the frame.  This will move the particle back to its hit location.  This consists of `@P = v@hitpos;`
+
+Response:
+    What happens to particles that collide
+
+    Die:
+        Particles that hit will set the `dead` attribute to 1, causing them to be deleted during the reaping pass.
+        
+    Stop:
+        This sets the `stopped` attribute to 1.  Particles that stop will no longer integrate their velocity, position, orientation, or angular velocity.  They can still be moved directly. For example, by the [Look At POP|Node:dop/poplookat] in instantaneous mode.
+        
+    Stick:
+        Particles that hit will have the `stuck` attribute set to 1.  The `pospath`, `posprim`, and `posuv` attributes will be setup to point to the hit location, causing the integrator to keep moving the particles to their stuck location every frame.  Usually you also want to turn on __Move to Hit__ with this.
+        
+        This node will continue to consider stuck particles as "colliding" and update the attributes at each time step. To avoid this, you can specify the __Group__ as `@stuck=0`, so the node only affects particles that aren't stuck.
+        
+    Slide:
+        Particles that hit will have the `sliding` attribute set to 1.  The `pospath`, `posprim`, and `posuv` attributes will be setup to point to the hit location, causing the integrator to try to slide the particles along the surface.
+        
+        You can also use the __Cling__ attribute on the [POP Property|Node:dop/popproperty] node to set how much the particles will cling to the object they are sliding on.
+        
+== Attributes ==
+
+Add Hit Total Attribute:
+    Adds the integer attribute `hittotal` that stores the cumulative total number of times the particle has collided with anything.
+
+Add Hit Num Attribute:
+    Adds the integer attribute `hitnum` that stores the number of times the particle has collided in this particular node.
+
+Add Hit Pos Attribute:
+    Adds the vector attribute `hitpos` that stores the position that the particle collided.
+
+Add Hit Normal Attribute:
+    Adds the vector attribute `hitnml` that stores the normal of the geometry at the time of the collision.
+
+Add Hit Velocity Attribute:
+    Adds the vector attribute `hitv` that stores the velocity
+    of the geometry at the time of the collision.  For SDF collisions
+    this will use the point velocity, so either point numbers should
+    be consistent or point velocity attributes present.
+
+Add Hit Time Attribute:
+    Adds the float attribute `hittime` that stores the time in seconds of the collision.
+
+Add Hit Path Attribute:
+    Adds the string attribute `hitpath` that stores the object that the particle collided.  This is an op: path usable in VEX.
+
+Add Hit Prim Attribute:
+    Adds the integer attribute `hitprim` that stores the primitive hit by the particle.  -1 if the primitive cannot be determined.
+
+Add Hit UV Attribute:
+    Adds the vector attribute `hituv` that stores the parametric coordinates of where the primitive was hit.  This is not texture UVs.
+
+== Bindings ==
+
+[Include:standard_pop_parms#bindingsParms/]
+
+@inputs
+
+[Include:standard_pop_inputs]
+
+@outputs
+
+[Include:standard_pop_outputs]
+
+@locals
+
+[Include:standard_data_locals]
+
+[Include:standard_locals]
+
+@related
+- [Node:dop/popcollisiondetect]
+

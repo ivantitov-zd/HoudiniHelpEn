@@ -1,0 +1,209 @@
+= Cloud =
+
+#type: node
+#context: sop
+#internal: cloud
+#icon: SOP/cloud
+#tags: create, model, volumes, clouds
+
+"""Creates a volume representation of source geometry."""
+
+This node takes an existing polygon or point cloud source geometry and create a volume representation.  Optionally it can create additional secondary details to create more cloud like appearance. 
+
+NOTE:
+    The workflow is intended to generate clouds without needing to simulate for fast results. Animation to the cloud shape can be achieved by using various Offset parameters (see demo file in the Help). If a simulation is required PyroFX->Billow Smoke is a good start (with slow time scale and things like buoyancy).
+
+@parameters
+
+== Volume ==
+
+The first stage in creating a cloud is to create a VDB that represents the cloud volume.  These parameters control how that is performed.
+
+Source:
+        Controls how the incoming geometry is interpreted.
+
+Polygon Model:
+    The source should be a closed, watertight, polygonal mesh.
+
+Point Cloud Model:
+    The source is a cloud of points.
+    
+    NOTE:
+        This does not work with the shape scattering.
+
+Point Radius Scale:
+        When stamping a point cloud model, the `pscale` attribute will be scaled by this amount.
+
+Uniform Sampling:
+        It is useful to make sure voxels in a volume are cubes.  This option allows the resolution of the volume to be specified without having to worry about matching the size and resolution fields. The maximum axis will be used for the division.
+
+Uniform Sampling Divs:
+        The number of voxels to divide the maximum axis into. The other axes will be divided into the number of cells that fit for this voxel size.
+
+Div Size:
+        The uniform size of the voxels, when specifying the voxel size directly.  The given sized box will be filled by voxels of this size.
+
+Use World Space for Band:
+        Determines the width of the converted VDB in terms of worldspace rather than voxels.
+
+Half-Band Voxels:
+        How many voxels outside the point sphere to fill in the generated VDB (when __Use world space for band__ is off).
+
+Half-Band:
+        How many Houdini units outside the point sphere to fill in the generated VDB (when __Use world space for band__ is on).
+
+Max Half-Width:
+        The maximum allowed half-width in voxel units.  Avoids inadvertent excessive computation of extraordinarily wide bands when world space band computation is used.
+
+Exterior Band Voxels:
+        How many voxels outside the surface to fill in the generated VDB (when __Use world space for band__ is off).
+
+Exterior Band:
+        How many Houdini units outside the surface to fill in the generated VDB (when __Use world space for band__ is on).
+
+Interior Band Voxels:
+        How many voxels inside the surface to fill in the generated VDB (when __Use world space for band__ is off).
+
+Interior Band:
+        The distance to compute the distance field inside the mesh.
+
+
+== Density ==
+
+These options control the conversion of the SDF version of the object into a fog version of the object.
+
+Density Multiplier:
+    Overall multiplier for final density.
+
+Density Ramp:
+    Ramp lookup for density field.  This controls how the density falls off across the boundary of the object.  The length of the boundary fall off is controlled by the interior bandwidth specified in the Volume page.
+
+== Scatter Shapes ==
+
+The provided geometry can optionally be filled with a cloud of spheres. These then create a puffy cloud like version of the object.
+
+Spatial Scale:
+    This sets the spatial scale used by the scene. It will be modified by the __Unit Length__ specified in the Houdini preferences on node creation. For default Houdini units of 1m, this will be set to 1. If working in centimeters, this will be set to 100. It can be further modified if needed. 
+
+Visualize As Polygons:
+    Display the resulting geometry as polygons.
+
+Smoothing:
+    Smooths the generated surface prior to converting to fog.  This rounds out sharp internal corners that tend to form where spheres intersect.
+
+Voxel Radius:
+    The number of voxels to run the smooth operation over. This is measured in voxels, not distance. This distance defines a cube, so increasing the radius will exponentially increase the work.
+
+Fill Source:
+    Fill the source input with spherical shapes.
+
+Random Seed:
+    Random seed used in jittering positions.
+
+Shape Size:
+    Overall size of the spherical shapes.  This is measured in world space.  If it is too small compared to the voxel size specified on the __Volume__ tab, the points won't be added to the final object.  If it is too large, no points may be selected inside of the object.
+
+Scatter Multiplier:
+    Overall multiplier on the amount of shapes generated when filling source.
+
+Noise Min:
+    Minimum scale of generated shapes.
+
+Noise Max:
+    Maximum scale of generated shapes.
+
+Noise Frequency:
+    Frequency of the noise used in random scaling.
+
+Noise Offset:
+    Noise offset used in random scaling.
+
+Secondary Shapes:
+    Create additional shapes on top of the source geometry.
+
+Use Painted Attrib:
+    You can paint a custom attribute which will determine where additional geometry is created.
+
+Scatter Attrib:
+    Name of the custom attribute.
+
+Iterations:
+    Number of loops used to build up secondary shapes.
+
+Random Seed:
+    Random seed used when generating secondary geometry.
+
+Shape Size:
+    Overall size of the secondary shapes generated.
+
+Scale Multiplier:
+    Multiplier of scales of secondary shapes.
+
+Noise Min:
+    Minimum scale of secondary shapes.
+
+Noise Max:
+    Maximum scale of secondary shapes.
+
+Noise Frequency:
+    Frequency of the noise used in random scaling.
+
+Noise Offset:
+    Noise offset used in random scaling.
+
+Up Vector Falloff:
+    Scaling of secondary shapes relative to an up vector.
+
+Up Vector:
+    User specified __Up Vector__.
+
+Angle:
+    Angle relative to the up vector that will be used when scaling secondary shapes.
+
+Bias:
+    How quickly the scale is affected by the __Angle__ relative to the __Up Vector__.
+
+Billow Offset:
+    Transforms the secondary shapes away or towards each other.
+
+    TIP:
+	Animating the __Billow Offset__ can provide a slow changing movement effect
+
+Density Offset:
+    Transforms the secondary shapes based on their proximity to each other.
+
+X Axis Shape Profile:
+    Adjusting this curve will allow for shaping of the x axis profile of the generated secondary shapes.
+
+Y Axis Shape Profile:
+    Adjusting this curve will allow for shaping of the y axis profile of the generated secondary shapes.
+
+Z Axis Shape Profile:
+    Adjusting this curve will allow for shaping of the z axis profile of the generated secondary shapes.
+
+== Flatten ==
+
+The flatten operation applies a non-linear stretch to the cloud.  This can be very useful for flattening out the bottom of thunder clouds.
+
+Flatten:
+    Enables flatting controls which can be used to flatten parts of the cloud object.
+
+Flatten Origin:
+    Center origin where the flatten effect will be based on.
+
+Flatten Up Vector:
+    Direction in which the flatten effect will occur.
+
+Top Scale:
+    Controls the amount of flatten/stretch effect above the origin along the up vector.
+
+Bottom Scale:
+    Controls the amount of flatten/stretch effect below the origin along the up vector.
+
+
+@related
+
+- [Node:sop/vdbfrompolygons]
+- [Node:sop/vdbfromparticles]
+- [Node:sop/isooffset]
+

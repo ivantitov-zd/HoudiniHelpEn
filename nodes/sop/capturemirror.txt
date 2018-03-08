@@ -1,0 +1,163 @@
+= Capture Mirror =
+
+#type: node
+#context: sop
+#internal: capturemirror
+#icon: SOP/capturemirror
+#tags: capture, character, attrs, flip
+
+"""Copies capture attributes from one half of a symmetric model to the other."""
+
+A correspondence is established between each point
+of the source side of the model (the side in which the arrow is on) with
+the closest mirrored point on the destination side. This allows you to
+paint capture weights (using the [Capture Layer Paint
+SOP|Node:sop/capturelayerpaint]) on one half of a character, and have
+those weights applied to the other half.
+
+Before mirroring capture weights, your skin geometry must be captured to
+bones or metaballs using the [Bone Capture SOP|Node:sop/capture], the
+[Bone Capture Proximity SOP|Node:sop/captureproximity], or the [Capture
+Metaball SOP|Node:sop/capturemeta]. Both the source (From) and
+destination (To) regions or metaball groups have to be specified in this
+initial capture.
+
+The From and To fields specify a list of capture regions or metaball
+groups that are to be mirrored. Both the from and to list orders are
+important; capture regions are matched by their orders in their
+respective lists. For example, to mirror the right arm to the left arm
+one might have:
+
+`From`: `"ruparm/cregion 0" "rlowarm/cregion 0" "rhand/cregion 0"`
+
+`To`: `"luparm/cregion 0" "llowarm/cregion 0" "lhand/cregion 0"`
+
+Pattern substitution rules may be used for the `From` and `To` parameters,
+please see the examples in [Attrib String Edit|Node:sop/attribstringedit].
+
+[Include:/shelf/mirrorcaptureweightsweights#includeme]
+
+@parameters
+    Group:
+        #channels: /group
+
+        Specifies a subset of points to affect.
+    Use Group As:
+        #channels: /usegroupas
+
+        Specifies whether the Group field specifies the set of source or
+        destination points.
+    Capture Type:
+        #channels: /capturetype
+
+	Whether to use [Bone Capture|Node:sop/capture], [Muscle
+	Capture|Node:/sop/musclecapture] or [Metaball
+	Capture|Node:sop/capturemeta] when mirroring. That is, whether to
+	mirror the `boneCapture`, `muscleCapture` or `metaCapture` attributes.
+    Behavior:
+        #channels: /mirrorop
+
+        How to treat unspecified capture regions. These also change the
+        behavior of the capturing. Each choice is associated with a
+        different workflow.
+
+
+        Copy Unmirrored Captures:
+            With this option, the destination point's capture weights
+            are replaced by the source point's weights. Any bone or
+            metaball object listed in the From parameter is changed to
+            the corresponding object in the To parameter, and
+            vice-versa. This operation is only done to one side of the
+            model, the side the mirror arrow points away from.
+
+            This choice is best when one has one side of the model
+            properly weighted and wishes to recreate the weights on the
+            other side.
+
+        Leave Unmirrored Captures:
+            This option processes all selected points. Each point's
+            weights for bones or metaball objects specified in the To
+            parameter are deleted, and then the mirror point's From bone
+            or metaball weights are copied in after they've undergone
+            the From->To conversion.
+
+            This choice is best when one has the From objects properly
+            weighted and wishes to make the To bones symmetric copies.
+            It does not affect the weights for unlisted bones or
+            objects.
+
+        Average Weights:
+            This option processes all selected points. Each point's
+            weights are added to the weights of its mirror point after
+            the mirror point's bones or metaball objects have undergone
+            the from->to and to->from conversion. The point's capture
+            weights are then normalized.
+
+            This choice is best when combining the above workflows. It
+            ensures a symmetrical weighting and does not damage
+            cross-boundary feathering. One should note that *all* of the
+            models weights are used - spurious weights will be spread to
+            the other side of the model.
+
+    Origin:
+        #channels: /origin{xyz}
+
+        The origin of the reflection plane.
+    Distance:
+        #channels: /dist
+
+        Distance to move reflection plane.
+    Direction:
+        #channels: /dir{xyz}
+
+        Direction of the reflection plane's normal. This normal should
+        face the source points when "Copying" unspecified capture
+        regions.
+    From:
+        #channels: /from
+
+        This is a space delimited list of quoted relative paths of
+        capture regions or metaballs to act as the source objects. If
+        you're using bones, specify the bone's name and the capture
+        region primitive number (as in `"ruparm/cregion 0"`). If you're
+        using metaballs, specify the metaball object's name and the
+        group name (as in `"ruparm/muscle biceps"`). If you're using muscles, 
+	then the names as specified in the `Muscle ID` parameter of the
+	corresponding [Muscle|Node:obj/riggedmuscle] object.
+
+	Pattern matching rules can be used here, which are the same as the
+	examples in [Attrib String Edit|Node:sop/attribstringedit].
+    To:
+        #channels: /to
+
+        To is specified using the same format as From, but specifies the
+        destination bones or metaball object. The two lists form a
+        one-to-one correspondence, so their order is important. If these
+        regions aren't already captured, this will be captured using their
+        rest transforms.
+
+	Pattern matching rules can be used here, which are the same as the
+	examples in [Attrib String Edit|Node:sop/attribstringedit].
+    Point Coloring:
+        #channels: /color
+
+        Whether to apply coloring to the incoming geometry by capture
+        region.
+
+        Default Source Color:
+            Leave the source geometry coloring as-is.
+        Color by Capture Region:
+            Apply point coloring based on either the capture region's
+            assigned color or the metaball group's assigned color.
+    Zero Weight Point Color:
+        #channels: /zeroweightcolor{rgb}
+
+        The color to apply to points when they are not weighted by any
+        capture regions or metaball groups.
+
+@related
+    - [Node:sop/capture]
+    - [Node:sop/capturemeta]
+    - [Node:sop/captureproximity]
+    - [Node:sop/capturelayerpaint]
+

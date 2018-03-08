@@ -1,0 +1,132 @@
+﻿= PolyWire =
+
+#type: node
+#context: sop
+#internal: polywire
+#icon: SOP/polywire
+#tags: polygons, curves, convert
+
+"""Constructs polygonal tubes around polylines, creating
+renderable geometry with smooth bends and intersections."""
+
+This node works like the [Wireframe node|Node:sop/wire],
+but this node creates more complex tube geometry from curves,
+with smoother bends and intersections than Wireframe, especially for
+[L-systems|Node:sop/lsystem].
+(The [Wireframe node|Node:sop/wire] creates transition surfaces where the original curve branches.)
+
+The four numerical parameters support all the local variables of the
+Point operation, plus the LSYSTEM specific variables of $WIDTH, $SEGS,
+$DIV, $LAGE, $GEN, and $ARC.
+
+TIP:
+    You can disable end caps using a workaround. First, add an attribute wrangle between the input curve and the Polywire node with the following snippet:
+    
+    {{{
+    #!vex
+    // Create an attribute which is 1 if the point is interior and 0
+    // if it's at the end
+    i@isinterior = neighbourcount(0, @ptnum) > 1;
+    }}}
+    
+    Then, in the Polywire node, set __Smooth points__ to `@isinterior`. 
+
+@parameters
+
+Group:
+    The group of polygons to convert to wires.
+    
+Wire Radius:
+    #id: radius
+
+    This is the radius of the wire to sweep over the polygon.
+    
+Maximum Joint Scale:
+    #id: maxscale
+
+    Prevent Joint Buckling scales up the intersection points so
+    that they lie on the intersection of two tubes, rather than a
+    width sized sphere. This can cause the points to be scaled past
+    the first segment of the tube, however, causing buckling. This
+    parameter allows you to change on a point level what the maximum
+    scale applied to the points is.
+    
+Smooth Point:
+    #id: smooth
+    
+    If the expression evaluates to a non-zero value for a point,
+    the generated tube is smooth and connected through that point.
+    If the expression is zero, the corresponding segment is disconnected.
+    A value of zero will leave ends uncapped.
+
+Divisions:
+    #id: div
+
+    This is the number of divisions in the circle which is to be
+    swept over the polygon. It can vary on a point basis.
+
+Segments:
+    #id: segs
+
+    The number of segments to divide each edge of the polygon into.
+    It can vary on a point basis.
+
+Segment Scales:
+    #id: segscale
+
+    These are how far into the segment to make the first circle and
+    how far towards the end to keep going. Both values are in the
+    range 0-1, where 0 is the start and 1 the end. These are segment
+    specific values. The local variable $NSEG is available here for
+    the number of segments in the previous parameter.
+
+Prevent Joint Buckling:
+    This toggle when set will scale the intersection point of edges
+    to avoid a collapse when sharp turns are made.
+
+Do Vertex Textures:
+    Toggles whether vertex textures are generated for the geometry.
+    For best texturing of branch points, the points of the wire
+    should be ordered so the "important" side has least point
+    number. For example, in a Y branch, the bottom of the Y should
+    have the smallest point numbers.
+
+U Seam Offset:
+    #id: uoff
+
+    A per segment parameter which cycles how far around the tube the
+    seam is placed. The seam is always snapped to the nearest
+    polygon edge.
+
+U Textures:
+    #id: textu
+
+    Per segment values for the starting/ending values of the u
+    texture.
+
+V Textures:
+    #id: textv
+
+    The same, but for v textures.
+
+Joint Up Vector:
+    #id: upvector
+
+    If enabled, the up vector at each joint is set to the specified
+    value. This will result in twisting of the branches.
+    
+@locals
+
+PTDIST:
+    When resolving a segment, this is the distance between the end
+    points of the segment.
+    
+NSEG:
+    This is the number of segments which the segments parameter
+    evaluated to for this segment.
+
+@related
+
+- [Node:sop/wire]
+- [Node:sop/lsystem]
+

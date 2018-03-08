@@ -1,0 +1,780 @@
+= Pyro =
+
+#type: node
+#context: material
+#internal: pyro
+#index: no
+
+"""Flexible, production-quality fire and smoke shader."""
+
+== Overview ==
+
+The Pyro material's interface may appear intimidating at first. However, it's actually quite straightforward once you grasp how it's organized. There are three main optical components to the material: _smoke_, _fire_, and _scattering_, corresponding to the first three tabs of the interface.
+
+Wherever the material allows you to specify a color, it is split into two complementary parameters: the _chromaticity_ of the color (its hue and saturation), and its _brightness_ (also known as value, luminance, or _intensity_). More often than not, you will want to manipulate a color's luminance separately from its hue or saturation. Especially in the Pyro material, you will often be dealing with very bright or very dark values, where the standard RGB swatch stops giving meaningful feedback. However, if you prefer, you can still ignore the separate brightness control (by leaving it at 1) and use the RGB swatch to express both a color (hue and saturation) and its intensity.
+
+In addition, in places where you can specify colors, the interface includes "mod" parameters (the menus throughout the interface that default to "No mods"). You can completely ignore these controls until you get a feel for the main parameters, as the Pyro material does not depend on them. See [modifiers|#usingmods] for more information.
+
+<!--
+== About this documentation == (setup)
+
+It's hard to convey what the parameters do by showing a complex simulation with multiple fields interacting. For the example images in the parameter help for this material, we'll use a very simple volume with a known range of values in each field.
+
+The example setup starts with a rectangular volume box with a constant scalar field value of 1, which we'll call `density`, and a field that increases linearly from 0 at the left edge of the box, to 1 at the right edge which we'll call `temperature`. We'll also add a viewing camera looking at the box front on, and a single point light with shadows above and in front.
+
+(image)
+
+Finally we'll assign the Pyro material to the box volume, set up a micropolygon mantra output node, and render a frame.
+
+NOTE:
+    All settings in the examples below are for linear color space. That is, the resulting rendered images are meant to be adjusted for display gamma (usually 2.2) post-render. This means you should set the gamma of your [mplay|/mplay] window or [render view|/ref/views/ipr] to 2.2. Otherwise your images will appear much more contrasty, without any of the midtones you see in the gamma-corrected images below.
+-->
+
+== Choosing fields ==
+
+The pop-up menus allowing you to choose fields contain several different types of fields:
+
+* *Standard fields*: A fixed list of fields that typically exist on the shaded object: `density`, `temperature`, `heat`, `burn`, and `age`.
+
+* *Shader fields*: fields generated internally by the shader. The `speed` field contains the magnitude of the vector-valued velocity field. The `time` field simply contains the current time in seconds.
+
+* *Mod fields*: these correspond to the `Field1`, `Field2`, `Noise1`, `Noise2`, etc. sub-tabs on the __Modifiers__ tab when they are activated. See [modifiers|#usingmods] for more information. Use the __Label__ parameter on the modifier to control how it appears in the menu.
+
+* *User fields*: these let you use other fields besides the standard names. First, in the geometry network, use a [Name surface node|Node:sop/name] to rename the field to one of `user1`, `user2`, etc. Then in the material, enable the field in the __Settings / User fields__ tab. Then you can choose the field in the pop-up menu.
+
+For example, you could assign the `temperature` field to be the smoke field by setting __Density field__ to "temperature".
+
+== Using scattering == (usingscatter)
+
+The Pyro material can simulate scattering of light from the fire through smoke (to a rough, single scattering event approximation), that is, you can have the fire light up the smoke surrounding it. The material does this using _point clouds_.
+
+Before rendering the final image, you need to have the Pyro material scatter points inside the smoke and fire volumes. The resulting point clouds are stored in two separate files for each frame, one for fire and one for smoke. Then, during shading, the Pryo material uses the point cloud files to simulate the emission of light from the fire field and the scattering of the light through the smoke field.
+
+The Pyro material uses the fire point cloud to fill the fire volume with point light sources, with the intensity and color of each light derived from the parameters on the Fire tab. When calculating illumination of the smoke from fire emission, the material will loop over some subset of these fire point lights and accumulate their contribution just as it does for external lights. The amount of illumination contributed by each one of the fire points is subject to the same attenuation factors as the external sources: distance, the smoke's own density, as well as any occluding objects embedded in the smoke. Each point in the smoke point cloud stores the resulting fire illumination. Then, while marching through the volume to shade it, the material will use a neighborhood of these precomputed fire illumination results, average them together, and use them in the final shading calculation.
+
+See [the scattering parameter help|#scatter] for more information.
+
+=== How to generate scattering point clouds ===
+
+The simplest way to generate point clouds is to render them from the Pyro material node's parameter interface. This lets you generate all point clouds for a frame or animation at once, and re-generate as needed.
+
+Advanced users may want to set up individual render output nodes to generate point clouds. This lets you generate point clouds for each frame before the final rendered image, and make Pyro shader point cloud generation part of a render dependency graph.
+
+In general, the __Volume Step Size__ used for generating the Pyro material's point clouds can be a lot coarser that the step size for the final image. As a rough starting guideline, start with a step size around ten times coarser than the final render's volume step size. For example, if the final render requires a __Volume Step Size__ of `0.01`, then you can set the step size for the scattering point clouds at `0.1` as a starting point, and refine based on look.
+
+Depending on the relative smoke and fire content of the effect, you may want to generate the smoke point cloud with a different density than the fire point cloud (usually for efficiency, since a sparse cloud is faster to compute than a dense cloud). The instructions below include how to do this for the two methods of generating point clouds.
+
+TIP:
+    The scattered illumination (and attenuation) is based on the smoke density and fire intensity when the point clouds were saved. If you change any parameters that affect the _smoke density_ or _fire color or intensity_, you must regenerate the point clouds. Changes that affect smoke color, shadow, or phase do not require regenerating the point clouds.
+
+TIP:
+    Point cloud files (extension `.pc`) are really geometry files (like `.bgeo` or `.geo` files). So, if you and want to visualize the point clouds, you can load the files into a Houdini using the [File surface node|Node:sop/file].
+
+:task:Set the filenames for point cloud files:
+    # In the Pyro material's parameters, click the __Scattering__ tab, then click then __Point cloud files__ sub-tab.
+        
+    # Set the __Smoke PC file__ and __Fire PC file__ parameters. Remember to [include the frame number|/render/expressions] (e.g. `$F4`) in the filename if you are doing animation.
+
+:task:Generate point clouds from the Pyro material node:
+    # In the Pyro material's parameters, click the __Scattering__ tab, then click then __Generate point clouds__ sub-tab.
+        
+    # If you want the same step size for fire and smoke, set the __Smoke step size__ and then set __Generate mode__ to "Use smoke step for both". If you want separate step sizes for smoke and fire, set __Smoke step size__ and __Fire step size__, then set __Generate mode__ to "Use individual steps". See the [parameter help|#scatter] for more information.
+        
+    # If you are generating point clouds for animation, Turn on __Frame range__ and set the start and end frame.
+        
+    # Click __Generate__.
+        
+:task:Generate point clouds as part of a render network (advanced):
+    The trick is to create separate render nodes for generating point clouds, where each render node uses a take in which the Pyro shader's __Shading mode__ is set to a different value.
+    
+    # Create render nodes for writing out the point clouds.
+        
+        * If you want the same step size for fire and smoke point clouds, create a single render node for writing out point clouds.
+            
+        * If you want separate step sizes for smoke and fire, create two render nodes and set their __Volume step size__ to different values for generating fire and smoke point clouds.
+            
+        * Set the __Properties / Render / Rendering engine__ parameter to either "Micropolygon Rendering" or "Micropolygon Physically Based Rendering". Micropolygon renders will generate different point clouds than raytracing, and Pyro can compute scattering much more efficiently with the type of clouds generated by the micropolygon engines.
+            
+        * Rename the render nodes to indicate the type(s) of point clouds they generate.
+        
+        TIP:
+            You can create three mantra nodes (for writing out the smoke cloud, fire cloud, or both) from the Pyro material's parameter interface. Go to the __Scattering / Generate point clouds__ sub-tab. Set __Generate mode__ to "Create ROPs only" and click __Generate__. This will create three render output nodes in `/out`. This is useful when you want to control some aspect of the render nodes beyond what the Pyro interface exposes, but duplicate the exact settings the Pyro material uses otherwise.
+                
+        WARNING:
+            Because the point clouds are rendered from the point of view of the camera selected in the render node, it is important that the _entire volume be visible_ from that camera. If the frustum of the main render camera clips any part of the visible smoke/fire, then no points will be generated for that portion of the effect and you may get shading artifacts, such as dark shadows suddenly popping in and out of the scattered emission.
+                
+            You may need to create a separate camera for the point cloud render node(s). The point of view of the point cloud camera should be as close as possible to the final render camera's, but with the entire effect (smoke and fire volumes) visible. The point cloud camera need not match the optical settings of the main render camera. Things like resolution, focal length, aperture, and so on, can all be different.
+                
+    # Set up separate [takes|/basics/takes] where the Pyro shader node has __Shading mode__ on the __Settings__ tab set to different values:
+        
+        * Create a take for the final image in which __Shading mode__ is set to "Normal shading".
+            
+        * If you want the same step size for fire and smoke point clouds, create another take in which __Shading mode__ is set to "Write all point clouds".
+            
+        * If you want separate step sizes for smoke and fire, create two more takes: one in which the __Shading mode__ is "Write smoke point cloud" and another in which __Shading mode__ is "Write fire point cloud".
+        
+        Rename the takes to indicate which __Shading mode__ setting they contain.
+            
+    # For each of the point render nodes you created, change its __Render with take__ parameter to one of the takes containing different __Shading mode__ settings.
+        
+    Once you have the render nodes set up, you can use the __Render__ button on each node to re-generate point clouds, or wire them into a [render dependency network|/render/batch] to make generating point clouds part of a pipeline.
+
+== Using modifier fields == (usingmods)
+
+TIP:
+    You can ignore the modifiers and the material will still work perfectly and be very useful. However, the modifiers are available when you need additional flexibility.
+
+See also the [modifier parameter help|#modifiers].
+
+=== Modifier overview ===
+
+The material's main parameters let you shading existing volume fields, but often those fields are not shaped exactly right to shade them as you want. You don't want to have to recalculate an entire simulation just to adjust some field slightly, or generate a new field which is just a simple transformation of an existing field. _Modifiers_ let you do useful field manipulations at shading time:
+
+Field Shaping:
+    * The falloff at the edge of a field (its contour) my be too soft and requires sharpening, or it's too sharp and needs to be softened. This kind of "softening" can also be the result of natural diffusion within the simulation and the correction may need to be applied gradually over time.
+    
+    * The field's range may drift too much throughout the simulation, or it may simply be too large or too small to work with comfortably in the context of shading. For example, a field which we want to use as a ramp lookup may have a sim-generated range which is much smaller (or much larger) than what you can comfortably work with using the ramp interface. Such fields need to be remapped to a different range.
+
+    * A field (`temperature` for example) may be unbounded and need to be clamped before you can work with it.
+
+High Frequency Detailing:
+    Increasing the volume resolution of a simulation is not always practical because of slower processing speed. In the context of smoke and fire, small-scale detailing usually means the addition of layers of noise. The material can add high resolution noise at shading time for a fraction of the cost of actually simulating it. The catch is you don't know beforehand where this noise-based detailing may be needed. As a result, the shader-based noise needs to be assignable to not only the incoming fields themselves (to assist with shaping), but also to the main parameters
+
+Field-Driven Parameterization:
+    * For example, you want the smoke to look darker when it's close to the flames, but lighter as it "cools off", so you need to drive the smoke's __Brightness__ parameter based on some transformation of the `temperature` field.
+
+    * It's now a magical smoke which needs to be smooth when moving fast, but have lots of noise detail when drifting normally or moving very little. So now you need to drive one (or possibly several) parameters of the noise based on several similar (but not identical) variations on the smoke's speed. Wanting the incoming fields (or variations of them) and/or the shader-generated noises to drive the material's main parameters is very common in production.
+
+To support this wide variety of field modifications and noise generation, Pyro provides a bank of "Modifiers". There are six field modifiers which can be used to shape or remap incoming fields, and four noise generators which can also optionally be driven by either the incoming fields or one of the six field modifiers. Any one of these modifiers, once activated, will be available to drive any one (or several) of the principal parameters which supports modification (any parameter which is accompanied by a "Mod" pop-up menu).
+
+=== Modifier organization ===
+
+* The Pyro material only works with scalar (single floating point number) fields.
+
+* Field modifiers operate on simulation fields. Their output is yet another scalar field which represents a modified version of the base field.
+
+* Noise generators do not necessarily depend on any field, though they can optionally be constrained to exist within a field (either a simulation field or the output of one of the field modifiers). You can assign their output to any mod-able parameter, except the (very few) parameters which strictly expect a field (such as the __Density Field__ parameter on the __Smoke__ tab).
+
+* Field modifiers and noise generators normally produce scalar output. However, you can use the scalar output as to look up a value in a color/vector ramp to produce vector/color output from a modifier. Currently there are only a few mod-able vector parameters, all colors (such as the __Smoke Color__ parameter).
+
+<w:link href="/images/pyro/modgraphic.png">
+<w:img href="/images/pyro/modgraphic_small.png" />
+</w:link>
+
+=== How to set up modifiers ===
+
+The Pyro material has two kinds of modifiers: field modifiers and noise modifiers. _Field modifiers_ let you modify the values of a field from the sim before you use them in the shader. _Noise modifiers_ let you add noise to a field or all fields before you use it/them in the shader.
+
+:task:Modify the smoke and fire fields:
+    # By default, the source fields on the __Smoke__ and __Fire__ tabs are set to use fields from the simulation named `density` and `temperature` directly.
+        
+        [Image:/images/dynamics/pyro_mod_fields1.png]
+            
+    # Click the __Modifiers__ tab, then click one of the __Field__ sub-tabs. Turn on __Active field modifier__ and give the modifier a descriptive name in the __Label__ text box.
+        
+        [Image:/images/dynamics/pyro_mod_fields2.png]
+        
+    # Set the __Base field__ to the field you want to modify, such as `density` for smoke.
+        
+    # Use the controls on the __Field__ sub-tab to modify the incoming field. For example, you can use __Range mapping__ and/or the __Interpolation__ ramp to remap the source smoke density.
+        
+    # Go back to the __Smoke__ or __Fire__ tab and change the source field to use the modifier field instead of the actual source field.
+        
+        [Image:/images/dynamics/pyro_mod_fields3.png]
+            
+    TIP:
+        Instead of using actual fields (such as `density` and `temperature`) for your smoke and fire fields, assign those fields to modifier fields and use the modifier fields instead.
+
+        Usually when your sim values come into the material, the raw flame is a bit high, not high enough, or doesn't have the right weight. By remapping the incoming range you can specify at what density the flame starts appearing and how it is distributed into the 0-1 range. Using the ramp you can then redistribute the intensity. This is very useful for both fire and smoke.
+        
+:task:Modify a value using a field:
+    Most parameters in the material have a pop-up menu to let you choose a modifier field as a multiplier for the parameter's value.
+        
+    For example, you can use the __Density amplitude__ parameter on the __Smoke__ field with a modifier to remap smoke density. Set it to a high number (e.g. `10`), then use the modifier field's ramp to control the amplitude.
+
+    [Image:/images/dynamics/pyro_smoke_amplitude.png]
+        
+:task:Have fire light up the surrounding smoke:
+    See the [Scattering parameters|#scatter].
+
+== Important parameters ==
+
+Important smoke parameters:
+
+Density amplitude:
+    Very important to achieve both wispy or billowy smoke.
+Smoke brightness:
+    Drastically changes brightness/exposure.
+Shadow density:
+    Very important to get a lighter smoke without blowing out the brightness.  Less contrasty smoke.
+Scattering Phase:
+    Controls how deep light penetrates into the smoke.  Small changes to this make a big difference.
+
+Important fire parameters:
+
+Fire Intensity:
+    Especially important when scattering.
+Noise Modifiers:
+    Try adding a noise modifier with the default settings: tons of noise.
+Temperature:
+    Increasing this will create a hotter, whiter flame.
+Red Boost:
+    Increasing this will create a hotter whiter flame, without affecting the temperature values.
+    
+Important scattering parameters:
+
+Fire Intensity:
+    A high fire intensity will really increase the amount of light emitted.
+Distance Attenuation:
+    How far the light penetrates the point cloud.
+Density Attenuation:
+    How much the light penetrates the point cloud through dense areas.
+
+== Density amplitude and volume step size == (ampvsstep)
+
+Fields generated by a simulation rarely have values as high as `1` inside a voxel. The Pyro shader's default density scaling of 500 was chosen to push the typically low-valued simulation densities toward a very dense, sooty smoke by default.
+
+This default is too high for if you begin with a very dense field. The result can be a very noisy image. The problem is the field is so dense that it's becoming solid, and the boundary between the "air" that surrounds a solid and its surface is infinitesimally small: there's nothing for a long time and then, suddenly, there is a surface. For the renderer to catch this sudden transition from "nothing" to "something", it needs to take very small steps, otherwise it might overshoot the surface boundary and miss it by a small amount.
+
+As mantra takes relatively large steps through space scanning for "density", it overshoots the boundary by differing amounts each time and determines that the boundary happened slightly earlier or later in each case. Therefore, some of these approximated boundary positions end up receiving shadows and some don't, resulting in an noisy image.
+
+You can try several solutions to this problem, each with a different impact on render times and visual quality:
+
+# Remove shadows from the light. This gets rid of the problem, but is not very useful since you usually want shadows in your smoke.
+
+# Lower the Pyro material's __Density amplitude__ until it becomes "soft" enough that the current __Volume Step Size__ setting in the mantra node has no problem catching it.
+
+# Decrease the __Volume Step Size__ setting in the mantra node until it is fine enough to catch our (unusually solid) boundary.
+
+The most common solution is a combination of choices #2 and #3: lower the density as you shorten the step until you find a place that is acceptable in terms of render time and image quality.
+
+@parameters
+
+== Smoke == (smoke)
+
+See [how to use modifiers|#usingmods] for information about the "mod" parameters. See [color correction|#colorcorrect] for information about the color correction parameters.
+
+Enable smoke visibility:
+    Turns the _visibility_ of smoke on or off. Note that this does _not_ control whether the smoke calculations occur, just whether to display their output. This is useful for hiding smoke you can see other things, such as fire, more clearly.
+
+Density field:
+    The name of the field that represents the smoke density. All volume/fluid simulations will generate at lease one field named `density`, and for pyrotechnic effects, you can usually use this to represent smoke or some byproduct of combustion.
+    
+Density amplitude:
+    A scaling factor for the density values in the field. Smoke fields generated by a simulation rarely have values as high as `1` inside a voxel. The Pyro material's default density scale of `500` is designed to push typically low simulation densities toward a very dense, sooty smoke.
+    
+    The default value may be too high if you already begin with a dense field. The result will sometimes be a very noisy image.
+    
+    (image)
+    
+    See [density amplitude and volume step size|#ampvsstep] above for more information.
+
+Use point color (tint with Cd):
+    When this option is on, the material will use the `Cd` (diffuse color) attribute on the volume to tint the color you set in the __Smoke color__ parameter. When this option is off, the material ignores the volume's color and only uses the __Smoke color__ parameter.
+    
+    (Technically, it's a "primitive" color, not a point color, since volumes are primitives and don't have points, but surface shaders use "point color", so the Pyro material uses it for the sake of familiarity.)
+
+Smoke color:
+    Modifies the reflectance color of the smoke. Note that if __Use point color (tint with Cd)__ is on, this color will be tinted by the color of the volume geometry.
+    
+    You can use the separate __Smoke brightness__ parameter to control the brightness. This is often more useful, since you will be dealing with very bright or very dark values, where the standard RGB swatch stops giving meaningful feedback. However, if you prefer, you can still ignore the separate brightness control (by leaving it at 1) and use the RGB swatch to express both a color (hue and saturation) and its intensity.
+    
+Smoke brightness:
+    Modifies the brightness of the smoke.
+
+Shadow color:
+    Modifies the color of shadows in the smoke.
+    
+    You can use the separate __Shadow density__ parameter to control the shadow intensity. This is often more useful, since you will be dealing with very bright or very dark values, where the standard RGB swatch stops giving meaningful feedback. However, if you prefer, you can still ignore the separate shadow density control (by leaving it at 1) and use the RGB swatch to express both a color (hue and saturation) and its intensity.
+
+Shadow density:
+    Modifies the intensity of smoke shadows. This is the complementary concept to "brightness" or "albedo" in the __Smoke brightness__ parameter above.
+
+Scattering phase:
+    NOTE:
+        *Scattering Phase is currently not supported for PBR rendering*. It is only available for raytracing and micropolygon rendering.
+
+    By default, the Pyro material assumes that light scatters evenly in all directions (isotropic scattering). In reality, depending on the type of particles suspended in the volume, the direction of light scattering may show a bias. It might, for example, scatter more often in the same direction as the incoming light ("forward scattering") or in the opposite direction of the incoming light ("backward scattering" or "retro-reflection").
+    
+    The Pyro material simulates this behavior (to a rough, single scattering event approximation). When __Scatter phase__ is `0`, it creates isotropic scattering. Positive values of __Scatter phase__ (from just above `0`, to `1`) create increasing degrees of forward scattering. Negative values (from just below `0`, to `-1`) create increasing degrees of backward scattering.
+    
+    This parameter has three components to give you separate control over scattering of the Red, Green, and Blue channels. You could, for example, let the blue channel scatter slightly more forward than the red or green channels. If you choose to modify them separately, you should be aware that you're introducing direction-based coloring to the volume, meaning that the color of the smoke depends on both the viewing direction and the direction of the incoming illumination.
+    
+    table>>
+        tr>>
+            td>>[Image:/images/pyro/n1t14_mantra.png]
+            td>>
+                Backlit side of a complex smoke cloud, isotropic scattering.
+        tr>>
+            td>>[Image:/images/pyro/n1t15_mantra.png]
+            td>>
+                With 50% forward scattering, the light travels further into the cloud. This would be appropriate if, for example, the "smoke" were composed of water vapor instead of "sooty" carbon particles.
+        tr>>
+            td>>[Image:/images/pyro/n1t16_mantra.png]
+            td>>
+                Here the blue channel scatters slightly more forward than the other two (RGB = 0.49, 0.5, 0.52), resulting in a subtly blue-tinted cloud (which on the lit side would appear slightly red/yellow).
+
+== Fire == (fire)
+
+See [how to use modifiers|#usingmods] for information about the "mod" parameters. See [color correction|#colorcorrect] for information about the color correction parameters.
+
+Fire is shaded as a constant color as it is considered an emitter (or an illumination source). It is disabled by default because there's no established standard for the naming of fields which represent fire: It could be "heat" or "temperature" or "burn" or some combination of all of these, or indeed, be a "user" field. The default field is "Bound: temperature".
+
+Because it is an emitter, the majority of the fire tab's interface deals with how to map a field's value to a color and an intensity. A secondary aspect of shading fire has to do with perceived opacity.
+
+In the real world, fire is not opaque, and so its opacity should be set to zero. This is Pyro's default behavior: transparent fire. However, real fire may sometimes appear opaque due to its intense luminance (or, less often, because of matter suspended in the fire which has not yet combusted). If you choose to control its apparent opacity solely by its intensity, then you have to be prepared to deal with output images which contain a very large dynamic range. In addition, if you leave fire completely transparent and your fire volume is very deep (in relative units), you may find that the intensity levels accumulating over the depth of the volume are hard to control practically. These reasons combine to sometimes create a need for "artistic" control over the perceived opacity of the fire. To this end, the Pyro material exposes some opacity controls you can use to assign an artistic (physically incorrect) opacity to the fire field.
+
+Enable fire visibility:
+    Turns the _visibility_ of fire on or off. Note that this does _not_ control whether the fire calculations occur, just whether to display their output. This is useful for hiding fire you can see other things, such as smoke, more clearly.
+
+Temperature field:
+    The name of the field to use for the fire's temperature.
+
+Fire intensity:
+    Increases or decreases the brightness of the fire.
+
+Opacity field:
+    The name of a field to use for the fire's opacity. The default "No mods" gives a physically correct fire with no opacity.
+    
+Opacity amplitude:
+    A scaling factor for the value of the opacity field. The default `0` gives a physically correct fire with no opacity. 
+
+    TIP:
+        To create a thick density, increase this parameter dramatically such as 10000000000.
+
+Opacity blend rate:
+    The Pyro material keeps an internal mask for the extent of the flames (the volume within which they are incandescent). This control allows you to “feather” the fire opacity at the envelope boundaries of the flames.
+    
+    The blend rate has a nominal range of 0-1 and is a _rate_, meaning that the higher the number, the faster the opacity will take effect at the border of the flames, and the lower the number, the more "feathered" or gradual the opacity blend will be from the outside edge of the flame toward its interior.
+
+Color model:
+    There are two approaches mapping the value of the temperature field to an output color: A _physically-based_ approach which assigns color (chromaticity) and intensity based on interpreting the field as a temperature distribution, and an _artistic_ approach which simply maps color and intensity directly from the underlying field values. The default is the physical model.
+    
+Use point color (tint with Cd):
+    When this option is on, the material will use the `Cd` (diffuse color) attribute on the volume to tint the fire color. When this option is off, the material ignores the volume's color and only uses the calculated fire color.
+    
+    (Technically, it's a "primitive" color, not a point color, since volumes are primitives and don't have points, but surface shaders use "point color", so the Pyro material uses it for the sake of familiarity.)
+    
+=== Physical model ===
+
+The physical model derives a color and intensity based on the current temperature (as given by the value of the temperature field, scaled by the __Temperature__ parameter below). This model uses Planck's formulas for both the color and intensity of a perfect emitter (also known as a "black body") at a certain temperature, given in degrees Kelvin.
+
+The black body model is generally a good starting point for a color spread for a flame. The drawback is it's based on measurements of near-perfect emitters/absorbers, which doesn't necessarily apply to flames (though it's not far off). In the case of flames, the visible color is more likely the result of chemical reactions than black body emission. For example, the bottom of a candle flame appears blue because it's more oxygenated than the rest of the flame (and burns more efficiently). Therefore, the Pyro material gives you controls to adjust the red/blue content of physically modeled flames.
+
+table>>
+    tr>>
+        td>>[Image:/images/pyro/n1t23_mantra.png]
+        td>>Fire field at 3000 degrees K, Red boost = 0, Blue boost = 0
+    tr>>
+        td>>[Image:/images/pyro/n1t24_mantra.png]
+        td>>Red boost = 4, blue boost = 0
+    tr>>
+        td>>[Image:/images/pyro/n1t25_mantra.png]
+        td>>Red boost = 0, blue boost = 4
+
+Temperature:
+    The temperature (in degrees Kelvin) corresponding to a value of `1` in the field.
+    
+    As a rough reference for what these temperatures mean, thermal emission becomes visible at around 500°K (e.g. the temperature at which an iron rod will start looking "red hot"). Temperatures for typical flames can range from around 2000°K (candle flame) to 3000°K (blowtorch, limelight) and higher.
+    
+    The Pyro material uses a fairly "hot" temperature as a default. This is only a guess based on observation of a few temperature fields generated by simulations, which don't always reach 1. It is entirely possible that the incoming fields may go well above one, in which case you should reduce the default.
+
+Red boost:
+    Artificially boosts the red (colder) end of the flame's spectrum. This parameter has a lower bound of 0, but is unbounded on the positive side. However, practical values should rarely go above 4-8.
+    
+Blue boost:
+    Artificially boosts the blue (hotter) end of the flame's spectrum, essentially sliding the blackbody temperature up into the extreme heat end of the spectrum.
+    
+    Although this operates only on the perceived chromaticity (hue + saturation), it is likely that the overall intensity of the flame will also increase because as the color goes to blue it passes through white, which is much more luminous than fully saturated red. So, you will need to adjust the fire intensity when using either of these "boost" parameters.
+    
+    It's possible that if you boost the blues, the core of the flame may be too bright and be clamped too much. You can use the __Soft Clip__ parameter to address this.
+
+Soft clip:
+    Also known as a "knee" operator (although this uses is a cheaper algorithm because it has to run for every shaded point). If the hot portion of the flame starts becoming so bright that it ends up clamping too much, you can use soft-clip it to some ceiling. 
+    
+    This is used to compress high intensities that can't be displayed by a some device (like a TV or monitor). This material already applies a tone mapping operator to the black body intensities (which have an insane dynamic range). Nevertheless, there are cases where the accumulated brightness of the fire will “blow up” beyond any displayable value. This typically happens when the fire occupies a very large volume and has zero opacity, with the result that every step along the march through the volume will simply add itself to all the previous values.
+
+Start:
+    The intensity value at which compression will start. Keep in mind that these are values within each step of the volume march (that is, per voxel), not the absolute accumulated value at the end of the march, so it will typically be a small value around 0.2 to 0.5.
+
+Suppression:
+    The amount by which to suppress the output. This is an unbounded positive. It may need to be set quite high depending on the situation, and can be thought of as an exponent. The higher it goes, the closer the result will approach a standard “clamp” at the value given in the Start parameter. It is, actually, a "soft" clamp.
+    
+    The Start value indicates where the clipping or clamping will start, and the Suppression parameter determines how strongly values above Start will be compressed. In practice, it is better to see how intense the flame is in context (that is, with the smoke enabled) before making any decisions on whether to clamp its intensity.
+    
+=== Artistic model ===
+
+The horizontal axis of the ramps corresponds to field values from `0` to `1`. Any values in the field lower than `0` or higher than `1` will be clamped, and so use the values at the left or right end of the ramp.
+
+The default settings are a crude approximation of the physical model, simply as a plausible starting point for an artists to start modifying.
+
+As with other color controls in the material, color and intensity have separate controls for practical reasons, but if you want you can embed intensity in the "hue" ramp.
+
+Temperature to hue mapping:
+    The color of the flame for field values from `0` to `1`.
+
+Temperature to intensity mapping:
+    The intensity of the flame color for field values from `0` to `1`. Note that the __Fire Intensity__ parameter (near the top of the __Fire__ tab) is the final, global intensity adjustment, so this ramp can be within a comfortable 0-1 range, as a "relative intensities" ramp.
+
+[Image:/images/pyro/n1t27_pyro2.png] [Image:/images/pyro/n1t27_mantra.png]
+
+== Scattering == (scatter)
+
+See [using scattering|#usingscatter] above.
+
+See also the __Scatter phase__ parameter on the [Smoke|#smoke] tab. See [color correction|#colorcorrect] for information about the color correction parameters. 
+
+TIP:
+    The scattered illumination (and attenuation) is based on the smoke density and fire intensity when the point clouds were saved. If you change any parameters that affect the _smoke density_ or _fire color or intensity_, you must regenerate the point clouds. Changes that affect smoke color, shadow, or phase do not require regenerating the point clouds.
+
+Scattering:
+    Whether to simulate and display scattered light emission from fire through the smoke.
+    
+=== Point cloud files ===
+
+    Smoke PC file:
+        The cache file for the smoke scattering point cloud. Remember to [include the frame number|/render/expressions] (e.g. `$F4`) in the filename if you are doing animation.
+        
+    Fire PC file:
+        The cache file for the fire scattering point cloud. Remember to [include the frame number|/render/expressions] (e.g. `$F4`) in the filename if you are doing animation.
+
+=== Generate point clouds ===
+
+    See [how to generate scattering point clouds|#usingscatter] for more information.
+    
+    Smoke step size:
+        Volume step size to use when generating the smoke point cloud. The smaller this number, the more dense the point cloud. A good rule of thumb is to start this value 10 times larger than the volume step size you are using for rendering the final image, then adjust based on the look.
+        
+    Fire step size:
+        You only need to set this parameter if you want a different step size for the smoke and fire point clouds (set __Generate mode__ to "Use individual steps"). Otherwise, set __Generate mode__ to "Use smoke step for both" and just set the __Smoke step size__ parameter.
+        
+    Camera:
+        The camera to use when "rendering" the point clouds. This can be the same camera you use to render the final image, but it should have the entire effect in view, since the point cloud will only be built in areas visible to the camera. You may need to create a new camera for building point clouds that has the same point of view as the main camera but pulled back to show the entire effect volume. See [how to generate scattering point clouds|#usingscatter] for more information.
+        
+    Frame range:
+        Turn this on and set the frame range to generate point clouds for multiple frames of animation. If this option is off, clicking __Generate__ will only generate point clouds for the current frame.
+        
+    Generate mode:
+        Use smoke step for both:
+            Use the value of the __Smoke step size__ parameter as the volume step size and generate the smoke and fire point clouds at the same time.
+            
+        Use individual steps:
+            Use the values of the __Smoke step size__ and __Fire step size__ parameters to generate smoke and fire point clouds with different step sizes.
+            
+        Create ROPs only:
+            Advanced: This setting won't actually generate any point cloud files. Instead, it will create render nodes in `/out` appropriate for generating point clouds, using the current values of the Pyro material. You will still need to customize the render nodes as described under [how to generate scattering point clouds|#usingscatter].
+        
+    Generate button:
+        Click to generate the point clouds necessary for simulating scattering. (If __Generate mode__ is "Create ROPs only", this will create render nodes in `/out`, not generate point clouds).
+
+[Image:/images/pyro/scatter_small.png]
+
+Amplitude:
+    A global "dimmer" dial: it controls the overall intensity of scattered light.
+    
+    table class="compact">>
+        tr>>
+            td>>[Image:/images/pyro/n1t45A_mantra.png]
+            td>>Amplitude = 0.5
+        tr>>
+            td>>[Image:/images/pyro/n1t44A_mantra.png]
+            td>>Amplitude = 1.0
+        tr>>
+            td>>[Image:/images/pyro/n1t45C_mantra.png]
+            td>>Amplitude = 2.0
+
+TIP:
+    In the real world, density attenuation and distance attenuation are linked. In the Pyro material, they're decoupled to allow for more artistic control.
+
+Density atten:
+    As light travels inside a dense medium it progressively loses intensity as bits of it are absorbed or scattered away. This parameter scales this "attenuation due to density". Values greater than `1` mean density attenuation happens faster than it would in the real world given the density, and values less than `1` mean less attenuation than in the real world.
+    
+    table class="compact">>
+        tr>>
+            td>>[Image:/images/pyro/n1t43A_mantra.png]
+            td>>Density atten = 0.5
+        tr>>
+            td>>[Image:/images/pyro/n1t43B_mantra.png]
+            td>>Density atten = 1.0
+        tr>>
+            td>>[Image:/images/pyro/n1t43C_mantra.png]
+            td>>Density atten = 1.5
+    
+Distance atten:
+    As in the real world, the light emitted by the point lights in the fire cloud attenuates with distance according to the inverse square law: the rate of attenuation is inversely proportional to the square of the distance. This parameter scales that attenuation. Values greater than `1` mean distance attenuation happens faster than it would in the real world given the distance (perceived as shortening the scattering distance), and values less than `1` mean less attenuation than in the real world (perceived as increasing the scattering distance).
+    
+    Scaling distance attenuation retains the overall shape/distribution of the scattering, but scales the perceived length/size up or down (whereas density attenuation behaves more like an intensity dimmer).
+    
+    table class="compact">>
+        tr>>
+            td>>[Image:/images/pyro/n1t44A_mantra.png]
+            td>>Distance atten = 0.5
+        tr>>
+            td>>[Image:/images/pyro/n1t44B_mantra.png]
+            td>>Distance atten = 1.0
+        tr>>
+            td>>[Image:/images/pyro/n1t44C_mantra.png]
+            td>>Distance atten = 2.0
+
+Scattering phase:
+    Controls the directionality of scattered fire light. `0` means isotropic scattering, positive numbers mean forward scattering, negative numbers mean backward scattering.
+
+Max search radius:
+    How far the scattering will spread, in world space units. Depending on the radius, this distance may encompass thousands or hundreds of thousands of points. Use the __Max contributors__ parameter to limit the number of points considered for efficiency.
+    
+Max contributors:
+    Of all points in the __Max search radius__, the material will consider this many of the closest points.
+
+    There is a point where additional light contributions stop having a significant effect on the overall result. However, this number is hard to determine without testing (it depends on several factors), so you should try to not limit the number of contributors at the beginning. Therefore, you should try starting with this parameter at a large number, like `10000`.
+    
+Filter points:
+    As the Pyro material marches through the volume, it computes the scattering contribution by averaging (or blurring) a neighborhood of precomputed point cloud points. This parameter is the number of cloud points in that "blur filter". Higher values give blurrier results. The default (`8` points) should be adequate in most cases for point clouds generated with a micropolygon renderer. For efficient shading, you should use the smallest number which still produces a smooth result. If the value is too small, you'll seeing grid-like artifacts in the scattered light.
+    
+    The following image shows filter points settings of (left to right, top to bottom) 1, 2, 4, 8, 16, and 32 in a constant cloud.
+    
+    [Image:/images/pyro/n1t42_mantra.png]
+    
+    NOTE:
+        If you are using your own render nodes to generate the point clouds using raytracing instead of micropolygon rendering for some reason, you will need to use a filter size of between 30 and 80 points due to the randomness of point distribution in raytraced point clouds.
+    
+Atten method:
+    How the material calculates the attenuation and occlusion of light emitted from the fire field. The three choices represent trade-offs between speed and accuracy.
+
+    Approximated, No shadows:
+        The default, cheapest approximation. This method assumes a constant density for each cloud point and will not  calculate occlusion (shadows) from objects embedded in the smoke. It is the fastest to compute, and in cases when the smoke's density  doesn't vary too much, it results in a fairly close approximation to real attenuation.
+    
+    Approximated, Hard shadows only:
+        This is the same approximation as "Approximated, No shadows", but it also computes shadows from solid objects in the smoke (no transparencies).
+    
+    Real:
+        Actually traces occlusion to each fire light source instead of approximating, which gives the highest quality results but can be very expensive. Use this method if there is a great deal of variation in the smoke density, and the approximation starts looking unconvincing, or there are transparent objects in the smoke.
+    
+        In practice, due to the order in which the sources are visited, it isn't necessary to trace for every single source, so the material has a __Quality__ parameter which allows you to control the frequency of these trace calls.
+    
+        [Image:/images/pyro/n1t41A_mantra.png]
+        [Image:/images/pyro/n1t41D_mantra.png]
+        Approximated, No Shadows. Cost: *1.00*
+        
+        [Image:/images/pyro/n1t41B_mantra.png]
+        [Image:/images/pyro/n1t41E_mantra.png]
+        Approximated, Hard Shadows Only. Cost: *2.06*
+        
+        [Image:/images/pyro/n1t41C_mantra.png]
+        [Image:/images/pyro/n1t41F_mantra.png]
+        Real, quality set to 10. Cost: *26.67*
+        
+Quality:
+    Available when __Atten method__ is "Real". A value from `0` to `100`. Traces occlusion once every N sources, where N is 100/Quality. The default `0.8` is useful in cases that don't require precise shadows (just density attenuation). If you have detailed embedded objects with crisp shadows, increase quality to around `10`.
+    
+== Modifiers == (modifiers)
+
+See [how to use modifier fields|#usingmods] above.
+
+=== Field modifiers ===
+
+Activate field modifier:
+    Make this field modifier "active", so it shows up in the pop-up menus of modifiers next to mod-able parameters.
+    
+Label:
+    A short, descriptive label for the field. This is how the field will appear in the pop-up menus of modifiers next to mod-able parameters. This string can include spaces and other non-alphanumeric characters.
+    
+Comment:
+    An optional longer description of the modifier and its purpose. This value is not used by the material, it's simply a convenient place to record information.
+    
+Base field:
+    The field on the object to modify, for example `temperature`.
+    
+Contour:
+    The Contour modifier operates on low field values and is useful to "sharpen" the contours of a smoke cloud. You can think of it as a "soft floor" operator. Values below the __Width__ will be compressed according to __Sharpness__, where the higher the sharpness, the more abrupt the transition between 0 and the width will be.
+    
+    [Image:/images/pyro/modplot_contour.png]
+    
+    The following images show a density field (with Density Amplitude set to 500) where the field values were rendered directly on the left, and then modified with contour sharpening (__Width__ = 0.02, __Sharpness__ = 20) on the right. (If you use sharp transitions like this, you'll probably need to lower the __Volume Step Size__ on the Mantra render node or you may see shadowing artifacts).
+    
+    [Image:/images/pyro/contour1.png]
+    [Image:/images/pyro/contour2.png]
+    
+    Turn on the checkbox to enable this modification.
+    
+Soft clip:
+    The soft clip modifier operates on high field values and is useful to compress very high values. You can think of it as a "soft ceiling". Values above __Start__ will be progressively compressed according to __Suppression__ such that, the higher the suppression, the more it will resemble a clamp operation.
+    
+    [Image:/images/pyro/modplot_softclip.png]
+    
+    The following images show a temperature field which was rendered directly on the left, and then modified with soft clipping (__Start__ = 0.5, __Suppression__ = 20) on the right.
+    
+    [Image:/images/pyro/softclip1.png]
+    [Image:/images/pyro/softclip2.png]
+
+    Turn on the checkbox to enable this modification.
+    
+Range mapping:
+    Range mapping simply fits one range to another, identically to the "fit" functions, VOPs, and operators available throughout Houdini. It maps the Field Range's Min value to the Target Range's Min value, and the Field Range's Max value to the Target Range's Max value.
+    
+    Values between these extremes will, by default, be interpolated linearly. However, you can use the __Interpolation__ ramp to set a custom interpolation curve.
+    
+    TIP:
+        Depending on the Min/Max settings of the field and target ranges, it may be tricky to predict the values produced by the interpolation ramp. Just remember: wherever the ramp has a value of zero, you will get the target range's Min value, and wherever the ramp value is one, you will get the target Range's Max value.
+
+    The range mapping is only active within the specified Field Range. Field values outside this range will clamp to the Min/Max values of the Target Range. Therefore, it is usually best to set as large a Field Range as possible and then shape the output using the ramp, using the target range as more of a scaling factor.
+    
+    (images)
+
+    Turn on the checkbox to enable this modification.
+    
+Interpolation:
+    The interpolation curve to use when __Range mapping__ is on.
+
+=== Noise modifiers ===
+
+The Pyro material divides the visual characteristics of the noise into two categories: The _basis_ (the fundamental type of noise), and the _fractal construction_ (the method use to construct fractals using the basis) of the noise.
+
+[Image:/images/pyro/noisetable_small.png]
+
+Activate field modifier:
+    Make this field modifier "active", so it shows up in the pop-up menus of modifiers next to mod-able parameters.
+
+Label:
+    A short, descriptive label for the noise. This is how the field will appear in the pop-up menus of noises next to mod-able parameters. This string can include spaces and other non-alphanumeric characters.
+    
+Comment:
+    An optional longer description of the noise and its purpose. This value is not used by the material, it's simply a convenient place to record information.
+    
+Exists in field:
+    Set to "None" to have the noise exist everwhere in space, or choose a field to have the noise exist within some sub-range of the field, where the field's values act as an envelope for the noise's amplitude.
+    
+Active field range:
+    The range of values from the input field (set in the __Exists in field__ parameter) to map into the noise function.
+    
+Amplitude distribution within active field range:
+    #id: mn_rngwl
+    
+    This ramp lets you scale the noise amplitude based on the values from the input field (set in the __Exists in field__ parameter). For example, if the input field has a lot of high values, you can scale down the high end to make the output noise more uniform.
+
+Noise basis:
+    The type of noise to use as the basis for generating the noise fractal. You can use the basis noise as-is by setting __Fractal type__ to "None".
+
+Invert noise:
+    Inverts the output values of the noise function, so high valued areas become low and low valued areas become high.
+
+4D noise:
+    For noise bases that support 4D noise (noise that evolves in time), turn this checkbox on to use the 4D version. The default is to use 3D noise because 4D noise is more expensive to compute.
+
+Frequency:
+    Increasing frequency decreases the size of noise features.
+    
+Offset:
+    Translates the noise in space.
+    
+Filter width:
+    Controls the scale of the noise's anti aliasing filter. The default filter size is calculated from the other settings and you will normally not need to adjust this, but there may be situations where the built-in anti-aliasing mechanism may under- or over-estimate the filter size. In those cases, you can use this parameter to scale the calculated filter size.
+    
+Exponent:
+    Raises the value of the noise basis to the given exponent. You can use this to increase or decrease contrast without clipping. Values above 1 will increase contrast, values above 0 and less than 1 will decrease contrast.
+
+Flow:
+    Available when __Noise basis__ is "Flow". This is like a separate dimension, similar to time for 4D noises, which when animated can make the noise appear to "flow". This is why this parameter defaults to "current time" (`$T`). When this parameter is exactly 0, the Flow basis is identical to the Perlin basis.
+    
+Fractal type:
+    The method for building a fractal from the noise basis. You can set this to "None" to see the noise basis on its own.
+    
+    NOTE:
+        All fractals are constructed by adding a signal with a scaled amplitude and frequency back onto itself an infinite number of times. This makes them both self similar and infinitely detailed, at least in theory. In practice, the number of loops is constrained by the amount of detail that can be displayed -- there's a limit to how much high frequency detail can be expressed by a single pixel. In the Pyro material, the "signal" that keeps feeding back onto itself is the noise basis.
+
+Max octaves:
+    Each feedback iteration of the fractal is called an octave (because the frequency is typically doubled at each step, as in a musical octave). Since it's a counter, the number of octaves would normally be an integer, but the Pyro material allows you to use floating point values to support driving the parameter with a modifier. For example, 3.5 octaves means 3 full iterations plus the fourth iteration at half its weight (a linear interpolation between octaves 3 and 4). All noise parameters in Pyro are continuous.
+    
+    Note that it's "Max Octaves" not "Octaves". This is because the actual number of octaves will depend on what can be practically displayed given the current camera settings, resolution, distance from volume, and so on without showing aliasing artifacts. The Max Octaves parameter says to not go beyond this number of octaves.
+
+Lacunarity:
+    Each octave (iteration of the fractal feedback loop) typically doubles the frequency of the signal. However, this doesn't necessarily have to be the case: The multiplier could conceivably be something other than 2. This scaling factor is called "lacunarity" because the visual effect is that as this factor grows, the number of "gaps" between features appear to grow (lacunae is a fancy word for gaps). Lacunarity is a measure of how a fractal fills space. In the Pyro material, it is the frequency scaling factor per octave.
+    
+    (This parameter's default is `2.01234` instead of `2.0` because, depending on the implementation, you will sometimes see the grid pattern of the basis lattice when the frequency factor is set to exactly `2.0`.)
+    
+Roughness:
+    Sometimes called "gain", this is the amplitude scaling factor per octave. This is typically set to 0.5 because in the standard fractal construction, as we double the frequency, we halve the amplitude. However, you can 
+    
+    But again, as with "lacunarity", there's no rule that says this must be so. Therefore, it is exposed as a parameter. 
+
+Displacement:
+    Available when __Fractal type__ is "Multiplicative", "Displaced", or "Gradient Advection". The parameter has a slightly different meanings for each.
+
+    * The Multiplicative fractal concentrates detail in places where the basis has high values and dampens detail where the basis has low values. This is why it is normally used for terrain generation, as it adds detail to the top of mountains but keeps the valleys smooth. The Displacement parameter controls the overall scale of that detail displacement. High values (above 1) will augment it -- that is: The peaks will become noisier faster and the valleys will be dampened more, though there will be fewer of them.
+        
+    * For the Displaced fractal, the Displacement parameter literally controls the amount that the spatial sample point will be displaced from its natural location. Visually, this means that the higher the number, the more "veiny" the appearance.
+        
+    * For the Gradient Advection fractal the Displacement parameter is identical to that of the Displacement fractal. The only difference is the direction in which the sample point is displaced: the gradient of the basis instead of an arbitrary direction.
+
+Lookup ramp for color/vector output:
+    The output of the noise generator is always scalar (single floating point values). For the few places in the material that need vector values instead of floating point (i.e. colors), this ramp lets you map output values to colors.
+    
+Output range:
+    Minimum and maximum output values of the noise function. For example, to arrive at something closer to what the Anti Aliased Noise VOP puts out, we can  change the Output Range to `[-0.5,0.5]`. By default all noises are normalized to a nominal output range of 0-1.
+    
+    Changing the output range to include negative values is perfectly safe and should not produce illegal output. The Pyro material will not allow fields which shouldn't be negative (such as density) to drop below zero.
+    
+Final amplitude:
+    Scales the output of the noise function. 
+
+== Settings == (settings)
+
+Shading mode:
+    Switches between normal shading and the generation of point clouds. See [how to generate scattering point clouds|#usingscatter].
+    
+Current time/Current frame:
+    Used by the material for 4D noise and solving dual rest position fields. You should leave these at their defaults (`$T` and `$FF`) unless you know you need to change them for some reason.
+    
+Dual rest:
+    Rest fields will become less defined as they diffuse, creating an undesirable stretching of any shader-based noise that is dependent on them. This option counteracts this by maintaining two rest fields which reset their values at different times. The material interpolates between the two fields to give the impression of a stable rest position. 
+
+Start frame:
+    You do not normally need to change this parameter. However, if you change the __Start frame__ parameter on the __Rest__ tab of the Pyro solver node in the DOP network for the effect this material is applied to, you will need to change this parameter to match.
+    
+Reset rate:
+    The number of frames between when the material resets a rest fields. The material staggers the reset points of the two fields so the reset of an individual rest field is not visible.
+    
+=== User fields ===
+
+If you need to use fields from the simulation besides the common ones already listed in the field pop-up menus (e.g. `density`, `temperature`), you can use a [Name surface node|Node:sop/name] to rename the field to one of `user1`, `user2`, etc. Then in the material, use the controls on this sub-tab to add the field(s) into the material's pop-up menus.
+
+Include in menus:
+    Turn this on to add a given `user<<n>>` field to the pop-up menus of available fields in the material's interface.
+    
+Label:
+    A short, descriptive label for the field. This is how the field will appear in the pop-up field menus. This string can include spaces and other non-alphanumeric characters.
+    
+Comment:
+    An optional longer description of the field and its purpose. This value is not used by the material, it's simply a convenient place to record information.
+
+=== Output variables ===
+
+A list of variables exported by this material.
+
+== Color correction controls == (colorcorrect)
+
+Each of the principal tabs, Smoke, Fire, and Scattering, has a block of color correction parameters. These are conveniences to allow in-shader tweaking of the final composition of each component. It is not always possible to delegate all correction to the compositing stage when working with volumes because the components influence each other during evaluation, so it is sometimes useful to have some basic correction control at the shading stage.
+
+These corrections are applied in the order they appear in the interface. That is, HSV, then Contrast, then Gamma, and finally Tint.
+
+Beyond that, the meaning of these corrections should hopefully be self explanatory as they are no different than the similarly named corrections found in the Halo (or, indeed, any other) compositing environment. Perhaps the only thing worth mentioning is the HSV correction as it is compressed into a single vector parameter.
+
+Enable color correction:
+    When this option is on, the material uses the parameters below to modify the final composition of the Smoke, Fire, or Scattering.
+
+HSV:
+    Rotates the hue. This value is normalized 0-1, so a value of 1 rotates the hue by 360° (a full rotation back to the starting hue). This value is not bounded and can be either positive or negative. For example, a value of -0.5 will rotate the hue by -180° and be equivalent to -1.5, -2.5, -3.5, etc.
+
+Contrast:
+    Increases or decreases the contrast.
+
+Gamma:
+    Modifies the gamma.
+
+Tint:
+    Tints the output color with a second color.
+
+@related
+
+- [Pyro effects|/pyro/pyro]
+- [Using ramps|/network/ramps]
+

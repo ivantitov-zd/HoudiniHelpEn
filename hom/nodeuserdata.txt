@@ -1,0 +1,132 @@
+= Per-node user-defined data =
+
+"""You can use HOM to store and retrieve arbitrary data on individual nodes."""
+
+== Overview ==
+
+Sometimes you need to store extra information on individual nodes. For example, you may want to...
+
+* Associate scene-level nodes with production database entries or asset tags.
+* Attach additional versioning information beyond what is already stored by Houdini.
+* Tag nodes as having been operated on by some tool to avoid unnecessary work.
+
+Methods on the [Hom:hou.Node] object let you get/set/delete values in user data dictionaries. Houdini has two different types of user data on nodes. They differ in whether or not they are saved with the scene file, and what types of values are allowed.
+
+Persistence ||
+	Values ||
+		Methods ||
+
+Saved with scene file |
+	String only |
+		* [Hom:hou.Node#setUserData]
+		* [Hom:hou.Node#userData]
+		* [Hom:hou.Node#userDataDict]
+		* [Hom:hou.Node#destroyUserData]
+
+Not saved with scene file |
+	Any object |
+		* [Hom:hou.Node#setCachedUserData]
+		* [Hom:hou.Node#cachedUserData]
+		* [Hom:hou.Node#cachedUserDataDict]
+		* [Hom:hou.Node#destroyCachedUserData]
+
+The "cached" user data dictionary is useful for nodes implemented in Python to save computed values between cooks to avoid recomputing them.
+
+== User data example ==
+
+{{{
+#!pycon
+>>> import time
+>>> # Get a node instance
+>>> n = hou.node("/obj/sphere1")
+>>> # Put a name/value on the node
+>>> n.setUserData("last_indexed", str(time.time()))
+>>> # Get the named value back from the node
+>>> n.userData("last_indexed")
+1260572254.21
+>>> # Get a dictionary of all name/value pairs on the node
+>>> n.userDataDict()
+{'last_indexed': '1260572254.21'}
+>>> # Accessing a non-existent name returns None
+>>> print n.userData("foo")
+None
+>>> # Remove a value from the node
+>>> n.destroyUserData("last_indexed")
+}}}
+
+The contents of the string can be structured data such as XML, JSON, compressed
+binary data, or pickled Python objects, however you are responsible for encoding
+and decoding structured data to/from simple strings.
+
+For example, here are two functions you could use to store compressed JSON
+representations of Python values:
+
+{{{
+#!python
+import zlib
+import hutil.json
+
+def setCompressedJSON(node, data):
+    node.setUserData(
+	"acme_studio", zlib.compress(hutil.json.utf8Dumps(data)))
+
+def compressedJSON(node):
+    str_data = node.userData("acme_studio")
+    if str_data is None:
+        return None
+    return hutil.json.utf8Loads(zlib.decompress(str_data))
+}}}
+
+{{{
+#!pycon
+>>> n = hou.node("/obj/geo1")
+>>> setNodeData(n, {"version": 1, "database_id": 1723})
+>>> print nodeData(n)["database_id"]
+1723
+}}}
+
+== Cached user data example ==
+
+The following example code would exist in the __Cook__ tab of a node type
+(e.g. a SOP) implemented using Python.  It avoids unnecessarily reparsing a
+configuration file between subsequent cooks.
+
+{{{
+#!python
+
+def cook(node):
+    config_file_name = node.evalParm("configfile")
+    if node.cachedUserData("config_file_name") != config_file_name:
+	config = ConfigParser.RawConfigParser()
+	config.read(config_file_name)
+	node.setCachedUserData("config", config)
+	node.setCachedUserData("config_file_name", config_file_name)
+    else:
+	config = node.cachedUserData("config")
+
+    # Use the configuration values and perform the cook.
+    #value = config.getfloat("foo")
+    # ...
+
+cook(hou.pwd())
+}}}
+
+== Tips ==
+
+* Trying to get a non-existent value returns `None` rather than raising a `KeyError`. Since the cached dictionary allows storing `None` as a value, you may need to check whether the key exists using `key in node.cachedUserDataDict()` to tell the difference.
+
+* To remove a value from a node, use [Hom:hou.Node#destroyUserData] or [Hom:hou.Node#destroyCachedUserData]. Doing `del node.userDataDict()["foo"]` will _not_ change the values on the nodes.
+
+* If you're storing structured data in a user data value (for example, as a JSON string), consider adding a "version" key to the data so you can tell which version of the data structure you're working with. Experience shows this comes in handy when you need to change or extend the stored format.
+
+@related
+
+- [Hom:hou.Node#userData]
+- [Hom:hou.Node#setUserData]
+- [Hom:hou.Node#userDataDict]
+- [Hom:hou.Node#destroyDataDict]
+- [Hom:hou.Node#cachedUserData]
+- [Hom:hou.Node#setCachedUserData]
+- [Hom:hou.Node#cachedUserDataDict]
+- [Hom:hou.Node#destroyCachedDataDict]
+

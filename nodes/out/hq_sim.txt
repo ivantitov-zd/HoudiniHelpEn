@@ -1,0 +1,223 @@
+= HQueue Simulation =
+
+#type: node
+#context: out
+#internal: hq_render
+#icon: SHELF/factory
+#bestbet: hqueue, queue
+
+"""HQueue, or Houdini Queue, is a distributed job scheduling system.
+"""
+
+HQueue, or Houdini Queue, is a distributed job scheduling system.  It consists of an HQueue server and a farm of processing nodes, or clients.  The server accepts job submissions from users and assigns them to available clients.
+
+The HQueue Simulation output driver submits dynamic simulation jobs to HQueue for distribution on the farm.  The simulation is performed by the node specified in the __Output Driver__ parameter.  This is typically a [Geometry ROP|Node:out/geometry].
+
+@parameters
+
+Submit Job:
+    Submits a simulation job to the HQueue system.  If the submission is successful, then a dialog pops-up with the job's id.  The id can be used to track the simulation progress on HQueue's web-based user interface.
+    
+== General ==
+
+Job Name:
+    The name of the job. Set this to <default> or set blank if you want the default job name to be used.
+
+Output Driver:
+    The render node used to generate the output files.  For most cases, this would be a path to a [Geometry ROP|Node:out/geometry].
+
+HQueue Server:
+    The machine name and listen port of the HQueue server.
+
+Target HFS:
+    The path to the Houdini distribution that will execute the simulation on the HQueue farm.  The distribution must be installed in a location that is accessible by every machine on the farm.  You can use the `$HQROOT` and `$HQCLIENTARCH` variables to help specify the folder path (see [HQueue Variables|Node:out/hq_sim#hqvariables]).
+
+Job Priority:
+    The job's priority. Jobs with higher priorities are scheduled and processed before jobs with lower priorities. 0 is the lowest priority.
+
+
+:
+    Simulate Current HIP File:
+	Choose this option if you want HQueue to simulate the .hip file that is currently open.  The current .hip file must be in a location that is accessible by every machine on the farm.  Note that any changes that are made to the .hip file while it is simulating on the farm are live.  That is, any new changes may be applied to the simulation on the farm.
+
+    Simulate Target HIP File:
+	Choose this option if you want HQueue to simulate another .hip file.  The .hip file must be located somewhere that is accessible by every machine on the farm.
+
+    Copy Project Files to Shared Folder and Simulate:
+	Choose this option if you want HQueue to simulate a copy of the currently opened .hip file.  After clicking on the __Render__ button, a file dependency dialog pops-up giving you an opportunity to choose the project files that are needed by the simulation.  These files are copied to the destination specified by the __Project Path__ parameter.
+
+Target HIP:
+    When __Simulate Target HIP File__ is chosen, set this parameter's value to the location of the .hip file to be loaded and simulated on the farm.  The .hip file must be saved somewhere on the shared drive, or any other location that is accessible by every machine on the farm.  You can use the `$HQROOT` variable to help specify the .hip file path (see [HQueue Variables|Node:out/hq_sim#hqvariables]).
+
+Project Path:
+    When __Copy Project Files to Shared Folder and Simulate__ is chosen, set this parameter's value to the location on the shared folder where you want to copy your .hip file and its dependencies to. The location must be accessible by all machines on the farm.  You can use the `$HQROOT` variable to help specify the .hip file path (see [HQueue Variables|Node:out/hq_sim#hqvariables]).
+
+Automatically Save HIP File:
+    When checked, Houdini automatically saves the current .hip file before submitting a job to HQueue.  This guarantees that the farm simulates with the latest changes made to your scene.  This parameter does not apply when __Simulate Target HIP File__ is chosen.
+
+Warn If Unsaved Changes in HIP File:
+    When checked, Houdini warns of any unsaved changes in the .hip file when submitting the job to HQueue.  If this parameter is not checked, then Houdini ignores any unsaved changes and automatically submits the job to HQueue.  This parameter does not apply when __Render Target HIP File__ or __Use Existing IFDs__ is chosen.
+
+Report Submitted Job ID:
+    When checked, Houdini shows a message stating the ID of the successfully submitted job. To avoid these messages, uncheck this parameter.
+
+Partitioning Type:
+    Choose how the simulation is to be partitioned and distributed on the farm.
+
+    Volume Slices:
+	For volume simulations.  The simulation is divided into slices using a 3-dimensional grid.  Set the __Slice Divisions__ parameter to set the properties of the grid.
+
+	The farm will set the variable `SLICE` to the slice number being simulated. This can be used for setting filesnames of the outputted geometry files.
+
+    Particle Slices:
+	For particle simulations.  The simulation is divided into slices using 1 or more slice planes.  Set the __Number of Slices__ parameter to indicate how many slices have been created by the planes.
+
+	The farm will set the variable `SLICE` to the slice number being simulated. This can be used for setting filesnames of the outputted geometry files.
+
+    Clusters:
+	For simulations that have a Cluster node. The simulation is divided so that there is one job per cluster. Set the __Cluster Node__ parameter to indicate which cluster should be used for the division.
+
+	The farm will set the variable `CLUSTER` to the cluster number being simulated. This can be used for setting filenames of the outputted geometry files.
+
+    Wedges:
+	There is one job created per wedge for the wedge node specified by the __Output Driver__ parameter.
+
+	The vairable `WEDGE` will be set to a string specifying the values changed for the wedge or the take used by the wedge. The variable `WEDGENUM` will be set to the wedge number being simulated.
+
+	Please see the [Wedge ROP documentation|Node:out/wedge] for more information.
+    
+    None:
+	The simulation is not divided.  Choose this option if you want to offload a simulation onto a single machine on the farm.  This option is ideal for RBD, Cloth, and Wire simulations.
+
+Slice Divisions:
+    Describe how the simulation should be divided in the x, y and z-directions.  Each slice created by the divisions requires a dedicated machine on the HQueue farm.  For example, if the divisions are set to 2x2x2, then there would be 8 slices and the simulation would require a total of 8 machines.
+
+    Having more divisions allows for more work to be parallelized and generally improves simulation times.  However, too many divisions can potentially slow down the simulation since more data must be passed between the slices.
+
+    Note that the number of slices dictates the number of generated geometry files.  For instance, a simulation with 2 slices will create 2 sets of geometry files.  So if 10 frames are to be simulated, then a total of 20 geometry files will be created, each file named with the slice number that it belongs to.
+
+    This parameter only applies if the __Partitioning Type__ is set to __Volume Slices__.
+
+Number of Slices:
+    The total number of slices in the particle fluid simulation.  HQueue will assign a client machine for each slice.
+
+    This parameter only applies if the __Partitioning Type__ is set to __Particle Slices__.
+
+Controls Node:
+    The DOPs control node that assists HQueue in distributing the simulation.  The node's __Tracker Address__, __Tracker Port__ and __Slice Divisions__ parameters are automatically set by HQueue when the scene is processed on the farm.
+
+    This parameter does not apply if the __Partitioning Type__ is set to __None__ or __Clusters__.
+
+Cluster Node:
+    The Cluster node that specifies that clustering to be used to determine the distributed jobs.
+
+    This parameter only applies if the __Partitioning Type__ is set to __Clusters__.
+
+
+== Email Options ==
+
+Send Status Emails:
+    Enable this parameter if you want status emails for the specified events to be sent out.
+
+NOTE:
+    The following parameters only apply when the __Send Status Emails__ parameter is turned on.
+
+Email Address:
+    The list of emails that will be sent status updates. Use commas to separate the entries.
+
+On Start:
+    Enable this parameter to have emails sent when the job starts being processed by a client.
+
+On Success:
+    Enable this parameter to have emails sent when the job is successfully completed.
+
+On Failure:
+    Enable this parameter to have emails sent when the job has failed, been canceled, or abandoned.
+
+On Pause:
+    Enable this parameter to have emails sent when the job is paused.
+
+On Resume:
+    Enable this parameter to have emails sent when the job is resumed.
+
+On Reschedule:
+    Enable this parameter to have emails sent when a job is rescheduled.
+
+On Priority Change:
+    Enable this parameter to have emails sent when a job's priority is changed.
+
+== Advanced ==
+
+Assign To:
+    Set this parameter if you want HQueue to assign the simulation job to a specific list of clients or client groups.
+
+    Any Client:
+	When this option is selected, HQueue will assign your simulation jobs to any available machine.
+
+    Listed Clients:
+	Choose this option to specify a list of client machines that HQueue can assign the simulation jobs to.  When simulation volumes or particles, make sure that you list enough clients to meet the requirement set by the __Slice Divisions__ or __Number of Slices__ parameter.
+
+    Clients from Listed Groups:
+	Choose this option to specify a list of client groups.  HQueue will assign the simulation jobs to any machines that are members of at least one of the listed client groups.
+
+Clients:
+    The list of client machines that HQueue can assign the simulation jobs to.  Use commas to separate the machine names.
+
+    This parameter only applies if __Listed Clients__ is chosen in the __Assign To__ parameter.
+
+Select Clients:
+    Click to pop-up a dialog with a list of client machines registered on the HQueue farm.  Accepting the selection in the dialog automatically populates the __Clients__ parameter with the selected clients.
+
+Client Groups:
+    The list of client groups that HQueue can assign the simulation jobs to.  Use commas to separate the group names.  Specifically, HQueue assigns simulation jobs to only the machines that are members of at least one of the groups in the list.
+
+    This parameter only applies if __Clients from Listed Groups__ is chosen in the __Assign To__ parameter.
+
+Select Client Groups:
+    Click to pop-up a dialog with a list of client groups registered on the HQueue farm.  Accepting the selection in the dialog automatically populates the __Client Groups__ parameter with the selected groups.
+
+Use Dedicated Machine for Tracker:
+    The tracker process coordinates the communication between the machines simulating the slices.  It does very little work aside from receiving and sending messages to the other machines.  By default, HQueue allows other simulation or render jobs to be assigned to the machine running the tracker.
+
+    Check this parameter to tell HQueue not to assign other jobs to the tracker machine.  You may want to do this if you have several slices and you are worried that the communication from the client machines to the tracker will slow the tracker machine down.
+
+    This parameter does not apply when the __Partitioning Type__ parameter is set to __None__ or __Clusters__.
+
+Enable Performance Monitor Logging:
+    When checked, HQueue turns on performance monitor logging using the hscript [Cmd:perfmon] command for the jobs doing the simulations.  The log is merged with the job's command output log and can be downloaded from the job view page on the HQueue web interface.
+
+Set Number of CPUs per Job:
+    Check this parameter if you want to set the maximum number of CPUs used for each simulation job.
+
+CPUs per Job:
+    The maximum number of CPUs that will be used by a simulation job.  If the number exceeds a client machine's number of CPUs, then the client machine will not be assigned to any simulation jobs.
+
+Dependency Order:
+    The rendering order to use when the target output driver has input ROP dependencies.
+
+    Frame by Frame:
+	Renders a frame for all the output drivers in the network, and then moves on to the next frame. This method produces final results much faster than node by node, as the first final frame will be finished much sooner in the render process.
+    Node by Node:
+        Renders the entire frame range for each output driver, before moving on to another one. This mode is more efficient overall, since some output driver types can execute faster in sequence than frame by frame. However, the first output frame is produced at almost the end of the render process.
+
+Environment:
+    A list of variable names and values that should be defined on the client machine when running the job.  The variables appear as shell environment variables.
+
+Create Directories:
+    A list of output directories that should be created on the farm before any files are rendered out.  For example, if your simulation generates a geometry files in `$HIP/geo`, then you will want to add this to the list.
+    
+    NOTE:
+        This parameter does nothing if the output directories already exist.
+
+
+@hqvariables HQueue Variables
+
+    HQueue defines a set of variables which appear in the environment of a running job.  You can use these variables to refer to common file paths, machine settings and server configuration values.
+
+    HQROOT:
+	Evaluates to the root directory of the HQueue shared file system.  The default HQueue installation sets this variable to `/mnt/hq` on Linux systems, `H:/` on Windows systems, and `/Volumes/HQShared` on Mac OSX systems.  Note that the shared file system can be configured to reside in a different location so check with your HQueue administrator for details.
+
+    HQCLIENTARCH:
+	Evaluates to the architecture and operating system of the client machine assigned to execute the simulation job.  For example, if the HQueue server assigned a job to a Linux, 64-bit machine on the farm, then `$HQCLIENTARCH` is set to `'linux-x86_64'` in the environment.
+
+	This variable is useful for when you want to refer to paths that depend on the client machine's platform.  For example, `/mnt/hq/houdini_distros/hfs.$HQCLIENTARCH` could refer to the Houdini distribution to use for a simulation job.  Specifically, it tells HQueue to use `/mnt/hq/houdini_distros/hfs.linux-i686` when running the job on	a 32-bit Linux machine, and to use `/mnt/hq/houdini_distros/hfs.linux-x86_64` when running the job on a 64-bit Linux machine.

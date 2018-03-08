@@ -1,0 +1,91 @@
+#type: node
+#context: sop
+#icon: fluidcompress
+#internal: fluidcompress
+
+
+= Fluid Compress =
+
+"""Compresses the output of fluid simulations to decrease size on disk"""
+
+The Fluid Compress SOP compresses fluid simulations, usually before saving the data to disk.  The compression is generally lossy, in that FLIP particles will be culled below the specified depth, and volume bandwidth is limited by zeroing out values. However, SOPs such as [Whitewater Source|Node:sop/whitewatersource] and [Particle Fluid Surface|Node:sop/particlefluidsurface] are designed to detect compressed fluid input and regenerate any required missing data.
+
+The typical input of this SOP are:
+
+* Particles from a FLIP simulation
+* A `surface` field representing the SDF field of a liquid simulation
+* Three fields name `vel.x`, `vel.y`, and `vel.z` representing the velocity vector field of a fluid simulation.
+
+The primary methods of compression by this operator are:
+
+* Particle culling below specified depth.
+* Partitioning the particles spatially and converting them into packed primitives.
+* Volume bandwidth limiting and conversion to sparse VDB format.
+* Flagging the VDB's to save as 16-bit on disk, further reducing disk space.
+
+NOTE:
+    This SOP creates several detail attributes indicating that the fluid has been compressed. Several of these are also stored to the info block when written to file, making them accessible through the the [File SOP|Node:sop/file]'s __Info Load__ mode or the `gstat` command line tool.  These attributes include:
+
+    * `fluidcompress_particleband` and `fluidcompress_volumeband` - the Particle and Volume bandwidth respectively.
+    * `fluidcompress_particlesuncompressed` and `fluidcompress_particlescompressed` - the number of fluid particles before and after compression.
+    * `fluidcompress_volumesize` and `fluidcompress_volumet` - the original size and center of the fluid volumes.
+    
+For more information, see the [Fluid Compression|/fluid/compress] help page in the Fluids chapter.
+
+@inputs
+    Fluid Simulation:
+        Particles and surface and velocity volumes from a fluid simulation.
+
+@parameters
+
+== Particles ==
+
+Particle Separation:
+    The distance between two particles in the fluid simulation. This parameter
+    should generally reference the same parameter on the [FLIP Object|Node:dop/flipobject]
+    of the input simulation.
+
+Cull Bandwidth:
+    If enabled, any particles below this depth in the `surface` field will be deleted.  This
+    parameter is specified in units of __Particle Separation__.
+
+Keep Attributes:
+    If enabled, all particle attributes except those specified here will be deleted.
+
+Pack Particles:
+    Partition the particles into packed primitives using the [Pack Points|Node:sop/packpoints] SOP.  Packing allows on-demand loading of particles from disk if the resulting files are loaded with __Delay Load Geometry__ enabled on a [File|Node:sop/file] or [File Cache|Node:sop/filecache] SOP.
+
+== Volumes ==
+
+NOTE:
+    Input volumes named `surface` and `vel` will be converted to VDB format.
+
+Limit Bandwidth:
+    Limit the bandwidth on input `surface` and `vel` volumes beyond the specified distance
+    from the fluid surface.  
+    
+    NOTE:
+        This value should ideally be greater than the __Foam Depth__ parameter on any [Whitewater Solver|Node:dop/whitewatersolver] nodes used with this data as a source.
+
+Advection Time:
+    The `vel` volume is limited by advecting backwards through time and clearing any values
+    that do not result in advection to within the __Limit Bandwidth__ of the surface field.  If operating at a different timescale you can adjust the parameter here.
+
+Advection CFL:
+    The CFL constraint on the advection used for velocity limiting. Lower numbers are more accurate but more expensive.
+
+Min Speed:
+    Velocity values below this speed are assumed to be zero and cleared to save memory.
+
+Write 16-Bit Floats:
+    A flag to specify that when writing to disk that the volumes should be down converted to 16 bit. This does not affect how they are stored in memory.
+
+@related
+    - [FLIP Solver|Node:dop/flipsolver]
+    - [Pack Points|Node:sop/packpoints]
+    - [Whitewater Source|Node:sop/whitewatersource]
+    - [Whitewater Solver|Node:dop/whitewatersolver]
+    - [Particle Fluid Surface|Node:sop/particlefluidsurface]
+
+
+

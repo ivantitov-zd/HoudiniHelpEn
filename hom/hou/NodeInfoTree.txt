@@ -1,0 +1,70 @@
+= hou.NodeInfoTree =
+#type: homclass
+#cppname: HOM_NodeInfoTree
+#group: nodes
+
+"""A tree structure designed to contain information about nodes and the data they generate."""
+
+This class represents a tree structure, where each branch of the tree can have
+any number of named sub-trees, as well as a two dimensional grid of
+strings. Most often this grid has two columns ("Property" and "Value"), with
+some number of rows to represent arbitrary key/value pairs. But the grid can
+also contain more complex data (such as the volume information in geometry
+data).
+
+@methods
+
+::`name(self)` -> `str`:
+    #cppname: HOM_NodeInfoTree::name
+    Returns the name of this branch of the tree.
+
+::`infoType(self)` -> `str`:
+    #cppname: HOM_NodeInfoTree::infoType
+    Returns a string that can be used to describe the type of data stored in
+    this tree. For example, a tree holding geometry information (generated
+    either by a SOP node or a DOP node) will return `"Geometry"` from this
+    method.
+
+::`branchOrder(self)` -> `tuple` of `str`:
+    #cppname: HOM_NodeInfoTree::branchOrder
+    Returns the "natural" order of the child branches in the dictionary
+    returned by `branches()`. This ordering is often not very important, but
+    in situations where there are a large number of branches that do have some
+    sort of natural order (such as the branches for each DOP object returned
+    by a DOP node) this method can help organize the information.
+
+    This code iterates through all child branches of a node's info tree in
+    their natural order, assuming an RBD simulation created from a default
+    sphere and torus object:
+    {{{
+    >>> nodeinfo = hou.node('/obj/AutoDopNetwork/output').infoTree()
+    >>> dopinfo = nodeinfo.branches()['DOP Info']
+    >>> objinfo = dopinfo.branches()['Objects']
+    >>> objbranches = objinfo.branches()
+    >>> for objname in objinfo.branchOrder():
+    ...   obj = objbranches[objname]
+    ...   print objname, ':', obj.branches()
+    ...
+    torus_object1 : {'Geometry': <hou.NodeInfoTree>}
+    sphere_object1 : {'Geometry': <hou.NodeInfoTree>}
+    }}}
+
+::`branches(self)` -> `dict` of `str` to [Hom:hou.NodeInfoTree]:
+    #cppname: HOM_NodeInfoTree::branches
+    Return a dictionary of all child branches. Each branch has a name, and is
+    a full tree, which may have it's own branches, and so on.
+
+::`headings(self)` -> `tuple` of `str`:
+    #cppname: HOM_NodeInfoTree::headings
+    Returns the titles of the columns for the data returned by the `rows()`
+    method. Usually this will be simply `('Property', 'Value')`, for rows that
+    are simply key/value pairs. But in some cases the headings can help
+    interpret the returned information.
+
+::`rows(self)` -> `tuple` of `tuple` of `str`:
+    #cppname: HOM_NodeInfoTree::rows
+    Return a two dimensional grid of strings. The returned tuple represents
+    the rows of the grid. The contained tuples each represent one row. All
+    contained tuples will be the same length, which will be the length of the
+    tuple returned by the `headings()` method.
+

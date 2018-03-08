@@ -1,0 +1,753 @@
+= Customize menus =
+
+== Overview ==
+
+Houdini lets you customize several menus, including the main menus, using XML configuration files.
+
+* Houdini loads the default menu files from the Houdini installation (`$HFS/houdini`), then any files with the same names from `$HOUDINI_MENU_PATH`. (The default path is `$HOME/houdini<<X>>.<<x>>/` and the current working directory.) This allows per-user menu customization.
+
+* By default `$HOUDINI_MENU_PATH` is the same as `$HOUDINI_PATH`.
+
+* Each definition file can add, rearrange, and remove menu items from files loaded earlier in the path.
+
+* Menus and menu items are identified by their `id` attribute. It is not an error to create a menu or item without an `id` attribute, but for various reasons every menu/item should have one.
+
+* For action and toggle menu items in the main menu files, the `id` value is also a [hotkey|/basics/hotkeys] symbol, allowing you to assign a hotkey to the item in the [hotkey editor|/ref/windows/hotkey].
+
+    Hotkey symbols must start with `h.`, so if an item's `id` doesn't start with `h.` already, Houdini creates its hotkey symbol by prefixing the `id` with `h.`.
+
+* Most of the menu items in the default files shipped with Houdini trigger built-in functionality based on the hotkey. However, action items can also trigger Python scripts. Additionally, you can create alias menu items. See the `<scriptItem>` and `<actionId>` tags below.
+
+* You can customize the context menu for nodes in the network editor using an `$HOUDINI_MENU_PATH/OPmenu.xml`.
+
+== Configuration files ==
+
+The configuration files are in an XML format, using a schema defined in `$HFS/houdini/menu.xsd`.
+
+=== Main menu files ===
+
+The main menus are defined by the following files in `$HFS/houdini`.
+
+File ||
+    Usage ||
+`MainMenuCommon.xml` |
+    Defines menus common to Houdini FX and Houdini.
+
+`MainMenuMaster.xml` |
+    An overlay that adds Houdini FX menu items to the common menus. This is applied when you start a Houdini FX license.
+    
+`MainMenuEscape.xml` |
+    An overlay that adds Houdini menu items to the common menus. This is applied when you start a Houdini license.
+    
+`MainMenuMPlay.xml` |
+    Menus for [Mplay|/mplay].
+
+Houdini searches the `$HOUDINI_MENU_PATH` in reverse order, first looking for `MainMenuCommon.xml` and then for `MainMenuMaster.xml` files. If there are conflicting definitions or edits of menu items, the files loaded later take precedence. For example, in the default `$HOUDINI_MENU_PATH` of "$HOUDINI_USER_PREF_DIR:$HH", Houdini will look for "$HH/MainMenuCommon.xml" first, then "$HOUDINI_USER_PREF_DIR/MainMenuCommon.xml", then "$HH/MainMenuMaster.xml", and finally "$HOUDINI_USER_PREF_DIR/MainMenuMaster.xml".
+
+The document element for a menu configuration file is always `<mainMenu>`. Menu definition and manipulation elements go inside `<mainMenu>`.
+
+{{{
+#!xml
+<?xml version="1.0" encoding="UTF-8"?>
+<mainMenu>
+...
+</mainMenu>
+}}}
+
+Four tags are allowed inside `mainMenu`: `menuBar`, [addScriptItem|#addScriptItem], [modifyItem|#modifyItem], and [removeItem|#removeItem].
+
+The `<menuBar>` element defines the structure of menus. The `MainMenuCommon.xml` file that ships with Houdini contains a `menuBar` element that defines the main menus. You can then use the add, modify, and remove tags to then customize the basic structure in later files.
+
+You can also use this tag to define additional structure to add on to the menus defined in previous files.
+
+This example will add a new top-level menu called "My Scripts" containing three items that run scripts when chosen by the user.
+
+{{{
+#!xml
+<?xml version="1.0" encoding="UTF-8"?>
+<mainMenu>
+  <menuBar>
+    <subMenu id="my_submenu">
+      <label>My Scripts</label>
+      
+      <scriptItem>
+        <label>My First Item</label>
+        <scriptPath>$HOME/scripts/first_script.py</scriptPath>
+      </scriptItem>
+      
+      <titleItem>
+        <label>My Title</label>
+      </titleItem>
+      
+      <scriptItem id="h.second_item">
+        <label>My Second Item</label>
+        <scriptPath>$HOME/scripts/generic_script.py</scriptPath>
+        <scriptArgs>-q -n camera</scriptArgs>
+      </scriptItem>
+      
+      <separatorItem/>
+      
+      <scriptItem id="h.third_item">
+        <label>My Third Item</label>
+        <scriptPath>$HOME/scripts/generic_script.py</scriptPath>
+        <scriptArgs>-q -n light</scriptArgs>
+      </scriptItem>
+    </subMenu>
+  </menuBar>
+</mainMenu>
+}}}
+    
+=== Context menu files ===
+
+Several context (right mouse button) menus are configurable using files similar to the main menu files.
+
+File ||
+    Menu ||
+        `id` Prefix ||
+`CHGmenu.xml` |
+    Channel group context menu |
+        `h.pane.group.`
+`OPmenu.xml` |
+    Node edit menu (i.e. RMB-click on a node in the network editor) |
+        `h.pane.wsheet.`
+`PARMmenu.xml` |
+    Parameter context menu (in the parameter editor) |
+        `h.pane.parms.`
+`ParmGearMenuenu.xml` |
+    The menu attached to the gear icon menu button in the parameter editor. |
+        `h.pane.parms.`
+`PlaybarMenu.xml` |
+    Playbar context menu |
+        `h.`
+`ShelfToolMenu.xml` |
+    Context menu for the tool buttons on the shelf |
+        `h.shelf.menu.`
+`ShelfMenu.xml` |
+    Context menu for the shelf and shelf tabs |
+        `h.shelf.menu.`
+`ShelfSetMenu.xml` and `ShelfSetPlusMenu.xml` |
+    Menu for the shelf set (drop-down arrow button in the upper right corner of the shelf and the plus button next to the tabs, respecitvely) |
+        `h.shelf.menu.`
+`VOPFXmenu.xml` |
+    Motion FX menu to the right of parameters on VOP nodes |
+        `h.pane.parms.`
+
+The structure of context menu files is similar to main menu files, however the top-level element is `<menuDocument>` and the menu items are wrapped in a `<menu>` element.
+
+The menu item labels for built-in functions are dynamically generated. Houdini will ignore any `<label>` and `<labelExpression>` element inside an `<actionItem>`.
+
+{{{
+#!xml
+<?xml version="1.0" encoding="UTF-8"?>
+<menuDocument>
+  <menu>
+    <scriptItem id="create_myramp">
+      <label>My First Item</label>
+      <scriptPath>$HOME/scripts/first_script.py</scriptPath>
+    </scriptItem>
+  </menu>
+</menuDocument>
+}}}
+
+The `id`s correspond to hotkeys with a certain fixed prefix (depending on the context menu being configured). For example, an item with `id=create_ramp`, refers to the `h.pane.parms.vopeffects.create_ramp` action in the hotkeys manager.
+
+Pop-up menus also support a `<context>` XML element inside a `<scriptItem>` (and
+other) menu item elements. The `<context>` element specifies conditions that a
+menu item must meet to be included in the menu.  The `<context>` element can
+contain:
+
+`<ownerMask>`:
+    Uses globbing to match owner name against the specified string.
+    An owner is the entity that pops up the menu, e.g., a parameter or 
+    a shelf tool.
+        
+    {{{
+    #!xml
+    <scriptItem id="box_tool_item">
+      <label>Box Tool Menu Item</label>
+      <context>
+        <ownerMask>*box*</ownerMask>
+      </context>
+    </scriptItem>
+    }}}
+
+`<expression>`:
+    Is a python expression that allows the menu item if it evaluates to true
+    (non-zero), and otherwise excludes it from the menu.
+
+    {{{
+    #!xml
+    <expression>kwargs.get('name','') == 'sop_box'</expression>
+    <expression>hou.applicationVersion()[0] >= 12</expression>
+    }}}
+
+    NOTE: 
+        You can have multi-line expressions.  The expression must `return` True
+        or False.
+
+        For example, this expression returns True if the hou.Node object in
+        kwargs exists and is an Object node:
+        
+        {{{
+        #!xml
+        <expression>
+        node = kwargs.get("node", None)
+        if node is None:
+            return False
+
+        return node.type().category().name() == "Object"
+        </expression>
+        }}}
+
+`<parentNetworkType>`:
+    Specifies a list of network types in which the item can appear. It's
+    applicable to VOP FX menus only.
+
+    {{{
+    #!xml
+    <parentNetworkType>vopsurface,vopmaterial</parentNetworkType>
+    }}}
+
+=== VOP FX menu file ===
+
+This is the menu displayed when you click the [Icon:BUTTONS/gear_mini] export menu button next to an input parameter in the parameter editor for a VOP node. This menu is used to attach "boilerplate" sets of VOP nodes to the parameter's input to set up various effects. You can customize it using the `VOPFXmenu.xml` file.
+
+The structure of `VOPFXmenu.xml` is similar to the context menu files, however you can use a `<context>` element inside a `<scriptItem>` or `<separatorItem>` element to specify what network types the menu item should be available in. Inside the `<context>` element, add a `<parentNetworkType>` element. The text of the element is a network type name (or comma-separated list of names).
+
+{{{
+#!xml
+<menuDocument>
+  <menu>
+    <actionItem id="create_parm"/>
+        <scriptItem id="create_texture">
+          <label>Texture Map</label>
+      <context>
+        <parentNetworkType>
+        vopsurface,vopmaterial,rsl_vopmaterial
+        </parentNetworkType>
+      </context>
+      <scriptCode><![CDATA[
+        import voptoolutils
+
+        effect = voptoolutils.parmVopEffect(kwargs, 'texture')
+      ]]></scriptCode>
+    </scriptItem>
+    ...
+}}}
+
+The context type token is the _node type_ of the _parent network_ in which the node resides. For example, for a VOP surface shader, the token is `vopsurface`. For a VOP SOP node it is `vopsop`.
+
+If you don't specify a `<context>`, an item shows up in all VOP contexts.
+
+The `id`s correspond to hotkeys with the `h.pane.parms.` prefix. For example, an item with `id=create_ramp`, refers to the `h.pane.parms.vopeffects.create_ramp` action in the hotkeys manager.
+
+== Menu items ==
+
+`<menu>`:
+    The top-level menu.  This element can have the following attributes:
+
+    `allowRedundantSeparators`:
+        Set to true of false.  When set to true redundant separators are
+        allowed to appear in the menu (i.e. separators appearing after
+        separators, separators at the beginning or end of the menu).  When set
+        to false Houdini automatically removes redundant separators for a
+        cleaner and more organized look.  The default is false.
+
+`<scriptItem>`:
+    Inside a `<subMenu>`, attaches a menu item that triggers a Python script when the user chooses it.
+    
+    For context menu items, the given script runs in a Python scope containing a `kwargs` variable. This is a dictionary containing useful information about the item the user invoked the menu on. Different context menus provide different keys. See the menu files in `$HFS/houdini` for more information.
+    
+    The `<scriptItem>` element can have the following sub-elements.
+    
+    `<label>`:
+        The label for the menu item.  Only one of `<label>` or
+        `<labelExpression>` can exist in the `<scriptItem>` element.
+    
+    `<labelExpression>`:
+        Contains a Python script to generate the menu item's label.  Only one
+        of `<label>` or `<labelExpression>` can exist in the `<scriptItem>`
+        element.
+
+        NOTE: 
+            You can have multi-line expressions.  The expression must `return` a string.
+
+            A `kwargs` global dictionary variable is made available to the Python
+            script.  The dictionary stores information pertaining to the menu's
+            current context.
+    
+    `<scriptPath>`:
+        Contains a path to the script to run when the user chooses this menu item.
+    
+    `<scriptCode>`:
+        Contains a Python script to be executed when the user chooses this menu item.
+        
+    `<scriptArgs>`:
+        (Optional) An argument string to pass to the script when it's called. In the script you can retrieve these arguments using the `sys.argv` list.
+        
+        This lets you use a single script for multiple menu items and vary its behavior based on the parameters.
+    
+    {{{
+    #!xml
+    <scriptItem id="h.my_item">
+        <label>Geometry...</label>
+            <scriptCode><![CDATA[
+            import soptoolutils
+
+        soptoolutils.chooseAndOpenGeoFile({}, False)
+        ]]></scriptCode>
+    </scriptItem>
+    }}}
+
+    {{{
+    #!xml
+    <scriptItem id="my_action">
+        <label>My Action</label>
+        <scriptCode><![CDATA[
+            arguments = '\n  '.join(['%s = %s' % (k,w) for (k,w) in kwargs.items()])
+            hou.ui.displayMessage('My Action with kwargs:\n  ' + arguments)
+            ]]>
+        </scriptCode>
+    </scriptItem>
+    }}}
+    
+`<subMenu>`:
+    Inside `<menuBar>` (in main menu files), this attaches a top-level menu. Inside `<menu>` (in context menu files) or another `<subMenu>`, it creates a sub-menu.
+    
+    The first child of the `<subMenu>` element should be a `<label>` element containing the menu's label text.
+    
+    {{{
+    #!xml
+    <subMenu id="animation_menu">
+        <label>Channels and Keyframes</label>
+        
+        <actionItem id="scope_append_channels" />
+        <actionItem id="scope_channels"/>
+            <separatorItem/>
+            <actionItem id="set_keyframe"/>
+            ...
+        </subMenu>
+    }}}
+
+    The `<subMenu>` element can have the following attributes:
+
+    `allowRedundantSeparators`:
+        Set to true of false.  When set to true redundant separators are
+        allowed to appear in the sub-menu (i.e. separators appearing after
+        separators, separators at the beginning or end of the sub-menu).  When set
+        to false Houdini automatically removes redundant separators for a
+        cleaner and more organized look.  The default is false.
+
+`<separatorItem>`:
+    Inside a `<menu>` or `<subMenu>` element, creates a separator line.
+
+`<titleItem>`:
+    Creates a read-only title to help categorize the items following it in the menu.
+
+`<actionItem>`:
+    Creates a menu item that invokes a built-in Houdini command based on the hotkey symbol in the `id` attribute.
+    
+    In the main menu files:
+    
+    * The `id` attribute on the `<actionItem>` element identifies the internal Houdini command (hotkey symbol) invoked by the menu item.
+    
+    * An `<actionItem>` element has a child `<label>` element containing the menu item's label text.
+    
+    {{{
+    #!xml
+    <actionItem id="h.startuphelp">
+        <label>Start Here</label>
+    </actionItem>
+    }}}
+    
+    In context menus:
+    
+    * The `id` attribute specifies a _suffix_ to be appended to a common command (hotkey symbol) for all items in the menu.
+    
+        For example, in the `PARMmenu.xml` (parameter context menu) configuration file, all `id` attributes correspond to hotkeys with the `h.pane.parms` prefix. So, an item with `id="revert_to_prev_val"` would refer to the `h.pane.parms.revert_to_prev_val` hotkey action.
+    
+    * The menu item labels for built-in functions are dynamically generated. Houdini will ignore any `<label>` element inside an `<actionItem>`.
+    
+    {{{
+    #!xml
+    <actionItem id="set_keyframe"/>
+    }}}
+
+    You can use `<actionId>` tag to create a menu item alias of another item. This way, a new item with a new label can be placed in any location, and it will perform the action of another menu item. 
+    
+    {{{
+    #!xml
+    <actionItem id="set_keyframe_alias">
+	<actionId>set_keyframe</actionId>
+    </actionItem>
+    }}}
+
+`<scriptMenuStripDynamic>`:
+    Creates a strip of dynamically-generated menu items defined by a Python
+    script.  The strip must be contained in a `<menu>` or `<subMenu>` element.  The `id`
+    attribute on the `<scriptMenuStripDynamic>` element identifies and
+    registers an internal Houdini command (hotkey symbol) invoked by the menu
+    items in the strip.
+
+    The `<scriptMenuStripDynamic>` element can have the following sub-elements.
+
+    * `<contentsScriptCode>`:        
+        Contains a Python script that returns the strip's menu items as a
+        sequence of strings.  The sequence stores the menu items' internal
+        token names and their labels.  For example, `['one', 'Apples', 'two',
+        'Cream Pie']` would correspond to two menu entries with internal token
+        names "one" and "two" and labels "Apples" and "Cream Pie".
+
+        If the Python script contains only one line, then Houdini evaluates it
+        as a Python expression.  If it contains multiple lines, then Houdini
+        evalutes it as a function body and requires that the last line
+        'returns' the string sequence.
+
+        A `kwargs` global dictionary variable is made available to the Python
+        script.  The dictionary stores information pertaining to the menu's
+        current context.  For example, the parameter RMB-menu stores a `parms`
+        entry in `kwargs` with a list of node parameters that the menu
+        currently applies to.  You can use the entries in `kwargs` to
+        conditionally choose which menu items appear in the strip.
+
+        NOTE:
+            When accessing `kwargs` entries in the contents script you should
+            first check if the entries exist to ensure that your script does not
+            raise an exception.  This is required because the contents script may
+            execute when the menu opens but before the menu strip opens and the
+            `kwargs` dictionary is fully initialized.
+
+            For example, access `kwargs` entries using the `get(...)` method:
+            {{{
+            #!python
+            node = kwargs.get("node", None)
+            if node:
+                # Access node properties...
+                ...
+            }}}
+
+    * `<scriptCode>`:
+        Contains a Python script to be executed when the user chooses a menu
+        item from this strip.
+
+        A `kwargs` global dictionary variable is made available to the Python
+        script.  The dictionary stores information pertaining to the menu's
+        current context.  It also contains `selectedtoken` and `selectedlabel`
+        entries that store the internal token name and label of the selected
+        menu item respectively.
+   
+    Here is an example of a scripted dynamic menu strip:
+    {{{
+    #!xml
+    <subMenu id="mySubMenuId">
+        <label>Colors</label>
+        <scriptMenuStripDynamic id="myUniqueDynamicStripId">
+            <contentsScriptCode><![CDATA[
+            menu_items = ["red", "The Color Red", "green", "The Color Green", "blue", "The Color Blue"]
+            return menu_items
+            ]]></contentsScriptCode>
+            <scriptCode><![CDATA[
+            import hou
+
+            selected_token = kwargs["selectedtoken"]
+            selected_label = kwargs["selectedlabel"]
+
+            hou.ui.displayMessage("You have selected %s (%s)." % (selected_label, selected_token))
+            ]]></scriptCode>
+        </scriptMenuStripDynamic>
+    </subMenu>
+    }}}
+
+NOTE:
+    It is not currently possible to dynamically enable and disable user-defined menus/items.
+    
+    The default menus use extra tags not defined above. These tags are closely tied to Houdini's internal implementation and are not currently useful for user customization.
+
+== Reorganizing menus ==
+
+To attach new items or sub-menus to existing menus, duplicate the existing parent structure and put your new items inside. Houdini will match up the duplicated structure to the defined structure.
+
+For example, The default __Edit > Preferences__ sub-menu is defined like this:
+
+{{{
+#!xml
+<?xml version="1.0" encoding="UTF-8"?>
+<mainMenu>
+    <menuBar>
+        ...
+        <subMenu id="edit_menu">
+            <label>Edit</label>
+            ...
+            <subMenu id="preferences_submenu">
+                <label>Preferences</label>
+                ...
+            </subMenu>
+            ...
+        </subMenu>
+        ...
+    </menuBar>
+</mainMenu>
+}}}
+
+To add a new item to the preferences sub-menu in an overlay file, do this:
+
+{{{
+#!xml
+<?xml version="1.0" encoding="UTF-8"?>
+<mainMenu>
+    <menuBar>
+        <subMenu id="edit_menu">
+            <subMenu id="preferences_submenu">
+                <scriptItem id="h.mypref">
+                    <label>My Preference</label>
+                    <scriptPath>$HOME/scripts/generic_script.py</scriptPath>
+                </scriptItem>
+            </subMenu>
+        </subMenu>
+    </menuBar>
+</mainMenu>
+}}}
+
+(See also the `addScriptItem` tag below for how to add a single item without duplicating structure.)
+
+To fine-tune the position of your new script item within the menu you are attaching to, you can use the following sub-tags inside `<scriptItem>` or `<actionItem>`:
+
+`<insertBefore />`:
+    Insert this item at the beginning of the menu, before existing items.
+    
+`<insertBefore><<id>></insertBefore>`:
+    Insert this item before the item with `id="<<id>>"`.
+    
+`<insertAfter />`:
+    Insert this item at the end of the menu, after existing items.
+    
+`<insertAfter><<id>></insertAfter>`:
+    Insert this item after the item with `id="<<id>>"`.
+    
+`<insertAtIndex><<num>></insertAtIndex>`:
+    Insert this item at the <<n>>the position in the menu.
+
+So, to insert your new menu item before the __3D Viewports__ entry in the Preferences sub-menu, do this:
+
+{{{
+#!xml
+<?xml version="1.0" encoding="UTF-8"?>
+<mainMenu>
+    <menuBar>
+        <subMenu id="edit_menu">
+            <subMenu id="preferences_submenu">
+                <scriptItem id="h.mypref">
+                    <label>My Preference</label>
+                    <insertBefore>h.prefs_viewports</insertBefore>
+
+                    <scriptPath>$HOME/scripts/generic_script.py</scriptPath>
+                </scriptItem>
+            </subMenu>
+        </subMenu>
+    </menuBar>
+</mainMenu>
+}}}
+
+
+`<addScriptItem>`:
+    #id: addScriptItem
+
+    This tag inside `<mainMenu>` lets you add a single script item to an existing parent menu without duplicating the menu structure as shown above.
+    
+    {{{
+    #!xml
+    <mainMenu>
+        <addScriptItem id="h.mypref">
+            <label>My Preference</label>
+            <parent>preferences_submenu</parent>
+            <insertBefore>h.prefs_viewports</insertBefore>
+        
+            <scriptPath>$HOME/scripts/generic_script.py</scriptPath>
+        </addScriptItem>
+    </mainMenu>
+    }}}
+    
+    `<parent><<id>></parent>`:
+        The `id` of the menu to attach this item to.
+
+`<modifyItem>`:
+    #id: modifyItem
+
+    This tag inside `<mainMenu>` lets you relabel, rearrange, or re-parent an existing item.
+    
+    A `<modifyItem>` element can contain `<label>`, `<parent>`, `<insertAfter>`, `<insertBefore>`, and `<insertAtIndex>` elements.
+    
+    For example, the following XML code moves the __Render > Create Render Node > Other Output Nodes > Dynamics__ item one level up:
+    
+    {{{
+    #!xml
+    <mainMenu>
+        <modifyItem id="h.create_dynamics">
+            <label>Moved Dynamics</label>
+            <parent>render_create_submenu</parent>
+            <insertBefore>render_create_subsubmenu</insertBefore>
+        </modifyItem>
+    </mainMenu>
+    }}}
+    
+    You can also use the `<modifyItem>` tag within the `<menuBar>` definition structure to adjust any items previously defined.
+
+`<removeItem>`:
+    #id: removeItem
+
+    This tag inside `<mainMenu>` lets you remove an existing item.
+    
+    For example, the following XML code moves the Desktop sub-menu to the top level and removes the unnecessary separator.
+    
+    {{{
+    #!xml
+    <mainMenu>
+      <menuBar>
+        <subMenu id="desktop_submenu">
+          <insertBefore>help_menu</insertBefore>
+        </subMenu>
+      </menuBar>
+      
+      <removeItem id="windows_menu_sep_0"/>
+    </mainMenu>
+    }}}
+
+== Toggle and radio items ==
+
+The `<scriptToggleItem>`, `<scriptMenuStripRadio>`, and `<scriptRadioItem>` tags let you create custom checkmark and radio menu items. The "states" of the items are stored in Houdini global variables.
+
+NOTE:
+    As of this writing, there is no way to get and set Houdini global variables in the optional scripts, so you will have to use `hou.hscript()` to access the HScript [Cmd:echo] and [Cmd:set] commands.
+    
+    {{{
+    #!python
+    # Set the value of a global
+    hou.hscript("set -g MYGLOBAL = 0")
+    
+    # Get the value of a global
+    value, err = hou.hscript("echo $MYGLOBAL")
+    }}}
+
+=== Checkbox (toggle) items ===
+
+You can create an item that is on or off using `<scriptToggleItems>`. The `<variableName>` sub-element specifies the name of the global variable controlled by this menu item. By default, choosing this menu item will change the value of the global variable between `"0"` and `"1"`.
+
+{{{
+#!xml
+<scriptToggleItem id="myitem">
+    <label>The text that appears in the menu</label>
+    <variableName>MY_GLOBAL_VARIABLE</variableName>
+</scriptToggleItem>
+}}}
+
+You can optionally specify a Python script inside the `<scriptCode>` sub-element or using a `<scriptPath>` reference. The script runs when the user chooses the item or the value of the global variable changes.
+
+{{{
+#!xml
+<subMenu id="edit_menu">
+    <scriptToggleItem id="myvar_toggle_script">
+        <label>MYVAR_TOGGLE Status With Script</label>
+        <insertBefore>objects_submenu</insertBefore>
+        <variableName>MYVAR_TOGGLE</variableName>
+        <scriptCode><![CDATA[
+        hou.hscript("""
+if( $MYVAR_TOGGLE ) then
+set -g MYVAR_TOGGLE = 0;
+else
+set -g MYVAR_TOGGLE = 1;
+endif
+        """)
+        hou.hscript('varchange MYVAR_TOGGLE')
+        (out, err) = hou.hscript('echo $MYVAR_TOGGLE')
+        if( int(out) ):
+            status = "on"
+        else:
+            status = "off"
+        hou.ui.displayMessage( "MYVAR_TOGGLE has been turned " + status )
+    ]]></scriptCode>
+    </scriptToggleItem>
+</subMenu>
+}}}
+
+=== Radio (mutually exclusive) items ===
+
+The
+code should set the variable, but it does not have to. The radio items
+that don't specify explicit script are equivalent to the following
+Python script:
+
+
+The code, however, can do whatever it wants. Still, it is a good idea
+to at least call hou.hscript('varchange VAR') to restore the radio item
+index, otherwise the menu may get out of sync, if the variable is not
+set to the value corresponding to the clicked item.
+
+You can use `<scriptMenuStripRadio>` in place of a regular menu item, to create a list of mutually exclusive items. The `<variableName>` sub-element specifies the name of the global variable controlled by this menu item. The `<scriptMenuStripRadio>` element should contain one or more `<scriptRadioItem>` elements which represent the items in the list. By default, choosing one of the menu item in the list will change the value of the global variable to the value inside the menu item's `<variableValue>` sub-element.
+
+{{{
+#!xml
+<scriptMenuStripRadio>
+    <variableName>MY_GLOBAL_VARIABLE</variableName>
+    
+    <scriptRadioItem id="my_item_1">
+        <label>First item</label>
+        <variableValue>value1</variableValue>
+    </scriptRadioItem>
+    ...
+</scriptMenuStripRadio>
+}}}
+
+You can optionally specify a Python script inside the `<scriptCode>` sub-element or using a `<scriptPath>` reference. The script runs when the user chooses the item or the value of the global variable changes to the value in that item's `<variableValue>` sub-element.
+
+The default action is equivalent to the script:
+
+{{{
+hou.hscript('set -g VAR = val')
+hou.hscript('varchange VAR')`
+}}}
+
+Technically, the script can do anything and is not required to use these commands, but to conform to user expectations about how radio menus work it should at some point set the global variable and then call [Cmd:varchange] to update the menu UI.
+
+{{{
+#!xml
+<subMenu id="edit_menu">
+    <subMenu id="myvar_variable">
+        <label>Set MYVAR_RADIO</label>
+        <insertBefore>objects_submenu</insertBefore>
+        
+        <scriptMenuStripRadio>
+            <variableName>MYVAR_RADIO</variableName>
+            <scriptRadioItem id="h.myvar_one">
+                 <label>One</label>
+                 <variableValue>value_of_one</variableValue>
+            </scriptRadioItem>
+            <scriptRadioItem id="h.myvar_two">
+                 <label>Two</label>
+                 <variableValue>two</variableValue>
+            </scriptRadioItem>
+            <scriptRadioItem id="h.myvar_three">
+                 <label>Three</label>
+                 <variableValue>3</variableValue>
+            </scriptRadioItem>
+            <scriptRadioItem id="h.myvar_four">
+                 <label>Four</label>
+                 <variableValue>fourth_value</variableValue>
+                 <scriptCode><![CDATA[
+                    message = 'Do you want to change the global variable MYVAR_RADIO?'
+                    response = hou.ui.displayMessage( message, ('Yes', 'No'))
+                    if response == 0:
+                    hou.hscript("set -g MYVAR_RADIO = 'fourth_value'")
+                    hou.hscript("varchange MYVAR_RADIO")
+                    else:
+                    # call varchange anyway to restore the radio strip UI to old radio index
+                    hou.hscript("varchange MYVAR_RADIO")]]>
+                </scriptCode>
+            </scriptRadioItem>
+        </scriptMenuStripRadio>
+        
+    </subMenu>
+</subMenu>
+}}}
+
+
+

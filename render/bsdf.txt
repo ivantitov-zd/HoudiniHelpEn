@@ -1,0 +1,70 @@
+= Understanding Mantra raytraced shading =
+
+"""Explains the background details of how Mantra uses raytracing to shade objects in the scene."""
+
+== BSDFs ==
+
+A [bidirectional scattering distribution function|Wp:Bidirectional_scattering_distribution_function] (BSDF) controls how light reflects off a surface.
+
+BSDFs are _probability models_. Given a certain angle of incidence, a BSDF will calculate a the probability that the light ray will bounce off the surface in a certain direction.
+
+[Image:/images/render/bsdf_visualize.svg]
+
+BSDFs are _bidirectional_. That means it can calculate how a ray of light from a light source bounces off a surface, and it can _also_, given a ray from a camera to a surface, work in reverse to calculate an angle from the surface to the light source.
+
+Since Houdini 13, Mantra's shading model is based on BSDFs: all [render engines|understanding] use BSDFs and the standard final product of a Mantra shader network is a BSDF (although the [Output VOP|Node:vop/output] still accepts `Cf` and `Of`).
+
+== How Mantra ray traces surfaces ==
+
+[Image:/images/render/bsdf_backtrack.svg]
+
+# Mantra fires a certain number of _primary rays_ (a.k.a. _direct_ rays) per pixel (controlled by the __Pixel samples__ parameter).
+
+    The default __Pixel samples__ is 3x3, or 9 primary rays per pixel.
+
+# When a primary ray hits a surface, Mantra fires _secondary_ rays (a.k.a _indirect_ rays).
+
+    The number of secondary rays is also controlled by the __Pixel samples__. When __Ray variance antialiasing__ is on, the number of samples multiplied by a number Mantra calculates based on where it needs more rays. The minimum multiplier is the __Min ray samples__ parameter (default `1`, meaning use the number in __Pixel samples__), and the maximum is __Max ray samples__ (default `9`, or _nine times_ the number in __Pixel samples__).
+
+    Mantra runs each surface shader BSDF in reverse, trying to backtrack from the camera angle back to a light source. A BSDF will have multiple possible result angles based on the camera angle. Mantra simply chooses an angle at random according to the BSDF's probability model. The more rays, the more the noise introduced by this randomness evens out.
+
+    For surface shaders with multiple BSDF components (which is the usual case). For example, a surface shader might have one or more reflective components, a diffuse component, and a sub-surface scattering component. In this case, Mantra calculates the best distribution of rays to satisfy all BSDFs in the shader.
+    
+# For each secondary ray, Mantra uses a 3D tree search algorithm to
+find surfaces or lights along rays computed by the BSDF. (This is why area lights are more efficient in physically based rendering: they're easier to find.)
+
+    When a ray hits a surface:
+    
+    * The sample is considered to be in shadow (the shader can use the [Is Shadow|Node:vop/isshadow] node to test for this).
+    
+    * If the bounce limit for this type of ray hasn't been reached yet, Mantra will again send secondary rays and repeat the process. Rays sent by reflect, diffuse, and refract have different bounce limits (on the __Properties > Shading__ tab of the Mantra node). The default __Diffuse limit__ is `0`, meaning the rays will stop when they hit the first surface (so you will not see objects reflected in other objects unless you increase this limit).
+    
+    When a ray hits a light:
+    
+    * The sample is considered unshadowed (the shader can use the [Is Shadow|Node:vop/isshadow] node to test for this).
+    
+    * Mantra takes all the collected values and computes the pixel color based on the light color and the colors of all the hit surfaces.
+
+Note that if you start with the default 3x3 = 9 samples per pixel, and each bounce sends out 9 or more additional rays, if you increase the allowed bounces (for example, to allow diffuse bounces), the number of rays can explode and rendering can get slow. If you need more bounces, you might try decreasing the base pixel samples and then increasing the max ray samples so Mantra uses fewer rays in simple cases but more where they're needed. Or, if you don't care about render time, you could just set pixel samples to 12x12 and turn off ray variance antialiasing to get extreme quality uniformly everywhere and a very long render time. See [render quality and speed|quality] for how to use the rendering parameters to balance speed and quality.
+
+== Ray tracing volumes ==
+
+Mantra treats volumes similarly to surfaces. It dices a volume into micropolygons. When a ray hits one of the micropolygons, it will stop or send additonal rays (based on the __Shading > Volume Limit__ parameter).
+
+== Using BSDFs in shaders == (bsdf)
+
+Mantra treats BSDFs as first-class objects. Certain VOP nodes such as the [Reflect VOP|Node:vop/reflect] can generate them and you can use the [Add|Node:vop/add], [Multiply|Node:vop/multiply], and [Subtract|Node:vop/subtract] VOPs to combine BSDFs.
+
+All VOPs that generate a BSDF have a __Label__ parameter. This lets you associate a name with the shading component the BSDF represents, such as diffuse, reflection, refraction, or sub-surface scattering. You can use these labels in two ways:
+
+* You can specify that certain lights only contribute to certain named BSDFs using the __Light contributions__ parameter on the [Light object|Node:obj/hlight]. See [light contributions|lights#contributions] below.
+
+* You can export certain components as separate [deep raster planes|deeprasters] for compositing. See [exporting components|deeprasters#export] below.
+
+== Tips ==
+
+* If you are using caustics or emission (including sub-surface scattering) in your shaders, on the [Mantra node|Node:out/idf], On the __Properties > Shading__ tab, set __Allowable paths__ to "All".
+
+
+
+

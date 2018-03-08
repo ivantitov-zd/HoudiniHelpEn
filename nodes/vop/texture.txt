@@ -1,0 +1,141 @@
+#type: node
+#context: vop
+#internal: texture
+#icon: VOP/texture
+
+= Texture =
+
+"""Computes a filtered sample of the texture map specified and returns
+an RGB or RGBA color."""
+
+This operator computes a filtered sample of the texture map specified
+and returns an RGB or RGBA color. If the image does not have an alpha
+channel (e.g. a JPEG image) and the operator returns RGBA, the alpha
+will be set to 1.
+
+With no texture coordinates given, the values of the global s and t
+variables are used to index the texture. If both derivative inputs (ds
+and dt) are connected, `s` and `t` will represent the center of a square
+whose bottom-left and upper-right corners are (s-ds,t-dt) and (s+ds,
+t+dt) respectively .
+
+To layer a texture on top of another using layered texture attributes
+already assigned to geometry, pipe the output of the Shading Layer
+Parameter into Vector To Float, then connect fval1 and fval2 to this
+operator's s and t inputs, choosing the RGBA signature and Decal
+wrapping. Then connect the color output to a Vector4 To Vector operator
+to separate the RGB from the alpha. Put down a [Mix|Node:vop/mix] operator and connect
+the RGB color to input2, the alpha to the bias and any previous
+Texture's color to input1. Repeat this procedure as needed.
+
+
+@parameters
+    Signature:
+        RGB or RGBA values
+    Texture Map:
+	#id: map
+        The image file to use as a texture map.
+    UDIM Filename Expansion:
+	#id: udim
+	UDIM texture filename expansion. 
+	The UDIM coordinate is computed based on the uv-coordinate: `1000 + int(u)+1 + int(v)*10`.
+	Example: "map_%(UDIM)d.rat" returns "map_1044.rat" with u=3.1, v=4.15  
+    Source Color Space:
+	#id: srccolorspace
+	The texture's color space.
+    S Coordinate:
+        S coordinate (or global `s`)
+    T Coordinate:
+        T coordinate (or global `t`)
+    S Derivative:
+        Derivative with respect to s (see [UV Project|Node:vop/uvproject])
+    T Derivative:
+        Derivative with respect to t (see [UV Project|Node:vop/uvproject])
+    Wrap:
+	#id: wrap
+        Determines how the image is evaluated when the texture
+        coordinates are outside the range 0-1. The options are:
+
+        Repeat:
+            (string value `repeat`). The image map repeats outside the
+            range 0 to 1. Basically, the integer component of the texture
+	    coordinate is ignored.
+        Streak:
+            (string value `streak`). Texture coordinates are clamped to
+            the 0 to 1 range.
+        Decal:
+            (string value `decal`). Coordinates outside the range 0 to 1
+            will evaluate to the border color rather than an image
+            color.
+    Filter Type:
+	#id: filter
+        Type of anti-aliasing filter to be used for evaluation. The
+        options are:
+
+        Box:
+            (string value `box`)
+        Gaussian:
+            (string value `gauss`)
+        Bartlett/Triangular:
+            (string value `bartlett`)
+        Sinc Sharpening:
+            (string value `sinc`)
+        Hanning:
+            (string value `hanning`)
+        Blackman:
+            (string value `blackman`)
+        Catmull-Rom:
+            (string value `catrom`)
+        Mitchell:
+            (string value `mitchell`)
+        Point Sampling:
+            (string value `point`)
+    Filter Width:
+	#id: width
+	Blur the texture based on derivatives in shading contexts.  For contexts that do not provide derivatives (such as the sop context), this parameter will have no effect and you should use __Texture Blur__ or __Pixel Blur__ instead.  In shading contexts, filtering will be proportional to the micropolygon size with a filter width of 1, filtering one micropolygon.
+    Texture Blur:
+	Blur the texture as a percentage of the image width.  The blur is specified as 0 (no blur) to 1 (blur the entire image).
+    Pixel Blur:
+	Blur the texture by the specified number of pixels.  If the resolution of the map changes, the amount of blur will change.
+
+    Border Color:
+        Border color when Decal wrapping is used.
+    Extrapolate Derivatives:
+        Specifies whether derivative extrapolation should be used when
+        computing anti-aliasing information.
+    Interpolate MIP Levels:
+        Specifies whether RAT files should interpolate between different
+        MIP levels. If enabled, it will help remove discontinuities when
+        different MIP levels of a RAT file are accessed. However, the
+        results of texture evaluation will be slightly softer (i.e.
+        blurrier) and will take twice as long to compute.
+
+    Default Color:
+        When evaluating decal textures, this is the color evaluated when outside of the decal.
+
+    Texture Channel:
+        This specifies which color channel for multi-plane textures should be evaluated.
+
+    PTexture Face: 
+        When evaluating ptex files, the polygon face used to index into the map. This will default to the polygon number. 
+
+    Texture Orientation:
+	Sometimes texture maps (notably ptex textures) have different orientations than might be normal in Houdini.  This parameter allows you to perform simple manipulations on the `s` and `t` coordinates.  The operations are:
+	
+        Default:
+                Use the default `s` and `t` coordinates.
+        Flip S:
+                Flip the `s` coordinate (horizontal flip).
+        Flip T:
+                Flip the `t` coordinate (vertical flip).
+        Swap S/T:
+                Swap the `s` and `t` coordinates (diagonal flip).
+	
+	When performing any operations, the flipping occurs before the swapping.
+
+@related
+    - [Node:vop/colormap]
+    - [Node:vop/envmap]
+    - [Node:vop/shadinglayer]
+    - [Node:vop/texture3d]
+

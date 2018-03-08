@@ -1,0 +1,104 @@
+#type: node
+#context: dop
+#internal: gasbuildcollisionmask
+#icon: DOP/gas
+
+= Gas Build Collision Mask =
+
+"""A microsolver that determines the collision field between the fluid
+field and any affector objects."""
+
+The Gas Build Collision Mask DOP is a microsolver used in building
+larger fluid simulations. The [Fluid Solver|Node:dop/fluidsolver] and [Smoke Solver|Node:dop/smokesolver] DOPs that
+allow microsolvers to be added before or after the main solver step to
+extend or tweak the simulation. Alternatively, enterprising people may
+attempt to build an entire new solver out of microsolvers.
+
+The Gas Build Collision Mask DOP builds a collision field that
+represents where affector objects overlap with the fluid field. It
+generates a signed distance field which is negative inside colliding
+objects and positive outside. It also generates a collision velocity
+field that stores the velocity of the affector object closest to each
+point.
+
+
+@parameters
+    Collision Field:
+        A scalar field of this name is created and set to be a signed
+        distance field of the affector objects. 
+
+        Each voxel of this field
+        is the distance to the closest affector object. If it is inside
+        an affector object, it is the negative distance to the surface.
+    Collision Velocity Field:
+        A vector field which is set to the velocity of the closest
+        affector object to each point. This is the local velocity - a
+        rotating ball but stationary will have a tube shaped velocity
+        field.
+
+	If a field name is specified, this field will be created if
+	it does not exist.
+    Index Field:
+        An optional index field which is set to the object id of which
+        object was closest to the given voxel and within the bandwidth
+        distance.
+
+	If a field name is specified, this field will be created if
+	it does not exist.
+    Reference Field:
+        If specified, both the generated __Collision Field__, __Collision Velocity__, and __Index Field__ field will be resized and re-resolutioned to match the reference field.
+    Use Bandwidth:
+        Rather than initializing the entire SDF with the distance to
+        the relationship objects, only initialize up to a distance
+        specified by the bandwidth.
+    Bandwidth:
+        The distance to the relationship objects to build the SDF,
+        measured in voxel cells.
+    Particle Bandwidth:
+	When the source is a particle system, add this number of
+	voxels to the particle's pscale radius to ensure each particle
+	influences at least one voxel cell.
+    Use Point Velocity for Collisions:
+        The local velocity of an affector object is a combination of
+        the angular and linear velocity. However, if the object is
+        deforming and points match frame to frame, the local point
+        velocity can be used as well to estimate the deformation effect.
+    Use Volume Velocity for Collisions:
+        If an affector object doesn't have a stable point count, but
+        does have a volume representation, the change in the volume
+        representation can be used as an estimate of deformation
+        velocity. 
+
+        NOTE:
+            This does not include any velocity tangential to the volume surface - a conveyor belt will appear to be stationary as the volume remains unchanged frame to frame.
+
+    Collide with Non-SDF:
+	Turning this on enables collision with non-SDF objects, such as smoke
+	or liquids.
+
+	Normally, the relationship uses the Signed Distance Field for
+	each object.  However, if the object is a different type
+	you can use other ways of getting its effective signed
+	distance field.  If this is set, the object is examined for a
+	"surface" scalarfield, which is treated as a signed distance
+	field.  If a "density" field is present, it is treated as a
+	fog volume with a 0.5 cutoff.  If a "geometry" geometry is
+	attached, and the geometry consists of a single volume, that
+	volume will be treated as a Fog volume (with cut off of 0.5). However, if its boundary condition is set to SDF, it will be treated as an SDF.
+
+    [Include:standard_gas_timestep]
+
+    [Include:standard_solver_parms]
+
+@inputs
+    [Include:standard_data_inputs]
+
+@outputs
+    [Include:standard_data_outputs]
+
+@locals
+    [Include:standard_data_locals]
+
+    [Include:standard_locals]
+
+

@@ -1,0 +1,170 @@
+= Particle fluids =
+
+== Overview ==
+
+Houdini has several different methods for simulating liquids such as water, mud, lava, and so on, each with different strengths and weaknesses.
+
+To simulate fluids such as smoke and flame, use [pyro simulation|/pyro/pyro].
+
+See [how to set up the viewport and desktop|/dyno/setup]. We highly recommend you use the technical [desktop|/basics/panes] (__Windows > Desktop > Technical__) so you have quick access to the tree view and details view.
+
+Particle fluid simulations use particles to represent the fluid. For visualization and rendering, the particles are _surfaced_ -- that is, a surface is created based on the particles.
+
+:vimeo:FLIP fluids
+    #id: 116176349
+    #keywords: FLIP solver, flip tank shelf preset, flip tank tool, fluid tank, RBD object, feedback scale, density, velocity 
+
+== FLIP (particle + grid) fluids ==
+
+FLIP fluid solvers copy the particle's velocities onto a grid, uses a _project non-divergent_ step to calculate a new velocity field, then copies the new field back onto the particles. 
+
+Pros |
+    Avoids explosions and stray particle spray.
+
+    The lower number of required sub-steps can make FLIP very fast.
+    
+    Allows new particles to be added to the system.
+    
+    Allows editing particles using POPs and SOPs.
+
+    Unbounded, can flow freely throughout the scene. FLIP uses a container to calculate the velocities, but it is recreated at every frame. The container is mostly useful as a limit outside which stray particles will be deleted.
+
+Cons |
+    
+    Uses a limit box. The limit box can be quite large however. It prevents a stray high-speed particle from forcing the solver to grow its fields so large that you run out of memory.
+    
+Velocities |
+    Stored on the particles.
+
+Manipulate |
+    Forces. Full control using POPs and SOP point editing.
+
+Distribution |
+    Arbitrary slices. Works best with fast-flowing liquid.
+
+Usual sub-stepping |
+    1x. However, if a fast-moving liquid or a fast-moving obstacle need to collide accurately, you will still need to sub-step.
+
+== Creating particle fluids == (emission)
+
+* The __Particle Fluids__ shelf tab has several tools for creating particle fluids:
+
+    * [Icon:SHELF/convert_to_fluid] [FLIP Fluid From Object|/shelf/flipfluidfromobject] creates a blob of fluid in the shape of the selected geometry.
+    
+    * [Icon:SHELF/flip_tank] [FLIP Tank|/shelf/fliptank] creates a rectangular body of particle fluid inside an invisible box.
+    
+    * [Icon:SHELF/sculptedparticlefluid] [Sculpted Particle Fluid|/shelf/sculptedparticlefluid] lets you select a piece of geometry representing a container and an intersecting piece of geometry representing the "water level", and creates a body of particle fluid inside the container.
+    
+    * [Icon:DOP/particlefluidemitter] [Emit Particle Fluid|/shelf/emitparticlefluid] creates an emitter from selected geometry. You can choose an existing
+
+* The tools on the __Populate Containers__ shelf tab. See [fluid sourcing|fluid_sour
+
+* You can mix and match creation methods, so you can create a "FLIP tank" full of liquid, and then create an emitter (selecting the tank as the fluid object to use) and have the emitted liquid mix and interact with the liquid in the tank.
+
+* With FLIP fluids, you can also use the [particle network|#direct_pops] to add particles to the simulation with particle nodes.
+
+== Particle fluids how to == (howto)
+
+:task:Create a blob of fluid from an object:
+    # Create a geometry object in the shape you want to convert to particles.
+
+    # Select the geometry object.
+    
+    # On the __Particle Fluids__ shelf tab, click [Icon:SHELF/convert_to_fluid] FLIP Fluid.
+    
+:task:Create a particle fluid emitter:
+    Use the [Icon:DOP/particlefluidemitter] [Emit Particle Fluid tool|/shelf/emitparticlefluid] on the __Particle Fluids__ shelf tab.
+    
+    _Or_ if you have an existing particle fluid object you want to add an emitter to, use the tools on the __Populate Containers__ 
+    
+    The Emit Particle Fluid tool on the __Particle Fuids__ tab is essentially like the [Source from volume|/shelf/sourcefromvolume] tool on the __Populate Containers__ tab, with the added feature that it can create a new particle fluid object automatically if you don't already have one.
+
+:task:Add a sink:
+    # Create a geometry object for the sink. Particle fluid that contacts this object will be removed.
+    
+    # On the __Particle fluids__ shelf tab, click the [Icon:DOP/particlefluidsink] Sink Particle Fluid tool.
+    
+    # Click any of the particles in the system you want to add the sink to, or just select the particle fluid object in the dynamics network, then press ((Enter)).
+    
+    # Select the sink geometry object and press ((Enter)).
+    
+:task:Collide with other objects:
+    Any objects you merge (using the [Merge DOP|Node:dop/merge]) with the fluid in the network, such as RBD or static geometry, will collide with the fluid particles. See [Particle fluid networks|#network] below.
+    
+    The [Icon:[RBD object|/shelf/rbdobject], [Static object|/shelf/staticobject], and [Terrain object|/shelf/terrainobject] 
+
+:task:Create a quick particle fluid from a container object and a surface:
+    The [Icon:SHELF/sculptedparticlefluid] [Sculpted Particle Fluid tool|/shelf/sculptedparticlefluid] lets you create a particle fluid automatically based on geometry defining a container (such as a pot or river bed) and geometry defining the surface of the fluid.
+    
+:task:Add a wave to a sculpted particle fluid:
+    If you use the [Icon:SOP/waveform] [Waveform tool|/shelf/waveform] (on the __Deform__ shelf tab) to add a wave shape to the surface you use for the fluid surface with the [Icon:SHELF/sculptedparticlefluid] [Sculpted Particle Fluid tool|/shelf/sculptedparticlefluid], the sculpted particle fluid tool will recognize the waveform and propagate the wave through the fluid.
+    
+    Select your water surface and apply the tool. Use the handle to position the wave interactively. Don't forget that with the Handle tool active, you press ((Y)) to cycle through the tool's various handles and tweak the wave to the starting shape you desire.
+
+:task:Direct the motion of the fluid:
+    See [directing particle fluids|/fluid/directingparticlefluid].
+    
+:task:Render tank-style simulations seamlessly:
+    Turn on __Distributed Pressure Solve__ on the [FLIP Solver|Node:dop/flipsolver]. This will account for tank pressure and will avoid any loss of fluid and visual seams where the slices meet. 
+    
+    NOTE:
+        This requires a lot of network bandwidth, and is not needed for flowing river-type simulations.
+
+== Particle fluid networks == (network)
+
+The FLIP fluid tools set up nodes in several different networks.
+
+[Image:/images/dynamics/flip_network.png]
+
+* A DOP network with a FLIP fluid object and FLIP solver to simulate the fluid.
+
+    [FLIP Object|Node:dop/flipconfigureobject]:
+        This node represents the simulated fluid. It has parameters for visualizing the liquid and changing its physical properties.
+    
+    [FLIP Solver|Node:dop/flipsolver]:
+        This has parameters for technical details of how to simulate the fluid.
+    
+    [Source Volume|Node:dop/sourcevolume]:
+        The Emit Particle Fluid and Populate Containers tools set up SOPs
+        in SOPs to turn the source geometry into a volume. This node then
+        imports the SOP volume and connects it to the FLIP solver's
+        fourth ("sourcing") input.
+        
+        See [fluid sourcing|/dyno/fluid_sourcing] for more information.
+
+* A new object at the Scene level for viewing and rendering the results of the simulation. One [DOP Import node|Node:sop/dopimport] imports all fields for rendering, and another imports only fast display-related fields for display in the viewport.
+
+
+
+    [Image:/images/dynamics/flip_sop_network.png]
+
+* If you want to use particle nodes (POPs) to affect the fluid behavior, you can connect a [POP Solver|Node:dop/popsolver] to the FLIP Solver's second  ("Particle velocity") input. You can double-click this node to add [particle nodes|/nodes/pop/] to the particle network inside. See [directing fluids with POPs|#direct_pops] below.
+
+== Visualizing particle fluids ==
+
+Visualization:
+    You can view the fluid particles as *sprites* (images that always face the camera, the default is a simple sphere), *spheres* (actual sphere geometry in the scene that is properly lit and shaded), or *particles* (drawn as points like regular particles).
+
+
+== Particle fluid resolution: particle separation ==
+
+To get a higher resolution fluid, decrease the __Particle separation__ parameter on the fluid object. The default separation value is fairly high to give fast results when prototyping, but you'll want to lower it for higher quality once you have an effect looking like what you want.
+
+The Particle Separation is measured in Houdini scene units which correspond to meters in Houdini's dynamics world. So a particle separation value of `0.1` is 10 cm. If you build your scene keeping in mind it is at meter scale, you will get more realistic results.
+
+TIP:
+    The _mass_ of the particles is calculated as volume times density. So changing the particle separation (which controls density) will change the mass of each individual particle.
+
+    If you are using POP nodes or DOP forces to change the behavior of the fluid, you may want to turn on any __Ignore mass__ parameters on the forces so the look doesn't change if you change the particle separation.
+
+    To use forces without an __Ignore mass__, you might find it easier to just explicitly set the mass of every particle to `1` on creation.
+
+The scale or feel of the fluid simulation is driven by the particle separation. Units help in keeping things straight and making sure your emitters and collision geometry are in meters is a terrific guide. A large scale effect with too much particle separation will look like a miniature (for example, in a waterfall, the water may shoot out off the edge as fast water would in a miniature waterfall model, not tumble down right away as it would in a giant waterfall). In that case you will need to decrease the separation to get the correct behavior and level of detail.
+
+
+
+@related
+
+* [distribute]
+
+* [Distributing fluid simulations|/dyno/distribute]

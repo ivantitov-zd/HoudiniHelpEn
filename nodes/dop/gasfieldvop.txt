@@ -1,0 +1,120 @@
+#type: node
+#context: dop
+#internal: gasfieldvop
+#icon: DOP/gas
+
+#tags: volumes
+
+= Gas Field VOP =
+
+"""Runs CVEX on a set of fields."""
+
+The Gas Field VOP operation runs CVEX over a set of fields.  The CVEX
+shader can be defined as a .vfl file, a Shop, or by building a CVEX
+VOP network inside this node.  The last is the most straightforward
+approach.
+
+Binding to the CVEX script controls what values are passed to which
+parameters of the script.  The default AutoBind will use the name of
+the fields to determine which parameter they should
+override.  If that parameter is marked as exported in the CVEX script,
+the field will be written to.  Otherwise, the field is just read to
+get the parameter's values.  
+
+The CVEX script is applied once for each exported field.
+Locally defined `ix`, `iy`, `iz`, `resx`, `resy`, `resz`, `orig`, and `P` bindings are
+created that refer to the index, resolution, center, and current voxel
+position of the currently exported primitive.
+
+The parameters list starts with parameters created by the CVEX
+script's parameters.  If the parameter is meant only to be bound to a
+field, it can be hidden by setting the invisible flag on the VOP
+parameter.
+
+@parameters
+
+== Vex Setup ==
+
+        Vex Source:
+                Where to get the CVEX script from.  Myself will refer to the VOP network built inside this node.  SHOP will use the __Shop Path__ and __Script__ will load the .vex file specified in the script.
+
+	Shop Path:
+                The CVEX Shop to apply.
+
+                This can also point to any node that contains a CVEX VOP Network.
+	    
+                NOTE:
+                        Referenced nodes parameters will be used.
+
+	Script:
+	    The CVEX script to apply.
+
+	Re-load VEX Functions:
+	    When in script mode, this reloads any .vex files to
+	    account for updates made outside of Houdini.
+
+	Compiler:
+	    The command line used by VOPs to compile the inside of
+	    this node.
+
+	Force Compile:
+	    Trigger a recompile of the VOP network.
+
+	Evaluation Node Path:
+	    VEX functions like `ch()` usually evaluate with respect to this node.
+	    Providing a path here can override where the path search starts
+	    from.  This is useful for embedding in a digital asset where you
+	    would like the top level digital asset to be the search root.
+
+	Export Parameters:
+	    This pattern can be used to override
+	    the export option on the VEX shader to avoid writing to 
+	    certain fields.  The pattern matches the VEX parameter, not
+	    the bound field.  The field will still be bound for
+	    reading.
+
+== Data Bindings ==
+
+	Autobind by Name:
+	    Will use the name of the field to determine which
+	    field binds with which parameter.  
+
+	    A scalar field named "foo" will be bound to the float
+	    parameter "foo".  A vector field "foo" will be bound to
+	    the vector (three float) parameter "foo".  A matrix field
+	    "foo" will be bound to the the matrix (three by three)
+	    parameter "foo".  An index field named "foo" will be bound
+	    to the integer parameter "foo".
+
+	Primitive, Name:
+	    Manually specifies the bindings of each field.  
+	    
+== Inputs ==
+
+Input 1, 2, 3, 4:
+	These control the four virtual inputs accessible inside of VOPs.
+
+	They can be accessed with the OpInput1-4 wires from the VOP, or with
+	the `@OpInput1-4` string parameters when using VEXpressions.
+
+	They can also be accessed numerically as 0-3 with VEX functions
+	that take an input number.
+
+	None:
+	    No geometry is wired to this input.
+	SOP:
+	    The SOP geometry will be cooked prior to running the VEX and
+	    the result wired to this input.
+	DOP Data:
+	    Data in the current simulation to reference.  Specified as
+	    an object/data, for example, `pyro1/vel` to refer to the velocity
+	    field of the `pyro1` object (which will show up as three volume
+	    primitives).
+	Nth Context Geometry:
+	    These refer to the SOPs wired into the parent DOP Network itself.
+
+[Include:standard_gas_timestep]
+
+@related
+    - [Node:dop/gasfieldwrangle]
+

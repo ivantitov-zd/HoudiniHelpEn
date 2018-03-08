@@ -1,0 +1,314 @@
+#type: node
+#context: shop
+#internal: principledshader
+#icon: VOP/principled
+
+= Principled Shader =
+
+"""An artist-friendly shader that can model a large number of materials realistically."""
+
+The goal of this shader is to produce physically plausible results while using intuitive rather than physical parameters. A large number of materials can be created with relatively few parameters. All parameters are in the zero to one range and represent plausible real-world values within that range.
+
+Textures can be applied to all relevant parameters. Note that the texture value is always multiplied with the value of the parameter.
+
+NOTE:
+    This is a SHOP shader, which means it cannot be [layered|/shade/layering] with other shaders.
+
+    If you need to do this, or if you need more control, you can use [Principled Shader VOP|/nodes/vop/principledshader] which this shader is based on.
+
+
+@parameters
+
+== Surface ==
+
+Base Color:
+    #id: basecolor
+    The overall color of the surface. Depending on other parameters, this can have different effects.
+
+    When __Metallic__ is `0.0`, __Base Color__ controls the color of diffuse reflections. Use __Reflect Tint__ to also tint reflections.
+
+    When __Metallic__ is `1.0`, diffuse is faded and __Base Color__ only controls the color and intensity of reflections.
+
+    Use __Sheen Tint__ to tint the __Sheen__ effect with the __Base Color__.
+
+
+Metallic:
+    #id: metallic
+    Values closer to 1 give the shader a more metallic appearance.
+
+    This is done by fading out the diffuse component and driving reflectivity by __Base Color__. This makes it easy to create the colored reflections typical of metallic materials.
+
+    [Image:/images/nodes/shop/principled_shader_metallic.png]
+
+Reflect:
+    #id: reflect
+    Controls the reflectivity of surfaces facing the viewer. This replaces the __Index of Refraction__ parameter found on other shaders to allow for more direct control over visual appearance.
+
+    When a surface is rotated away from the viewer, more and more light is reflected regardless of this parameter's value. At 90 degrees away from the viewer, 100% of the light is reflected, as in the real world.
+
+    TIP:
+	How shiny an object appears mostly depends on it's __Roughness__ rather than it's __Reflect__ value. When you intend to vary shininess using a texture, __Roughness__ is usually the better parameter to use.
+
+    NOTE:
+	For additional artistic control, you can disable reflections completely by setting __Reflect__ exactly to `0.0`. When using a texture, this effect also occurs in completely black areas of the texture.
+
+    [Image:/images/nodes/shop/principled_shader_reflect.png]
+
+    The effect of __Reflect__ on a black object in a white environment. Note how reflections at the edges are not affected unless __Reflect__ is exactly `0.0`.
+
+    [Image:/images/nodes/shop/principled_shader_reflect_white.png]
+
+    NOTE:
+	The effect of this parameter diminishes with increasing __Metallic__ values, since metallic reflectivity is tied to __Base Color__.
+
+Reflect Tint:
+    #id: reflecttint
+    Tints reflections with the Base Color. This is not typical of non-metallic materials, but can be used for artistic purposes.
+
+    [Image:/images/nodes/shop/principled_shader_reflecttint.png]
+
+    NOTE:
+	The effect of this parameter diminishes with increasing __Metallic__ values, since metallic reflections are always tinted by __Base Color__.
+
+Roughness:
+    #id: rough
+    Controls how dull a surface appears. A value of `0.0` results in a smooth surface with perfectly sharp reflections. A value of `1.0` produces a completely dull surface. Under the hood, this simulates microscopic bumps which become more pronounced the higher the __Roughness__, causing reflected light to be scattered more.
+
+    The effect of __Roughness__ on a material with __Metallic__ set to `1.0`:
+
+    [Image:/images/nodes/shop/principled_shader_rough_metallic.png]
+
+    The effect of __Roughness__ on a material with __Metallic__ set to `0.0`:
+
+    [Image:/images/nodes/shop/principled_shader_rough_dielectric.png]
+
+Anisotropy:
+    #id: aniso
+    [Include:/nodes/vop/standard_shading_parms#aniso]
+
+    [Image:/images/nodes/shop/principled_shader_aniso.png]
+
+    [Include:/nodes/vop/standard_shading_parms#aniso_notes]
+
+Anisotropy Direction:
+    #id: anisodir
+    [Include:/nodes/vop/standard_shading_parms#anisodir]
+
+    This parameter has it's own __Filter Type__ parameter which appears when __Use Texture__ is enabled. This defaults to `Point (No Filter`), which usually works best. When you change this to an actual filter like `Gaussian`, artifacts may appear around the transition between areas with different direction values.
+
+    TIP:
+	The `0-1` range makes it easy to apply a texture to this value. To find the texture value needed for a certain direction:
+
+	* Turn off __Use Texture__ under __Anisotropy Direction__.
+	* Try out values on the slider and kick off test renders until you get the desired result.
+	* Paint the slider value into your texture.
+	* Turn __Use Texture__ back on.
+
+	To help with this workflow, the __Anisotropy Direction__ remembers it's value whenever __Use Texture__ is toggled. It defaults to `1.0` when __Use Texture__ is enabled, meaning you get the unmodified texture data.
+
+Subsurface:
+    #id: subsurface
+    Gives the appearance of subsurface scattering. This is a fast approximation and doesn't perform actual SSS.
+
+    [Image:/images/nodes/shop/principled_shader_subsurface.png]
+
+    NOTE:
+	The effect of this parameter diminishes with increasing __Metallic__ values.
+
+Sheen:
+    #id: sheen
+    Produces extra reflections at grazing angles, which can be useful to match certain cloths and some other materials.
+
+    [Image:/images/nodes/shop/principled_shader_sheen.png]
+
+    NOTE:
+	The effect of this parameter diminishes with increasing __Metallic__ values.
+
+Sheen Tint:
+    #id: sheentint
+    Tints reflections produces by __Sheen__ with the __Base Color__. This can help with matching certain cloth materials.
+
+    [Image:/images/nodes/shop/principled_shader_sheentint.png]
+
+    NOTE:
+	The effect of this parameter diminishes with increasing __Metallic__ values.
+
+Coat:
+    #id: coat
+    Controls the intensity of coat reflections. The coat can have a different __Roughness__ value than the base layer, see __Coat Roughness__.
+
+    [Image:/images/nodes/shop/principled_shader_coat.png]
+
+Coat Roughness:
+    #id: coatrough
+    Controls the roughness of __Coat__ reflections.
+
+    [Image:/images/nodes/shop/principled_shader_coatrough.png]
+
+Filter:
+    #id: basecolor_textureFilter
+    The type of texture filter to use. This is used for all __Surface__ parameters except for __Anisotropy Direction__, which has it's own __Filter__ parameter.
+
+Filter Width:
+    #id: surface_textureFilterWidth
+    The width of the filter to use when sampling textures. Higher values causes the texture to be filtered/burred more.
+
+== Emission ==
+
+Emission Illuminates Objects:
+    #id: emitillum
+    Controls whether emission should illuminate other objects.
+
+Emission Color:
+    #id: emitcolor
+    The color of light emitted from the surface.
+
+Emission Intensity:
+    #id: emitint
+    Intensity of light emitted from the surface.
+
+== Bump & Normals ==
+
+=== Base ===
+
+Texture Type:
+    Bump:
+	[Include:/nodes/shop/standard_shading_parms#displacetype_bump]
+    Normal:
+	[Include:/nodes/shop/standard_shading_parms#displacetype_normal]
+
+
+Texture Color Space:
+    #contentfrom: /nodes/vop/texture#srccolorspace
+
+Vector Space:
+    #contentfrom: /nodes/vop/displace#vectorspace
+
+Offset:
+    #contentfrom: /nodes/vop/displace#offset
+
+Effect Scale:
+    #contentfrom: /nodes/vop/displace#scale
+
+Texture Path:
+    #contentfrom: /nodes/vop/texture#map
+
+UDIM Filename Expansion:
+    #contentfrom: /nodes/vop/texture#udim
+
+Wrap:
+    #contentfrom: /nodes/vop/texture#wrap
+
+Filter:
+    #contentfrom: /nodes/vop/texture#filter
+
+Filter Width:
+    #contentfrom: /nodes/vop/texture#width
+
+Channel:
+    #contentfrom: /nodes/vop/displace#channel
+
+Image Plane:
+    #contentfrom: /nodes/vop/displacetexture#teximageplane
+
+Normal Space:
+    #contentfrom: /nodes/vop/displace#normalspace
+
+Flip X:
+    #contentfrom: /nodes/vop/displace#normalflipx
+
+Flip Y:
+    #contentfrom: /nodes/vop/displace#normalflipy
+
+=== Coat ===
+
+Separate Coat Normals:
+    When enabled, grants separate control over the __Coat__ reflection layer's normals. For example, this allows you to create a scratched coat layer with a smooth base layer underneath.
+
+The rest of the parameters on this tab are the same as on the __Base__ tab above.
+
+== Displacement ==
+
+Displacement Bound:
+    [Include:/nodes/shop/standard_shading_parms#vm_displacebound]
+
+True Displacement:
+    [Include:/nodes/shop/standard_shading_parms#vm_truedisplace]
+
+Include In Exported Tangent Normals:
+    Controls whether displacement should affect the normals exported through the `Nt` variable.
+
+    TIP:
+	To export the tangent-space normals generated by the shader as an image plane, enable the __Shading Tangent-Space Normals (Nt)__ parameter on the [Icon:ROP/mantra][Mantra ROP|Node:out/ifd]'s __Images/Extra Image Planes__ tab.
+
+Texture Type:
+    Displace Along Normal:
+	[Include:/nodes/shop/standard_shading_parms#displacetype_dispnormal]
+    Vector Displacement:
+	[Include:/nodes/shop/standard_shading_parms#displacetype_dispvector]
+
+
+Texture Color Space:
+    #contentfrom: /nodes/vop/texture#srccolorspace
+
+Vector Space:
+    #contentfrom: /nodes/vop/displace#vectorspace
+
+Offset:
+    #contentfrom: /nodes/vop/displace#offset
+
+Effect Scale:
+    #contentfrom: /nodes/vop/displace#scale
+
+Texture Path:
+    #contentfrom: /nodes/vop/texture#map
+
+UDIM Filename Expansion:
+    #contentfrom: /nodes/vop/texture#udim
+
+Wrap:
+    #contentfrom: /nodes/vop/texture#wrap
+
+Filter:
+    #contentfrom: /nodes/vop/texture#filter
+
+Filter Width:
+    #contentfrom: /nodes/vop/texture#width
+
+Channel:
+    #contentfrom: /nodes/vop/displace#channel
+
+Image Plane:
+    #contentfrom: /nodes/vop/displacetexture#teximageplane
+
+== Settings ==
+
+=== Component Labels ===
+
+Diffuse:
+    #id: difflabel
+    Specifies a label for the diffuse component. This can be used to export
+    contributions from this component to a separate image plane.
+
+Base Reflection:
+    #id: baselabel
+    Specifies a label for the base reflection component. This can be used to export
+    contributions from this component to a separate image plane.
+
+Coat Reflection:
+    #id: coatlabel
+    Specifies a label for the coat reflection component. This can be used to export
+    contributions from this component to a separate image plane.
+
+=== Misc ===
+
+UDIM Filename Expansion:
+    #id: udim
+    #contentfrom: /nodes/vop/texture#udim
+
+@related
+
+- [Node:shop/mantrasurface]
+- [Node:shop/pyro]
+- [Principled Shader VOP|Node:vop/principledshader]
+- [Surface Model VOP|Node:vop/surfacemodel]

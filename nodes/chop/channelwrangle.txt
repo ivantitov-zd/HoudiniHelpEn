@@ -1,0 +1,163 @@
+#type: node
+#context: chop
+#internal: channelwrangle
+#icon: CHOP/channelwrangle
+
+#tags: vex, util
+
+= Channel Wrangle =
+
+"""Runs a VEX snippet to modify channel data."""
+
+This is a very powerful, low-level node that lets experts who are familiar with VEX tweak channel data and attributes using code.
+
+This node corresponds to the [Channel VOP|Node:chop/vopchop], but uses a textual VEX snippet instead of a VOP network.
+
+WARNING:
+    This node requires that you understand the [vex language|/vex].
+    It is very easy to write incorrect code using this node.
+
+This node runs the snippet for every channel (or group of channels depending on the __Iterate__ parameter) in the input channels.
+This node also runs over all the samples based on the first input channel range.
+The snippet can edit the input channels by changing the bound parameters.
+It can access information from other channels or geometry using VEX functions.
+
+* Press ((MMB)) on the node to see any error output from the snippet.
+
+* You can use the VEX function `ch` to evaluate parameters.
+  The path is relative to this node (`ch("parm")` will evaluate the parameter `parm` on this node). This evaluation will be done at the current sample time if you don't supply an explicit time for vex functions.
+
+NOTE:
+    If you create a __Transform VOP__ node using the [Tab menu|/basics/tabmenu], it creates a Channel VOP and sets it to work with transform channels and constraints.
+
+== Syntax ==
+
+The __VEX snippet__ parameter lets you enter a snippet of [VEX code|/vex] to run on the input channels.
+See [VEX snippets|/vex/snippets] for information on special syntax in the snippet parameter.
+See [the VEX chapter|/vex/] for information on the VEX language.
+
+== Context ==
+
+This node runs the VEX snippet in the *CHOP context* and the following global variables are available.
+
+[Include:/vex/contexts/chop#globals]
+
+
+== VEX variables ==
+
+You can create temporary VEX variables.
+Normal VEX variables do not have a `@` prefix.
+For example, the following code swaps `px` and `py`.
+
+{{{
+#!vex
+float temp = @px;
+@px = @py;
+@py = temp;
+}}}
+
+== VEX structures for Constraints ==
+[Include:/vex/contexts/chop#constraints/]
+
+@parameters
+
+== Code ==
+
+Channel Names:
+    #id: vex_name
+
+    Space separated names of the channels to create when the first input isn't connected.
+    Supports the same patterns as the __Scope__ parameter.
+
+Channel Count:
+    #id: vex_count
+
+    Repeats the __Channel Names__ multiple times when the first input isn't connected.
+
+Iterate:
+    #id: iterate
+
+    How to iterate over channels and samples.
+
+    Over Channels and Samples:
+        Iterates over all the samples of a channel one channel at a time.
+        Use the `V` global variable to read and write the current channel value.
+
+    Over Samples and Channels:
+        Iterates over channels one sample at a time.
+        Use the `V` global variable to read and write the current channel value.
+
+    Over Samples and Every Nth Channels:
+        Iterates over channels one sample at a time, but you can evaluate a group of channels together.
+        Use the __Iterate Step__ to define the size a channel group.
+        Use the __Iterate Names__ with a `@` prefix to read and write the current values.
+
+    Over Samples and Every Translate/Rotate/Scale:
+        Iterates over transform channels one sample at a time.
+        Access the translation vector using `@t`, the rotation using `@r` and the scale using `@s`.
+        A `struct chopConstraintContext` is also bound to the `c` variable.
+        Use `c->fetchInput(1)` to return the second input transform as a `struct chopTRS`.
+        Use `c->fetchInputMatrix(1)` to return the second input transform as a matrix.
+
+    Over Clip:
+        Runs the snippet a single time with `C` and `I` variables set to zero.
+        Use this to if you want to analyze all the channels using a snippet.
+        You can't write to the global variable `V` or to any channel data.
+        You can read and write clip attributes using `chattr` and `chsetattr`.
+
+    Over Channels:
+        Runs the snippet one time per channel with the `I` variable set to zero.
+        Use this to if you want to analyze channels individually using a snippet.
+        You can't write to the global variable `V` or to any channel data.
+        You can read and write channel attributes using `chattr` and `chsetattr`.
+
+    Over Sample:
+        Runs the snippet one time per sample with the `C` variable always set to zero.
+        Use this to if you want to analyze the all channel values for a single sample using a snippet.
+        You can't write to the global variable `V` or to any channel data.
+        You can read and write sample attributes using `chattr` and `chsetattr`.
+
+
+Iterate Step:
+    #id: channel_step
+
+    Sets the number of channels to regroup together when __Iterate__ is set to __Every Nth Channels__.
+
+Iterate Names:
+    #id: bind_names
+
+    A space separated string representing the bind names when __Iterate__ is set to __Every Nth Channels__.
+    Use an iterate name prefixed by `@` to read and write to a channel.
+
+
+VEXpression:
+    #id: snippet
+
+    A snippet of VEX code that will manipulate the channels.
+    You can use `@<<channel_name>>` syntax to access bound channels or `V` to write to the current channel sample.
+
+Evaluation Node Path:
+    #id: vex_cwdpath
+
+    VEX functions like `ch()` usually evaluate with respect to this node.
+    Enter a node path here to override where the path search starts from.
+    This is useful for embedding in a digital asset, where you want searches
+    to start from the asset root.
+
+Enforce Prototypes:
+    #id: vex_strict
+
+    Automatic binding with the `@` syntax can be convenient, but if your
+    system becomes more complex there is the risk that a typo in an `@` binding
+    will silently just bind a non-existent attribute.
+
+    This option forces all `@` bindings to be explicitly declared as
+    prototypes before use.
+
+[Include:common#channel]
+
+[Include:common#common]
+
+@related
+- [Node:chop/vopchop]
+

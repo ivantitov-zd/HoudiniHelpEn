@@ -1,0 +1,222 @@
+#type: node
+#context: sop
+#internal: polydoctor
+#icon: SOP/polydoctor
+#tags: cloth
+
+= PolyDoctor =
+
+"""Helps repair invalid polygonal geometry, such as for cloth simulation."""
+
+You can use this node to set attributes and optionally group invalid geometry,
+as well as attempt to automatically repair certain problems.
+
+NOTE:
+    This node only works on polygonal geometry. It ignores other types of input.
+
+== Overview ==
+
+For each type of problem on the __Primitives__ and __Edges & Points__ tabs, you can choose one of three options: "Ignore", "Mark", or "Repair".
+
+Ignore:
+    Geometry with this problem will have the "valid" attribute set to `1` and
+    be included in the "valid" group.
+
+Mark:
+    Geometry with this problem will have the "valid" attribute set to `0` and
+    *not* be included in the "valid" group.
+
+Repair:
+    The node will attempt to automatically repair geometry with this problem.
+    Repaired polygons will have the "valid" and "repaired" attributes set to `1` and be included in the "valid" and "repaired" groups.
+
+See the help for the __Attributes__ tab below for the names of the "valid" and "repaired" attributes and groups.
+
+== Visualizing problems == (visualize)
+
+Instead of or in addition to automatic repairs, you can use the attributes or groups created by this node with the "Mark" option to visualize problems and repair them manually.
+
+:task:Color invalid polygons red in the viewport:
+    # On the PolyDoctor node's __Attributes__ tab, turn on __Create a group for each attribute__.
+    
+        This creates a group named `valid_poly_grp` containing the valid polygons (the polygons with the `valid_poly` attribute set to `1`).
+        
+        Since you want to color the _invalid_ polygons, you'll need to create an inverted group from `valid_poly_grp`.
+    
+    # Right click the output of the PolyDoctor node and choose [Group Geometry|Node:sop/group].
+    
+    # In the Group Geometry node, click the __Combine__ tab. In the __Group__ parameter, set the left side to `invalid_poly_grp`, click the [Smallicon:BUTTONS/not_equal] Not Equal button, and set the right side to `valid_poly_grp`.
+    
+        This creates a new group named `invalid_poly_grp` which contains all the polygons _not_ in `valid_poly_grp`.
+    
+    # To color the polygons in `invalid_poly_grp`, right click the output of the Group Geometry and choose [Color|Node:sop/color].
+    
+    # In the Color node, set __Group__ to `invalid_poly_grp`, set the __Class__ to "Primitive" and set the __Color__ to red.
+    
+    # Click the [display flag|/nodes/sop/] on the Color node.
+
+TIP:
+    You can create a branch in the node network with a [Switch node|Node:sop/switch], or use the bypass flag on the Color node, to switch between the normal polygon colors and the invalid polygon coloring.
+
+@parameters
+
+Max Passes:
+    The maximum passes allowed over all of the algorithms repairing the geometry in this SOP. Using multiple passes lets the node repair possible problems created by fixing another problem.
+
+Random Seed:
+    Used in the Globally/Locally Small Area repairs to randomize the order in which polygons are repaired. This makes the resulting geometry more uniform. You can try changing it to get a slightly different layout.
+
+== Primitives ==
+
+Ill-Formed:
+    Polygons with overlapping or "degenerate" vertices. This problem is difficult to detect and fix manually, but it helps other algorithms (dynamic solvers and other operations in this node) to run smoothly.
+
+5+ Edges:
+    Polygons with five or more edges. Cloth simulation works better with quads or triangles. This fix can also be useful for working with modeling formats and software that do not support N-sided polygons.
+
+	When this node repairs polygons with five or more edges, it picks the most uniform quadrilaterals and triangles to divide the polygons.
+
+    NOTE:
+        You should always use this SOP instead of the [Divide SOP|Node:sop/divide] when cleaning up geometry for use as cloth simulation objects.
+
+Non-Convex:
+	After marking or repairing __5+ Edges__ polygons, there may still be non-convex quadrilaterals.
+	
+	When this node repairs non-convex quadrilaterals, it triangulates them in the best way for use with the cloth solver.
+
+Overlapping:
+    Different polygons with the same vertices. Repairing removes all but one of the overlapping polygons.
+
+Pair Overlaps:
+    When this option is on, overlapping polygons are both deleted.
+    This is useful when the overlap comes from two objects fusing
+    along an edge. When this option is off, the first overlapping
+    polygon is kept and the second polygon is deleted.
+
+Self-intersecting: 
+	Polygons that overlap/intersect other polygons or themselves. Repairing removes the polygons completely.
+
+Thickness:
+	A virtual thickness added to geometry objects when checking for intersections as specified above. Objects that are closer to each other than this will be detected as intersecting.
+
+Globally Small Areas:
+	Polygons with small areas compared with the __Global Area Threshold__. Repairing shrinks these polygons to a point.
+
+Global Area Threshold:
+    A value between 0 (no area) and 1 (the circumference of a bounding sphere containing the input geometry). Polygons with an area smaller than this threshold are marked/repaired.
+
+Locally Small Areas:
+	Polygons with small areas relative to their neighbors (polygons with a shared edge). Repairing shrinks these polygons to a point.
+    
+Local Area Threshold:
+    A ratio value of "smaller polygon area divided by larger polygon area". Polygons with smaller areas than this relative to their neighbors are marked/repaired. For example, a value of `0.1` would repair any polygons less than one-tenth the size of their neighbors.
+
+Non-Uniform Polygons:
+	Polygons whose area is not uniformly distributed (thin or awkwardly shaped), as set by the __Uniformity threshold__.
+    
+Uniformity Threshold:
+    A value between 1 (a circle) and zero (totally non-uniform, like a very thin rectangle or a polygon with a small area but large perimeter). Polygons with uniformity lower than this are marked/repaired.
+
+== Edges & Points ==
+
+Setting the edge-related parameters to "Mark" will mark the polygons containing the invalid edges.
+
+Globally Small Edges:
+	Edges with a short length compared to the __Global Edge Threshold__. Repairing shrinks these edges to the midpoint of the edge.
+
+Global Edge Threshold:
+    A value between 0 (zero length) and 1 (the diameter of a bounding sphere containing the input geometry). Edges shorter than this threshold are marked/repaired.
+
+Locally Small Edges:
+    Edges with a short length, compared to the edges of neighbors (polygons with a shared edge). Repairing shrinks these edges to the midpoint of the edge.
+
+Local Edge Threshold:
+    The minimum allowed edge-to-edge ratio. Smaller values allow _larger_ edge length differences.
+
+Disconnected Points:
+	Points that don't belong to a polygon. Repairing removes these points completely.
+
+
+== Topology ==
+
+Non-Manifold Points: 
+	Mark:
+                Marks points whose incident polygons form non-manifold topology around them, i.e. their infinitesimal neighborhood restricted to polygons does not have topology of either a disc or a half-disc. 
+        Repair:
+                Enforces all points to become manifold points by minimally duplicating points and reassigning polygons incident to each point to various duplicates of it. 
+	
+Ignore Winding of Input Polygons:
+	If this checkbox is turned on, maximal manifold polygon patches are detected without taking the given winding of the polygons into effect. A maximal manifold patch is essentially a proper piece of surface with either no boundary or a boundary composed of edges that are incident to either 1 or 3+ polygons.
+	
+Prefer Larger Angles Between Neighboring Polygons:
+	When repairing non-manifold points, the repair procedure may have to make decisions on which pairs of polygons incident to the same edges should be paired together to locally form surfaces. If this option is set, preference is placed over choosing pairs which are closer to being coplanar (small normal difference). Otherwise, pairs that form sharp dihedral angles (large normal difference) are connected first. 
+
+Visualize Maximal Manifold Patches:
+	When this checkbox is turned on, maximal manifold patches of the input geometry are colored randomly. Visualizing these patches can help you see disconnects between polygons that are expected to be neighbors on the same patch of surface but fail to do so due to various reasons ranging from inconsistent winding (unless __Ignore Winding of Input Polygons__ is selected) to non-manifold topology at boundary points that may be hard to recognize because of degenerate geometry.
+	
+	NOTE:
+	        This option is overridden if any of the visualization options are selected in the __Visualize__ tab.
+
+Create Manifold Number Attribute:
+	If this checkbox is turned on, a primitive attribute named `manifoldnumber` is created that indicates the manifold patch to which each polygons belongs. The generated manifold numbers are in the range of `0` to `m - 1`, where m is the number of manifold patches. Non-polygon primtives (as well as non-closed polygons) are given a manifold number of -1.
+
+Correct Winding of Polygons to Majority of their Manifold Patch:
+	If this checkbox is turned on, maximal manifold patches are calculated ignoring the winding of the polygons and then the windings of polygons in the same patch are made consistent with the dominant winding of that patch. 
+	
+Delete Small Manifold Patches:
+	If __Repair__ is chosen as the action on __Non-Manifold Points__, then this option deletes all maximal manifold patches that have fewer polygons than a desired threshold. This is useful since often repairing non-manifold points may detach small parts of the geometry that prevent the formation of clean manifold patches from the reset. These detached geometry make up manifold patches themselves, but are often composed of very few (often one or two) polygons and are generally unwanted.
+
+Primitive Threshold:
+	Specifies the threshold used in deleting small manifold patches. Any manifold patch with up to this many polygons will be deleted. 
+	
+
+== Attributes ==
+
+The parameters on this tab let you set the names of the attributes created by
+this node, and optionally create groups.
+
+Valid Polygons:
+    The name of the primitive attribute used to mark polygons. The default is `valid_poly`. Valid polygons will have this attribute set to `1`. Marked invalid polygons will have it set to `0`.
+
+Repaired Polygons:
+    The name of the primitive attribute used to indicate repaired polygons. The default is `repaired_poly`. Polygons edited by this node will have this attribute set to `1`. This is a subset of the valid polygons.
+
+Valid Points:
+	The name of the point attribute used to mark points. The default is `valid_pt`. Valid points will have this attribute set to `1`. Marked invalid points will have it set to `0`.
+
+Modified Points:
+	The name of the primitive attribute used to indicate modified points. The default is `repaired_pt`. Points edited by this node will have this attribute set to `1`. This is a subset of the valid points.
+
+Create a group for each attribute:
+	Creates [groups|/model/groups] containing the polygons with a particular attribute set to `1`. The names of the groups are the names of the corresponding attributes with `_grp` added. For example, all polygons with `valid_poly` set to `1` will be in a group named `valid_poly_grp`.
+	
+	To invert a group, use the [Group Geometry node|Node:sop/group] with the __Combine__ tab. See [visualizing problems|#visualize] above.
+
+== Visualize ==
+Options in this tab can help visualize points and polygons that are marked and repaired in other tabs. 
+
+Invalid Points:
+	If selected, the marked points are painted in the chosen color. 
+
+Repaired Points:
+	If selected, repaired points are painted in the chosen color. 
+	
+	NOTE:
+	        If a point is both marked and repaired, it takes the color selected for repaired points. 
+	
+Invalid Polygons:
+	If selected, marked polygons are displayed in the chosen color. 
+
+Repaired Polygons:
+	If selected, repaired polygons are displayed in the chosen color. 
+	
+	NOTE:
+	        Visualizing points takes precedence over visualizing polygons. Therefore, if any of the "Invalid Points" and "Repaired Points" options are chosen in this tab, the corresponding selections for polygons are ignored. 
+	
+    
+@related
+
+- [Node:sop/facet]
+- [Node:sop/divide]
+- [Node:sop/delete]
+

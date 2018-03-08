@@ -1,0 +1,213 @@
+= Compiled blocks =
+
+"""You can mark a chain of compilable SOPs as a compiled block which can execute much faster in parallel."""
+
+
+== Overview ==
+
+In geometry networks, you can put a part of the network inside a _compiled block_ (if all the nodes inside are "compilable"). In a way, this makes the block act as if they were one node.
+
+This imposes a number of restrictions on how the network can work, but can potentially deliver big benefits in the right circumstances.
+
+* The main benefit is multithreaded [for-each loops|looping] where the network runs the same block of nodes over a large number of separate pieces. Compiled blocks let Houdini spread those iterations across multiple cores.
+
+* Another benefit is more efficient use of OpenCL. Normally, even if a node processes geometry on the graphics card, the geometry must be copied back into main memory after each node, because any other node could potentially try to access it. In a compiled block, however, multiple OpenCL-based nodes can keep data on the graphics card as they process it without copying it back, increasing speed.
+
+* In a normal network, each node theoretically makes a copy of the geometry it's working on. There are lots of optimizations to make this efficient in practice, but it still has a cost. In a compiled block the nodes can work in-place on the same geometry because external references are not allowed. This can give compiled blocks additional speedups.
+
+
+== Restrictions == (restrictions)
+
+Unfortunately, to get these benefits, we had to limit some of the flexibility that makes working in Houdini dynamic and fluid.
+
+Only "compile-able" nodes:
+    You can only used nodes that have been modified to allow compiling inside compiled blocks. You can [enable a badge in the network editor|#tips] to see which nodes can't be used in a compiled block.
+    
+    We are continuing to convert nodes based on perceived need. We will probably never get to all the hundreds of existing SOPs. If there's a node you want to use inside a compiled block that isn't converted yet, let us know.
+
+No `stamp()` expression:
+    The [Exp:stamp] expression function is the ultimate spooky action at a distance. It relies on any node being able to force another node anywhere else in the network to cook. This complete freedom is not possible with compiled blocks.
+
+No local variables, no per-component expressions:
+    When a node is part of a compiled block, its [algorithm|#verb] is compiled into the block's operation, and its parameters are left behind. _Expressions are not evaluated over each component in the geometry_. Only expressions that work statically "ahead of time" on the entire geometry will work (for example, reading from a numbered input).
+    
+    If you need to do something per-component (for example, move points based on the value of a point attribute), you must use a VEX-based node, such as [Attribute Wrangle|Node:sop/attribwrangle].
+    
+    (Unlike, `stamp()`, this restriction might be lifted someday, depending on how necessary it proves.)
+
+No internal geometry references by name:
+    Normally, if you need information about another node, you can evaluate an expression and refer to that node by its path. For example, `npoints("/obj/sphere1")` to get the number of points in a node's geometry. This isn't very efficient, but it works. In a compiled block, you can't refer to the geometry in a node using the node path. To accomplish the same thing in a compiled block, you need to replace internal named references with references to [spare inputs|#spare].
+    
+    You _can_ reference _channel values_ on nodes inside the block by path (for example, `ch("../sphere1/tx")`). You just can't read _geometry_, as in a `point` expression.
+    
+    You _can_ reference geometry _outside_ the compiled block, however all access to the exterior node will be serialized by a lock, so it will probably hurt performance in a threaded loop. In this case you would use a [spare input|#spare] instead.
+    
+    Nodes outside the block can reference geometry on nodes inside the block, but doing so cook the interior node (and any dependencies) normally, without any of the benefits of compilation.
+
+Nodes can't read from their direct inputs:
+    Expressions can't read data from/about the node's direct inputs (for example, `point(0, …)` or `npoints(0)`). You have to use a [spare input|#spare] to reference the input node.
+    
+    This is another restriction that may be partially lifted in a future version of Houdini, at least for input 0.
+
+Disabled/hidden parameters are not evaluated:
+    This is true for all compile-able SOPs, even outside a compiled block. Previously, each SOP would determine which parameters to evaluate in its own cooking code. Now, the cook logic is divorced from parameter evaluation. This means that parameters need to be pre-evaluated. To avoid creating fake time dependency on disabled parameters (or making potentially expensive evaluations), the pre-evaluation skips disabled and hidden parameters.
+
+Stop Condition not supported:
+    The Stop Condition on For Each nodes isn't supported inside a compiled block.
+
+NOTE:
+    At this point in their development, in a production environment, you should probably resist the urge to try to add compiled blocks everywhere trying to gain maximum efficiency. The drawbacks mean the reward is often not worth the effort.
+    
+    * Target use of compiled blocks where they will give the most benefit: in iterations over large numbers of pieces.
+    
+    * You might want to get your network working and "finalized", and then based on profiling, try converting any "slow" parts into compiled blocks.
+
+
+== How to ==
+
+Houdini will attempt to compile everything between one or more [Compile Block Begin nodes|Node:sop/compile_begin] and a corresponding [Compile Block End node|Node:sop/compile_end].
+
+:task: Create a compiled block:
+    # In the network editor, open the ((Tab)) menu and choose Compiled Block to create a pair of compiled block nodes.
+
+        Houdini automatically creates a pair of Begin and End nodes wired together.
+
+    # You can wire the block into your network, and wire the nodes to compile in between the begin and end nodes.
+
+
+== Compiled loops == (loops)
+
+* Put loops _inside_ the compiled block, rather than a compiled block inside a loop.
+
+* On the For-Each Block End node of the top-level loop, turn on __Multithread when compiled__.
+
+    Turning on this checkbox tells Houdini to distribute the different iterations of this loop to different cores. You probably only want to do it on the outer loop to avoid an explosion of the number of distributed tasks.
+
+
+=== Nesting blocks === (nesting)
+
+When using compiled blocks and loops, you must be careful to properly encapsulate and nest each block with Begin/End nodes at the "borders" of each block. Visually, in the network, wires crossing into a block should only be connected to block begin nodes.
+
+:fig:[Image:/images/nodes/sop/compiledsops_broken_loop.png]
+    In this network, the wire to `merge3` crosses a block boundary. This would be valid in a normal cook, where Houdini would just re-cook that path each iteration. The loops in a compiled block are compiled as a separate unit, however, so they have to stand on their own.
+
+:fig:[Image:/images/nodes/sop/compiledsops_fixed_loop.png]
+    The fix is to insert a Block Begin node before the merge, to properly nest the compiled and looping blocks. Set the __Method__ parameter on this Begin node to "Fetch input".
+
+
+== Spare inputs == (spare)
+
+As noted in the [restrictions|#restrictions] section, geometry expressions can't reference the node's direct inputs, or in named nodes.
+
+The rule is there can't be any "surprises" (dynamic expressions) about what to cook. Any SOPs that need data from another SOP in the compiled block have to make this clear "statically" _before they cook_, not during the cook.
+
+(The case of VEX-based nodes such as [Attribute Wrangle|Node:sop/attribwrangle] and [Attribute Expression|Node:sop/attribexpression] is a bit different. In a VEX node, `point(0, …)` will work in VEX because the VEX SOPs have always evaluated all their inputs as it is very inefficient to try and evaluate them on demand.)
+
+The workaround for this is to add a _spare input_ to the node, and point that input to the node you want to reference. Then you can use the spare input's number where you would otherwise use a node path. Spare inputs are _pre-cooked_ before the compiled block runs. This allows multiple threads can refer to the pre-cooked geometry without having to worry about locking.
+
+TIP:
+    For expression functions that take a node path string as an argument (for example, `npoints("/obj/sphere1")`), you can substitute an integer instead to refer to an input (for example, `npoints(-1)`).
+
+:task: Use a spare input to reference another node:
+    # Select the compiled node in which you want to reference the geometry of another node.
+    
+    # In the parameter editor, click the [Smallicon:BUTTONS/gear] gear menu and choose __Add spare input__.
+    
+        Houdini adds a new parameter at the end of the node's interface representing the input.
+    
+    # In the __Spare input <<n>>__ field, enter the path of the node you want to reference.
+    
+    # Hover over the __Spare input <<n>>__ label to get a tooltip showing which number to use in geometry expressions to refer to the spare input (for example, `npoints(-1)`).
+    
+        (Spare input references count down, so while the first direct input is `0` and the second direct input is `1`, the first spare input is `-1`, the second is `-2`, and so on.)
+
+
+== Tips and notes == (tips)
+
+* Spare inputs are also useful to refer to extra geometry inputs in a Wrangle node (beyond the four direct inputs Wrangle nodes come with).
+
+* If you put the display flag on a node inside a compiled block, the network will cook normally (uncompiled) to that point. The display flag must be on or after the block end node for the block to compile.
+
+* You can turn on a badge to see which nodes you _cannot_ use inside a compiled block.
+
+    In the network editor, choose __View > Display Options__ or press ((D)). The set the pop-up menu for __Compilable SOP badge__ to "normal" or "large". Nodes that you _cannot_ use in a compiled block will be marked with the [Icon:NETVIEW/not_compilable_badge] badge.
+
+
+== Troubleshooting == (errors)
+
+No support for compiling this node type:
+    #glyph: fa-exclamation-triangle
+    
+    Many SOP node types have not yet been converted to work in compiled blocks.  See the [tips|#tips] above for how to turn on a badge in the network editor showing which nodes are not compilable.
+    
+    If there's a node you need to use inside a compiled block that isn't supported yet, let us know. It will help us decide which nodes to focus on converting.
+
+Attempt to internally reference a compiled node:
+    #glyph: fa-exclamation-triangle
+    
+    You cannot reference nodes inside a compiled block by name. Use a spare input and refer to the node using the spare input number instead. See [spare inputs|#spare].
+
+Violation of strict nesting of blocks. Incompatible For Block Begin encountered while processing Block End. A Block Begin in Fetch Input mode may be needed:
+    #glyph: fa-exclamation-triangle
+    
+    See [nesting blocks|#nesting]. Look at the nodes mentioned in the error message and see if they have wires crossing into a block that are connected to something other than a block/loop begin node.
+    
+    To fix this problem, add a loop/compiled block begin node to the incoming wire. For loop begin nodes, if you just want to use the input, set the __Method__ to "Fetch input".
+
+
+== Verbs == (verbs)
+
+As part of making SOP nodes compilable, we separated out the node's basic operation code (what the node _does_ to geometry) from the code that deals with the concerns of the node (caching, reading inputs, evaluating parameters, and so on). We call these functions _verbs_. You can use them in Python scripting to modify geometry held in a [Hom:hou.Geometry] object. This might be useful anywhere you need to programmatically alter geometry and don't want to have to build a geometry network to do so.
+
+Use [Hom:hou.NodeTypeCategory#nodeVerbs] to get a dictionary mapping node names to [Hom:hou.SopVerb] objects, or use [Hom:hou.NodeTypeCategory#nodeVerb] to get a verb by name. Verbs have the same name as the node whose functionality they contain.
+
+You can list the available "verbs" in a Python shell with:
+
+{{{
+#!python
+sorted(hou.sopNodeTypeCategory().nodeVerbs().keys())
+}}}
+
+The following example grabs the geometry from a node and applies the [Subdivide|Node:sop/subdivide] and [IsoOffset|Node:sop/isooffset] verbs to it.
+
+{{{
+#!python
+node = hou.node("/obj/geo1/testgeometry_pighead1")
+geo = node.geometry()
+resultgeo = hou.Geometry()
+
+# Get a hou.SopVerb that knows how to subdivide.
+sops = hou.sopNodeTypeCategory()
+subverb = sops.nodeVerb('subdivide')
+
+# Pass in a dictionary mapping parameter names to values.
+# Node defaults are already set, so just set non-default things.
+subverb.setParms({'iterations':3})
+
+# SopVerb.execute() takes a target hou.Geometry to write the results into,
+# and a list of hou.Geometry to be the inputs of the verb (use None in the
+# list to represent an unwired input).
+subverb.execute(resultgeo, [geo])
+
+# Now do an isooffset
+isoverb = sops.nodeVerb('isooffset')
+isoverb.setParms({'samplediv':100, 'output':0})
+isoverb.execute(resultgeo, [resultgeo])
+}}}
+
+If you are using verbs to modify geometry inside a [Python SOP|Node:sop/python], you need to overwrite the node's geometry at the end of the script:
+
+{{{
+#!python
+# Grab a reference to this node
+node = hou.pwd()
+geo = node.geometry()
+
+# ... operate on geometry ...
+
+# When verbs execute on the hou.Geometry they may replace the
+# underlying geometry rather than in-place edit it. So you have
+# to explicitly write it back to the node's geometry.
+node.geometry().clear()
+node.geometry().merge(resultgeo)
+}}}

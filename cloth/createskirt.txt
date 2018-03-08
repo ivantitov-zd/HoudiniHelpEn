@@ -1,0 +1,125 @@
+= How to |> create a simple cloth skirt and attach it to a character =
+
+All cloth should ideally be modeled on a character in T-Pose. This makes it easier to ensure that the the cloth fabric doesn't penetrate the character's geometry initially. Cloth usually takes 10-20 frames to settle, so be sure to allow this much time in the T-pose before starting any major character animations.
+
+NOTE :
+    Keep your cloth geometry reasonably sized. For example, pants should be around 1 unit long. If you modeled pants to be 100 units long, they would behave like pants that are 100 meters high (328 feet). The default units are meters.
+    Before you start, make sure you are working with proper scale. If you prefer working with feet or inches, rather than meters, set your units accordingly in the __Preferences__ > __HIP File Options__. It is important to do this before creating your cloth simulations.
+
+# Create a [Icon:SOP/circle][Circle|/shelf/circle] using the __Create__ tab of the shelf. Make sure the __Primitive Type__ is __Polygon__, __Orientation__ is __ZX plane__, __Arc Type__ is __Open Arc__, and has at least 20 __Divisions__.
+
+# Transform the circle to fit around the characters waist, as close as possible without intersecting any of the character's actual geometry.
+
+# [Icon:SOP/polyextrude][Poly Extrude|/shelf/polyextrude] the circle down to the desired length and scale it out. 
+
+# On __Options__ tab,  add divisions until each primitive looks roughly like a square and turn off the __Output Front__ checkbox.
+
+    [Image:/images/howto/cloth_skirt.png]
+
+# Edit the points of the skirt so they do not intersect the geometry of the body.
+
+# Add a fuse node (this will help the cloth simulation).
+
+# Use the [Icon:SOP/subdivide][Subdivide tool|/shelf/subdivide] on the __Polygon__ shelf, and increasing depth accordingly. Thinner fabric that wrinkles more should have more resolution and thicker fabric that deforms less can have lower resolution.
+
+# Back at Geometry level, select your circle object and click [Icon:DOP/clothobject][Cloth Object|/shelf/clothobject] on the __Cloth__ shelf tab.
+
+# Go back to the Geometry level, select the character's body geometry, and turn it in to a collision object by clicking [Icon:DOP/clothbodycollider][Cloth Body|/shelf/clothbodycollider] on the __Cloth__ shelf tab.
+
+# To attach the skirt to the body, select the skirt and click [Icon:DOP/clothattachtobody][Attach to Body|/shelf/clothattachtobody] on the __Cloth__ shelf tab and follow the prompts. 
+
+    * Select the skirt and press ((Enter)). 
+    * Select the points around the waistline of the skirt and press ((Enter)).
+        TIP:
+            You can select one point on the wasitline of the skirt and press the hotkey ((L)) to loop around and select all of the points.
+            
+        [Image:/images/howto/skirt.png]
+        
+    * Select the character's geometry and press ((Enter)) to create a set of constraints.
+      
+# Press [Icon:PLAYBAR/play_forward]play on the Playbar to view the simulation. 
+
+The look of the cloth can be adjusted in the [Icon:DOP/clothobject][Cloth Object|Node:dop/clothobject] in the AutoDopNetwork by adjusting the parameters in the Model tab of the Cloth Object. The most important control is the Overall Stiffness. Increasing the __Overall Stiffness__ will produce stiffer fabrics, and decreasing it will create softer or silkier fabrics. Given an __Overall Stiffness__, the behavior can be fine-tuned further by modifying the components of the __Relative Stiffness__ that correspond to stretch, shear, weak bend, and strong bend. The Relative Stiffness values should be between 0 and 1; they act as multipliers for the __Overall Stiffness__.
+
+For example, the following three dresses are identical. The orange dress has the default settings, the pink dress has slighter lower __Overall Stiffness__ than the other two. The orange and purple dresses have the same __Overall Stiffness__, but the purple dress has fewer folds, because it uses the __Strong Bend__ instead of __Weak Bend__.
+
+table>>
+    tr>>
+        td>> [Image:/images/howto/cloth_pinkdress.png]
+        td>>
+            table>>
+                tr>>
+                    td>> Overall Stiffness
+                    td>> Relative Stiffness Stretch
+                    td>> Relative Stiffness Shear
+                    td>> Relative Stiffness Weak Bend
+                    td>> Relative Stiffness Strong Bend
+                tr>>
+                    td>> 500
+                    td>> 1
+                    td>> 0.1
+                    td>> 0.001
+                    td>> 0
+
+table>>
+    tr>>
+        td>> [Image:/images/howto/cloth_orangedress.png]
+        td>>
+            table>>
+                tr>>
+                    td>> Overall Stiffness
+                    td>> Relative Stiffness Stretch
+                    td>> Relative Stiffness Shear
+                    td>> Relative Stiffness Weak Bend
+                    td>> Relative Stiffness Strong Bend
+                tr>>
+                    td>> 2000
+                    td>> 1
+                    td>> 0.1
+                    td>> 0.001
+                    td>> 0
+
+table>>
+    tr>>
+        td>> [Image:/images/howto/cloth_purpledress.png]
+        td>>
+            table>>
+                tr>>
+                    td>> Overall Stiffness
+                    td>> Relative Stiffness Stretch
+                    td>> Relative Stiffness Shear
+                    td>> Relative Stiffness Weak Bend
+                    td>> Relative Stiffness Strong Bend
+                tr>>
+                    td>> 2000
+                    td>> 1
+                    td>> 0.1
+                    td>> 0
+                    td>> 0.001
+
+== Trouble Shooting ==
+
+If there are visible penetrations between cloth geometry and the character geometry or within the cloth geometry itself, a few steps can be taken in order to solve it. It is recommended to do these one at a time (re-simulating, to check for improvements), since making many adjustments at once will significantly increase your simulation times and you won't be able to narrow down the cause of the problem.
+
+* You can increase the __Max Local Collision Passes__ to ensure that as many secondary collisions as possible are resolved, in a cheap way.
+    
+* If the penetrations are resolved, but the result doesn't look good, try increasing the __Max Global Collision Passes__ instead. This is a bit more expensive, but more physically accurate.
+    
+* If the results are still not satisfactory, try increasing the __Min Substep Rate__ instead of increasing the collision passes.
+       
+* If the cloth is very close to the body, the __Thickness__ of the animated character geometry (Static Object) can be adjusted. You can do this on the [Static Object|Node:dop/staticobject] node on the __Collisions__ subtab of the __Surface__ tab.
+   
+== Tips for working with cloth ==
+
+* Be sure that cloth is never initially intersecting with the body geometry or with itself. 
+
+* You can model the cloth geometry either with triangles or with quads. When using quads, ensure that the edges are aligned with the warped and weft directions of the fabric. When using triangles, supply an a vertex or point attribute `materialuv` that indicates the flow of the fabric directions.
+
+* If there need to be significant differences in polygon sizes in the geometry, make sure that there model has a gradual transition from larger to smaller sizes.
+
+* When stitching cloth, the points on both cloth sides need to line up.
+
+* The Wind Force can be used to create wind effects for cloth. Change or animate the wind behavior mainly using the __Velocity__ parameter on the Wind Force.
+
+* Avoid simulating high-resolution geometry (such as rendering geometry) directly, because this will significantly slow down the simulation. Use the [Icon:SOP/clothcapture][Cloth Proxy|/shelf/clothproxy] shelf tool to create a setup that uses the Cloth Capture and Cloth Deform nodes with a simpler mesh.
+

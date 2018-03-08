@@ -1,0 +1,245 @@
+= Dop Import =
+
+#type: node
+#context: sop
+#internal: dopimport
+#icon: SOP/dopimport
+#tags: dynamics, io, transfer
+
+"""Imports and transforms geometry based on information extracted from a
+DOP simulation."""
+
+The DOP Import SOP imports geometry from a DOP network, and can also transform
+the input geometry based on the transforms of the DOP objects. The
+__Import Style__ parameter can be used to select between several modes of
+operation.
+
+DOP objects have two distinct transforms associated with them. One comes
+from the Position data attached to the object. The other comes from the
+Geometry data on the object, which has an inherent transform associated
+with it. This SOP can apply either, both, or neither of these two
+transforms. It can also apply the inverse transform to effectively undo
+the transform operation of another Dop Import SOP.
+
+The Dop Import SOP also allows the transformation of selected vector
+attributes for points and primitives.
+
+== Point velocities ==
+
+In addition to transforming the geometry, this SOP can create a
+velocity point attribute on the geometry.
+
+This velocity is calculated by combining any velocity attribute on
+the geometry in the DOP simulation (such as those set by the Cloth
+Solver) and the overall object velocity and angular velocity stored
+in the object's Position data. This SOP can calculate an instantaneous
+velocity for each point by combining the linear and angular velocities of
+the object, or it can integrate the two velocities over some timestep.
+The instantaneous velocity approach is a true representation of the
+velocity of each point, but if the object has a high angular velocity
+then rendering with these instantaneous velocities may make the object
+appear to be exploding in the render. In this case, integrated
+velocities can be used to ensure the extrapolated points stay "inside"
+the object's geometry. The Integrate Over Time parameter specifies the
+integration interval and should be set to match your timestep, or the
+duration of each geometry segment when using multi-segment motion blur.
+
+If a vectorfield called "vel" is present on the object, it is
+interpreted as a velocity field and added to the computed
+velocity.
+
+The velocity attribute of the simulation object's Geometry is
+transferred to the input geometry using a technique similar to the
+Attribute Transfer SOP. It is not necessary to have the input
+geometry match the simulation object's Geometry to get good point
+velocities. This option is useful for rendering simulation objects
+with motion blur.
+
+When importing DOP Objects as points, this option is disabled. The
+DOP Object overall velocity is always assigned to the point representing
+that object.
+
+@parameters
+
+DOP Network:
+    #id: doppath
+
+    The DOP Network to extract the transform and velocity
+    information from.
+    
+Object Mask:
+    #id: objpattern
+
+    Specifies the objects within the DOP Network to extract the
+    transforms from.
+    
+Use Single Object:
+    Turning on this option causes the entire input geometry to be
+    transformed by the first simulation object matched by the __Object
+    Mask__ parameter. If this option is off, then for each object in
+    the Object Mask, this SOP looks for a primitive group with the
+    same name as the object. Only that primitive group is affected
+    by the object it matches. This means some geometry may not be
+    transformed at all if it does not belong to a matching primitive
+    group.
+    
+Import Style:
+    Controls the mode of operation for this SOP.
+
+    Transform Input Geometry:
+        Pulls geometry from the SOP node connected to its input, and
+        transforms that geometry using the objects fetched from the DOP
+        network. The __Object Names__ are used to identify primitives
+        belonging to each object.
+
+    Fetch Geometry from DOP Network:
+        Pulls geometry from the DOP Network, ignoring any SOP that may be
+        connected to its input. This is similar to the functionality
+        provided by the Object Merge SOP, but geared towards DOP Networks.
+        This node provides better control over how the geometry is
+        transformed, and provides parameters that are easier to use for
+        this purpose.
+
+    Fetch Packed Geometry from DOP Network:
+        Creates a packed primitive for each object being fetched from the
+        DOP network. For an [RBD Packed Object|Node:dop/rbdpackedobject],
+        the object's packed primitives will be directly returned.
+        Otherwise, the object's geometry will be packed into an embedded
+        packed primitive.
+
+    Fetch Unpacked Geometry from DOP Network:
+        Pulls geometry from the DOP Network, ignoring any SOP that may be
+        connected to its input. For an [RBD Packed Object|Node:dop/rbdpackedobject],
+        the unpacked collision geometry will be returned.
+
+    Stamp Input Geometry:
+        Creates copies of primitive groups from the SOP connected to its
+        input. This mode is similar to __Transform Input Geometry__, except
+        it can be used when there are several DOP Objects with the same
+        name, all of which want to generate a separate copy of the input
+        primitive group of the same name. This option is also useful if the
+        input SOP contains geometry that is not part of any primitive
+        group, and so does not correspond to any DOP Object.
+
+    Create Points to Represent Objects:
+        Creates one point per object, and sets attributes on that point to
+        represent the position, orientation, velocity, and geometry for
+        that object. This allows for very light weight geometry to be
+        generated from a DOP Network, which can then use point instancing
+        at render time.
+
+Pivot Location:
+    Specifies how to initialize the offset for the point referenced by the
+    packed primitive.
+    
+Display As:
+    The viewport LOD for the packed primitives when __Import Style__ is
+    __Fetch Packed Geometry from DOP Network__.
+    
+Import By Name:
+    Use the name attribute instead of primitive groups to identify
+    primitives belonging to each DOP Object.
+    
+Object Names:
+    Specifies the format of the name used to identify each DOP object.
+    These names are used by the __Transform Input Geometry__ mode and when
+    creating primitive groups or a `name` primitive attribute on the
+    imported geometry.
+
+    Use DOP Object Name:
+        The DOP Object name is used to identify the object. For an [RBD
+        Packed Object|Node:dop/rbdpackedobject], the value of the `name`
+        point attribute is used.
+    Use DOP Object Id:
+        Generates a name based on the numeric identifier of the source DOP
+        object. You may want to use this setting if there is some chance
+        that multiple DOP Objects with the same name may be imported from
+        the DOP network.
+    Use Full Path to Object:
+        For an [RBD Packed Object|Node:dop/rbdpackedobject], the DOP Object
+        name is combined with the value of the `name` point attribute to
+        produce an identifier such as `object2/piece3`. You may want to use
+        this setting if there is some chance that multiple [RBD Packed
+        Objects|Node:dop/rbdpackedobject] may contain packed primitives
+        with the same names.
+        
+Geometry Data Path:
+    #id: geodatapath
+
+    The subdata path for the geometry to import from the DOP
+    Network. The same data path will be used for all source objects.
+    If left blank, the primary geometry data for the object is used.
+    
+Inverse Transform:
+    Applies the inverse of the transform calculated for the
+    simulation object.
+    
+Transform Geometry With Position Data:
+    Finds the Data named Position on the simulation object and
+    extracts its translation and rotation information to transform
+    the geometry.
+    
+Transform Geometry With Geometry Data:
+    Use the transform embedded in the Geometry data attached to the
+    simulation object. This is a transform is usually set when __Use
+    Object Transform__ is set on the Geometry Data.
+    
+Preserve World Space Positions:
+    Use the inverse transform of the object containing this SOP.
+    This allows the world space position of the geometry to be
+    independent of the object level transform. This is useful when
+    this SOP is placed inside an object that is used as the source
+    geometry for the simulation object whose transform is being
+    extracted. The object level transform may be used for the
+    initial position of the simulation object, but you may not want
+    it to affect the world space position of the geometry output
+    from this SOP. When the Inverse Operation option is set, this
+    component of the transform is also inverted.
+    
+Center at Pivot:
+    When __Import Style__ is set to __Create Points to Represent Objects__, use the RBD Object's pivot as the point center, which will typically place the points at the
+    objects' centers of mass. This will ensure the created points better match the motion of the source simulation.
+    
+Add DOP Object Name Attribute:
+    Adds a string primitive attribute `name` which contains the name of the
+    object. The format of the name is specified by the __Object Names__
+    parameter.
+    
+Add DOP Object Path Attribute:
+    Adds a string primitive attribute `dopobject` which contains the
+    path of the DOP Network followed by the DOP object id.
+    
+Add DOP Object Id Attribute:
+    Adds an integer primitive attribute `dopobjectid` which contains
+    the DOP object id of the sourced object.
+    
+Add to Existing Velocity Attributes:
+    Adds velocities computed from the DOP Object to any existing velocity attribute values on the geometry. Turning off this option causes the velocity computed from the DOP Object to simply override any existing velocity attribute value.
+
+    NOTE:
+        When geometry is dynamically fractured, point velocities are added to transfer the velocity to the smaller chunks. If this parameter is turned on, these point velocities will go to your final render. Turn this parameter off to improve motion blur. It is on by default, but is turned off by shelf tools by default.
+
+Delete Abandoned Primitives:
+    When in transform mode, any primitives that do not have a
+    corresponding DOP Object will be deleted instead of being left untransformed.  This is useful if your solver deletes objects over
+    time.
+    
+Point Velocities:
+    Controls whether point velocities will be calculated for the geometry
+    from this SOP, and the method of calculation. The Instantaneous and
+    Integrated velocity calculations are described in the overview.
+    
+Integrate Over Time:
+    #id: integrateovertime
+
+    The time interval over which velocities are calculated when using the
+    Integrated Point Velocities calculation. This value should be set to
+    a single frame time, or the duration of a single geometry segment when
+    using multi-segment motion blur.
+    
+Do Not Trigger Simulation:
+    If the DOP simulation being imported is out of date, the old cached
+    value will be returned rather than trying to simulate.  This avoids
+    recursion problems when viewing a SOP chain being used by a [SOP Solver|Node:dop/sopsolver]
+    that would store bad geometry in the simulation cache.
+

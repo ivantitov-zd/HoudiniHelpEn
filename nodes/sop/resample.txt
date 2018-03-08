@@ -1,0 +1,197 @@
+= Resample =
+
+#type: node
+#context: sop
+#internal: resample
+#icon: SOP/resample
+#tags: polygons, splines, topology, model, cleanup, tech
+
+"""Resamples one or more curves or surfaces into even length segments."""
+
+The Resample op works natively with all curve types including polygon,
+NURBS or Bezier curve inputs. However, for NURBS or Bezier curves the
+resample SOP will use a polygonal approximation to calculate the length of
+the curve using the LOD parameter - though the final sample points will
+still lie on the original curve. Other non-curve geometry will first be
+converted to polygon curves before resampling.
+
+== Inputs / Geometry Types ==
+
+The Resample op works in conjunction with any primitive type that
+can be converted to polygons. This includes Bezier curves, NURBS
+curves, circles, and polygons.
+
+== Example ==
+
+To create a constant length flag with the Resample SOP:
+
+# Create a number of horizontal lines using a [Grid
+  SOP|Node:sop/grid]: Primitive Type: Polygon; Connectivity:
+  Rows; Size: 3, 1
+
+# Append a [Group SOP|Node:sop/group]: Group: group1; Entity:
+  Points; Number: Enable; Pattern: 0-99:1,10
+
+# Append a [Spring SOP|Node:sop/spring]: Source Group: group1;
+  Forces/Wind: 1, 0, 0; Turbulence: 1, 0, -1
+
+# Clip each line to a constant length by appending a Resample
+  op: Maximum Segments: On; Segments: 15
+
+# Appending a [Skin SOP|Node:sop/skin] whose parameters can stay
+  at the default, and enable the Points display in the Viewport
+  options.
+
+# Click Play to view the result. Adjust the view as necessary.
+
+# Toggle the display op back and forth between the [Spring
+  SOP|Node:sop/spring] and the [Skin SOP|Node:sop/skin]. Notice
+  how the lines are stretched and deformed from their original
+  length by the forces acting on them in the [Spring
+  SOP|Node:sop/spring]. After resampling, they are a constant
+  length.
+
+@parameters
+
+Group:
+    Group of curves of surfaces to resample.
+
+Level of Detail:
+    #id: lod
+
+    Level of detail at which to convert non-polygonal inputs.
+    
+Resample by Polygon Edge:
+    #id: edge
+
+    Each edge of the polygon will be resampled independently. This
+    option will preserve corners in the input.
+    
+Method:
+    #id: method
+
+    Even Length Segments:
+        Measure the natural edge length.
+    Even X Segments:
+        Measure the edges against the X axis.
+    Even Y Segments:
+        Measure the edges against the Y axis.
+    Even Z Segments:
+        Measure the edges against the Z axis.
+
+Measure:
+    #id: measure
+    
+    Along Arc:
+        Measure distance along the original curve between resampled
+        points.
+
+    Along Chord:
+        Measure distance between resampled points.
+        
+Maximum Segment Length:
+    #id: dolength
+
+    Specify maximum length of resulting edges.
+
+Length:
+    #id: length
+
+    The maximum segment length of resulting edges. If you are working in centimeters, the default is 10. If you are working in meters, the default is 0.1.
+
+Maximum Segments:
+    #id: dosegs
+
+    Specify the maximum number of edges.
+
+Segments:
+    #id: segs
+
+    The maximum number of edges.
+
+Allow Primitive Attributes to Override Parameters:
+    #id: useattribs
+
+    If the input contains primitive attributes `segment_length` or `num_segments`, they will override the __Length__ or __Segments__ parameters.  If the value of either is less than or equal to zero, it will behave as if the corresponding toggle is disabled for that primitive.
+
+Even Last Segment Same Length:
+    #id: allequal
+
+    When enabled, and __Method__ is __Even Length Segments__, and
+    __Maximum Segment Length__ is enabled, instead
+    of having a last segment that is shorter than the rest, all
+    segments are shrunk slightly, so that they all have the same length.
+
+Maintain Last Vertex:
+    #id: last
+
+    Include final CV of original in resampled polygon.
+
+Randomize First Segment Length:
+    #id: randomshift
+
+    When resampling multiple curves, randomly adjust the first segment
+    length for each curve. The randomly chosen length is based on the
+    curve primitive number. This option can help to eliminate aliasing
+    when using the resample SOP to convert curves to a point cloud.
+
+Create Only Points:
+    #id: onlypoints
+
+    Instead of creating new polygon primitives, create only the points
+    on the resampled curve. This option can be faster when only the
+    resulting points are required.
+
+Treat Polygons As:
+    #id: treatpolysas
+
+    Set this to __Subdivision Curves__ to resample polygons as if they are
+    smooth, subdivision curves, instead of the usual __Straight Edges__.  The
+    __Interpolating Curves__ option will resample them as if they are
+    smooth curves that pass through all of the points in the polygon.
+
+Output as Polygon Curves to be Subdivided Later:
+    #id: outputsubdpoly
+
+    This option moves the output points in such a way that if the curves
+    being output will be subdivided later, e.g. in Mantra or the viewport,
+    their subdivided forms should pass through the sampled points.
+    This is particularly useful when downsampling
+    curves to a small number of points before rendering as subdivision curves.
+    Without this option, the shape of the subdivided curves won't match
+    the original curves as well.
+
+Distance Attribute:
+    #id: ptdistattr
+
+    Create a point attribute storing the length of output curve that
+    is closest to each point along the curve.  This is half the sum
+    of the lengths of all edges connected to each output point.
+    When creating only points, this value
+    can be used to determine how much of the original curve each point
+    represents.
+
+Tangent Attribute:
+    #id: tangentattr
+
+    Create a point attribute storing the normalized curve tangent for
+    each point on the resampled curve. When creating only points, this
+    value can be used to determine the tangent of the original curve at
+    that point.
+
+Curve U Attribute:
+    #id: curveuattr
+
+    Create a point attribute storing the unit curve parameter value for
+    the resampled point.
+
+Curve Number Attribute:
+    #id: curvenumattr
+
+    Create a point attribute storing the curve primitive number for the
+    resampled point.
+
+@related
+
+* [Node:sop/convert]
+* [Node:sop/refine]

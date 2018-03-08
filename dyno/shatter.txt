@@ -1,0 +1,66 @@
+= Shattering =
+
+== Overview ==
+
+There are two main ways of shattering in Houdini:
+
+* *Voronoi fracturing* pre-fractures a model into pieces and then creates a [glue constraint network|constraintnetwork] between the pieces. When the pieces collide with enough force, they will separate.
+
+* *Solid objects* (also known as Finite Element Method or FEM) converts the model into solid made up of 3D tetrahedrons. The solid [Finite element solver|Node:dop/finiteelementsolver] simulates the object as solid matter: it can bend, have elasticity, shift internal mass, chip, crumble, or shatter depending on its physical parameters.
+
+*Solid objects* are slower but more accurate. *Voronoi fracturing* is less realistic but is much faster. You can use the solid solver for close-up "hero" effects and voronoi fracturing for mid-ground/background effects.
+
+:vimeo:RBD fracture
+    #id: 116905502
+
+== Voronoi fracturing == (voronoi)
+
+* Use the [Make Breakable shelf tool|/shelf/makebreakable] on an RBD object. Houdini adds a node rig that automatically fractures and glues the object if and when it collides with another object.
+
+    TIP:
+        You may want to increase the number of sub-steps in the solver to have the automatic shattering occur closer in time to the first impact.
+
+* If you need more control, you can pre-fracture the geometry "manually" in SOPs.
+
+    # In the geometry network, add a [Voronoi Fracture node|Node:sop/voronoifracture]. Connect the geometry you want to fracture to the first input.
+    
+    # The Voronoi Fracture node's second input takes a point cloud that represents the centers of the resulting shattered pieces. You can easily create a configurable number of center points by wiring the geometry into an [Iso Offset node|Node:sop/isooffset] to create a volume representation, then adding a [Scatter|Node:sop/scatter] to scatter points in the volume, then connecting the scatter to the Voronoi Fracture's second input.
+    
+        [Image:/images/dynamics/voronoi_fracture_network.png]
+        
+        Other ways of creating points may give interesting effects. For example, you could use a [Box node|Node:sop/box] to create a regular grid of points and use that as the center points, to get regularly spaced rows and columns of pieces.
+    
+    # At the object level, select the geometry object. On the __Rigid Bodies__ shelf tab, click the [RBD Fractured Object tool|/shelf/rbdfracturedobject] to create an RBD object from the geometry.
+    
+    # Use the [Glue Adjacent tool|/shelf/glueadjacent] on the object to automatically set up a [glue constraint network|constraintnetworks] between the pieces.
+
+The following nodes may also be useful in a shattering workflow.
+
+* The [Transform Pieces SOP|Node:sop/xformpieces] copies transforms into point attributes packed primitives. The shelf tools use it to copy the simulated transformations of pieces back onto the packed geometry in the geometry network. You can use it in a workflow where you write out just the transformations of simulated pieces to disk, then use Transform Pieces to instance heavy geometry onto points using the transformations at render time.
+
+* The [Exploded view SOP|Node:sop/explodedview] lets you move disconnected pieces away from each other. This can be useful for visualizing the results of fractures, and also for effects.
+
+* The [RBD Fractured Object tool|/shelf/rbdfracturedobject] can automatically convert the geometry to [packed pieces|/model/packed] in the DOP network. However, if you need to convert regular geometry to packed pieces in the geometry network, you can use the [Assemble node|Node:sop/assemble].
+
+* If you are using Voronoi pre-fracturing and getting L-shaped groups, try changing the jitter (for example, from the default `0.8` to `0.25`).
+
+== Solid objects (FEM) == (solid)
+
+* See [how to set up a solid object simulation|solids].
+
+* On the Solid Object node, turn on __Fracturing__. Use the __Fracture threshold__ to control how much force is necessary to fracture the object.
+
+* You can [specify parts of a solid that always stick together|solids#fracturing], allowing you to pre-fracture objects. The [Fractured Solid Object shelf tool|/shelf/fracturedsolidobject] is an example of this workflow.
+
+* There are some limitations on [solid object collisions|solids#collisions].
+
+* The [Embed Highres Object tool|/shelf/embedhighresobject] tool on the __Solid__ shelf tab lets you select low resolution and high resolution geometry. The solver solves using the low resolution geometry for speed, then applies the same forces and fractures to the high resolution geometry. This tool uses the parameters on the Solid Object's __Geometry__ tab.
+
+== Tips ==
+
+* You can use the [Debris tool|/shelf/debris] to emit particles from the shattered pieces as they separate. This lets you simulate dust and small debris being jolted loose from the impact.
+
+* You can set up a hybrid simulation where you use voronoi fracturing to separate "large scale" pieces and then at a certain frame switch the geometry to solid objects. The best way to do this is to simulate the voronoi fracturing, cache the simulated geometry to disk, and then use the cached geometry and switch it to Solid objects at the given frame.
+
+* You can simulate low-resolution geometry and replace it with high-res geometry at render time using the [Alembic procedural shader|Node:shop/vm_geo_alembic]. See [how to use Alembic proxy geometry|/io/alembic#shader].
+

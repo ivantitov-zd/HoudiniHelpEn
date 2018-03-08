@@ -1,0 +1,312 @@
+#type: node
+#context: dop
+#internal: popsolver
+#icon: DOP/popsolver
+#index: no
+
+= POP Solver =
+
+The POP Solver DOP sets objects to use a POP Solver. A POP Solver uses
+a POP Network to process the positions of points stored in the Geometry
+data of the object. The POP Network can use any POP Nodes, including
+Collision POPs. 
+
+However, better results can often be achieved by doing
+the collision detection in DOPS using the POP Solver. This is done by
+having the objects to collide against imported into the simulation,
+often as RBD Objects. By allowing the POP Solver to perform the
+collision detection, it is also possible to have the other objects be
+affected by their collisions with the particles.
+
+TIP:
+    Set the __Solver Mode__ to __Velocity Update__ when using FLIP and to __Force Update__ when using SPH.
+
+
+@parameters
+
+    == POP Network ==
+
+	Use External POP:
+	    Since the POP Solver is itself a POP network, if this
+	    toggle is not set, it is the contained POP network that is
+	    used for solving.
+
+        POP Path:
+            #channels: /poppath
+
+            Points to the POP Network which is used to process the
+            points in the object's Geometry data at each timestep.
+
+	Rehome Particles:
+	    Each particle belongs to a particle primitive.  Each particle
+	    primitive has string attribute called "generator" which stores
+	    which node, relative to the POP Network, that particle primitive is
+	    owned by.  At the start of each POP Cook pass the particles will
+	    return to their home node, as specified by this generator value.
+	    If no POP Node in the network matches the name, the particles
+	    aren't cooked by any of the nodes in the network.
+
+	    Rehoming the particles will temporarily set all the particles to
+	    point to the same node.  This way you can ensure your particles are
+	    processed regardless of what the name of the generator particle
+	    was.
+
+	    Left-most Generator follows the POP path up the left-most input
+	    until a root POP node is reached.  That node is then used as the
+	    home.  Specific POP allows one to specify a precise POP to become
+	    the new home.
+
+        == Standard ==
+
+            Initial State:
+                #channels: /initialstate
+
+                Geometry file on disk to use as initial state of the
+                POP simulation.
+            Random Seed:
+                #channels: /seed
+
+                Provides a seed value for all random number generation
+                performed by the POP Network.
+            Oversampling:
+                #channels: /oversample
+
+                How many times to cook the POP Network for each DOP
+                simulation timestep.
+            Max # of Particles:
+                #channels: /maxparticles
+
+                Controls the maximum number of particles that can exist
+                in the POP simulation at any given moment. A value of 0
+                means particles can always be birthed.
+            Remove Unused Points:
+                Remove unused (killed) points from the object's
+                geometry.
+
+	== New Particles ==
+
+	    Ensure All Points Are Particles:
+		Tells the solver to check the object's geometry to ensure
+		that all points are part of particle primitives. 
+
+		POP Nodes
+		will only process points that are part of particle
+		primitives. Any points that are not part of particle
+		primitives are added to a new particle primitive with
+		various attributes set according to the following parameter
+		values.
+	    Inherit Velocity:
+		Turning on this option causes the solver to not only look
+		at the velocity attribute data on the object's geometry to
+		determine its velocity. It also looks at the Position data
+		on the object, and adds any velocity and angular velocity
+		components to the velocity of each point. 
+
+		This option is
+		very useful to ensure continuity when handing off an object
+		to the POP Solver from another solver (such as RBD).
+	    New Particle Generator:
+		#channels: /generator
+
+		If a new particle primitive is created due to the Ensure
+		All Points Are Particles parameter, the generator attribute
+		of the new parameters is set to this value. 
+
+		POPs use the
+		generator attribute to determine which POP Node was the
+		source for this primitive, and therefore which route through
+		the POP Network the particles will take.
+	    New Particle Lifespan:
+		#channels: /lifespan
+
+		If a new particle primitive is created due to the Ensure
+		All Points Are Particles parameter, the lifespan of the
+		particles are set to this value.  This measures how long
+		in seconds that a particle will live before it dies of old
+		age.
+
+		A value of -1 will cause the particles to never die of old
+		age.
+
+        == Context SOPs ==
+
+            SOP 1, 2, 3, and 4:
+		Path to a SOP to use as the First, Second, Third, and Fourth
+		Context Geometry.
+
+        == Context Data ==
+
+            Data Path 1, 2, 3, and 4:
+		Path to DOP Data to use as the First, Second, Third, and Fourth
+		Context Geometry.  The referenced path should be of type
+		SIM_Geometry, ie, from a Geometry DOP or SOP Geometry DOP.  The
+		path is relative to the POP Solver node so a value of
+		"Geometry" will refer to the geometry attached to the solver,
+		not the geometry at the root of the object.  The path
+		"/Geometry" will get data from the root of the object.
+
+    == Collisions ==
+
+        Handle Collisions:
+            Enable particles to collide with other objects in the scene. Leave this on.
+
+        Stop Particles:
+            #channels: /collidestop
+
+            The parameters in this tab provide filters to apply to all
+            DOP objects which are affectors of the POP Object. Any
+            objects which match this filter cause particles to stop when
+            involved in a collision. 
+
+	    The filters in this tab are applied
+            in order, so the first filter which matches a given object
+            determines the behavior of that object.
+        Kill Particles:
+            #channels: /collidekill
+
+            Any objects which match this filter cause particles to be
+            killed when involved in a collision.
+        Continue Particles:
+            #channels: /collidecontinue
+
+            Any objects which match this filter cause particles to
+            continue unaffected when involved in a collision.
+        Stick Particles:
+            #channels: /collidestick
+
+            Any objects which match this filter cause particles to
+            stick to them when involved in a collision. Sticking the
+            particles to the object is achieved using constraints.
+        Bounce Particles:
+            #channels: /collidebounce
+
+            Any objects which match this filter cause particles to
+            bounce off them when involved in a collision. The bounce
+            attribute of the particle is used to determine the amount of
+            energy preserved in the collision.
+
+    == Solver ==
+
+        Geometry Name:
+            This specifies which geometry data will be used as the
+            particle system by the POP Solver. Usually this will be
+            Geometry as that represents the standard geometry of a node.
+            
+	    However, any other data of GeometryCopy type may be
+            specified and manipulated by the particle network. One can
+            thus update marker particles in a fluid simulation or
+            vorticle particles by using the appropriately named geometry
+            data.
+
+	Solver Mode:
+	    The POP Solver can be used in several different ways in a DOP
+	    Network.  The solver mode provides a quick way to setup the __Update
+	    Stages__ and __Suppression Rules__ to reflect these different rules.
+
+	    Custom:
+		Each stage can be enabled by hand.  The default parameters are
+		for the __Stand Alone__ mode.
+
+	    Stand Alone:
+		The POP Solver acts like a standalone pop network.  It will
+		integrate all the particles, apply any DOP forces, etc.
+
+	    Velocity Update:
+		This setup is useful for when a pop solver is used in the
+		velocity update stage of a FLIP Solver or [Particle Fluid
+		Solver|Node:dop/particlefluidsolver].  It updates the
+		velocity according to the acceleration,
+		but does not update position, leaving that for another
+		microsolver to integrate.
+
+	    Force Update:
+		This setup is useful for when a POP Solver is used in the force
+		update stage of a [Particle Fluid
+		Solver|Node:dop/particlefluidsolver].  It turns off
+		all of the integration and the reaping of dead particles.  
+		It also turns on the conversion of the accel attribute
+		into a force attribute, as expected by the particle
+		fluid solver.
+
+	== Update Stages ==
+	
+	    Do Cook First:
+		The normal POP order of cooking is Reap, Apply Rules,
+		Prep, and then Cook.  This works for POPs as it allows
+		accelerations to be seen before they are applied.
+		However, when chaining multiple POP networks together it
+		means the suppression rules need to be set on the next
+		network rather than the current one.
+
+		Setting Do Cook First changes the cook order to Prep,
+		Cook, Reap, Apply Rules.  Note that since DOP Forces are
+		set outside the cook invocation, setting Do Cook First
+		will disable DOP Forces.  However, in the case of particle
+		fluids, this is likely the desired behavior in any case.
+	    Prep Particles:
+		Before cooking particles they need to be reset from their
+		old values. The Prep Particles stage of the cook process
+		zeros out the accelerations and torques and updates the
+		state flags based on the age of the particles. 
+
+		If you want multiple POP solvers to accumulate forces, one must
+		disable the prep in one of the solvers to allow the
+		acceleration to be passed from one solver to the next.
+	    Cook POPs:
+		Determines if the POP network will be executed for the
+		particles. The POP network adjusts particle accelerations
+		according to the POP nodes. Cooking does not update the
+		velocity or position to reflect timestepping, however.
+	    Apply Rules:
+		After the new accelerations and torques have been
+		calculated by the pop network, they need to be integrated
+		over time to calculate the new velocities and positions. The
+		Apply Rules stage does this. It also handles speed limits
+		and up vector adjustments.
+
+	    Reap Particles:
+		For efficiency particles flagged for deletion are all
+		deleted in a single reap pass. This stage can be enabled
+		with this option. 
+
+		NOTE:
+		    Particles that are marked for deletion are removed from the
+		    simulation, so even if their deletion is disabled, they
+		    will still stop simulating.
+	    DOP Forces:
+		Enables the processing of DOP level forces.  If one is
+		chaining multiple POP Solvers together, one only wants to
+		apply the forces once to avoid double counting.
+
+	    Convert Accel to Force:
+		POPs normally work by computing an `accel` attribute
+		that stores the change in velocity.  However, it expects forces rather than accelerations when the solver is in force mode. This will convert the
+		`accel` attribute into a force value by multiplying by
+		the density.  If a density attribute is not present,
+		it multiplies by mass.  If neither are present, or
+		either mass or force attributes are missing, it does
+		nothing.
+
+	== Suppression Rules ==
+
+	    Suppress *:
+		These options suppress individual portions of the Rule
+		update.  If __Apply Rules__ is off, everything is suppressed.
+		If it is on, one can turn of specific sections.
+    [Include:standard_solver_parms]
+
+@inputs
+    [Include:standard_data_inputs]
+
+@outputs
+    [Include:standard_data_outputs]
+
+@locals
+    [Include:standard_data_locals]
+
+    [Include:standard_locals]
+
+
+@related
+    - [Node:dop/popobject]
+

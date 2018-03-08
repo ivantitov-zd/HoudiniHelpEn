@@ -1,0 +1,59 @@
+#type: node
+#context: sop
+#internal: switch
+#icon: COMMON/switch
+
+#tags: util, network
+
+= Switch =
+
+"""Switches between network branches based on an expression
+or keyframe animation."""
+
+This node passes the input specified in the __Select input__ parameter to the output. The input numbering starts at 0. You can control the parameter with an
+[expression|/expressions]  or animate it.
+
+For example, you could use the expression `$F - 1` to switch to the
+first input at frame 1, the second input at frame 2, and so on. Use the
+expression `($F >= 5)` to use the first input for the first four frames,
+and the second input afterward (boolean operators such as `>=` return
+`0` for false and `1` for true, so the switch will select input 0 when
+the expression is false and input 1 when the expression is true).
+
+
+TIP:
+    Often, you can use a Switch in a network that could potentially have
+    errors to bypass the failing nodes. One way to do this is to use the
+    following expression in the __Select Input__ parameter:
+
+    {{{
+    #!exp
+    if (strmatch("*Error:*", run("opinfo " + opfullpath("../" + opinput(".", 1)))), 0, 1)
+    }}}
+    With this expression, the switch will use the _second_ input, unless
+    it has an error, in which case it will switch to the _first_ input.
+
+    The expression gets the operator info string (using [run|Exp:run]
+    expression function to call the [opinfo|Cmd:opinfo] HScript command)
+    of the second input (`opinput(".", 1)`. The inputs are zero-based,
+    so `1` refers to the second input). If [strmatch|Exp:strmatch] finds
+    an error string, the [if|Exp:if] function returns 0 (use first
+    input), otherwise it returns 1 (use second input).
+
+    You can also use the following expression when working with SOPs that generate warnings instead of errors. For example, when an Object Merge is the second input to a switch which is not loading any geometry and generates a warning:
+
+    {{{
+    #!exp
+    if (strmatch("*Warning:*", run("opinfo " + opfullpath("../" + opinput(".", 1)))), 0, 1)
+    }}}
+
+
+
+@parameters
+    Select Input:
+        #channels: /input
+
+        The input number (starting at 0) to pass to the output. You can
+        use an expression to control this or animate the parameter
+        value.
+

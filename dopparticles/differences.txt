@@ -1,0 +1,64 @@
+= Major differences from old POPs =
+
+== Comparison ==
+
+Old POPS ||
+	Dynamic Particles ||
+
+Each generator node created a separate particle primitive, and nodes wired from the generator operate on the particle primitive. |
+
+	Particles are in point groups called [streams|streams]. It is much easier to create a node branch that operates on a subset of all particles.
+
+Accumulated `accel` each frame. |
+
+	Accumulates `force` each frame, to better match other dynamics.
+
+Used `mass` attribute by default. |
+
+	While the solver will respect `mass` by default, the default POP nodes all have __Ignore Mass__ set by default, which can be turned off in each node. This is because [FLIP fluids|/fluid/] use `mass` in a way that doesn't make much sense for particle simulations.  This also allows direct application to bullet RBD sims in a sensible manner.
+
+Used the Collect node to merge primitives from different generators |
+
+	Uses the standard [Merge DOP|Node:dop/merge] to merge particle streams.
+
+Used display flag to set output of simulation |
+
+	Must re-wire the network to change output.
+
+Used local variables such as `$ID` and `$CR` in HScript expressions |
+
+	Uses [VEX expressions|/dopparticles/vexpressions] for faster processing and multithreaded cooking.
+
+Implemented mostly in C++ |
+
+	Implemented using VOPs and SOPs, allowing you to examine the source networks and derive new behavior.
+
+Cooking networks of C++ nodes with few particles was very fast |
+
+	Uses just-in-time compilation of VOPs and cooking of node networks, so basic overhead is higher. However, if you use per-particle expressions, the new VEX expressions are much faster than the old HScript expressions, and multithreading makes high particle simulations faster.
+
+Used Guide node flag to show guides in the viewer (for example, to visualize force direction) |
+	
+	DOPs have a Hidden node flag that hides any visible guides. Guides and visualization are controlled by node parameters.
+
+Applied drag as acceleration opposite the velocity. This is unstable with high drag values and can oscillate near zero. |
+
+	Drag is proportional to the square of the velocity allowing for faster squishing of extreme velocities while preserving low speed motion. Drag is applied implicitly (the drag equation is directly solved), avoiding overshoot even with very high drag values.  The `dragexp` attribute can be used to switch the drag model on a per-particle basis.
+
+Used collision nodes to handle both collision detection and response. Handling collision response in a node flow was awkward. |
+
+	A particle node in the chain applies properties specifying collision behavior. The particle solver node responds to DOP collisions according to the properties.
+
+The integer `state` attribute was a "bit field" of collision properties. You had to use bitwise operations to tease out the values packed in the integer. The hidden `backtrack` attribute tracked where particles came from.
+
+	Collision properties are broken out into separate `pprevious` and `has_pprevious`, `stopped`, `dead`, `sliding`, `stuck` attributes. This is actually more efficient since the new geometry engine will automatically compress the storage of identical attribute values on particles.
+
+Used a 2-float vector called `life`, where the first component was the age and the second component was the lifespan. A virtual local variable `$LIFE` gave the ratio of the two. |
+
+	Uses two scalar attributes called `age` and `life`. You can get the equivalent of the old `$LIFE` ratio in a VEX expression using `@nage`.
+
+== Other  ==
+
+* Dynamic particles have no equivalent of the old "particle event" system. Events were a workaround for the early restriction that particle systems could only exist in the `/part` network.
+
+* The Creep POP functionality has been replaced with a [POP VOP|Node:dop/popvop] or [POP Wrangle|Node:dop/popwrangle], and use of the `posprim`/`pospath`/`posuv` attributes and the `primuv()` function. 

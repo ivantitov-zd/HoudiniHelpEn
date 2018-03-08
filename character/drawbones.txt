@@ -1,0 +1,288 @@
+= Draw bones =
+#parent: buildingrigs
+
+== Overview ==
+
+See the [guidelines|riggingtips]  and [rigging styles|riggingapproaches]
+for general advice on bones and rigging in Houdini.
+
+Use the [Bones|/shelf/bones] tool at the object level
+to create [Bone|Node:obj/bone] objects.
+Please take care not to confuse them in the following instructions
+(I'll try not to either).
+
+=== Kinematics ===
+
+    _Kinematics_ is the life-like movement of digital characters. There are
+    two main ways to specify the movement of characters:
+    
+    * Manually set the rotation of each joint in a bone chain.
+    
+    * *Inverse Kinematics (IK)* lets you specify an endpoint that a bone
+      chain should reach, and then an _IK solver_ automatically finds a set
+      of rotations for the joints that reach that goal. (This process is
+      called "inverse" kinematics because the solver works "backward" from
+      the required result to create the conditions necessary to create it).
+    
+      In a bone chain representing an arm for example, this lets you specify
+      the position of the hand, and the solver will automatically rotate the
+      shoulder and elbow joints.
+    
+      You can give the solver "hints" that help it create more natural
+      solutions. For example, you can specify a [rest angle|restangles]
+      that tells the solver the natural way a joint bends.
+
+=== KIN_Chops === (kinchops)
+
+    Whenever you create bones with kinematic solvers, Houdini creates a
+    CHOP network called `KIN_Chops` that contains the kinematic solver
+    engines for the various bone set-ups. You can create separate CHOP
+    networks manually if you want, but Houdini will create `KIN_Chops`
+    automatically.
+
+    The solvers inside the CHOP network are simply CHOPs that take bones
+    and goals as inputs and spit out rotations back to the bones. You
+    can even choose/blend between different kinematics solvers with the
+    [Composite CHOP|Node:chop/comp].
+
+== How to draw bones ==
+
+TIP:
+    As you're drawing, use the text field in the  [operation controls
+    toolbar|/basics/tools]  to name the bone.
+
+TIP:
+    Houdini uses an optimized IK solver for bone chains with two bones.
+    If you have a natural two-bone part of the system, try to draw it
+    separately to take advantage of the optimized solver.
+
+:task:Draw bones with  kinematics:
+    # At the object level, choose the [Bones tool|/shelf/bones].
+
+    # Use the  [operation controls toolbar|/basics/tools]  or press
+      ((RMB)) to choose a  kinematics solver
+      (such as __Inverse Kinematics__).
+
+    # Click ((LMB))to draw bones in the viewer. Click ((RMB)) to
+      finish drawing.
+
+      In the viewer, the bones are connected in a chain with a small
+      sphere at the root. In the network editor, each bone has a
+      node and the root and chain goals are [Null
+      objects|Node:obj/null]. Houdini also creates a CHOP network
+      containing the CHOPs that drive the kinematics.
+
+:task:Draw bones without kinematics:
+    # At the object level, choose the [Bones tool|/shelf/bones].
+
+    # Click ((LMB))to draw bones in the viewer. Click ((RMB)) to
+      finish drawing.
+
+      In the viewer, the bones are connected in a chain with a small
+      sphere at the root. In the network editor, each bone has a
+      node and the root is a [Null object|Node:obj/null].
+
+:task:Branch a new chain off an existing one:
+    * At the object level, choose the [Bones tool|/shelf/bones].
+
+    * To draw from the end of an existing bone, ((Shift + LMB))
+      the bone.
+        
+    * To parent your new chain to the end of an existing bone but
+      not draw from it, ((Ctrl + MMB)) the bone.
+
+
+:task:Connect two existing chains with a new bone:
+    # At the object level, choose the [Bones tool|/shelf/bones].
+
+    # Shift-click the end bone of the first chain to start a new
+      bone from it.
+
+    # Press ((Ctrl + J)) to turn on snapping.
+
+    # Click the root of the start bone of the second chain.
+
+    #  Parent the second chain to the new bone.
+
+:task:Split a bone into two new bones:
+    # At the object level, choose the [Bones tool|/shelf/bones].
+
+    # ((Ctrl + LMB)) the bone you want to split.
+
+:task:Create bones in the shape of an existing curve:
+    * See  [create and control bones with a curve|controlbones].
+
+== How to edit bones ==
+
+:task:Examine the rotations on a bone:
+    * Press ((MMB)) on a bone to show its pre-transforms and the
+      actual rotations if the bones are driven by an IK solver.
+
+:task:Remove kinematics from existing bones:
+    # Use the  [tab menu|/basics/tabmenu]  to choose the [Bones
+      tool|/shelf/bones].
+
+    # Press ((RMB)) to show the Bones tool's tool menu and
+      choose __Remove Kinematics__.
+
+    # Select the bones you want to remove kinematics from, then
+      click ((RMB)) to finish.
+
+:task:Add kinematics to existing bones:
+    # Use the  [tab menu|/basics/tabmenu]  to choose the [Bones
+      tool|/shelf/bones].
+
+    # In the  [operation controls toolbar|/basics/tools] , use the
+      pop-up menu to set the kind of kinematics you want to add.
+
+    # Press ((RMB)) to show the Bones tool's tool menu and
+      choose __Add Kinematics__.
+
+    # Select the first bone of the chain and press ((RMB)), then
+      select the last bone and click ((RMB)) to finish.
+
+:task:Change the kinematics solver of existing bones:
+    * Remove the existing kinematics, then add the new kinematics
+      (see above).
+
+    * If you have an existing  [kinematics solver CHOP|#kinchops]
+      you want to use for a bone,
+      enter its path in the bone's __Kinematic solver__ parameter
+      (on the __Bones__ tab in the parameter editor).
+
+:task:Edit bone lengths and zero positions:
+    # Use the  [tab menu|/basics/tabmenu]  to choose the [Bones
+      tool|/shelf/bones].
+
+    # Click the small squares at the joints between bones and use
+      the translate (((T))), rotate (((R))), and scale (((E)))
+      manipulators to edit them.
+
+      You can also use the special manipulator (((Y))) to move a
+      joint relative to the chain: along the upper or lower bone
+      axis, or in and out along an axis halfway between the two bone
+      axes.
+
+:task:Parent bones:
+    # Houdini will move the child bone to the position of the parent
+      and set them up as a hierarchy in the Network pane.
+
+      If you do _not_ want the child chain to move when it's
+      parented, turn on the child object's __Keep position when
+      parenting__ parameter.
+
+      (You can turn this setting off globally in the __Objects and
+      Geometry__  section of the [Houdini Preferences|/ref/windows/mainprefs]
+      window.)
+
+    # Use the [Parent tool|/shelf/parent], or
+      [connect|/ref/panes/network]  the output of the parent bone to the
+      input of the child.
+
+      If the "child" chain had a null root object, it will not be
+      part of the chain and you can delete it.
+
+:task:Remove a joint:
+    # Use the  [tab menu|/basics/tabmenu]  to choose the [Bones
+      tool|/shelf/bones].
+
+    # Press ((RMB)) on the joint you want to remove and choose
+      __Delete Joint__. Houdini merges the two bones on either side
+      of the joint into one.
+
+NOTE:
+    Do not to use the transform tools to rotate joints during
+    set-up because these will alter the __Rotate__ values of the bone.
+    Use the Bones tool instead.
+    
+    Use the transform tool when you are animating the bone
+    chain after setting up the rest pose.
+
+== How to create a reverse foot setup ==
+
+steps>>
+    # Draw an IK bone chain that has a thigh bone, shin bone, ankle
+      bone, and foot bone.
+
+    # Turn on __Keep position when parenting__ on all the goal nulls.
+
+    # [Parent|/basics/parent] the goal at the bottom of the ankle to
+      the goal at the top of the ankle, and parent the toe goal to the
+      ankle bottom goal.
+
+    # [Create a new control Null|/model/nulls]  and parent the ankle top
+      goal to it.
+
+    # Turn on the control Null's __Keep position when parenting__
+      parameter and parent it to the character root Null to put it in
+      character space instead of world space.
+
+    # Use the control Null to pose the foot. Translating
+      and rotating the control Null drives the foot, ankle, and leg
+      bones nicely.
+
+    # Clean transforms on the toe goal and then lock
+      the translate parameters and the Y and Z rotation parameters. Only
+      leaving X rotations on the toe unlocked gives nice rotations with
+      the reverse foot setup.
+
+    # Repeat the previous step for the for the ankle top and ankle
+      bottom goals.
+
+    # [Change the appearance of the control null|/model/nulls]  to
+      reflect its function. For example, you can position it under the
+      foot bone and make it look like a footprint.
+
+    # You can optionally make the ankle top, ankle bottom, and toe goals
+      [invisible and unselectable|/nodes/obj] .
+    
+== How to position a Null at the end of a bone ==
+
+Positioning a Null at the start of a bone is fairly easy: parent the
+Null to the Bone object and set its position and rotation to (0, 0, 0).
+
+To position a Null at the _end_ of a bone, do one of the following.
+
+Snapping method:
+    steps>>
+        # [Turn on display of points|/basics/view] .
+
+        # [Parent|/basics/parent] the Null to the bone.
+
+        # Use the [Pose|/shelf/pose] or
+          [Icon:TOOLS/move] Move tool and [snapping|/model/aids]
+          to snap the Null to the endpoint of the bone.
+
+Parameter reference method:
+    steps>>
+        # [Parent|/basics/parent]  the Null to the bone.
+
+        # Select the Bone object and in the parameter editor press
+          ((RMB)) on the __Length__ parameter and choose __Copy
+          Parameter__.
+
+        # Select the Null object and in the parameter editor press
+          ((RMB)) on the __Translate Z__ parameter and choose __Paste
+          Relative Reference__.
+
+          This pastes a parameter reference to the bone's length, so the
+          Null will always be offset in the bone's space by the bone's
+          length. Unfortunately, the referenced length is positive, and
+          we need to offset by a negative number.
+
+        # Put a minus sign in front of the expression inserted by
+          __Paste Relative Reference__ to reverse the sign (for example,
+          `ch("../L_hip_bone1/length)`).
+          
+== Troubleshooting characters ==
+
+IK-driven movement is jittery:
+    The solver applies transformations hierarchically to
+    objects. In a very large and complex rig network, errors can
+    accumulate which make movement less smooth.
+    
+    In the kinematic solver CHOP, reduce the tracking
+    threshold factor. This increases the accuracy of
+    transformations but also increases 
+    [cooking time|/basics/cooking].
+

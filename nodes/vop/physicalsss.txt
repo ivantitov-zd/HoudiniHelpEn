@@ -1,0 +1,364 @@
+= Physical SSS =
+
+#type: node
+#context: vop
+#internal: physicalsss
+#bestbet: subsurface scatter scattering sss
+
+"""Outputs surface color based on a physically-based subsurface
+scattering model. This node an do physically correct single scattering and/or multiple scattering."""
+
+[Include:/news/11/new_feature]
+
+TIP:
+    The functionality of this node is built into the
+    [surface model VOP|Node:vop/surfacemodel], however you may want to use this node if you need finer control over the scattering.
+
+Subsurface scattering simulates the look of materials such as skin, jade, fruit, marble, milk, and others, where light enters a semi-transparent skin, bounces around underneath and is either absorbed or exits at a different point on the surface. For more information, see [the Wikipedia article|Wp:Subsurface_scattering].
+
+The Physical SSS node uses a physically correct lighting model, in contrast to nodes included in previous releases.
+
+This node can simulate single scattering, and/or multiple scattering using
+either ray tracing or a point cloud.
+
+== Workflow ==
+
+* Certain looks are achievable with single scattering alone. Try working on the look with both single scattering and multiple scattering on, then turn off multiple scattering. If it doesn't affect the look, you can leave multiple scattering off.
+
+* To increase quality, turn up the __Samples__ parameter for single scattering, and/or the number of points in the point cloud (__Auto Size Factor__/__Auto Point Cloud Size__) for multiple scattering.
+
+== Managing point clouds == (clouds)
+
+Use the __Point Cloud Mode__ parameter to control reading and writing the point cloud file.
+
+By default, the node re-generates the point cloud every time you render.
+This may be useful when you're experimenting with the scene, but once the geometry is stable you will want to cache the point cloud file for faster renders, especially when rendering animation.
+
+The point cloud file is based on surface ST coordinates, so it is not necessary to regenerate it for a deforming surface. However, you need to regenerate it if the topology of the shaded surface changes. Since the point cloud is based on mantra's inherent S and T coordinates, it is not necessary to assign UVs to polygons for the point cloud to work.
+
+:task:Cache the subsurface scattering point cloud file:
+    # Set __Point Cloud Mode__ to __Write To File__.
+    # Enter the name of the point cloud file in the __Point Cloud__
+      parameter.
+    # Render the scene. The node will generate the point cloud and
+      write it to the filename.
+    # Change the __Point Cloud Mode__ parameter to __Read From File__.
+
+TIP:
+    Point clouds can be viewed using gplay or by loading the .pc file into houdini using a file SOP.  Viewing the point cloud in this way will automatically convert it to geometry.  The `P` attribute stored on the points will be the position from the render that generated the point cloud - not necessarily the final position produced by the renderer.
+
+@parameters
+
+Parameter Mode:
+    #id: mode
+    
+    Switches the interface between artist-friendly controls
+    based on color, and physically-based measurements. The physical
+    mode can be useful if you have measured the scattering values for a particular material.
+
+    Artist:
+        Enables the __Diffuse Color__, __Attenuation Density__, and
+        __Attenuation Color__ parameters.
+        
+    Physical:
+        Enables the __Absorption Coefficient__, __Reduced Scattering
+        Coefficient__, and __Scattering Scale__ parameters.
+        
+    When you change one set of controls, Houdini will map the values to the other set of controls automatically. However, some values may not translate perfectly.
+
+Diffuse Color:
+    #id: diffuseclr
+
+    This is the dominant color that will appear in lit areas of the surface.
+
+Attenuation Density:
+    #id: attendensity
+
+    How quickly the light intensity decreases as it scatters. Higher values make the lighting level decrease faster. Available when __Parameter mode__ is __Artist__.
+
+    [Image:/images/nodes/shop/mantrasurface_sss_atten.png]
+
+Attenuation Color:
+    #id: attenclr
+
+    The color the surface will tend toward in unlit areas. This value adjusts the density so that the color components with higher attenuation color values will scatter light at longer distances, while color components with a low attenuation color will scatter at shorter distances. Available when __Parameter mode__ is __Artist__.
+
+Absorption Coefficient:
+    #id: absrp
+
+    Probability (per distance unit) that light will be absorbed, per color channel (red, green, blue). This parameter is useful when you have physically measured values for a certain material. Available when __Parameter mode__ is __Physical__.
+    
+    Since the probability is per distance unit, it may range from `0` to infinity.
+
+Reduced Scattering Coefficient:
+    #id: redscatr
+
+    Probability (per distance unit) that light will scatter (assuming isotropic scattering), per color channel (red, green, blue). This parameter is useful when you have physically measured values for a certain material. Available when __Parameter Mode__ is __Physical__.
+    
+    Since the probability is per distance unit, it may range from `0` to infinity.
+
+Scattering Scale:
+    #id: scatrscale
+
+    This parameter adjusts the scale of the scattering/absorption events.  Values less than 1 will cause the scattering to become more localized and the surface to look more opaque, while values greater than 1 will cause the scattering to become less localized and the surface to look more transparent.  Available when __Parameter Mode__ is __Physical__.
+
+Scattering Phase:
+    #id: g
+
+    Controls the nature of the scattering. Positive values give forward scattering, `0` gives isotropic scattering, and negative values give backscattering. Range is `-1` (full backscattering) to `1` (full forward scattering).
+    
+    The value depends on the type of material you are trying to model. For example, skin is highly forward scattering, while marble is backscattering.
+
+    [Image:/images/nodes/shop/mantrasurface_sss_phase.png]
+
+Inside IOR:
+    #id: iior
+
+    Absolute index of refraction of the surface medium (the physical material the shader is simulating the look of).
+
+Outside IOR:
+    #id: oior
+
+    Absolute index of refraction of the surrounding medium (for
+    example, air).
+
+    See the [list of indices for various materials|Wp:List_of_refractive_indices].
+
+Enable RGB Spectral Scattering:
+    #id: spectral
+    Enables independent scattering of the red, green, and blue color
+    components.  When enabled, an independent scattering and absorption
+    coefficient will be used for each color component, leading to more
+    accurate renders - though the results can sometimes show colors that
+    are complementary to the attenuation color. For example, with a blue
+    attenuation color, shorter scattering distances will render with a
+    yellow tint. To partially eliminate this unpredictable effect, disable
+    this toggle.
+
+== Single Scattering ==
+
+Enable Single Scattering:
+    #id: singlesss
+
+    Enable/disable contribution from light that scatters exactly once in the surface.  Certain types of surfaces (such as skin) gain little contribution from single scattering and so disabling this option will reduce computation time with little impact on accuracy.
+
+Optimize Secondary Rays:
+    #id: optsingle
+
+    When this option is on, the node uses a BRDF to approximate the scattered rays. This option is faster but less accurate.
+
+Samples:
+    #id: nsingle
+
+    The number of samples for single scattering. Increase this option to decrease noise at the expense of slower shading.
+
+== Multiple scattering ==
+
+Enable Multiple Scattering:
+    #id: multienable
+
+    Enable contribution from light that scatters more than once in the surface.  For low albedo materials (low __Diffuse Color__), multiple scattering contributes little to the image and can be disabled to reduce computation time.
+
+Model:
+    #id: multimodel
+    
+    Controls the way in which multiple scattering is computed.  Normally
+    you should use the __Local And Global__ mode if you are planning to use
+    a point cloud, and __Ray Tracing__ to compute multiple scattering
+    without a point cloud.  Using a point cloud can produce smoother and
+    faster results, but it requires precomputation of a point cloud and
+    computation of irradiance for each point in the cloud (once per
+    render).
+
+    Ray Tracing:
+	Use ray tracing rather than a point cloud to approximate multiple
+	scattering.  This option avoids point cloud calculations but may
+	require more sampling to eliminate noise.
+
+    Full Ray Tracing:
+	When an single object is made of multiple packed primitives (i.e.
+	multiple Alembic shape nodes), each shape will have local multiple
+	scattering.  With Full Ray Traced, all individual packed primitives
+	will be considered when computing multiple scattering.
+
+    Local BRDF:
+        Only use a BRDF function to compute the multiple scattering
+        contribution.  This is the fastest option, though no subsurface
+	diffusion will be produced.
+        
+    Global Point Cloud:
+        Use a point cloud to compute the multiple scattering contribution.
+	This option requires a precomputation stage to generate the point
+	cloud and to calculate and cache the surface irradiance values in
+	the point cloud.
+        
+    Local And Global:
+	Use the BRDF function to compute the local contribution and the
+	point cloud to compute the global contribution, with the __Local
+	Radius Scale__ parameter controlling the local radius.  This option
+	will usually produce more accurate results than using a point cloud
+	alone, especially for short scattering distances.
+    
+    Path Tracing:
+	Simulate subsurface scattering by path tracing through it as a
+	volume.  This options is slow and noisy but will produce the most
+	accurate results - so it may be used to produce ground truth images
+	for comparison with the other techniques.
+
+Global Light Quality:
+    #id: globquality
+
+    The quality of the light sampling used for the point cloud contribution when __Model__ is __Global Point Cloud__ or __Local And Global__.  This value is also used to control the number of ray samples when the __Model__ is __Ray Tracing__.
+
+Local Light Quality:
+    #id: loclquality
+
+    The quality of the light sampling used for the BRDF contribution when __Model__ is __Local BRDF__ or __Local And Global__. The local quality can be an order of magnitude lower than the global quality without adversely affecting the outcome, allowing faster evaluation.
+
+Optimize Secondary Rays:
+    #id: optmulti
+
+    Use a BRDF approximation to compute multiple scattering for secondary rays. Turn this option on for faster but less accurate results. 
+
+Local Radius Scale:
+    #id: loclradscale
+
+    Controls the contribution from the local BRDF in the __Local And Global__ model.  Smaller values will reduce the area of local integration, which will reduce sharpness and possibly introduce low frequency noise.  Higher values will increase sharpness and reduce low frequency noise.
+
+Point Cloud Mode:
+    #id: pcmode
+
+    Controls how the shader generates a point cloud.  The simplest option is to select __Generate At Render Time__.  This will create a new point cloud for every render.  To reduce computation time, you can first use __Write To File__ mode and then re-use the point cloud using __Read From File__ mode on subsequent renders.  This is also the recommended approach when rendering animations because the shader will smoothly interpolate the point cloud across frames.  The exception to this is when the model's topology changes (two joined polygons are separated, for example).  In this case, a new point cloud must be generated.  Note that in __Write To File__ mode, the file will be overwritten if it already exists.  Cancelling a render before it completes in __Write To File__ mode may result in an unusable point cloud file.
+
+    See [managing point clouds|/nodes/vop/physicalsss#clouds] for more information.
+
+    Generate At Render Time:
+        Always regenerate the point cloud whenever the node renders. This is convenient since you don't have to worry about file management, and can be useful when you are modifying the shader and model at the same time. However, for efficiency you should cache the point cloud, especially when rendering animation.
+        
+    Read From File:
+        Read the point cloud from a file (specified in the __Point Cloud__ parameter below), generated using the __Write To File__ mode.
+        
+    Write To File:
+        Write the point cloud to the file specified in the __Point Cloud__ parameter below.
+
+Point Cloud:
+    #id: pcname
+
+    Controls the file the point cloud is written to/read from when __Point Cloud Mode__ is __Write To File__ or __Read From File__. The point cloud is based on surface UVs, so it is not necessary to write a new point cloud file for each frame unless the topology of the model is changes.
+
+Cache Positions/Normals/Areas:
+    #id: pcsavepos
+
+    Writes point positions, normals, and areas to the point cloud. This may speed up shading, but only for static geometry and a static camera. If the geometry or camera moves (transforms), you should either turn this option off or regenerate the point cloud.
+
+Cache Irradiance:
+    #id: pcsaveirrad
+
+    Writes light information to the point cloud. This can speed up shading for point clouds with many points, but only for static geometry and a static camera. If the geometry or camera moves (transforms), you should either turn this option off or regenerate the point cloud.
+    
+Auto Point Cloud Size:
+    #id: pcautosize
+
+    Turn this option on to have the node automatically decide how many points to use in the point cloud based on the scattering properties of the surface. You can then use the __Auto Size Factor__ parameter to scale that number. Turn this option off to set the number of points in the cloud manually.  Smaller point clouds are faster to generate and render, so reducing the size can speed up the render.
+
+Auto Size Factor:
+    #id: pcautofactor
+
+    Lets you scale the number of points the node chooses for the point cloud when __Auto Point Cloud Size__ is on.
+
+Point Cloud Size:
+    #id: pcsize
+
+    Number of points to generate in the point cloud when __Auto Point Cloud Size__ is off.  Higher point counts will increase quality at the expense of computation time.
+
+Filter Multiple Scattering:
+    #id: pcfilter
+
+    Caches results of multiple scattering calculation on the point cloud's points, and then interpolates between those cached values to compute the value at a sampled point. This is much more efficient, but less accurate, than recomputing scattering for each sampled point on the surface.
+    
+    When this option is enabled, the __Multiple Scattering Color (Global)__ output of this VOP must be exported via a [Parameter VOP|Node:vop/parameter].  To do this, create a [Parameter VOP|Node:vop/parameter], set its __Parameter Type__ to __Color__, set its __Parameter Name__ to `multiglobclr`, set __Export__ to __Always__, and connect its input to this VOPs __Multiple Scattering Color (Global)__ output.  Alternatively, use the right click __Create Export Bindings__ menu item on the physicalsss node to create exports for each output.
+
+Filter Samples:
+    #id: pcfiltersize
+
+    Number of point cloud points to filter (see __Filter Multiple Scattering__).  Increasing the point count will produce a more blurry result, while decreasing the point count will produce a more blotchy result.
+
+== Performance Tips ==
+
+* Limit the number of points in your point cloud by reducing __Auto Size Factor__ or __Point Cloud Size__. Focus on getting your point count as low as possible.
+
+* Enable __Filter Multiple Scattering__.
+
+* Enable __Optimize Secondary Rays__ for both single and multiple scattering.
+
+* Set the multiple scattering model to __Local and Global__.
+
+* Reduce the __Light Quality__ parameters. 
+
+@inputs
+
+Position:
+    #id: p
+    
+    Allows you to override the surface position to compute the color for.
+
+Blur position:
+    #id: blurp
+    
+    If you override the position, you need to override the blur position (the position at the start of the frame).
+
+Normal:
+    #id: n
+    
+    If you override the position, you need to override the normal.
+
+Transmitted:
+    #id: t
+    
+    If you are simulating fresnel (refracted) outside this node, you can override the fresnel transmission vector. Normally the node computes the refraction angle itself using the fresnel function.
+
+Fresnel transmission:
+    #id: kt
+    
+    If you override the transmission vector, this input allows you to override the amount of transmitted light.
+
+@outputs
+
+Color:
+    #id: clr
+    
+    The result of the subsurface scattering.
+
+No scattering color:
+    #id: noscatrclr
+    
+    Light that is attenuated as it passes through the surface but not scattered.
+
+Single scattering color:
+    #id: singleclr
+    
+    Light that is scattered once as it passes through the surface.
+
+Multiple scattering color:
+    #id: multiclr
+    
+    Light that is scattered more than once as it passes through the surface.
+
+Multiple scattering color (Local):
+    Light that is scattered more than once and is computed using the BRDF.
+
+Multiple scattering color (Global):
+    Light that is scattered more than once and is computed using the point cloud.
+
+Fresnel reflectance:
+    #id: kr
+    
+    Amount of light reflected at the surface point.
+
+@related
+
+- [Node:vop/surfacemodel]
+- [Node:vop/singleSSS]
+
+
+

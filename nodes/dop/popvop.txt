@@ -1,0 +1,137 @@
+#type: node
+#context: dop
+#internal: popvop
+#icon: DOP/popvop
+
+#tags: volumes
+
+= POP VOP =
+
+"""Runs CVEX on a particle system."""
+
+The POP VOP operation runs CVEX over a set of particles.  The CVEX shader can be defined as a `.vfl` file, a SHOP, or by building a CVEX VOP network inside this node.  The last is the most straightforward approach.
+
+Binding to the CVEX script controls what attributes are passed to which parameters of the script.  The default AutoBind will use the name of the attributes to determine which parameter they should
+override.  If that parameter is marked as exported in the CVEX script, the attribute will be written to and/or created.  Otherwise, the attribute is just read to get the parameter's values.  
+
+Optionally, you can also bind read-only field parameters.  These will be sampled at the attribute's location in space and passed to CVEX.
+
+@parameters
+
+[Include:standard_pop_parms#commonMain/]
+
+== Vex Setup ==
+
+        Vex Source:
+                Where to get the CVEX script from.  Myself will refer to the VOP network built inside this node.  SHOP will use the __Shop Path__ and __Script__ will load the `.vex` file specified in the script.
+
+	Shop Path:
+                The CVEX SHOP to apply.
+
+                This can also point to any node that contains a CVEX VOP Network.
+	    
+                NOTE:
+                        Referenced nodes parameters will be used.
+
+	Script:
+	    The CVEX script to apply.
+
+	Re-load VEX Functions:
+	    When in script mode, this reloads any `.vex` files to account for updates made outside of Houdini.
+
+	Compiler:
+	    The command line used by VOPs to compile the inside of this node.
+
+	Force Compile:
+	    Trigger a recompile of the VOP network.
+
+	Evaluation Node Path:
+	    VEX functions like `ch()` usually evaluate with respect to this node. Providing a path here can override where the path search starts from.  This is useful for embedding in a digital asset where you would like the top level digital asset to be the search root.
+
+	Export Parameters:
+	    When a VEX parameter is exported, the bound attribute will be created if it doesn't exist.  This pattern can be used to override the export option on the VEX shader to avoid writing to or creating certain attributes.  The pattern matches the VEX parameter, not the `bound` attribute.  The attribute will still be bound for reading.
+
+	Enable Multithreading:
+	    There should be no threading issues with VEX.  In the unlikely
+	    event that there are, this will allow you to determine which
+	    node is guilty, and work around it without turning off threading
+	    on a global scale.
+
+== Volume Bindings ==
+
+
+== Data Bindings ==
+
+	Geometry:
+	    The list of the geometry on the object to process.
+
+	Autobind by Name:
+	    Will use the name of the attribute to determine which attribute binds with which parameter.  
+
+	    Integer attributes will bind to integer parameters.  Float attributes will bind to float, vector, point, matrix, or matrix4 depending on their tuple size.  String attributes will bind to strings.
+
+	Attribute Name, VEX Parameter:
+	    Manually specifies the bindings of each attribute.  
+
+	Field Name, VEX Parameter:
+	    Optionally binds Scalar, Vector, Matrix, or Index fields from this object to the CVEX function.  They will be sampled at the current `P` location of each element.
+	
+	Autobind Groups by Name:
+	    Automatically bind any groups to the integer parameter prefixed with `group_`.
+	Group Name, VEX Parameter:
+	    Manually specifies the bindings of each group.
+
+	Update Normals If Displaced:
+	    If points are being run over, and the `P` attribute is written to,
+	    but the `N` attribute is not written to, any incoming normals will
+	    become out of date.  When this option is set, vertex and point
+	    normals will be updated when this occurs.
+
+== Inputs ==
+
+    Input 1, 2, 3, 4:
+	These control the four virtual inputs accessible inside of VOPs.
+
+	They can be accessed with the OpInput1-4 wires from the VOP, or with the `@OpInput1-4` string parameters when using VEXpressions.
+
+	They can also be accessed numerically as 0-3 with VEX functions that take an input number.
+
+	None:
+	    No geometry is wired to this input.
+	SOP:
+	    The SOP geometry will be cooked prior to running the VEX and the result wired to this input.
+	DOP Data:
+	    Data in the current simulation to reference.  Specified as
+	    an object/data, for example, pyro1/vel to refer to the velocity
+	    field of the pyro1 object (which will show up as three volume
+	    primitives)
+	Myself:
+	    Referring to the geometry currently being processed is special as you have to ensure a copy is made so the VEX functions can refer to its original form.  This handles
+	    that for you.
+	Nth Context Geometry:
+	    These refer to the SOPs wired into the parent DOP Network itself.
+	Myself (No Reads from Outputs):
+	    Refers the currently processed geometry.  Does not make a copy
+	    so it is up to the user to ensure no reads are made from
+	    any attributes that are bound.
+    SOP Path:
+	Path to a SOP to wire in.
+    DOP Data:
+	Object/data path a piece of DOP data in THIS simulation to wire in.
+
+== Solver ==
+
+    [Include:standard_gas_timestep]
+
+    [Include:standard_solver_parms]
+
+@inputs
+    [Include:standard_pop_inputs]
+
+@outputs
+    [Include:standard_pop_outputs]
+
+@related
+
+- [Node:dop/popwrangle]
+

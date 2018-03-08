@@ -1,0 +1,384 @@
+= Rendering as part of a workflow =
+
+== Overview ==
+
+Integrating Houdini rendering into an automated workflow generally involves one or both of the following command line programs.
+
+* The `hython` and `hbatch` command line programs lets you run Houdini Python or HScript (respectively) scripts from the command line, allowing you to do almost everything you can do through the Houdini user interface on the command line, including generating IFD files from render nodes.
+
+* The `mantra` renderer program takes IFD files (mantra's scene description format) and uses them to render images.
+
+The main difference between the two approaches is that `hbatch` uses a Houdini license while mantra only uses a render license. A common general workflow is to use a single host to generate IFD files for the frames of an animation (using a single full license), and then farm out the rendering to mantra instances (using multiple cheaper render licenses).
+
+:platform:windows
+    On Windows, use __Start > All Programs > Side Effects Software > Houdini x.x.x > Command Line Tools__ to open a command line shell with environment variables defined and Houdini programs in the path.
+
+
+== General tips ==
+
+* You can use the [Pre Post render node|Node:out/prepost] with the [Shell render node|Node:out/shell] to run scripts to load geometry files from a server before rendering, and save rendered images to a server after rendering.
+
+* As with many other network types, it's a good idea to keep a [Null render node|Node:out/null] with a noticeable, descriptive name (for example `FINAL_OUTPUT`) at the end of a render network, so that even as you insert and remove nodes from the network, you can always refer to the final node consistently.
+
+* You can set a render node to render using a specific [take|/basics/takes]. This is an easy way to set up render passes.
+
+
+== Render dependencies ==
+
+You can connect [render nodes|/nodes/out/] together to create dependency graphs, allowing you to control the order in which renders run. You can connect any number of inputs and outputs.
+
+When rendering a node, Houdini will render all input nodes first.
+
+By default, Houdini will render _all frames_ in the input nodes before rendering any frames of the rendering node. That is, if Node B depends on Node A, all frames of Node A are rendered before any frames of Node B (A<sub>1</sub>, A<sub>2</sub>, ..., A<sub>n</sub>, B<sub>1</sub>, B<sub>2</sub>, ..., B<sub>n</sub>). You can instead interleave dependencies (A<sub>1</sub>, B<sub>1</sub>, A<sub>2</sub>, B<sub>2</sub>, ..., A<sub>n</sub>, B<sub>n</sub>) using the `-I` option of [Cmd:render].
+
+Houdini generally ignores the __Frame range__ parameter on an input node when rendering dependencies unless the child node's __Valid Frame Range__ parameter is "Render Frame Range Only (Strict)". In that case, Houdini will only output frames within the input node's frame range.
+
+For example:
+
+[Image:/images/rendering/dependencies.png]
+
+`composite` is dependent on `char_diffuse`, `char_specular` and `backgound`. `char_diffuse` and `char_specular` are both dependent on `character`. If `composite` is rendered, the order of the render process would be:
+
+# All frames of `character`
+# All frames of `char_diffuse`
+# All frames of `char_specular`
+# All frames of `background`
+# All frames of `composite`
+
+* Houdini will not allow you to create a circular dependency.
+
+* All input render nodes to a  [subnetwork|/ref/panes/network]  will render before the nodes inside the subnet.
+
+* The subnetwork will render all its "final" nodes (render nodes
+  without output connections) at the same frame or frame range.
+
+* If a subnet has more than one "final" node, _the order in which
+  they render is arbitrary_ (it's the order the nodes were created
+  in). To enforce an ordering, use a [Merge render nodes|Node:out/merge] to
+  merge the final render nodes together and  [order its
+  inputs|/ref/panes/network] .
+
+* Render node SubNetworks have no direct connections between the child render nodes and the input render nodes to the SubNetwork. Thus, using a Switch or Batch render nodes with no inputs in a SubNetwork will not have them affect the inputs to the SubNetwork.
+
+:task:Make one node dependent on the output of another:
+    [Wire|/network/wire] the output of the "parent" render node to the input the dependent node.
+
+    If a render node has more than one input, Houdini renders the inputs sequentially. Sibling inputs have no dependencies on each other.
+
+
+== Dependency render nodes ==
+
+A number of render nodes manage dependencies, and do not render anything
+themselves.
+
+* [Pre post|Node:out/prepost] allows optional "pre-render" and "post-render" branches to run before/after a "main" branch.
+
+* [Batch|Node:out/batch] causes the frames in the input to be rendered in sequential order, in one pass, regardless of the order in which frames are requested.
+
+* [Frame Dependency|Node:out/framedep] - Makes a frame depend on other frame times.
+
+* [Merge|Node:out/merge] merges all dependencies together, to make networks easier to read.
+
+* [Switch|Node:out/switch] selects one input (or no inputs) to add a dependency on.
+
+== Workflow render nodes ==
+
+* [Alembic|Node:out/alembic] "renders" the scene to an Alembic file.
+
+* [Mantra Archive|Node:out/archive] "renders" the scene to a geometry format optimized for loading by the renderer (using a procedural shader).
+
+* [Geometry|Node:out/geometry] "renders" part of the Houdini scene to a geometry file.
+
+* [Shell|Node:out/shell] runs a script or command.
+
+
+== Render passes ==
+
+Two different ways to show/hide different objects for different render passes:
+
+* Set up the visibility and settings for each render pass in a separate [take|/basics/takes], then set a render node to render using that take.
+
+* Create a [bundle|/basics/bundles] or wildcard pattern specifying the objects that should be visible in the pass. Use the __Objects__ tab on the mantra node to specify which objects the render node should render. Note that [Houdini wildcards|/network/patterns] can exclude names as well as include them.
+
+TIP:
+    A good practice is to create a separate render node for each render pass. However, you could use a single render node and script the node's __Take__ parameter.
+
+
+== Generating an IFD or RIB file == (ifd)
+
+IFD is the scene description format produced by Houdini and consumed by mantra to produce a rendered image or animation sequence. The IFD file contains a complete description of the scene and how to render it.
+
+RIB is the equivalent of IFD for RenderMan and RenderMan-compatible renderers.
+
+You can set up a render output node to save a file instead of rendering an image directly. This gives you the flexibility of rendering at another time, from another machine, or on a render farm. See [network rendering|render].
+
+:task:Set up a render node to output IFD instead of an image:
+    # Turn on the __Disk File__ checkbox on the __Driver__ tab of the render node and click the [Icon:BUTTONS/chooser_file] file chooser icon to set a file path.
+    
+    # Click the __Render__ button to generate the IFD file.
+    
+:task:Render an IFD file from the command line:
+    {{{
+    mantra -f <<filename>>.ifd <<output_filename>>.pic
+    }}}
+    
+    (If you don't specify the `-f` option, mantra will read the IFD from `stdin`.)
+    
+:task:Save an IFD file from a `.hip` file on the command line:
+    Use the `hbatch` command line program to load the `.hip` file and trigger the render node.
+        
+    # Set up a render node to output IFD, as above.
+        
+    # Load the `.hip` file into `hbatch`.
+        
+        {{{
+        hbatch myjob.hip
+        }}}
+        
+    # On the `hbatch` command line, use the [Cmd:render] command to trigger the render node.
+        
+        {{{
+        / -> render my_render_node
+        / -> quit
+        }}}
+
+:task:Render a `.hip` file directly from the command line:
+    Use the provided `hrender` script in `$HFS/bin`. This script is written in `csh`. To use this script on Windows, you will need to use a UNIX-like environment such as Cygwin.
+    
+    This script uses `hbatch` and so uses a Houdini license, unlike rendering an IFD with mantra which only uses a rendering license.
+
+
+== Using mantra on the command line == (mantra)
+#index: document
+
+Once you have an IFD file you can use mantra to render it on the command line, for example:
+
+{{{
+mantra -f frame0001.ifd rendered_frame0001.pic
+}}}
+
+(If you don't specify the `-f` option, mantra will read the IFD from `stdin`.)
+
+`mantra -h` will print a summary of the available options.
+
+Most command-line options are overrides for [properties|/props]. This means you can set these properties on the scene camera, and then override them on the command line if necessary.
+
+
+=== Control options ===
+
+`-H <<hostlist>>`:
+    Specify a comma separated list of hosts to perform rendering. For example -H chili,cayenne.
+    
+`-n <<val>>`:
+    Number of processes to render using network rendering (deprecated in favor of -j).
+    
+`-N <<maj>>.<<min>>(.<<ren>>)`:
+    When network rendering, ensure that remote hosts will run at least this version of mantra.
+`-j <<numthreads>>`:
+    Specify the number of threads (`-j 0` uses maximum threads).
+    
+`-f <<file>>`:
+    Read the IFD from the file given instead of from `stdin`.
+
+    If the specified file has a `.gz` or `.sc` file extension, mantra will assume the file is compressed.
+
+    In addition, file system plug-ins (FS) are used, so you can specify IFD files using `opdef:`, `op:`, or even `http:` protocols.
+
+`-e none|basic|full`:
+    Enable or disable use of engine procedural shaders that generate geometry from a SOP network at render time.
+    
+    `none` is the default instead of `basic` because to enable geometry-generation procedurals mantra sets up an environment to evaluate SOP networks, impacting start-up performance (both memory and time). The impact will differ based on your environment. One studio might find engine mode added 12 seconds to the process startup time, while for another it could be less than 0.5 seconds.
+    
+    The argument to `-e` should be one of the following:
+    
+    `none`:
+        Do not enable use of engine procedurals (the default). 
+    
+    `basic`:
+        Enable procedural shaders that only generate curves or points (`enginecurvegen` and `enginepointgen`). Unlike `full`, this does not consume a Houdini Engine license.
+    
+    `full`:
+        Use a Houdini Engine license to enable procedural shaders to generate surface geometry ([Node:shop/vm_geo_engine] and [Node:vop/engineinstance]).
+    
+    If your scene has SOP procedurals but you do not render with the appropriate support enabled using `-e`, the shader will print an error message and not generate any geometry, but the rest of the render will work normally.
+
+`-F`:
+    Indicates that the first argument after all options specifies the name of the IFD file to render (instead of the output image).
+    
+`-o <<file>>`:
+    Send verbose output to the file given.
+    
+    On Windows, you can use `consolewait` or `consolenowait` instead of a file name. `consolewait` opens a console window for the output, and you must close the window before the next frame will render. It lets you read fast-moving output but requires you to babysit the window. `consolenowait` opens a console window and closes it as soon as the frame is done. For slow renders you might still be able to read the output, and it doesn't require you to click to close the window at every frame.
+    
+`-p <<file>>`:
+    Append verbose output to the file given.
+    
+`-P <<pyfilter>>`:
+    Specifies a python filter program (see Python Filtering).
+    
+`-V <<string>>`:
+
+    If the string contains
+    
+    * `0`-`9` -- Set the `renderer:verbose` IFD property
+    * `a` -- Set the `renderer:alfprogress` IFD property
+    * `p` -- Set the `renderer:vexprofile` IFD property to 1
+    * `P` -- Set the `renderer:vexprofile` IFD property to 2
+    
+    On Windows, if the output appears in a pop-up console window, use `-o consolewait` to keep the window open so you can read the verbose output.
+
+
+=== Rendering options ===
+
+`-r`:
+    Set [renderer:renderengine|/props/mantra] to `raytrace`.
+    
+`-q`:
+    Set render quality (deprecated in favor of -Q).
+
+`-Q <<arg>>`:
+
+    Set render quality. If the argument contains
+    
+        * b - Motion blur will be disabled.
+        * B - Ray-tracing motion blur will be disabled.
+        * d - Depth of field will be disabled.
+        * r - All ray-tracing will be disabled.
+        * i - Irradiance/Occlusion will be disabled.
+
+    *Example*: `-Q Bd`
+    
+`-s <<factor>>`:
+    Set the [renderer:shadingfactor|/props/mantra] property.
+    
+`-L <<factor>>`:
+    Set the [renderer:rayshadingfactor|/props/mantra] property.
+    
+`-M <<memory>>`:
+    Set the [renderer:geocachesize|/props/mantra] property.
+    
+`-S <<filename>>`:
+    Specify a stylesheet file for rendering.
+    
+`-v <<variance>>`:
+    Set the [image:variance|/props/mantra] to the value specified.
+    
+`-A`:
+    Set [image:samples|/props/mantra] to (1,1).
+    
+`-B <<size>>`:
+    Set the [image:bucket|/props/mantra] property.
+    
+`-J <<jitter>>`:
+    Set the [image:jitter|/props/mantra] property.
+    
+`-c <<coving>>`:
+    Set the [object:coving|/props/mantra] property.
+
+
+=== Image options ===
+
+`-i`:
+    Force interactive rendering (into [MPlay|/mplay]).
+    
+`-I`:
+    Set various image options (using a comma separated list).
+
+    * `resolution=<<W>>x<<H>>` -- set image:resolution
+    * `jitter=<<V>>` -- set image:jitter
+    * `subpixel=0|1` -- set image:subpixel
+    * `sample=<<W>>x<<H>>` -- set image:samples
+    * `sample=<<N>>` -- equivalent to `sample=<<N>>x<<N>>`
+
+    For example, `-I resolution=100x80,bucket=16,sample=4,subpixel=1`
+    
+`-w <<width>>, -h <<height>>`:
+    Specify width/height of image (deprecated in favor of -I).
+
+`-b <<depth>>`:
+    Specify default quantization for image planes.
+
+`-z`:
+    Render a depth image, use _average_ depth value for each pixel.
+
+`-Z`:
+    Render a depth image, use _closest_ depth value for each pixel.
+
+`-u <<object>>[:<<attrib>>]`:
+    Set the [renderer:uvobject|/props/mantra] and optionally [renderer:uvattribute|/props/mantra] properties.
+
+
+== `hython` and `hbatch` ==
+
+* Running `hython` gives you a Python command-line environment with the [houdini object model|/hom] package (`hou`) available.
+
+    {{{
+    % hython myscene.hip
+    Python ...
+    Houdini ... hou module imported.
+    Type "help", "copyright", "credits" or "license" for more information.
+    >>> rnode = hou.node("/out/mantra1")
+    >>> help(rnode)
+    >>> rnode.render()
+    }}}
+
+* Running `hbatch` gives you an [HScript|/commands] command-line environment. This lets you script almost any action you can perform 
+
+    {{{
+    % hbatch myscene.hip
+    hbatch Version ... (Compiled on ...)
+    / -> cd out
+    /out -> help render
+    /out -> render mantra1
+    }}}
+    
+    `hbatch -h` will print a summary of the available options. 
+
+
+== Multithreaded rendering ==
+
+Mantra is a multithreaded process, which means that a single mantra render will split work between available processors to speed up rendering. By default, mantra detects the number of processors installed in the system and will start enough threads to use all of the processors.
+
+You can turn off multithreaded rendering by unchecking the __Use Max Processors__ checkbox on the __Rendering__ sub-tab of the __Properties__ tab on the mantra render node. You can also manually set the number of threads to use for rendering by setting the __Thread Count__.
+
+
+== Simple network rendering ==
+
+Mantra has a simple method for distributing rendering to multiple machines on the local network. This may be useful for ad-hoc speedups when rendering a single image. For more robust and full-featured network rendering, use a render queue manager such as [HQueue|#farm] or Alfred.
+
+The `-H` option lets you specify hostnames to render on. You can use this to render an IFD file on the command line, or in the __Command__ parameter on the __Main__ tab of the mantra output driver.
+
+For example:
+
+{{{
+mantra -H localhost,clinton,beijing,finland
+}}}
+
+This command line will start up mantra on 4 servers named `localhost`, `clinton`, `beijing`, and `finland`. The machines will render tiles and send them back to the host machine to be assembled into the final image. 
+
+* This only works for rendering a single image.
+
+* All machines must be running the same version of Houdini license software (`hserver`). If one of the machines you specify is running a different version of `hserver`, or not running `hserver` at all, the render will hang.
+
+    You can check the version of hserver that is running on a machine by running the command `hserver -l`.
+
+    {{{
+    % hserver -l
+    Hostname:       clinton [Linux (little endian)]
+    Uptime:         21:29:16        [Started: Wed Aug 15 18:11:48 2007]
+    License Server: internal
+    Server Version: sesinetd9.0.634
+    Version:        Houdini9.0.688
+    ...
+    }}}
+
+    The major and minor numbers of the `Version:` value (in this example, `9.0`) must match on all machines.
+
+
+== Managing a render farm == (farm)
+
+HQueue is a general-purpose job management system that distributes, monitors and manages tasks across a collection of servers. It specializes in managing render and dynamic simulation jobs submitted from Houdini however it can be customized to work with any job from any application.
+
+See [the online HQueue documentation|http://www.sidefx.com/docs/hqueue/] for information on how to install and use HQueue.
+
+

@@ -1,0 +1,169 @@
+= Mountain =
+
+#type: node
+#context: sop
+#internal: mountain
+#version: 2.0
+#icon: SOP/mountain
+#tags: fractal, reshape, random
+
+"""Displaces points along their normals based on fractal noise."""
+
+NOTE:
+    This operator uses  [normal attributes|/model/attributes]  on the
+    input geometry. If a normal has 0 length, this operator will not
+    displace the point along that normal.
+
+[Include:/shelf/mountain#includeme]
+
+@parameters
+
+Group:
+    The point group to which to apply displacement.
+
+Height:
+    Displacement amount of the height.
+
+Element Size:
+    Distance between peaks of lowest frequency noise.
+
+Scale:
+    Allow for anistropic scaling of noise in the three principle axes.
+
+Offset:
+    World space offset for the noise function.
+
+Pulse Length:
+    The duration of extrema for the lowest frequency of time-based noise.
+
+Time:
+    The time to evaluate at.  Use $T to make the noise time dependent.
+
+Noise type:
+    The type of noise to generate. Different algorithms give noise with different characteristics.
+    
+    Sinusoid:
+        *Not actually noise*. This simply outputs a sine wave instead of adding noise to the input signal. This may be useful for debugging with an output that spans the entire `0-1` range.
+        
+        [Image:/images/nodes/vop/unoise_sine.png]
+    
+    Perlin:
+        A noise where the visual details are the same size. [Wikipedia article|Wp:Perlin_noise]
+        
+        [Image:/images/nodes/vop/unoise_perlin.png]
+    
+    Periodic Perlin:
+        A variant of Perlin noise with a repeating pattern. This can be useful for creating images, geometry, and motion that can be tiled and merged.
+        
+        [Image:/images/nodes/vop/unoise_periodic_perlin.png]
+    
+    Simplex (Improved Perlin):
+        *The default*. A faster and more interesting variant of Perlin noise.
+        
+        [Image:/images/nodes/vop/unoise_simplex.png]
+    
+    Sparse Convolution:
+        Sparse Convolution noise is similar to Worley noise. Does not have artifacts at grid points.
+        
+        [Image:/images/nodes/vop/unoise_sparse.png]
+    
+    Flow:
+        A noise that's stable over time, like a rotated Perlin noise, useful to create noise that seems to swirl and flow smoothly across time. Use the __Flow rotation__ parameter below to control the rotation.
+        
+        [Anim:/images/nodes/vop/unoise_flow.gif]
+    
+    Periodic Flow:
+        A variant of Flow noise with a repeating pattern. This can be useful for creating images, geometry, and motion that can be tiled and merged. Use the __Flow rotation__ parameter below to control the rotation.
+        
+        [Anim:/images/nodes/vop/unoise_periodic_flow.gif]
+    
+    Worley (cellular) F1:
+        Produces cellular features similar to plant cells, ocean waves, honeycombs, cratered landscapes, and so on. [Wikipedia article|Wp:Worley_noise]
+        
+        [Image:/images/nodes/vop/unoise_worley_f1.png]
+    
+    Worley (cellular) F2:
+        A variant of Worley noise that produces blunted and cornered features.
+        
+        [Image:/images/nodes/vop/unoise_worley_f2.png]
+    
+    Alligator:
+        Produces a bumpy output. Named for its alleged resemblance to alligator skin.
+        
+        [Image:/images/nodes/vop/unoise_alligator.png]
+
+
+Fractal Type:
+    None:
+        Does not add any additional noise on top of the basic noise.
+        
+        [Image:/images/nodes/vop/unoise_fractal_none.png]
+    
+    Standard:
+        Adds pseudo-random noise on top of the basic output.
+        
+        [Image:/images/nodes/vop/unoise_fractal_standard.png]
+    
+    Terrain:
+        Adds noise like "Standard" but dampens the noise in the valleys, which can be useful for generating mountainous terrain.
+        
+        [Image:/images/nodes/vop/unoise_fractal_terrain.png]
+    
+    Hybrid:
+        Like terrain, but with more sharpness in the valleys.
+
+Max octaves:
+    The number of iterations of distortion to add to the output of the basic noise. The more iterations you add, the more "detailed" the output. Note that the output may have fewer octaves than this parameter (that is, increasing the parameter will eventually stop adding detail), because the node eventually stops when there's no more room to add more detail in the output.
+
+Lacunarity:
+    The frequency increment between iterations of fractal noise added to the basic output. Note that you can use a negative value.
+    
+    [Anim:/images/nodes/vop/unoise_lacunarity.gif]
+
+Roughness:
+    The scale increment between iterations of fractal noise added to the basic output. The higher the value the larger the "jaggies" added to the output. You can use a negative value for roughness.
+    
+    [Anim:/images/nodes/vop/unoise_roughness.gif]
+
+
+Flow Rotation:
+    The rotation of the "swirl" when __Noise type__ is "Flow", from `0` to `1`. Because this parameter is fractional, you can't just use `$F` to animate it, since all integral values will look the same, representing a complete revolution.
+
+Fold:
+    "Flips" values below the median to be above the median, so all valleys become peaks. (Note it flips across the _median_, not `0`.) If the median is `0`, this is like taking the absolute value.
+
+    [Image:/images/nodes/vop/unoise_fold1.png]
+    [Image:/images/nodes/vop/unoise_fold2.png]
+
+Complement:
+    Outputs the numerical complement (`1 - x`) of the computed noise. Basically turns the output upside-down.
+
+Gain:
+    Increases or decreases the contrast from 0.5 in the output.
+
+Bias:
+    Moves the output down or up toward `0` or `1`.
+
+Clipping Minimum:
+    The minimum value of the noise, measured in normalized 0..1 space.
+Clipping Minimum:
+    The maximum value of the noise, measured in normalized 0..1 space.
+
+Lattice warp and gradient warp are two methods for adding "fractal-ness" to the basic noises by warping the noise space.
+
+Enable Lattice Warp:
+    Adds "stringiness" or "wiriness" to standard noise.
+
+    [Anim:/images/nodes/vop/unoise_lattice_warp.gif]
+    
+Accumulate Lattice Warp:
+    When __Lattice Warp__ is on, this accumulates the warp for each iteration (octave) of added fractal noise. When used in images, this can add interesting smudgy effects, and interesting landmarks when used for terrain.
+
+Enable Gradient Warp:
+    Widens the peaks or valleys of the noise output.
+    
+    [Anim:/images/nodes/vop/unoise_gradient_warp.gif]
+
+Accumulate Gradient Warp:
+    When __Gradient Warp__ is on, this accumulates the warp for each iteration (octave) of added fractal noise.
+

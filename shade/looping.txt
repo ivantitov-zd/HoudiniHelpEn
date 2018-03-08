@@ -1,0 +1,123 @@
+= Loops and conditionals in VOPs =
+
+#since: 15.0
+#bestbet: block
+
+"""How to create looping and conditional blocks of nodes in VOP networks."""
+
+
+== Overview ==
+
+Houdini compiles VOP networks into a VEX program, with the output of one node/function being fed to the input of the next. The block VOPs let you make chains of nodes loop (for, while, for...each, do...until), or only run under certain conditions (if, break if) into your networks.
+
+Without "if", you could structure your network such that the result of one branch of the network was only applied when certain conditions were true. For example, you calculate a blur by averaging point values, but use a Switch VOP to only apply the results, say, on points that were a certain distance from the centroid. The problem is that the generated VEX would _always_ calculate the blur, and _then_ decide whether to use it or not. An "if" block lets you make the entire calculation conditional. This can give large speed increases for complex operations, especially inside loops.
+
+:vimeo_ref: H15 Masterclass: Loops
+    #id: 142534639
+
+
+== If block ==
+
+# In a VOP network, open the ((Tab)) menu and choose __If block__.
+
+    Houdini creates a [Block Begin If|Node:vop/block_begin_if] and [Block End|Node:vop/block_end] pair. Anything you wire between this nodes will execute conditionally.
+
+# Wire a value into the "condition" input of the begin node. The block will only execute if this value is true (not `0`).
+
+
+== Repetition ==
+
+# In a VOP network, open the ((Tab)) menu and choose __For loop__.
+
+    Houdini creates a [Block Begin For|Node:vop/block_begin_for] and [Block End|Node:vop/block_end] pair. Anything you wire between these nodes will repeat.
+
+# To set the number of repetitions, connect the "length" input on the begin node.
+
+    * To start at an index other than `0`, you can also connect the "index" input.
+
+    * The length and index are also available as outputs on the block begin node so you can use them as inputs to nodes inside the block.
+
+# Wire up the nodes you want to loop between the begin and end nodes, [setting up any looping variables|#variables] you need.
+
+# Wire from the outputs of the block end node out to the rest of the network to use the final results of the loops.
+
+
+== Looping over items in an array ==
+
+# In a VOP network, open the ((Tab)) menu and choose __For-each loop__.
+
+    Houdini creates a [Block Begin For|Node:vop/block_begin_for] and [Block End|Node:vop/block_end] pair. Anything you wire between these nodes will be run for each member of an array.
+
+# Wire the array value into the begin node's first input.
+
+    * To start at an index other than `0`, you can also connect the "index" input.
+
+    * The array and index are also available as outputs on the block begin node so you can use them as inputs to nodes inside the block.
+    
+    * The "element" output represents the "current" item in the array at each iteration.
+
+# Wire up the nodes you want to loop between the begin and end nodes, [setting up any looping variables|#variables] you need.
+
+# To get a result from the loop, you must set up a looping variable and then use the final value of the looping variable as the result.
+
+    TIP:
+        If you want to generate an array of changed values, you must create an empty array as one of the looping variables and append to it in each iteration of the loop. 
+
+
+== Looping variables == (variables)
+
+You can wire values into nodes within a block, but the value will always be the same in each iteration. You need to set up the block nodes if you want values that change across iterations of the loop.
+
+For values that *don't change* between iterations of a loop, you can wire them in from any other node outside the loop (for example, from a Globals node).
+
+*For each variable you expect to change* across iterations of a loop, you need to set up rows on the begin and end node:
+
+# Wire its initial value into the "next" input on the block begin node.
+
+# In the begin node's parameters, enter a name for the variable in the __Output <<n>> name__ field.
+
+# Use the corresponding output to wire up the nodes of the repeating network inside the block. Then, wire the result into the "next" input on the block end node.
+
+# In the end node's parameters, enter the same name in the __Output <<n>> name__ field to match it up with the same variable on the begin node.
+
+Houdini draws a dotted line from the output on the end node back to the input on the begin node, to show that the value will be fed back into the loop at each iteration.
+
+NOTE:
+    If you don't assign names to the changing variables, Houdini will match up the rows on the begin and end node by order (that is, the first variable row on the begin node will match up with the first variable row on the end node). This can be convenient but may end up erroring if you change one node but not the other.
+
+
+== Looping based on a condition ==
+
+* The __Do While__ block has a "condition" input on the end node. The loop will always run at least once, and repeat as long as the condition is true (not `0`).
+
+* The __For Loop Until__ and __For Each Loop Until__ blocks are the same as the __For Loop__ and __For Each Loop__ blocks, but they have a "condition" input. The loop will always run once, and _stop_ if the condition is true (not `0`).
+
+* The __While Loop__ block has "condition" inputs on both the begin node and the end node.
+
+    * The condition on the begin node will be checked before the block starts looping. The loop will only run if the condition is true (not `0`).
+    
+    * After each iteration, the condition on the _end_ node is checked, and the loop only repeats if the condition is true.
+    
+    In this loop, the end condition is a [looping variable|#variable] whose value can change. You should get its value from within the block. For example, you can't wire it from the same node as the begin condition (outside the block), because that value won't change across iterations.
+
+
+== Tips ==
+
+* If a loop doesn't run (for example, if the number of iterations is `0`, or the "while" condition is false at the start), the looping variable outputs on the end node pass through their values from the corresponding inputs on the begin node.
+
+* The color of the blob surrounding the nodes in a loop comes from the color of the Block Begin and Block End nodes. Change the color of one of these nodes to change the color of the blob.
+
+* To hide or show the blob, right-click the Block Begin node and choose __Flags > Descriptive parameter__.
+
+
+== Nodes ==
+
+:list:
+    #query: path:/nodes/vop/block_*
+    #filtered: no
+
+
+@related
+
+- [Looping in geometry networks|/model/looping]
+

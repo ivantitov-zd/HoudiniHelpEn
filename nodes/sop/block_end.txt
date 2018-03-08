@@ -1,0 +1,101 @@
+= Block End =
+
+#type: node
+#context: sop
+#internal: block_end
+#icon: SOP/block_end
+#tags: tech, loop
+
+"""The end/output of a looping block."""
+
+See [looping in geometry networks|/model/looping] for general information on how to use this node and [Block Begin|Node:sop/block_begin].
+
+== Repetition mode vs. piecewise mode ==
+
+The node will present a different interface based on whether it is working on pieces.
+
+If the node is in Auto Detect from Inputs, it will use this approach:
+
+* When the Block Begin node referenced in the __Piece Block Path__ parameter is set to "Fetch piece", or when the second input of this node is connected, the node is in "piecewise" mode and will show parameters related to pieces. You do not need to set the number of iterations because it will automatically iterate over each piece.
+
+* Otherwise, the node is in "repetition" mode and will show parameters allowing you to set the number of iterations.
+
+Otherwise, the Iteration Method controls the repetition mode.
+
+@parameters
+
+Iteration Method:
+
+Iteartion Method:
+    Auto Detect from Inputs:
+	If the second input is present, the Piece iteration method is used
+	across that geometry.  Similarly, if the Piece Block Path exists,
+	the Piece Iteration method is used across the Piece Block's input.
+	If neither of these are the case, the Count method is used.
+
+    By Pieces:
+	One iteration will be done for each piece in the template geometry.
+	If no template geometry is wired up, it is an error.
+
+    By Count:
+	A fixed number of iterations is performed according to the Iterations
+	parameter.
+
+Gather Method:
+    Feedback Each Iteration:
+        Outputs the geometry from the last iteration of the loop. You would use this when the Block Begin node is set to "Fetch feedback", so the loop is accumulating geometry at each step and you just want the end result.
+	
+    Merge Each Iteration:
+        Records the geometry from each iteration, and merges them together at the end. You would use this when the Block Begin node is set to "Fetch piece", so the loop is only modifying one piece at a time and you need to merge them together at the end.
+
+Iterations:
+    The number of times to cook the loop. Not available in piecewise mode.
+
+Start Value:
+    The value of the `value` metadata attribute on the first iteration. See [the looping documentation|/model/looping#metadata] for how to use this. Not available in piecewise mode.
+
+Increment:
+    The amount to add to the `value` metadata attribute after each iteration. See [the looping documentation|/model/looping#metadata] for how to use this. Not available in piecewise mode.
+
+Piece Element:
+    In piecewise mode, whether to loop over primitives or points. This controls whether the piece attribute will be a point or primitive attribute. Not available in repetition mode.
+
+Piece Attribute:
+    The name of a partition attribute defining pieces, where each point/primitive where the attribute has the same value is considered part of the same piece. Several tools such as [Shatter|/shelf/shatter] create this type of attribute for you. If not given, the node will simply loop over every point/primitive in the input. Not available in repetition mode.
+	
+    Partition attributes can only be integer or strings. This will be a point or primitive attribute depending on the value of __Piece element__.
+    
+Max Iterations:
+    Only allow a maximum of this number of iterations. This can be useful for testing and debugging. You can also use it in piecewise mode to guard against huge input geometry.
+
+Default Block Path:
+    The path to a Block Begin node. If the number of iterations is 0, output this Block Begin node's input.
+
+Piece Block Path:
+    The path to a Block Begin node, from which to get pieces. Alternatively you can connect the geometry containing pieces to this node's second input. Either switches the node to "piecewise" mode.
+
+Reset Cached Pass:
+    After cooking, this node caches the output of the last iteration. This lets you debug the last iteration by moving the display flag around inside the loop. Clicking this button clears the cache, so until the node cooks again the nodes show the initial state.
+
+Single Pass:
+    Runs a single iteration at the given offset. This is useful for debugging piecewise loops, showing the output of an individual piece/iteration.
+
+Stop Condition:
+    If this parameter is `1` at the start of an iteration, looping stops. You can write an expression here to test some condition. For example, you could set a threshold for the number of polygons in a feedback loop.
+
+    If the stop condition triggers before the first iteration, it is as if __Max iterations__ was `0`, and this node outputs the input to the __Default block path__ node.
+
+@inputs
+
+Nodes to Iterate Over:
+	This network chain will be re-evaluated for each iteration.
+	Upstream Block Begin SOPs will be dirtied each pass.
+
+Geometry Pieces to Loop Over:
+    A source for pieces to iterate over. Alternatively you can use the __Piece block path__ parameter to specify the source. This should be a Block Begin node set to "Fetch piece".
+
+@related
+
+- [Looping in geometry networks|/model/looping]
+- [Node:sop/block_begin]
+- [Node:sop/copy]

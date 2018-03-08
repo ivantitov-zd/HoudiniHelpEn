@@ -1,0 +1,140 @@
+= VOP structs =
+
+== Overview ==
+
+A [VEX structured type|/vex/lang#structs] (usually called a "struct") is a compound data type made up of named pieces of sub-data (such as integers, floats, vectors, matrices, and/or other structs) called _members_.
+
+The _definition_ of a struct specifies the names, datatypes, and UI labels of the members, like a template. This defines a new _data type_, similar to vectors and matrices. You can then create _instances_ of the template and fill in the member values.
+
+You can use structs in VOP networks through the [Struct|Node:vop/struct], [Struct Pack|Node:vop/structpack], and [Struct Unpack|Node:vop/structunpack] nodes.
+
+NOTE:
+    In Houdini 13, structs are not used by Houdini. They are mostly useful for bundling wires together as a form of organization. Future versions of Houdini will integrate structs more deeply. For example, entities such as ramps and noise settings that are currently represented as multiple wires could be alternately represented as a struct.
+
+== Defined and ad-hoc structs ==
+
+Houdini can work with structs in VOPs in two ways.
+
+* "Defined" structs are saved in a [file in the Houdini path|#json] and are available everywhere in Houdini. This is useful for types you want to re-use and/or use in more than one network or share between networks. You create instances of defined structs using the [Struct node|Node:vop/struct].
+
+* "Ad-hoc" structs are created "on-the-fly" and are only available in the network containing the node. This is useful when you want to bundle wires together to simplify the network. You create ad-hoc struct instances using the [Struct Pack node|Node:vop/structpack].
+
+== The nodes ==
+
+* The [Icon:VOP/struct] [Struct node|Node:vop/struct] can bundle separate wires into a struct wire. The node requires that you specify (or create) a _defined struct type_, and creates inputs/outputs based on the defined members.
+
+    You can also use the Struct node to _un-bundle_ a struct wire into separate member wires.
+
+* The [Icon:VOP/structpack] [Struct Pack node|Node:vop/structpack] bundles separate wires into a struct wire. Unlike the [Struct node|Node:vop/struct], it doesn't require you to specify a defined struct type. Instead, it uses the types of any incoming wires (and names you specify in the parameters) to create an _ad-hoc struct type_.
+
+* The [Icon:VOP/structunpack] [Struct Unpack node|Node:vop/structunpack] individual members out of an input struct wire _by name_. Usually you should use the [Struct node|Node:vop/struct] to unbundle a struct wire into member wires. However, this node lets you write assets/subnetworks that accept _any struct type_, since it extracts members by name and type, whereas of wiring the outputs of Struct is by position.
+
+    If the input struct has a member of the given name but the wrong type, it will cause an error in the network. Houdini forces you to explicitly set the expected type (instead of Houdini automatically changing the output type based on whatever struct type is wired in) to allow you to wire the outputs consistently.
+
+== How to ==
+
+:task:Create a new defined struct type:
+    # Create a [Struct node|Node:vop/struct].
+    # In the parameter editor, click __Edit__.
+    # Use the __Create new__ menu to create a new 
+    # Use the [VOP structure editor|/ref/windows/edit_vop_struct] to define the members.
+    # Click __Accept__.
+
+:task:Create an instance of a defined struct:
+    # Create a [Struct node|Node:vop/struct].
+    # In the parameter editor, choose the struct type from the __Struct name__ menu.
+    # Wire member data into the inputs. The first output contains the struct instance.
+
+:task:Create an ad-hoc struct:
+    # Create a [Struct Pack node|Node:vop/structpack].
+    # Wire member data into the inputs.
+    # In the parameter editor, you can name the members. This will make wiring and debugging easier. If the name is blank, Houdini uses the name of the wire. In some cases this will be what you want anyway (for example, if the input is from a Parameter node, the default name is the parameter name).
+    # The output contains the struct instance.
+
+:task:Extract the members of a struct as separate wires:
+    # Create a [Struct node|Node:vop/struct].
+    # Wire the struct into the first input.
+    # If you want to require that the input be of a certain defined type, in the parameter editor, set the __Struct name__ to the type. The node will error if the input is not of that type.
+    # The outputs after the first contain the member data.
+
+:task:Extract one or more members of a struct by name:
+    # Create a [Struct Unpack node|Node:vop/structunpack].
+    # Wire the struct into the input.
+    # In the parameter editor, set the __Number of members__ you want to extract.
+    # For each item, set the __Member <<n>> name__ and the type you expect the member to be.
+    
+        (The node will error if the input struct does not have _all_ the specified members or if they are not of the specified type.)
+    
+    # The outputs contain the extracted values.
+
+:task:Set the value of a struct member:
+    # Create a [Struct node|Node:vop/struct]
+    # Wire the struct into the first input.
+    # Wire new values into the inputs corresponding to the members you want to set.
+    
+    [Image:/vex/images/set_struct.png]
+
+:task:Modify the value of a struct member:
+    # Unbundle the struct into separate wires using [Struct|Node:vop/struct] or [Struct Unpack|Node:vop/structunpack] (see above).
+    # Wire the output(s) you want to change into nodes that modify the value.
+    # Create a second [Struct node|Node:vop/struct] to re-bundle the struct. Wire the struct (first) output of the unbundling node to the struct (first) input of this node.
+    # Insert nodes between the member outputs of the "unbundling" node and the member inputs of the "rebundling" node to change the values.
+    
+    [Image:/vex/images/modify_struct.png]
+
+:task:Create a new instance of an ad-hoc struct given a wire of that type:
+    # Create a [Struct node|Node:vop/struct].
+    # Wire the struct into the first input.
+    # Wire member data into the inputs. The first output contains the struct instance.
+
+== Tips ==
+
+* There is a default wire color for structs, but when you [edit a struct|/ref/windows/edit_vop_struct] you can specify a custom color for wires with that struct type.
+
+* To edit the struct definition files on disk "by hand", see [how structs are stored on disk|#json] for information about the file locations and format.
+
+* When you create a VOP digital asset, you can specify defined structs as input and output types.
+
+* Since Houdini looks for the definition files on the path (see below), if you have a shared network store on the path, you can define site-wide structs for use by shader writers.
+
+== Storage of defined types == (json)
+
+The "defined" struct types available across Houdini are loaded from JSON files. Houdini loads any `*.json` files in a path defined by the `HOUDINI_VOP_DEFINITIONS_PATH` environment variable. The default path is `<<HOUDINI_PATH>>/vop`. The default file for struct types created using the editor in Houdini is `$HOME/Houdini<<X>>.<<Y>>/vop/vopdefinitions.json`.
+
+Houdini will also load struct definitions from an asset if the asset has a section named `VopTypeDefinitions`. This section should contain a `JSON` string in the same format as the files.
+
+The following example shows the basic structure of a struct type definition file. The `connectorColor` key and `label` on members are optional.
+
+{{{
+#!json
+
+{
+    "typeDefinitions": [
+        {
+            "type": "struct",
+            "typeName": "StructTest",
+            "connectorColor": {
+                "type": "RGB",
+                "data": [0.25, 0.2, 0.9]
+            },
+            "variables": [
+                {
+                    "typeName": "int",
+                    "name": "a"
+                },
+                {
+                    "typeName": "vector",
+                    "name": "b",
+                    "label": "Label B"
+                },
+                {
+                    "typeName": "matrix3",
+                    "name": "c"
+                }
+            ]
+        }
+    ]
+}
+}}}
+
+The full format is defined in a "JSON schema" file in `$HFS/houdini/vop/TypeDefinitions.json.schema`.

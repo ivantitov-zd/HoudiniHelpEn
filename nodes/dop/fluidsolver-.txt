@@ -1,0 +1,345 @@
+#type: node
+#context: dop
+#internal: fluidsolver
+#icon: DOP/fluidsolver
+#index: no
+
+= Fluid Solver =
+
+"""Sets and configures a Fluid solver. """
+
+The Fluid Solver DOP sets objects to use the Fluid Dynamics solver.
+
+If an object has this DOP as its "Solver" subdata, it will evolve
+itself as a Fluid object.
+
+This solver makes use of various field subdata on the object. The
+object should have a scalar field "surface" to track the surface of the
+fluid in space. The object should have a vector field called "vel" to
+track the velocity of each point in space.
+
+To setup an object with the requisite subdata, use the [Fluid Configure
+Object DOP|Node:dop/fluidconfigureobject].
+
+TIP:
+    If you have a problem where your fluid appears to be disappearing from your simulation you could try and turn off the build outside markers, as they delete fluid. Also, setting the marker escape threshold to 0 will help to keep fluid inside. If you have a water streamer that is less than a few voxels in size, you might finds it keeps disappearing from the fluid simulation.
+
+TIP:
+    If you are sourcing from an object that deforms, or collides with a deforming object, the solver will not pay attention to the per-point deformation. You need to set the __Velocity Type__ to __Point Velocity__ on the __Fields > Sources__ subtab.
+
+@parameters
+
+    == Substeps ==
+
+        Minimum Substeps:
+            While the Fluid Solver tries to estimate the correct
+            substep size for a stable simulation, if unusual forces are
+            present it may take too large of a step. 
+
+	    By setting the
+            minimum substep one can enforce stability.
+        Maximum Substeps:
+            The Fluid Solver will not break the simulation down into
+            more substeps than this. 
+
+	    It is a very good idea to always
+            have a maximum to ensure frames will be finished regardless
+            of their complexity. Lowering this ceiling can ensure a
+            minimum computation time at the expense of accuracy.
+        CFL Condition:
+            The CFL Condition is a factor used for automatically
+            determining what size substep a scene requires. 
+
+	    The idea is
+            that any substep should not allow any objects to
+            interpenetrate by more than one voxel cell. This condition
+            is met when this parameter is at 1. A value of 10 would
+            allow a substep to move the fluid by as much as 10 voxel
+            cells, possibly tunneling through objects rather than
+            properly deflecting.
+
+	Advection Type:
+	    The type of advection to use.  The __Single Stage__ method is equivalent to the [Gas Advect DOP|Node:dop/gasadvect], where each point is back traced
+	    through the velocity field once to find the new voxel value.
+
+	    The __BFECC__ and __Modified MacCormack__ methods do a second basic
+	    advection stage to compute an estimate of the error introduced by the
+	    advection process.  The field can then be corrected by this error,
+	    resulting in a sharper fluid that doesn't disperse as much.
+	Clamp Values:
+	    The error correction factor can result in the new voxel values lying
+	    outside the range of the original field, resulting in negative density
+	    values, for example.  Clamping will enforce a global maximum and
+	    minimum to the original values.
+
+	Advect Vel Type:
+	    The advection type of the velocity field can be controlled separately from
+	    the base fields.  Using the higher advection methods will reduce the
+	    apparent viscosity of the field, but may end up adding energy or causing
+	    chatter.
+
+	Advection Method:
+	    Controls particle tracing.
+	    
+	    Single step:
+		Takes the velocity at each voxel and makes a single step in
+		that direction for the time step.  This is fastest and is
+		independent of the speed of the velocity field, but will start
+		to break up for large time steps.
+		
+	    Trace:
+		Ensures the backtracking does not move more than a single
+		voxel before its velocity is updated, allowing for larger
+		time steps.
+		
+	    Midpoint:
+		Like __Trace__ but uses a higher order advection for more accuracy
+		but slower simulation.
+
+    == Internal Forces ==
+
+        Viscosity:
+            Viscosity is a force which tries to ensure that
+            neighboring voxels have the same velocity. 
+
+	    A zero value
+            allows fluid in adjacent voxels to move any direction
+            without resistance. Higher values introduce a penalty effect
+            when a voxel's velocity varies from that of its neighbors.
+            This is currently implemented by applying a diffusive term
+            to the velocity field.
+        Use Strain:
+            An additional Strain Field will be added to track the
+            amount of deformation that any part of the fluid has
+            undergone. 
+
+	    This can be used to provide a restorative force
+            to create a visco-elastic fluid.
+        Plastic Flow Rate:
+            This is the rate of plastic flow. The current strain is
+            dissipated at this rate per second. A value greater than the
+            timestep per second can lead to overshoot.
+        Plastic Flow Threshold:
+            This is the threshold for plastic flow. When the norm of
+            the strain exceeds this threshold, the strain is dissipated
+            according to the plastic flow term. 
+
+	    This causes the fluid to
+            lose its history and permanently enter its new
+            configuration.
+        Strain Elastic Modulus:
+            Similar to a drag coefficient, the elastic modulus provides the scale factor for how to translate a certain amount of distortion into a restorative force. 
+
+	    A larger value will cause the fluid to spring back faster. However, large values may require more timesteps to keep the simulation stable.    
+        Confinement Strength:
+            An overall scale adjustment for the vorticle forces.  Vorticle forces are small pin-wheel like forces that add turbulence to fluids. 
+            NOTE:
+                Vorticle forces are only present if data named vorticles is attached to the object.
+        Feedback Scale:
+            A scale factor used in applying feedback forces to other
+            objects.  A value of zero prevents any feedback from
+            occurring.  
+
+	    The value can be thought of as a density, so to
+            have a default RBD object to balance a value of 1000 should
+            be used.
+        Speed Limit:
+            If set, each axis of the velocity field will be clamped to
+            this maximum speed.  This is done after the force
+            computation and before the divergence or advection, so it
+            is possible for the speed to end up slightly larger than
+            this value.  
+
+	    NOTE:
+	        As the clamping is done per-axis, the velocity along the diagonal can be up to sqrt(3) higher.
+        Use Friction and Bounce:
+            Determines if the fluid's physical parameters will be used
+            to apply friction and bounce to collisions.  If not set,
+            it will be treated as zero friction and zero bounce.
+        Scale by Surface:
+            External forces will be scaled by an estimate of how much
+            of the cell contains liquid.  This allows for sub-voxel
+            waves to be evened out under gravity.  
+
+	    However, it also
+            means that the edges of containers will have less gravity
+            and hence will creep upwards in an undesirable manner.
+
+    == Advanced ==
+
+        Reinitialize Rate:
+            The rebuilding and reinitialization of the SDF will only be performed every every N frames where N is the reinitialization rate.  
+
+	    The rebuilding introduces artifacts into the simulation so ideally this should be as large as possible without the resulting distortions in the signed distance field introducing their own problems.
+            
+        Rebuild SDF:
+            The voxels that border the zero isocontour are used to determine the initial zero isocontour. The rest of the field is then rebuilt from these values directly.
+            
+        Reinitialize SDF:
+            If the field is already almost a signed distance field, a less drastic error correction can be performed. The reinitialization equation is applied which will converge on a signed distance field without affecting the boundary.
+            
+        Reinitialize Iterations:
+            The number of times to apply the reinitialization equation.
+            
+        Build Inside Markers:
+            Construct marker surfels on the inside of the surface. Inside surfels increase volume as they correct the surface by pushing out the boundary.
+            
+        Build Outside Markers:
+            Construct marker surfels on the outside of the surface. Outside surfels decrease volume as they correct the surface by pushing in the boundary.
+            
+	Markers Per Voxel:
+	    The desired number of markers to maintain inside each voxel.  More
+	    markers allows for a better capturing of the surface behaviour, but
+	    can require a lot of memory and processing time for large
+	    complicated sims.
+
+        Minimum Marker Radius:
+            The minimum radius of marker surfels, measured in terms of voxel size.
+            
+        Maximum Marker Radius:
+            The maximum radius of marker surfels, measured in terms of voxel size.
+            
+        Marker Escape Threshold:
+            The distance the marker must be on the wrong side of the surface, as measured in terms of the marker's radius, to qualify as escaped.  Only escaped markers will update the surface value.
+            
+        Correct Surface:
+            The motion of the collision objects may cause the fluid to interpenetrate the fluid objects. The Correct Surface step will remove any fluid that is penetrating a collision object.
+
+	Limit Velocity Extrapolation:
+	    When extrapolating the velocity field into non-fluid
+	    cells, the extrapolation is stopped when a certain number
+	    of cells has been filled along the border.
+
+	Max Cells to Extrapolate:
+	    The number of non-fluid cells that should be filled with
+	    velocity values on the non-fluid side of the velocity
+	    field.
+            
+        Preserve Bubbles:
+            Trapped air will be given a pressure value independent of the boundary pressure conditions. This prevents the bubbles from collapsing in on themselves. If not set, fluid will be free to flow into bubbles from all sides ensuring their
+            swift dissipation.
+            
+        Sticky Fluid:
+            Determine if collision objects should prevent fluid from leaving their surface instead of just preventing the
+            fluid from entering their surface.  This should be left
+            on.
+            
+        Ghost Fluid:
+            Pressures are extrapolated into air cells rather than just set
+            to zero.  This causes sub-voxel ripples in the air side to be
+            suppressed.
+            
+        Variational:
+            Contribution to the pressure equation is proportional to the amount of the cell in the liquid.  This attempts to avoid stairstep boundaries on solid boundaries.  Currently, only
+            at most one of Ghost Fluid and Variational should be set.
+
+    == Fields ==
+
+    === Collisions ===
+
+        Restrict Mask to Bandwidth:
+            The collision mask is an SDF built storing the distance to the collision geometry for each node.  By default, it is only calculated up to a certain distance from the collision geometry.  
+
+	    However, if one wishes to use this field for special effects (such as having things react before they reach the object), one might want to compute the full range of the mask.
+        Velocity Type:
+            Rigid Velocity:
+                The collision velocity of the object is calculated by
+                treating it as a rigid body.  Only the angular
+                velocity and linear velocity will be used, no local
+                deformation will be taken into account.
+            Point Velocity:
+                The collision velocity of the object tries to take into
+                account deformation by using point history.  This only
+                works if the topology doesn't change.
+            Volume Velocity:
+                Uses the SDF representation of the object to detect
+                deformation.  Does not require a fixed topology over
+                time, but cannot detect tangential velocities.
+
+	Collide with Non-SDF:
+	    Allows the fluid to collide with objects that don't have
+	    Geometry/SDF, such as other fluids.
+
+
+    === Sources ===
+
+        Velocity Merge:
+            Controls how the source object's velocity will affect the
+            liquid's velocity field.
+                None:
+                    The source's velocity will be ignored.
+                Net New Source:
+                    Velocity will be set in those areas where fluid
+                    will be added this frame from the source.
+                New Source:
+                    Velocity will be set in those areas where the
+                    source is present.
+
+        Velocity Type:
+            Rigid Velocity:
+                The velocity of the object treating it as a rigid
+                body.  Only the angular velocity and linear velocity
+                will be used, no local deformation will be taken into
+                account.
+            Point Velocity:
+                The velocity of the object attempting to take into
+                account deformation by using point history.  This only
+                works if the topology doesn't change.
+            Volume Velocity:
+                Uses the SDF representation of the object to detect
+                deformation.  Does not require a fixed topology over
+                time, but cannot detect tangential velocities.
+
+    === Pumps ===
+        
+        Velocity Type:
+            Controls how the pump object's per point velocity is
+            computed.
+                Rigid Velocity:
+                    The velocity of the object treating it as a rigid
+                    body.  Only the angular velocity and linear velocity
+                    will be used, no local deformation will be taken into
+                    account.
+                Point Velocity:
+                    The velocity of the object attempting to take into
+                    account deformation by using point history.  This only
+                    works if the topology doesn't change.
+                Volume Velocity:
+                    Uses the SDF representation of the object to detect
+                    deformation.  Does not require a fixed topology over
+                    time, but cannot detect tangential velocities.
+
+    === Clear ===
+
+	Fields to Clear:
+	    Zeros out the specified types of fields after the solve
+	    step.  This ensures the .sim files, which store the
+	    complete state of the simulation, do not have any
+	    information not needed, reducing their size and save time.
+		None:
+		    No special clearing of fields is done.
+		Hidden:
+		    Fields not needed for the next time step that do
+		    not have guide parameters are cleared.
+		Static:
+		    Fields not needed for next time step are cleared.
+		    Note that some guides will thus start showing up
+		    as zero as the underlying field got cleared.
+	Additional:
+	    A space separated list of extra fields that should be
+	    cleared post-solve.
+
+    [Include:standard_solver_parms]
+
+@inputs
+    [Include:standard_data_inputs]
+
+@outputs
+    [Include:standard_data_outputs]
+
+@locals
+    [Include:standard_data_locals]
+
+    [Include:standard_locals]
+
+

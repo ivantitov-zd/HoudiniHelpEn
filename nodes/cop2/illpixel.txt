@@ -1,0 +1,85 @@
+#type: node
+#context: cop2
+#internal: illpixel
+#icon: cop2/illpixel
+
+= Illegal Pixel =
+
+"""Detects illegal pixels, like NAN and INF, in images."""
+
+Shaders and renderers can generate illegal floating point values every
+once in a while. This operation detects bad pixels, specifically NAN and
+INF, and either highlights them or fixes them. It can also notify you
+through a warning or an error which frame and plane have bad pixels.
+
+Because the data is missing from that pixel, it can be zeroed out or
+replaced by blending together surrounding pixels. When zeroing pixels,
+the entire pixel is zeroed even if only one component is bad (to avoid
+color shifting).
+
+If pixels are replaced, and only a part of the pixel's components is
+bad, only that component will be replaced. If a large block of bad
+pixels is present, it will attempt to iterate up to 16 times to break
+down the block. Large blocks will look like blurry spots in the image,
+so you may want to limit the number of bad pixels to replace.
+
+NOTE:
+    Bad pixels are only detectable in floating point formats (16 and 32
+    bit floating point). Integer formats will have already been
+    quantized to a valid (but possibly random) color in the renderer,
+    making them impossible to detect.
+
+NOTE:
+    Bad pixels will not be detected in planes or areas of the image that
+    are not used during the cook.
+
+
+@parameters
+
+    == Illegal Pixel ==
+
+        Illegal Pixels:
+            Illegal pixels can be flagged or fixed. Often, flagging is
+            used to debug the shader, while fixing is used to attempt to
+            continue with the image as-is.
+
+            "Fix by Blending Surrounding Pixels":
+                For small numbers or isolated pixels, this method will
+                work well to fix the image.
+            "Fix by Zeroing":
+                This method clears the NANs so that downstream
+                compositing operations behave, but doesn't do much in
+                the way of visually correcting the image.
+            "Show by Highlighting":
+                Shows bad pixels by highlighting them super-red
+                (20,0,0).
+            "Show by Isolating":
+                Shows bad pixels by highlighting them and clearing all
+                correct pixels.
+        Notification:
+            If a bad pixel is found, this operation can raise a warning
+            or an error.
+
+            "None":
+                The node is not flagged with an error or warning, though
+                the number of bad pixels is still reported in the node
+                info.
+            "Warning":
+                A warning flag is posted with the number of bad pixels
+                in the node info.
+            "Error":
+                An error is raised. The number of bad pixels is printed
+                in the node info, but it may not be entirely accurate
+                because this will terminate the cook, and no more tiles
+                will be processed.
+            "Error if Over Limit":
+                An error is raised if the number of bad pixels in a
+                single plane is greater than the limit specified.
+                Otherwise, a warning is raised.
+        "Illegal Pixel Limit":
+            The number of acceptable bad pixels. If more than this
+            number are in the image, the cook will halt.
+@locals
+    [Include:coplocalvars]
+
+

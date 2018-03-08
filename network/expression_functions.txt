@@ -1,0 +1,124 @@
+= Custom HScript expression functions =
+
+"""How to add custom functions to the HScript expression language."""
+
+You can create custom functions you can use in HScript expressions. Before you write your own function, double check the [built-in library of expression functions|/expressions/index]. The function you need may already exist.
+
+NOTE:
+    If you are writing such advanced expressions that you need custom functions, you should consider switching to [Python|/hom/] for scripting.
+
+== How to ==
+
+:task:Open the custom function editor:
+    # Choose __Edit > Aliases and Variables__ to open the Aliases and Variables editor.
+
+    # Click the __Expressions__ tab.
+
+:task:Create a new custom function:
+    # Open the custom function editor (see above).
+
+    # Enter your new function in the large text box.
+
+    # Click __Apply Changes__. Your new function should appear in the list of functions on the left.
+
+:task:Load definitions from an external file:
+    Click the plus icon in the bottom right corner of the custom function editor and choose the file to load.
+
+:task:Edit the function source code in an external editor:
+    # Click the __Edit__ button in the bottom right corner of the custom function editor.
+
+        Houdini uses the external editor defined by the `$EDITOR` environment variable. If `$EDITOR` is not set, Houdini uses a default editor for the platform (e.g. `vi` or `notepad.exe`).
+
+    # Edit the source code in the external editor, then save and quit to return to Houdini.
+
+== Format ==
+
+Custom function definitions have the following syntax:
+
+{{{
+[return_type]
+functionName([[arg_type1] arg_name1 [, [arg_type2] arg_name2] ...])
+{
+...
+}
+}}}
+
+The return type and argument types can be `float`, `string`, `vector`, or `matrix`.
+
+NOTE:
+    If you don't explicitly list a return type or an argument's type, Houdini will assume it's a float, and will silently cast any other data type to a float. If you forget to specify that an argument is a string, Houdini will cast it to float, potentially causing hard to find bugs.
+
+The body of the function definition can use extra syntax such as assignment (`=`, `+=`, `-=`), `if`, `for`, `while`, etc. Use `return` to return a value.
+
+Lines beginning with `#` are comments and are ignored by Houdini.
+
+== Examples ==
+
+{{{
+# Function to find the minimum value of two
+# floating point numbers
+
+min(v1, v2) {
+    if (v1 < v2) {
+        return v1;
+    } else {
+        return v2;
+    }
+}
+
+# Function to reverse the order of a string
+
+string strreverse(string in) {
+    float len = strlen(in);
+    
+    string result = "";
+    
+    for (src = len-1; src >= 0; src--) {
+        result += in[src]; return result;
+    }
+}
+
+# Example to find the minimum element in a vector
+
+float vecmin(vector vec) {
+    min = vec[0];
+    
+    for (i = 1; i < vsize(vec); i++) {
+        if (vec[i] < min)  min = vec[i];
+    }
+    
+    return min;
+}
+
+# Example to transform a vector into the space
+# of an object passed in.
+
+vector opxform(string oname, vector v) {
+    matrix xform = 1;
+    
+    if (index(oname, "/obj/")) {
+        xform = optransform(oname);
+    } else {
+        xform = optransform("/obj/"+oname);
+    }
+    
+    return v * xform;
+}
+
+# Example to find all objects which have their
+# display flag set
+
+string opdisplay() {
+    string objects = run("opls /obj");
+    string result = "";
+    nargs = argc(objects);
+    
+    for (i = 0; i < nargs; i++) {
+        string obj = arg(objects, i);
+        if ( index(run("opset " + obj), " -d on") >= 0 ) result += " " + obj;
+    }
+    
+    return result;
+}
+}}}
+

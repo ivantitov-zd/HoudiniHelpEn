@@ -1,0 +1,142 @@
+﻿= Copying and instancing point attributes =
+
+When you copy or instance geometry onto points, Houdini looks for specific attributes on the destination points to customize each copy/instance.
+
+== Attributes ==
+
+Name ||
+    Type ||
+        Description ||
+
+`orient` |
+    float4 (quaternion) |
+        Orientation of the copy
+
+`pscale` |
+    float |
+        Uniform scale
+
+`scale` |
+    float3 |
+        Non-uniform scale
+
+`N` |
+    vector |
+        Normal (+Z axis of the copy, if no `orient`)
+
+`up` |
+    vector |
+        Up vector of the copy (+Y axis of the copy, if no `orient`)
+
+`v` |
+    vector |
+        Velocity of the copy (motion blur, and used as +Z axis of the copy if no `orient` or `N`)
+
+`rot` |
+    float4 (quaternion) |
+        Additional rotation (applied after the orientation attributes above)
+
+`P` |
+    vector |
+        Translation of the copy
+
+`trans` |
+    vector |
+        Translation of the copy, in addition to `P`
+
+`pivot` |
+    vector |
+        Local pivot point for the copy
+
+`transform` |
+    3x3 or 4x4 matrix |
+        Transformation matrix overriding everything except translations from `P`, `pivot`, and `trans`.
+
+`shop_materialpath` |
+    string |
+        Path to a material. You can add this attribute to points using the [Material surface node|Node:sop/material]. When you instance an object onto a point with this attribute, the instanced object uses the given material.
+        
+        Not supported in the viewport.
+
+`material_override` |
+    string |
+        A serialized Python dictionary mapping parameter names to values. You can add this attribute to points using the "override" controls on the [Material surface node|Node:sop/material]. When you instance an object onto a point with this attribute, the instanced object applies the given overrides to its material.
+        
+        Not supported in the viewport.
+
+
+== Priorities ==
+
+* If `pivot` exists, use it as the local transformation of the copy/instance.
+
+* If the `transform` attribute exists:
+    * Use it as a 3x3 or 4x4 matrix to transform the copy/instance.
+
+* If the `transform` attribute does not exist:
+    * If the `orient` attribute exists:
+        * Use it to orient the copy/instance.
+
+    * If the `orient` attributes does not exist:
+        * Orient the copy/instance using `N` as the +Z axis and `up` as +Y axis.
+        * If `N` does not exist, use `v` (velocity) if it exists.
+
+    * If the `rot` attribute exists, apply it after the above.
+
+    * If `pscale` exists, use it to scale the to scale the copy/instance (multiplied by `scale` if it exists).
+
+    * If `scale` exists, use it to scale the copy/instance (multiplied by `pscale` if it exists).
+
+* If `trans` exists, use it and `P` to move the copy/instance.
+
+Or, put another way:
+
+{{{
+Key: 
+X = pivot matrix (translate by -pivot)
+O = orient matrix 
+S = scale matrix (scale * pscale) 
+L = alignment matrix (*) 
+R = rot matrix 
+T = trans matrix (trans + P) 
+M = transform matrix
+
+(*) The alignment matrix (L) is defined by N or v and up. 
+
+IF N exists AND up exists and isn't {0,0,0}: 
+   L = mlookatup(N,0,up) 
+ELSE IF N exists: 
+   L = dihedral({0,0,1},N) 
+ELSE IF v exists AND up exists and isn't {0,0,0}: 
+   L = mlookatup(v,0,up) 
+ELSE IF v exists: 
+   L = dihedral({0,0,1},v) 
+
+IF transform exists:
+   Transform = X*M*T
+ELSE IF orient exists: 
+   Transform = X*S*(O*R)*T
+ELSE: 
+   Transform = X*S*L*R*T
+}}}
+
+== Instancing and motion blur ==
+
+Velocity Blur:
+    The shutter open transform is based off the Axis Alignment and Positioning stated above. For the shutter close transform the shutter open transform is used plus the vector `v/$FPS * shutter_speed`. In the cases where that you have `N` and a `v` attribute, `N` is used to align but `v` is still used to blur.
+    
+    NOTE:
+        `v` is independent of the transform constructed for the Axis Alignment and Positioning. You can rotate, scale and skew all you want but v = (0,0,1) then your object will be blurred in the z direction. 
+
+Transform Blur:
+    Same as Velocity Blur but the Object level transform is also taken into account. 
+
+Deformation Blur:
+    The Axis Alignment and Positioning transform is constructed for both shutter open and close, the object level transform is also taken into account. This method is the most accurate.
+
+== Examples ==
+
+(The image in the lower right corner of each frame is the geometry if it were instanced without any of the attributes.)
+
+[Image:images/instancing.jpg]
+
+

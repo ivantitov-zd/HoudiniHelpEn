@@ -1,0 +1,2298 @@
+= hou.Node =
+#type: homclass
+#cppname: HOM_Node
+#superclass: hou.NetworkMovableItem
+#group: nodes
+
+"""The base class for all nodes in Houdini (objects, SOPs, COPs, etc.)  An instance of this class corresponds to exactly one instance of a node in Houdini."""
+
+Each node has a unique path that defines its location in the tree of nodes.
+The node path hierarchy is similar to the hierarchy of folders and files in a
+file system.  Some nodes, called networks, may contain other nodes inside them,
+much like a file folder would, while other nodes may not.  For example, an
+object node instance and a SOP subnetwork node instance may contain SOP nodes,
+but a box SOP instance may not.
+
+TIP:
+    Be careful not to confuse nodes with node types.  A node is an instance
+    of a node type.  For example suppose `/obj/geo1/box1` is a box SOP.  It has
+    its own unique name (box1) and its own copies of parameter values.  It is
+    an instance of the box SOP node type.  This node type defines what
+    parameters are common to all box SOP node instances, as well as the
+    algorithm that each BOX SOP performs.  The class that represents a node
+    type is [Hom:hou.NodeType].
+
+You cannot create instances of `hou.Node` using `hou.Node.__init__`.
+Instead, you look up Node objects corresponding to existing Houdini nodes
+with [hou.node()|Hom:hou.node_].  To create a new Houdini node instance inside another
+node, use [Hom:hou.Node#createNode].  To delete a Houdini node, use
+[Hom:hou.Node#destroy].
+
+Note that a Node object internally stores a reference to the corresponding
+Houdini node, and that their lifetimes are different.  If a Python node object
+is deleted because its reference count in Python goes to zero, the Houdini node
+will be unaffected.  On the other hand, if you have a Node object in a Python
+variable and the Houdini node is deleted, the Python variable will still exist,
+and Python will not crash.  Instead, if you later call a method on that
+Python Node object, Houdini will raise a [Hom:hou.ObjectWasDeleted] exception.
+
+Be careful not to confuse this class with the function [hou.node|Hom:hou.node_].
+
+
+@methods
+
+== Hierarchy ==
+
+::`node(self, node_path)` -> [Hom:hou.Node] or `None`:
+    #cppname: HOM_Node::node
+    #replaces: Cmd:opfind, Exp:chsop, Exp:opexist, Exp:opfullpathfrom
+    Return the node at the given path, or None if no such node exists.  If
+    you pass in a relative path (i.e. the path does not start with `/`),
+    searches are performed relative to this node.
+
+    For example, to get the parent node of a node in the the variable `n`, use
+    `n.node("..")`. To get a child node named `geo5`, use `n.node("geo5")`.
+    To get a sibling node named `light3`, use `n.node("../light3")`.
+
+    Note that the return value may be an instance of a subclass of Node. For
+    example, if the node being found is an object node, the return value
+    will be a [Hom:hou.ObjNode] instance.
+
+    If the path is an absolute path (i.e. it starts with `/`), this
+    method is a shortcut for `hou.node(node_path)`.  Otherwise, it is
+    a shortcut for `hou.node(self.path() + "/" + node_path)`.  See also
+    [Hom:hou.node_].
+
+::`nodes(self, node_path_tuple)` -> `tuple` of [Hom:hou.Node] or `None`:
+    #cppname: HOM_Node::nodes
+    
+    This is like [node()|#node] but takes multiple paths and returns multiple Node objects. This is the equivalent of:
+    
+    {{{
+    nodes = [self.node(path) for path in paths]
+    }}}
+
+::`item(self, item_path)` -> [Hom:hou.NetworkMovableItem] or `None`:
+    #cppname: HOM_Node::item
+    Return the network item at the given path, or None if no such item exists.
+    If you pass in a relative path (i.e. the path does not start with `/`),
+    searches are performed relative to this node.
+
+    If the path is an absolute path (i.e. it starts with `/`), this
+    method is a shortcut for `hou.item(node_path)`.  Otherwise, it is
+    a shortcut for `hou.item(self.path() + "/" + item_path)`.  See also
+    [Hom:hou.item].
+
+    Note that the return value may be an instance of a subclass of
+    NetworkMovableItem. For example, if the item being found is an object node,
+    the return value will be a [Hom:hou.ObjNode] instance. If the item is a
+    nework box, the return value will be a [Hom:hou.NetworkBox] instance.
+
+::`items(self, item_path_tuple)` -> `tuple` of [Hom:hou.NetworkMovableItem] or `None`:
+    #cppname: HOM_Node::items
+    
+    This is like [item()|#item] but takes multiple paths and returns multiple NetworkMovableItem objects. This is the equivalent of:
+    
+    {{{
+    items = [self.item(path) for path in paths]
+    }}}
+
+::`isNetwork(self)` -> `bool`:
+    #cppname: HOM_Node::isNetwork
+    Return `True` if this node is a network, in other words a node that may
+    contain child nodes. Otherwise return `False` which indicates that several
+    other methods such as [Hom:hou.Node#createNode] will raise
+    [Hom:hou.OperationFailed] if they are called.
+
+::`children(self)` -> `tuple` of [Hom:hou.Node]:
+    #cppname: HOM_Node::children
+    #replaces: Cmd:opfind, Cmd:opls, Exp:opnchildren
+    Return a list of nodes that are children of this node.  Using the file
+    system analogy, a node's children are like the contents of a
+    folder/directory.
+
+    To find the number of children nodes, use `len(node.children())`.
+
+    The order of the children in the result is the same as the user defined
+    ordering in Houdini.  To see this order, switch the network view pane
+    into list mode, and ensure that the list order is set to __user defined__.
+    To reorder nodes, drag and drop them in the list.
+
+    {{{
+    #!python
+    def pc(node):
+        '''Print the names of the children of a particular node.  This function
+           can be handy when working interactively in the Python shell.'''
+        for child in node.children():
+            print child.name()
+
+    def ls():
+        '''Print the names of the nodes under the current node.'''
+        pc(hou.pwd())
+    }}}
+
+    The following expression evaluates to a list of children of a particular
+    node type:
+    {{{
+    #!python
+    [c for c in node.children() if c.type() == node_type]
+    }}}
+
+::`allItems(self)` -> `tuple` of [Hom:hou.NetworkMovableItem]:
+    #cppname: HOM_Node::allItems
+    Return a tuple containing all the children of this node.
+    Unlike `children`, this method will also return
+    [Hom:hou.NetworkBox], [Hom:hou.SubnetIndirectInput],
+    [Hom:hou.StickyNote], and [Hom:hou.NetworkDot] objects.
+
+::`allSubChildren(self, top_down=True)` -> tuple of [Hom:hou.Node]:
+    #cppname: HOM_Node::allSubChildren
+    #replaces: Cmd:oprmtype, Cmd:opfind
+    
+    Recursively return all sub children of this node.  For example,
+    `hou.node("/").allSubChildren()` will return all the nodes in the hip
+    file.
+
+    top_down:
+        If True, this function will do a top-down traversal, placing a node
+        in the returned tuple before its children.  If False, it will do
+        a bottom-up traversal, placing children before their parents.
+
+    Note that a tuple is returned, not a generator.  This means that it is
+    safe to delete or create nodes while looping through the return value.
+
+    The following function deletes all children of a particular type that
+    appear anywhere inside a given node:
+    
+    {{{
+    #!python
+    def removeSubChildrenOfType(node, node_type):
+        '''Recursively delete all children of a particular type.'''
+        for child in node.allSubChildren():
+            if child.type() == node_type:
+                child.destroy()
+    }}}
+
+    This code, for example, removes all the visibility SOPs anywhere under /obj:
+    
+    {{{
+    #!pycon
+    >>> removeSubChildrenOfType(hou.node("/obj"), hou.sopNodeTypeCategory().nodeTypes()['visibility'])
+    }}}
+
+::`allNodes(self)` -> generator of [Hom:hou.Node]:
+    #cppname: HOM_Node::allNodes
+    Recursively return a sequence of all nodes contained in this node including
+    this node.  This method differs from [Hom:hou.Node#allSubChildren] in the
+    following ways:
+    - It includes this node in the returned sequence.
+    - It does not guarantee a top-down or bottom-up traversal order.
+    - The method is a generator and does not return a tuple so it is not safe
+      to create or delete nodes while looping through the return value.
+
+    Here is an example of printing out the paths for all nodes under /obj:
+    {{{
+    #!python
+    root_node = hou.node("/obj")
+    for node in root_node.allNodes():
+        print node.path()
+    }}}
+
+::`glob(self, pattern, ignore_case=False)` -> tuple of [Hom:hou.Node]:
+    #cppname: HOM_Node::glob
+    #replaces: Cmd:opglob, Cmd:opfind
+    Return a tuple of children nodes name matches the pattern.
+
+    The pattern may contain multiple pieces, separated by spaces.  An asterisk
+    (`*`) in a pattern piece will match any character.  By default, Houdini
+    will add the nodes from each pattern piece to those already matched.
+    However, if the pattern piece begins with a caret (`^`), Houdini will
+    remove the matches for that piece from the result.
+
+    By default the pattern match is case-sensitive.  Set `ignore_case` to
+    True for case-insensitive pattern matching.  Note that case insensitivity
+    only applies when matching node names.  It does not apply when matching
+    group, network box or bundle names.
+
+    This method returns an empty tuple if you pass in an empty pattern.
+
+    {{{
+    #!pycon
+    >>> obj = hou.node("/obj")
+    >>> obj.createNode("geo", "geo1")
+    <hou.ObjNode of type geo at /obj/geo1>
+    >>> obj.createNode("geo", "geo2")
+    <hou.ObjNode of type geo at /obj/geo2>
+    >>> obj.createNode("geo", "grid")
+    <hou.ObjNode of type geo at /obj/grid>
+    >>> obj.createNode("geo", "garbage")
+    <hou.ObjNode of type geo at /obj/garbage>
+    >>> obj.createNode("geo", "box")
+    <hou.ObjNode of type geo at /obj/box>
+
+    >>> def names(nodes):
+    ... return [node.name() for node in nodes]
+
+    >>> names(obj.glob("g*"))
+    ['geo1', 'geo2', 'grid', 'garbage']
+    >>> names(obj.glob("ge* ga*"))
+    ['geo1', 'geo2', 'garbage']
+    >>> names(obj.glob("g* ^ga*"))
+    ['geo1', 'geo2', 'grid']
+    }}}
+
+    See also [Hom:hou.Node#recursiveGlob].
+
+::`recursiveGlob(self, pattern, filter=hou.nodeTypeFilter.NoFilter)` -> tuple of [Hom:hou.Node]:
+    #cppname: HOM_Node::recursiveGlob
+    #replaces: Cmd:opglob, Cmd:opfind
+    Like [Hom:hou.Node#glob], return a tuple of children nodes whose name
+    matches the pattern.  However, any matching child will have all its children
+    added, recursively.  As well, the result may be filtered by node type.
+
+    Houdini first matches children nodes against the pattern, then recursively
+    adds the subchildren of matching children, and then applies the filter.
+
+    `pattern`:
+        Child node names will be matched against this string pattern.  See
+        [Hom:hou.Node#glob] and [Hom:hou.NodeBundle] for information about the
+        pattern syntax.  Note that if a child node matches the pattern, all of
+        its subchildren will be added to the result (subject to filtering),
+        regardless of the pattern.
+
+    `filter`:
+        A [Hom:hou.nodeTypeFilter] enumeration value to limit matched nodes
+        to a particular type (e.g. object nodes, geometry object nodes,
+        surface shader SHOPs, etc.).
+
+    The pattern and filter behavior is very similar to that used by node
+    bundles in Houdini.  See [Hom:hou.NodeBundle] for more information.
+
+    Raises [Hom:hou.OperationFailed] if the pattern is invalid.
+
+
+== Adding and removing ==
+
+::`createNode(self, node_type_name, node_name=None, run_init_scripts=True, load_contents=True, exact_type_name=False)` -> [Hom:hou.Node]:
+    #cppname: HOM_Node::createNode
+    #replaces: Cmd:opadd
+    Create a new node of type `node_type_name` as a child of this node.
+
+    `node_name`:
+        The name of the new node. If not specified, Houdini appends a number
+        to the node type name, incrementing that number until a unique node
+        name is found.  If you specify a name and a node already exists with
+        that name, Houdini will append a number to create a unique name.
+
+    `run_init_scripts`:
+        If True, the initialization script associated with the node type will
+        be run on the new node.
+
+    `load_contents`:
+        If True, any subnet contents will be loaded for custom subnet
+        operators.
+
+    `exact_type_name`:
+        If True, the node's type name will be exactly as specified in the
+        `node_type_name`. Otherwise, a preferred operator type that matches
+        the given `node_type_name` may be used. For example, the given "hda"
+        may match a newer version "hda::2.0", or if there are two available
+        operators "namespaceA::hda" and "namespaceB::hda", and the "namespaceB"
+        has precedence, then the created node will be of type "namespaceB::hda".
+
+    Raises [Hom:hou.OperationFailed] if this node cannot contain children.
+    Raises [Hom:hou.PermissionError] if this node is inside a locked asset.
+
+    {{{
+    #!pycon
+    >>> obj = hou.node("/obj")
+
+    # Let Houdini choose a name based on the node type name.
+    >>> obj.createNode("geo")
+    <hou.ObjNode of type geo at /obj/geo1>
+
+    # Let Houdini choose a unique name.
+    >>> obj.createNode("geo")
+    <hou.ObjNode of type geo at /obj/geo2>
+
+    # Give the node a specific name.
+    >>> obj.createNode("geo", "foo")
+    <hou.ObjNode of type geo at /obj/foo>
+
+    # Let Houdini create a unique name from our suggested name.  Also, don't
+    # run the geometry object init scripts so the contents are empty.
+    >>> obj.createNode("geo", "geo1", run_init_scripts=False)
+    <hou.ObjNode of type geo at /obj/geo3>
+    >>> obj.node("geo1").children()
+    (<hou.SopNode of type file at /obj/geo1/file1>,)
+    >>> obj.node("geo3").children()
+    ()
+    }}}
+
+::`createOrMoveVisualizer(self, output_index)`:
+    #cppname: HOM_Node::createOrMoveVisualizer
+    Creates a node for visualizing the data from a particular output of this
+    node. If a visualizer node already exists in the current network, it is
+    moved and connected to the specified `output_index`. This method is only
+    implemented for SOP and VOP nodes. Other node types do nothing when
+    this method is called.
+
+::`destroy(self)`:
+    #cppname: HOM_Node::destroy
+    #replaces: Cmd:oprm
+    Delete this node.
+
+    If you call methods on a Node instance after it has been destroyed, Houdini
+    will raise [Hom:hou.ObjectWasDeleted].
+
+    Raises [Hom:hou.OperationFailed] if you try to delete a node inside a
+    locked asset.
+
+::`copyItems(self, items, channel_reference_originals = False, relative_references = True)` -> `tuple` of [Hom:hou.NetworkMovableItem]:
+    #cppname: HOM_Node::copyItems
+    Create copies of all specified items in this network. The items do not
+    need to be children of this network, but all items must be contained in
+    the same parent network.
+
+    If `channel_reference_originals` is True, the parameters of all new nodes
+    are set to channel reference the original nodes. If a copied node is a
+    sub-network, only the top level node establishes channel references to the
+    original. Child nodes inside the sub-network will be simple copies of the
+    original child nodes. The `relative_references` parameter controls whether
+    the channel references use relative or absolute paths to the source nodes.
+
+    Returns a `tuple` of all the new network items.
+
+    Raises [Hom:hou.OperationFailed] if this node cannot contain children.
+    Raises [Hom:hou.PermissionError] if this node is inside a locked asset.
+
+::`deleteItems(self, items)`:
+    #cppname: HOM_Node::deleteItems
+    Destroys all the items in the provided tuple of
+    [Hom:hou.NetworkMovableItem] objects. This is significantly more efficient
+    than looping over the items and calling `destroy()` on each one. It also
+    safely handles cases where one object may not be allowed to be deleted
+    unless another object is also deleted.
+
+    Raises [Hom:hou.OperationFailed] if one or more of the provided items is
+    not a child of this node.
+    Raises [Hom:hou.PermissionError] if this node is or is inside a locked
+    digital asset.
+
+
+== Selection ==
+
+::`isCurrent(self)` -> `bool`:
+    #cppname: HOM_Node::isCurrent
+    #replaces: Cmd:opget, Exp:opflag
+    Return a boolean to indicate of the node is the last selected node in its
+    network.
+
+    Each network (i.e. node containing children) stores its own list of
+    selected nodes, and the last selected node has special meaning.  For
+    example, it is the node displayed in unpinned parameter panes.
+
+    See also [Hom:hou.selectedNodes] to get a tuple of all the selected nodes
+    in all networks in Houdini.  The last node in this list also has special
+    meaning in Houdini, and corresponds to the global current node.
+
+::`setCurrent(self, on, clear_all_selected=False)`:
+    #cppname: HOM_Node::setCurrent
+    #replaces: Cmd:opset
+    Set or unset this node as the last selected one.
+
+    Each network (i.e. node containing children) stores its own list of
+    selected nodes, and the last selected node has special meaning.  For
+    example, it is the node displayed in unpinned parameter panes.
+
+    If `on` is True, this node will become the last selected node.  If it
+    is False and this node was the last selected one, it will be unselected
+    and the second-last selected node will become the last selected node.
+
+    If `clear_all_selected` is true, Houdini will unselect every node in
+    this network before performing the operation.
+
+    See also [Hom:hou.Node#setSelected] and [Hom:hou.selectedNodes].
+
+::`selectedChildren(self, include_hidden=False, include_hidden_support_nodes=False)` -> `tuple` of [Hom:hou.Node]:
+    #cppname: HOM_Node::selectedChildren
+    #replaces: Cmd:opget
+    Return a tuple containing the children of this node that are selected.
+    Note that the last selected node has special meaning, and can also be
+    retrieved with [Hom:hou.Node#isCurrent].
+
+    `include_hidden`:
+        If False, hidden nodes are not included in the result, even if they
+        are selected.
+
+    `include_hidden_support_nodes`:
+        If True, include in the returned tuple any hidden nodes that exist
+        solely to support nodes that are actually selected. This specifically
+        refers to VOP Parameter nodes, but may include other support nodes
+        as well.
+
+    The following example will print the names of all selected objects in
+    `/obj`:
+    {{{
+    #!python
+    for n in hou.node("/obj").selectedChildren():
+        print n.name()
+    }}}
+
+    To find the total number of selected children nodes, use
+    `len(node.selectedChildren())`.
+
+::`selectedItems(self, include_hidden=False, include_hidden_support_nodes=False)` -> `tuple` of [Hom:hou.NetworkMovableItem]:
+    #cppname: HOM_Node::selectedItems
+    Return a tuple containing the children of this node that are selected.
+    Unlike `selectedChildren`, this method will also return any selected
+    [Hom:hou.NetworkBox], [Hom:hou.SubnetIndirectInput],
+    [Hom:hou.StickyNote], and [Hom:hou.NetworkDot] objects.
+
+    `include_hidden`:
+        If False, hidden nodes are not included in the result, even if they
+        are selected. Other network item types cannot be hidden, and so are
+        unaffected by the value of this parameter.
+
+    `include_hidden_support_nodes`:
+        If True, include in the returned tuple any hidden nodes that exist
+        solely to support nodes that are actually selected. This specifically
+        refers to VOP Parameter nodes, but may include other support nodes
+        as well.
+
+    The following example will print the positions of all selected items in
+    `/obj`:
+    {{{
+    #!python
+    for n in hou.node("/obj").selectedItems():
+        print n.position()
+    }}}
+
+::`numItems(self, item_type=None, selected_only=False, include_hidden=False)` -> `int`:
+    #cppname: HOM_Node::numSelectedItems
+    Return the number of children of this node that are selected and are of
+    the type specified by `item_type`.
+
+    `item_type`:
+        If `None`, the total number of selected items of any type is returned.
+        If a [Hom:hou.networkItemType] value is provided, the number of
+        selected items of that type is returned.
+
+    `selected_only`:
+        If `True`, only selected items are counted.
+
+    `include_hidden`:
+        If `False`, hidden nodes are not included in the result, even if they
+        are selected. Other network item types cannot be hidden, and so are
+        unaffected by the value of this parameter.
+
+
+== Types ==
+
+::`type(self)` -> [Hom:hou.NodeType]:
+    #cppname: HOM_Node::type
+    #replaces: Cmd:optype, Exp:optype
+    Return the [Hom:hou.NodeType] object for this node.
+
+    For example, all camera node instances share the same node type.
+
+::`changeNodeType(self, new_node_type, keep_name=True, keep_parms=True, keep_network_contents=True, force_change_on_node_type_match=False)` -> [Hom:hou.Node]:
+    #cppname: HOM_Node::changeNodeType
+    #replaces: Cmd:opchangetype
+    Changes the node to a new type (within the same context). `new_node_type`
+    is the internal string name of the type you want to change to.
+
+    `Keep_name`, `keep_parms`, and `keep_network_contents` indicate that the
+    node should keep the same name, parameter values, and contents,
+    respectively, after its type has changed.  `force_change_on_node_type_match`
+    indicates whether to perform the change even when is already of the
+    specified type.
+
+::`childTypeCategory(self)` -> [Hom:hou.NodeTypeCategory]:
+    #cppname: HOM_Node::childTypeCategory
+    Return the [Hom:hou.NodeTypeCategory] corresponding to the children of
+    this node.  For example, if this node is a geometry object, the children
+    are SOPs.  If it is an object subnet, the children are objects.
+
+
+== Parameters ==
+
+::`parm(self, parm_path)` -> [Hom:hou.Parm] or `None`:
+    #cppname: HOM_Node::parm
+    #replaces: Exp:chexist
+    Return the parameter at the given path, or `None` if the parameter
+    doesn't exist.
+
+::`globParms(self, pattern, ignore_case=False)` -> tuple of [Hom:hou.Parm]:
+    #cppname: HOM_Node::globParms
+    #replaces: Cmd:chls
+    Return a tuple of parameters matching the pattern.
+
+    The pattern may contain multiple pieces, separated by spaces.  An asterisk
+    (`*`) in a pattern piece will match any character.  By default, Houdini
+    will add the parameters from each pattern piece to those already matched.
+    However, if the pattern piece begins with a caret (`^`), Houdini will
+    remove the matches for that piece from the result.
+
+    By default the pattern match is case-sensitive.  Set `ignore_case` to
+    True for case-insensitive pattern matching.  Note that case insensitivity
+    only applies when matching node and parameter names.  It does not apply
+    when matching group, network box or bundle names.
+
+    This method returns an empty tuple if you pass in an empty pattern.
+
+::`evalParm(self, parm_path)` -> `int`, `float`, or `str`:
+    #cppname: HOM_Node::evalParm
+    #replaces: Exp:ch, Exp:chs
+    Evaluates the specified parameter and returns the result.
+
+::`parms(self)` -> `tuple` of [Hom:hou.Parm]:
+    #cppname: HOM_Node::parms
+    #replaces: Cmd:opparm
+    Return a list of the parameters on this node.
+
+::`parmsReferencingThis(self)` -> `tuple` of [Hom:hou.Parm]:
+    #cppname: HOM_Node::parmsReferencingThis
+    Return a list of the parameters that reference this node.
+
+::`allParms(self)` -> generator of [Hom:hou.Parm]:
+    #cppname: HOM_Node::allParms
+    Recursively return a sequence of all the parameters on all of the nodes
+    contained in this node including this node.
+
+    This method is a generator and does not return a tuple.
+
+    Here is an example of printing out the parameter paths for all nodes under /obj:
+    {{{
+    #!python
+    root_node = hou.node("/obj")
+    for parm in root_node.allParms():
+        print parm.path()
+    }}}
+
+::`setParms(self, parm_dict)`:
+    #cppname: HOM_Node::setParms
+    Given a dictionary mapping parm names to values, set each of the
+    corresponding parms on this node to the given value in the dictionary.
+
+    The following example sets the `tx` and `sy` parameters at once:
+    {{{
+    #!python
+    >>> node = hou.node("/obj").createNode("geo")
+    >>> node.setParms({"tx": 1, "sy": 3})
+    }}}
+
+    Raises [Hom:hou.OperationFailed] if any of the parameter names are not
+    valid.
+
+    See also the [setParmExpressions|Hom:hou.Node#setParmExpressions] method.
+
+::`setParmsPending(self, parm_dict)`:
+    #cppname: HOM_Node::setParmsPending
+    Given a dictionary mapping parm names to values, sets the pending value of
+    each of the corresponding parms on this node.
+
+    Raises [Hom:hou.OperationFailed] if any of the parameter names are not
+    valid.
+
+    See also the [setPending|Hom:hou.Parm#setPending] method.
+
+::`setParmExpressions(self, parm_dict, language=None, replace_expressions=True)`:
+    #cppname: HOM_Node::setParmExpressions
+    Given a dictionary mapping parm names to expression strings, set each of
+    the corresponding parms on this node to the given expression string in
+    the dictionary.
+
+    See [Hom:hou.Parm#setExpression] for a description of the `language` and
+    `replace_expressions` parms.
+
+    The following example expressions set the `tx` and `sy` parameters at once:
+    {{{
+    #!python
+    >>> node = hou.node("/obj").createNode("geo")
+    >>> node.setParmExpressions({"tx": 'ch("ty")', "sy": "sin($F)"})
+    }}}
+
+    Raises [Hom:hou.OperationFailed] if any of the parameter names are not
+    valid.
+
+    See also the [setParms|Hom:hou.Node#setParms] method.
+
+::`parmTuple(self, parm_path)` -> [Hom:hou.ParmTuple] or `None`:
+    #cppname: HOM_Node::parmTuple
+    Return the parm tuple at the given path, or `None` if it doesn't exist.
+
+    This method is similar to `parm()`, except it returns a
+    [Hom:hou.ParmTuple] instead of a [Hom:hou.Parm].
+
+::`evalParmTuple(self, parm_path)` -> `tuple` of `int`, `float`, or `str`:
+    #cppname: HOM_Node::evalParmTuple
+    Evaluates the specified parameter tuple and returns the result.
+
+::`parmTuples(self)` -> `tuple` of [Hom:hou.ParmTuple]:
+    #cppname: HOM_Node::parmTuples
+    Return a list of all parameter tuples on this node.
+
+    This method is similar to `parms()`, except it returns a list of
+    [Hom:hou.ParmTuple] instead of [Hom:hou.Parm].
+
+::`parmsInFolder(self, folder_names)` -> `tuple` of [Hom:hou.Parm]:
+    #cppname: HOM_Node::parmsInFolder
+    Return a list of parameters in a folder on this node.  Returns all
+    parameters in the folder and its subfolders (if any).
+
+    folder_names:
+        A sequence of folder name strings.  For example, to get a list of the
+        parameters in the Shading folder of the Render folder, use
+        `("Render", "Shading")`.  Note that by folder name, we mean the label
+        used in the parameter dialog, not the internal parameter name.
+
+        If this sequence is empty, the method returns all parameters on the
+        node, the same as if you called `parms()`.
+
+    Raises [Hom:hou.OperationFailed] if the folder specified by `folder_names`
+    does not exist.
+
+    For example, suppose a node had a Render folder that contained a Shading
+    subfolder.  Then this line of code would return the parameters in the
+    Render folder:
+    {{{
+    #!python
+    # Note the trailing comma after "Render" to tell Python that "Render" is
+    # contained in a tuple/sequence as opposed to just a single string with
+    # parentheses around it.
+    >>> node.parmsInFolder(("Render", ))
+    }}}
+
+    And this line of code would return the parameters in the Shading subfolder.
+    {{{
+    #!python
+    >>> node.parmsInFolder(("Render", "Shading"))
+    }}}
+
+
+    See also [Hom:hou.Parm#containingFolders]
+    and [Hom:hou.Parm#containingFolderSetParmTuples]
+
+::`parmTuplesInFolder(self, folder_names)` -> tuple of [Hom:hou.ParmTuple]:
+    #cppname: HOM_Node::parmTuplesInFolder
+
+    Return a list of the parameter tuples in a folder on this node.
+    This method is similar to `parmsInFolder()`, except it returns a list of
+    [Hom:hou.ParmTuple] instead of [Hom:hou.Parm]. See `parmsInFolder()`
+    above for information about the arguments.
+
+    See also [Hom:hou.Parm#containingFolders]
+    and [Hom:hou.Parm#containingFolderSetParmTuples]
+
+::`expressionLanguage(self)` -> [Hom:hou.exprLanguage] enum value:
+    #cppname: HOM_Node::expressionLanguage
+    Return the node's default expression language.
+
+    When you enter an expression in a parameter that does not already contain
+    an expression, the node's expression language is used to determine how
+    that expression should be evaluated.  You can change a node's expression
+    language in the parameter dialog in the GUI.
+
+    Changing the node's expression language will not change the language in
+    parameters already containing expressions (i.e. parameters with keyframes).
+
+    Note that if a parameter already contains an expression and you change that
+    expression in the GUI, the expression language will not change, regardless
+    of the value of the node's expression language. To change the language of an
+    existing expression in a parameter from Python, use
+    [Hom:hou.Parm#setExpression], as in
+    `parm.setExpression(parm.expression(), language)`.
+
+::`setExpressionLanguage(self, language)`:
+    #cppname: HOM_Node::setExpressionLanguage
+    Set the node's default expression language.
+    See `expressionLanguage()` for more information.
+
+::`parmAliases(self, recurse=False)` -> dict of [Hom:hou.Parm] to `str`:
+    #cppname: HOM_Node::parmAliases
+    #replaces: Cmd:chalias
+    Return a dictionary of parameter aliases on the node's parameters.  The
+    keys in the dictionary are the parameters that have aliases and the values
+    are the alias names.
+
+    recurse:
+        Return the parameter aliases for this node _and its children_.
+
+::`clearParmAliases(self)`:
+    #cppname: HOM_Node::clearParmAliases
+    #replaces: Cmd:chalias
+    Removes all alias names from parameters on the node.
+
+::`spareParms(self)` -> tuple of [Hom:hou.Parm]:
+    #cppname: HOM_Node::spareParms
+    #replaces: Cmd:opspare
+    Return a list of the spare (user-defined) parameters on this node.
+
+::`removeSpareParms(self)`:
+    #cppname: HOM_Node::removeSpareParms
+    #replaces: Cmd:opspareds
+    Removes all spare parameters from this node.
+
+::`parmTemplateGroup(self)` -> [Hom:hou.ParmTemplateGroup]:
+    #cppname: HOM_HDADefinition::parmTemplateGroup
+    #replaces: Cmd:opspare
+    Return the group of parm templates corresponding to the current parameter
+    layout for this node.
+
+    You can edit the parameter layout for this node (add or remove spare
+    parameters, reorder or hide built-in parameters, etc.) by getting the
+    current parameter group, modifying it, and calling
+    [Hom:hou.Node#setParmTemplateGroup] with it.
+
+    The following example creates a geometry object, adds a `My Parms` folder
+    to it, and adds a `My Parm` float parameter to it in that folder.  The
+    parameters are added only to the geometry object created; other geometry
+    objects are unaffected.
+
+    {{{
+    #!python
+    >>> node = hou.node("/obj").createNode("geo")
+    >>> group = node.parmTemplateGroup()
+    >>> folder = hou.FolderParmTemplate("folder", "My Parms")
+    >>> folder.addParmTemplate(hou.FloatParmTemplate("myparm", "My Parm", 1))
+    >>> group.append(folder)
+    >>> node.setParmTemplateGroup(group)
+    }}}
+
+    See [Hom:hou.ParmTemplateGroup] and the
+    [setParmTemplateGroup|Hom:hou.Node#setParmTemplateGroup] method for more
+    information and examples.
+
+::`setParmTemplateGroup(self, parm_template_group, rename_conflicting_parms=False)`:
+    #cppname: HOM_HDADefinition::setParmTemplateGroup
+    #replaces: Cmd:opspare
+    Change the spare parameters for this node.
+
+    `parm_template_group`:
+        A [Hom:hou.ParmTemplateGroup] object containing the new parameter
+        layout.
+
+    `rename_conflicting_parms`:
+        If `True`, parameters in the group with the same parm tuple names will
+        be automatically renamed.  If `False` and there are parms with the same
+        name, this method raises [Hom:hou.OperationFailed].
+
+    Note that each node type has a set of parameters which must exist and
+    must be of certain types.  If your parm template group does not contain
+    the required parameters for the node type the will be added at the
+    bottom and will be made invisible.  Similarly, if your parm template
+    group attempts to modify the type, range, label, or other property of
+    a required parameter, all changes to that parameter other than visibility
+    settings will be ignored.
+
+    This method is preferred over the other parameter-related methods in this
+    class (addSpareParmTuple, removeSpareParmTuple, replaceSpareParmTuple,
+    addSpareParmFolder, removeSpareParmFolder) because it lets you more easily
+    make manipulate parameters.
+
+    See [Hom:hou.HDADefinition#setParmTemplateGroup] to change the parameter
+    interface of a digital asset.
+
+::`addSpareParmTuple(self, parm_template, in_folder=(), create_missing_folders=False)` -> [Hom:hou.ParmTuple]:
+    #cppname: HOM_Node::addSpareParmTuple
+    #replaces: Cmd:opspare
+    Add a spare parameter tuple to the end of the parameters on the node.  If
+    `in_folder` is not an empty sequence, this method adds the parameters to
+    the end of the parameters in a particular folder.
+
+    parm_template:
+        A [Hom:hou.ParmTemplate] subclass instance that specifies the type
+        of parameter tuple, the default value, range, etc.
+
+    in_folder:
+        A sequence of folder names specifying which folder will hold the
+        parameter.  If this parameter is an empty sequence (e.g. `()`), Houdini
+        will not put the parameter inside a folder.  If it is, for example,
+        `("Misc", "Controls")`, Houdini puts it inside the "Controls" folder
+        that's inside the "Misc" folder.  If it is, for example, `("Misc",)`,
+        Houdini puts it inside the "Misc" folder.
+
+    create_missing_folders:
+        If True, and the folder location specified by `in_folder` does not
+        exist, this method creates the missing containing folders.
+
+    Note that this method can add a single folder by passing a
+    [Hom:hou.FolderParmTemplate] for `parm_template`.
+
+    See also the `removeSpareParmTuple()` and `addSpareParmFolder()` methods.
+
+    This method is deprecated in favor of `setParmTemplateGroup`.
+
+::`removeSpareParmTuple(self, parm_tuple)`:
+    #cppname: HOM_Node::removeSpareParmTuple
+    Removes the specified spare parameter tuple.
+
+    See also `addSpareParmTuple()`.
+
+    This method is deprecated in favor of `setParmTemplateGroup`.
+
+::`addControlParmFolder(self, folder_name=None, parm_name=None)`:
+    #cppname: HOM_Node::addControlParmFolder
+    Adds a control parameter folder as the front-most folder at the top-level.
+    This is used to increase visibility of customized control parameters. If a 
+    folder of the same name already exists, no new folder will be created.
+    If folder_name is None, it will be set as 'Controls'. If parm_name is None,
+    it will be set as 'folder'.
+
+    If there are no current folders present, the existing parameters will be
+    grouped together and stored into a new folder named 'Parameters' and placed
+    after the new control parameter folder.
+
+::`addSpareParmFolder(self, folder_name, in_folder=(), parm_name=None, create_missing_folders=False)`:
+    #cppname: HOM_Node::addSpareParmFolder
+    Adds a folder to the spare parameters.
+
+    Note that all the folders in a set correspond to one parameter.  If this
+    is the first folder to go in the set, parm_name will be used as the
+    parameter name.  Otherwise, parm_name will be ignored and the parameter
+    name of the first folder in the set is used.
+
+    If this is the first folder in the set and parm_name is None, it will
+    default to 'sparefolder0'.  If parm_name is already in use, a unique name
+    will be automatically generated.
+
+    If `create_missing_folders` is True, this method will create the folders in
+    in_folder that don't exist. So, this method can be used to add spare folders
+    and a spare parameter at the same time.
+
+    Note that you can add folders by passing a [Hom:hou.FolderParmTemplate]
+    to the `addSpareParmTuple` method, so this method is deprecated.  Note
+    also that `addSpareParmTuple` is deprecated in favor of
+    `setParmTemplateGroup`.
+
+    See also the `removeSpareParmFolder` and `addSpareParmTuple` methods.
+
+    This method is deprecated in favor of `setParmTemplateGroup`.
+
+::`removeSpareParmFolder(self, folder)`:
+    #cppname: HOM_Node::removeSpareParmFolder
+    Removes an empty folder from the spare parameters.
+
+    `folder` is a sequence of folder names.  So, to remove
+    the Output folder, use `("Output",)` instead of `"Output"`.
+
+    See also `addSpareParmFolder()`, [Hom:hou.ParmTemplateGroup#remove], and
+    [Hom:hou.ParmTemplateGroup#findFolder].
+
+::`replaceSpareParmTuple(self, parm_tuple_name, parm_template)`:
+    #cppname: HOM_Node::replaceSpareParmTuple
+    Replace an existing spare parameter tuple with a new one.  The old
+    parameter tuple is removed and the new one is added in its place.
+
+    parm_tuple_name:
+        The name of the spare parameter tuple to replace.  Raises
+        [Hom:hou.OperationFailed] if no parameter tuple exists with this name,
+        or if it is the name of a non-spare parameter.
+
+    parm_template:
+        A [Hom:hou.ParmTemplate] describing the new parameter tuple.
+
+    The new parameter tuple may or may not have the same name as the old one.
+    By providing a parameter tuple with the same name, you can modify an
+    existing spare parameter tuple.
+
+    Note that you cannot replace non-spare parameter tuples.  However, you can
+    change the visibility of non-spare parameters using
+    [Hom:hou.ParmTuple#hide].
+
+    To change a parameter for all instances of digital asset, use
+    [Hom:hou.HDADefinition#replaceParmTuple].
+
+    This method is deprecated in favor of `setParmTemplateGroup`.
+
+::`localVariables(self)`:
+    #cppname: HOM_Node::localVariables()
+    Return a list of local variables that can be referenced in parameter
+    expressions on this node.
+    
+
+== Inputs and outputs ==
+
+::`inputs(self)` -> `tuple` of [Hom:hou.Node]:
+    #cppname: HOM_Node::inputs
+    #replaces: Cmd:opgetinput, Exp:opinputs, Exp:opninputs, Exp:icl, Exp:icn, Exp:icr, Exp:ics
+    Return a tuple of the nodes connected to this node's inputs. If an input
+    is connected to a [Hom:hou.SubnetIndirectInput], the node connected to the
+    corresponding input on the parent subnet is returned. In other words the
+    presence of the indirect input is hidden. This means the resulting nodes
+    may not all be siblings of the calling node.
+
+    If a particular input is not connected (or is connected to an indirect
+    input and the corresponding subnet parent input is not connected), a
+    `None` value is placed in the tuple at that location.
+
+::`outputs(self)` -> `tuple` of [Hom:hou.Node]:
+    #cppname: HOM_Node::outputs
+    #replaces: Exp:opoutput, Cmd:opdepend, Exp:opnoutputs
+    Return a tuple of the nodes connected to this node's outputs.
+
+    This method is a shortcut for `[connection.inputNode() for connection in
+    self.outputConnections()]`.
+
+::`inputConnections(self)` -> `tuple` of [Hom:hou.NodeConnection]:
+    #cppname: HOM_Node::inputConnections
+    #replaces: Cmd:opgetinput
+    Returns a tuple of [Hom:hou.NodeConnection] objects for the connections
+    coming into the top of this node. The tuple will have a length equal to
+    the number of connections coming into the node.  Returns an empty tuple
+    if nothing is connected to this node.
+
+    To get a list of the connected nodes themselves, use [Hom:hou.Node#inputs].
+    To get a list of all possible connection sites (whether or not anything
+    is connected to them), use [Hom:hou.Node#inputConnectors].
+
+    {{{
+    #!pycon
+    >>> cookie = hou.node("/obj").createNode("geo").createNode("cookie")
+    >>> cookie.setInput(1, cookie.parent().createNode("box"))
+    >>> cookie.inputConnections()
+    (<hou.NodeConnection from grid1 output 0 to cookie input 1>,)
+    >>> cookie.inputConnectors()
+    ((), (<hou.NodeConnection from grid1 output 0 to cookie input 1>,))
+    }}}
+
+    See also [Hom:hou.Node#inputConnectors].
+
+::`outputConnections(self)` -> `tuple` of [Hom:hou.NodeConnection]:
+    #cppname: HOM_Node::outputConnections 
+    Return a tuple of NodeConnection objects for the connections going out of
+    the bottom of this node.  If nothing is wired into the output of this
+    node, return an empty tuple.
+
+    To get a list of the connected nodes themselves, use
+    [Hom:hou.Node#outputs].
+
+    Note that this method is a shortcut for: `reduce(lambda a, b: a+b,
+    self.outputConnectors(), ())`.  Since most nodes have only one output
+    connector, though, this method is usually equivalent to
+    `self.outputConnectors()[0]`.
+
+    {{{
+    #!pycon
+    >>> box = hou.node("/obj").createNode("geo").createNode("box")
+    >>> box.parent().createNode("xform").setFirstInput(box)
+    >>> box.parent().createNode("subdivide").setFirstInput(box)
+    >>> box.outputConnections()
+    (<hou.NodeConnection from box1 output 0 to xform1 output 0>, <hou.NodeConnection from box1 output 0 to subdivide1 input 0>)
+    }}}
+
+    See also [Hom:hou.node#outputConnectors].
+
+::`inputConnectors(self)` -> `tuple` of `tuple` of [Hom:hou.NodeConnection]:
+    #cppname: HOM_Node::inputConnectors
+    #replaces: Cmd:opdepend, Cmd:opgetinput, Exp:opinput
+    Return a tuple of tuples of [Hom:hou.NodeConnection] objects.  The length
+    of the result tuple is equal to the maximum number of inputs that can be
+    connected to this node.  Each subtuple contains exactly one node
+    connection if something is wired into the connector; otherwise it is the
+    empty tuple.
+
+    See also [Hom:hou.NodeConnection] and [Hom:hou.Node#inputConnections].
+
+::`outputConnectors(self)` -> `tuple` of `tuple` of [Hom:hou.NodeConnection]:
+    #cppname: HOM_Node::outputConnectors
+    #replaces: Exp:opgetinput, Exp:opninputs, Exp:icl, Exp:icn, Exp:icr, Exp:ics, Cmd:opdepend
+    Return a a tuple of tuples of [Hom:hou.NodeConnection] objects.  The length
+    of the result tuple is equal to the number of output connectors on this
+    node.  Each subtuple contains all the connections going out of that
+    connector, and is empty if nothing is wired to that connector.
+
+    {{{
+    #!python
+    >>> split = hou.node("/obj").createNode("dopnet").createNode("split")
+    >>> split.parent().createNode("rbdsolver").setFirstInput(split)
+    >>> split.parent().createNode("gravity").setFirstInput(split, 1)
+    >>> split.parent().createNode("merge").setFirstInput(split, 1)
+    >>> split.outputConnectors()
+    ((<hou.NodeConnection from split1 output 0 to rbdsolver1 input 0>,), (<hou.NodeConnection from split1 output 1 to gravity2 input 0>, <hou.NodeConnection from split1 output 1 to merge1 input 0>), (), ())
+    }}}
+
+    See also [Hom:hou.NodeConnection] and [Hom:hou.Node#outputConnections].
+
+::`indirectInputs(self)` -> `tuple` of [Hom:hou.SubnetIndirectInput]:
+    #cppname: HOM_Node::indirectInputs
+    #replaces: Cmd:opdepend
+    Return the hou.SubnetIndirectInput objects of a subnet.
+
+    Raises [Hom:hou.InvalidNodeType] if this node is not a subnetwork.
+
+::`inputAncestors(self, include_ref_inputs=True, follow_subnets=False)` -> `tuple` of [Hom:hou.Node]:
+    #cppname: HOM_Node::inputAncestors
+    Return a tuple of all input ancestors of this node.  If include_ref_inputs
+    is False, then reference inputs are not traversed.  If follow_subnets is
+    True, then instead of treating subnetwork nodes as a single node, we also
+    traverse its children starting with its display node.
+
+    See also the `inputs()` method.
+
+::`inputIndex(self, input_name)`:
+    #cppname: HOM_Node::inputIndex
+    Obtains an index of a node input that has the given name.
+
+    For the node categories that use input names, it returns the index
+    of the input with the given name. For VOP nodes, the name may also be
+    a node parameter name that has a corresponding input.
+
+::`outputIndex(self, output_name)`:
+    #cppname: HOM_Node::outputIndex
+    Obtains an index of a node output that has the given name.
+
+    For the node categories that use input names, it returns the index
+    of the output with the given name.
+
+::`setInput(self, input_index, item_to_become_input, output_index=0)`:
+    #cppname: HOM_Node::setInput
+    #replaces: Cmd:opwire, Cmd:opunwire
+    If `item_to_become_input` is not None, connect the output connector of
+    another node to an input connector of this node.  Otherwise, disconnect
+    anything connected to the input connector.
+
+    input_index:
+        The index of this node's input connector.
+
+    item_to_become_input:
+        If `None` this method disconnects everything from the input connector.
+        If a [Hom:hou.Node] or a [Hom:hou.SubnetIndirectInput], this method
+        connects its output to this node's input connector.
+
+    output_index:
+        The index of the other node's output connector.
+
+    Raises [Hom:hou.InvalidInput] if `output_index` is invalid.  Raises
+    [Hom:hou.OperationFailed] if `item_to_become_input` is not in the same
+    network as this node.  Raises [Hom:hou.PermissionError] if the node is
+    inside a locked asset.
+
+::`setNamedInput(self, input_name, item_to_become_input, output_name_or_index)`:
+    #cppname: HOM_Node::setNamedInput
+    Connects an output on this node (specified by either an output name or
+    an output index) to the input on the item_to_become_input specified by
+    input_name.
+
+::`setFirstInput(self, item_to_become_input, output_index=0)`:
+    #cppname: HOM_Node::setFirstInput
+    #replaces: Cmd:opwire
+    A shortcut for `self.setInput(0, item_to_become_input)`.  See
+    [Hom:hou.Node#setInput] for more information.
+
+::`setNextInput(self, item_to_become_input, output_index=0, unordered_only=False)`:
+    #cppname: HOM_Node::setNextInput
+    #replaces: Cmd:opwire
+    Connect the output connector from another node into the first unconnected
+    input connector or a multi-input connector of this node. If a node has
+    some ordered inputs followed by a multi-input connector, the
+    `unordered_only` parameter can be used to force the input to connect to
+    the unordered multi-input connection instead of any of the ordered input
+    which may not be connected.
+
+    This method is roughly equivalent to:
+    {{{
+    #!python
+    for input_index, conectors in enumerate(self.inputConnectors()):
+        if len(connectors) == 0:
+            self.setInput(input_index, item_to_become_input, output_index)
+        raise hou.InvalidInput("All inputs are connected")
+    }}}
+
+    Raises [Hom:hou.InvalidInput] if all inputs are connected.  See
+    [Hom:hou.Node#setInput] for more information.
+
+::`insertInput(self, input_index, item_to_become_input, output_index=0)`:
+    #cppname: HOM_Node::insertInput
+    Insert an input wire.  In other words, for each input connector after
+    input_index, shift the contents of that input connector to the next
+    one, and then call [Hom:hou.Node#setInput].  See [Hom:hou.Node#setInput]
+    for the meanings of the parameters.
+
+::`numOrderedInputs(self)` -> `int`:
+    #cppname: HOM_Node::numOrderedInputs
+    Some nodes can have a small number of dedicated inputs with specific
+    meanings, followed by an arbitrary number of additional inputs, where
+    gaps are not permitted between the inputs (these are referred to as
+    unordere inputs). This is common in DOP nodes such as the
+    [Multiple Solver DOP|Node:dop/multisolver]. This function returns the
+    number of dedicated (or ordered) inputs that occur before the unordered
+    inputs begin. This function will only return non-zero valus if the
+    [Hom:hou.NodeType#hasUnorderedInputs] function for this node's
+    [Hom:hou.Node#type] object returns `True`.
+
+::`createInputNode(self, input_index, node_type_name, node_name=None, run_init_scripts=True, load_contents=True, bool exact_type_name=False)`:
+    #cppname: HOM_Node::createInputNode
+    Create a new node and connect it to one of this node's inputs.  Return the
+    new node.
+
+    input_index:
+        The index of this node's input connector.
+    node_type_name:
+        The name of the type of node to create.  See the
+        [createNode|Hom:hou.Node#createNode] method for more information.
+    node_name:
+        See the [createNode|Hom:hou.Node#createNode] method for more
+        information.
+    run_init_scripts:
+        See the [createNode|Hom:hou.Node#createNode] method for more
+        information.
+    load_contents:
+        See the [createNode|Hom:hou.Node#createNode] method for more
+        information.
+    exact_type_name:
+        See the [createNode|Hom:hou.Node#createNode] method for more
+        information.
+
+    See also the [createOutputNode|Hom:hou.Node#createOutputNode] method.
+
+::`createOutputNode(self, node_type_name, node_name=None, run_init_scripts=True, load_contents=True, bool exact_type_name=False)`:
+    #cppname: HOM_Node::createOutputNode
+    Create a new node and connect its first input to this node's (first) output.
+    Return the new node.
+
+    See the [createNode|Hom:hou.Node#createNode] method for more information
+    on the parameters.
+
+    See also the [createInputNode|Hom:hou.Node#createInputNode] method.
+
+::`inputNames(self)` -> tuple of `str`:
+    #cppname: HOM_Node::inputNames
+    Returns a tuple of all input names for this node. Names for input
+    connectors that are hidden are also included.
+
+::`inputLabels(self)` -> tuple of `str`:
+    #cppname: HOM_Node::inputLabels
+    Returns a tuple of all input labels for this node. Labels for input
+    connectors that are hidden are also included.
+
+::`outputNames(self)` -> tuple of `str`:
+    #cppname: HOM_Node::outputNames
+    Returns a tuple of all output names for this node.
+
+::`outputLabels(self)` -> tuple of `str`:
+    #cppname: HOM_Node::outputLabels
+    Returns a tuple of all output labels for this node.
+
+
+== Dependencies ==
+
+::`references(self, include_children = True)` -> `tuple` of [Hom:hou.Node]:
+    #cppname: HOM_Node::references
+    Return a tuple of nodes that are referenced by this node, either through
+    parameter expressions, referring to the node by name, or using expressions
+    which rely on the data generated by another node. These reflect all the
+    other ways (besides connecting to an input) in which one node may affect
+    another.
+
+    Note that the result can differ depending last cook of the nodes. It's 
+    recommended that you first call cook() on the node first.
+
+::`dependents(self, include_children = True)` -> `tuple` of [Hom:hou.Node]:
+    #cppname: HOM_Node::dependents
+    Return a tuple of nodes that are reference this node, either through
+    parameter expressions, referring to the node by name, or using expressions
+    which rely on the data generated by this node. These reflect all the
+    other ways (besides connecting to an input) in which one node may affect
+    another.
+
+    Note that the result can differ depending last cook of the nodes.
+
+== Subnets ==
+
+::`isSubNetwork(self)` -> `bool`:
+    #cppname: HOM_Node::isEditableInsideLockedHDA
+    Return True if the node is a sub-network and False otherwise.
+
+::`collapseIntoSubnet(self, child_nodes, subnet_name=None, subnet_type=None)` -> [Hom:hou.Node]:
+    #cppname: HOM_Node::collapseIntoSubnet
+    #replaces: Cmd:opcollapse
+    Given a sequence of children nodes of this node, collapse them into a
+    subnetwork.  In other words, create a subnet inside this node's network
+    and move the specified children of this network inside that subnet.
+
+    child_nodes:
+        The children nodes of this node that will go in the new subnet.
+
+    subnet_name:
+        The name for the new subnet node, or None if you want Houdini to
+        automatically choose a name.
+
+    subnet_name:
+        The type for the new subnet node, or None if you want Houdini to
+        automatically choose a primary subnetwork type, which is recommended.
+
+    Raises [Hom:hou.OperationFailed] if a node inside `child_nodes` is not
+    a child of this network, or if `child_nodes` is an empty sequence.
+
+    This example function takes a single node and replaces it with a subnet,
+    moving the node into the subnet..
+    {{{
+    #!python
+    def collapseSingleNodeIntoSubnet(node, subnet_name=None):
+        node.parent().collapseIntoSubnet((node,), subnet_name=None)
+    }}}
+
+::`extractAndDelete(self)` -> `tuple` of [Hom:hou.NetworkMovableItem]:
+    #cppname: HOM_Node::extractAndDelete
+    #replaces: Cmd:opextract
+    Move the children of this subnet node to become siblings of this node, and
+    then delete this node.  The method is the opposite of
+    `collapseIntoSubnet()`. Returns a tuple containing all extracted items.
+
+    Raises [Hom:hou.InvalidNodeType] if this node is not a subnetwork.
+
+
+== Assets ==
+
+::`canCreateDigitalAsset(self)` -> bool:
+    #cppname: HOM_Node::canCreateDigitalAsset
+    Return `True` if [Hom:hou.Node#createDigitalAsset] can succeed.
+
+::`createDigitalAsset(self, name=None, hda_file_name=None, description=None, min_num_inputs=None, max_num_inputs=None, compress_contents=False, comment=None, version=None, save_as_embedded=False, ignore_external_references=False, change_node_type=True, create_backup=True)` -> `Node`:
+    #cppname: HOM_Node::createDigitalAsset
+    Create a digital asset from this node.  You would typically call this
+    method on subnet nodes.
+
+    name:
+        The name of the node type that the new digital asset will define.
+
+    hda_file_name:
+        The name of the hda file where Houdini will save the digital asset.
+        If `None` Houdini will use `$HOME/houdiniX.Y/hda/OPcustom.hda`.
+
+    description:
+        The name that will appear in the tab menu.  If None, Houdini will use
+        the name for the description.
+
+    min_num_inputs:
+        The minimum number of inputs that need to be wired into instances of
+        the digital asset.  See [Hom:hou.HDADefinition#minNumInputs] for more
+        information.
+
+    max_num_inputs:
+        The number of input connectors available on instances of the digital
+        asset for input connections.  See [Hom:hou.HDADefinition#minNumInputs]
+        for more information.
+
+    compress_contents:
+        Whether or not the contents of this digital asset are compressed inside
+        the hda file.  See [Hom:hou.HDAOptions#compressContents] for more
+        information.
+
+    comment:
+        A user-defined comment string.  See [Hom:hou.HDADefinition#comment]
+        for more information.
+
+    version:
+        A user-defined version string.  See [Hom:hou.HDADefinition#version]
+        for more information.
+
+    save_as_embedded:
+        Whether or not the digital asset's definition will be saved with the
+        hip file instead of an hda file.  When this parameter is True, Houdini
+        ignores the `hda_file_name` parameter.  Setting this parameter to True
+        is equivalent to setting this parameter to False and setting the
+        `hda_file_name` parameter to "Embedded".
+
+    ignore_external_references:
+        If True, Houdini will not generate warnings if the contents of this
+        digital asset reference nodes outside the asset.
+
+    change_node_type:
+        Normally, Houdini will change the node creating the digital asset into
+        the new digital asset type.  Setting this flag to false will cause the
+        node to remain unchanged.
+
+    create_backup:
+        Create a backup before modifying an existing hda file.
+
+::`createCompiledDigitalAsset(self, name=None, hda_file_name=None, description=None)`:
+    #cppname: HOM_Node::createCompiledDigitalAsset
+    #replaces: Cmd:otcreatecompiledtypefrom
+    Create a compiled digital asset from this node.  You would typically call
+    this method on vop network nodes, such as Material Shader Builder SHOP,
+    Surface Shader Builder SHOP, or VEX Surface SHOP Type VOPNET. The digital asset
+    does not have contents section, which means it does not have vop network inside,
+    but instead relies on the saved VEX code sections to provide the shader code.
+
+    After the creation of a compiled HDA, if its VEX code section is ever
+    changed manually, the corresponding vex object code section can be
+    recompiled using [Hom:hou.HDADefinition#compileCodeSection].
+
+    name:
+        The name of the node type that the new digital asset will define.
+
+    hda_file_name:
+        The name of the hda file where Houdini will save the digital asset.
+        If `None` Houdini will use `$HOME/houdiniX.Y/hda/OPcustom.hda`.
+
+    description:
+        The name that will appear in the tab menu.  If None, Houdini will use
+        the name for the description.
+
+
+::`allowEditingOfContents(self, propagate=False)`:
+    #cppname: HOM_Node::allowEditingOfContents
+    #replaces: Cmd:otsync
+    Unlocks a digital asset so its contents can be edited.
+
+    To use this function, you must have permission to modify the HDA.
+
+::`matchCurrentDefinition(self)`:
+    #cppname: HOM_Node::matchCurrentDefinition
+    #replaces: Cmd:otsync
+    If this node is an unlocked digital asset, change its contents to match
+    what is stored in the definition and lock it.  The parameter values are
+    unchanged.
+
+    If this node is locked or is not a digital asset, this method has no
+    effect.
+
+    See also [Hom:hou.Node#matchesCurrentDefinition] and
+    [Hom:hou.Node#isLocked].
+
+::`matchesCurrentDefinition(self)` -> `bool`:
+    #cppname: HOM_Node::matchesCurrentDefinition
+    #replaces: Cmd:otsync
+    Return whether the contents of the node are locked to its type definition.
+
+::`isLockedHDA(self)` -> `bool`:
+    #cppname: HOM_Node::isLockedHDA
+    If this node is an instance of a digital asset, return whether or not it
+    is locked.  Otherwise, return False.
+
+    To differentiate between unlocked digital assets and nodes that are
+    not instances of digital assets, check if the node's type has a definition:
+    {{{
+    #!python
+    def isUnlockedAsset(node):
+        return not node.isLockedHDA() and node.type().definition() is not None
+    }}}
+
+    See [Hom:hou.HDADefinition#updateFromNode] for an example of how to
+    save and lock all unlocked digital asset instances.
+
+::`isInsideLockedHDA(self)` -> `bool`:
+    #cppname: HOM_Node::isInsideLockedHDA
+    Return whether this node is inside a locked digital asset.  If this node is
+    not inside a locked HDA, the node may deviate from the HDA definition.
+
+::`isEditableInsideLockedHDA(self)` -> `bool`:
+    #cppname: HOM_Node::isEditableInsideLockedHDA
+    Return True if the node is an editable node contained inside a locked HDA
+    node and False otherwise. In particular this function will return False
+    for a node that is not inside a locked HDA.
+
+::`isEditable(self)` -> `bool`:
+    #cppname: HOM_Node::isEditable
+    Return True if the node is editable. This is similar to the
+    [Hom:hou.Node#isEditableInsideLockedHDA] method except that it will return
+    True for nodes that are not inside a locked HDA. This function is the
+    simplest way to determine if most node modifications (changing inputs,
+    changing parameters, changing flags) will be allowed on the node.
+
+::`hdaModule(self)` -> [Hom:hou.HDAModule]:
+    #cppname: HOM_Node::hdaModule
+    This method is a shortcut for `self.type().hdaModule() to reduce the length
+    of expressions in Python parameters and button callbacks.  See
+    [Hom:hou.NodeType#hdaModule] for more information.
+
+    See also the `hm` method and [Hom:hou.phm].
+
+::`hm(self)` -> [Hom:hou.HDAModule]:
+    #cppname: HOM_Node::hdaModule
+    This method is a shortcut for `self.hdaModule()`.
+
+    See also [Hom:hou.phm].
+
+::`syncNodeVersionIfNeeded(self, from_version)`:
+    #cppname: HOM_Node::syncNodeVersionIfNeeded
+    Synchronize the node from the specified version to the current version of
+    its HDA definition. See also [Hom:hou.HDADefinition#version].
+
+
+== Metadata ==
+
+::`comment(self)` -> `str`:
+    #cppname: HOM_Node::comment
+    #replaces: Cmd:opcomment
+    Return the node's comment string.
+
+::`setComment(self, comment)`:
+    #cppname: HOM_Node::setComment
+    #replaces: Cmd:opcomment
+    Sets the comment associated with this node.
+    See also `appendComment()`.
+
+::`appendComment(self, comment)`:
+    #cppname: HOM_Node::appendComment
+    #replaces: Cmd:opcomment
+    Appends the given text to the comment associated with this node.
+
+::`isDisplayDescriptiveNameFlagSet(self)` -> `bool`:
+    #cppname: HOM_Node::isDisplayDescriptiveNameFlagSet
+    #replaces: Cmd:opget, Exp:opflag
+    Return a boolean to indicate of the node should display its
+    descriptive name in the network editor.
+
+::`setDisplayDescriptiveNameFlag(self, on)`:
+    #cppname: HOM_Node::setDisplayDescriptiveName
+    #replaces: Cmd:opset
+    Set or unset whether this node should display its descriptive
+    name in the network editor.
+
+::`creationTime(self)` -> `datetime.datetime`:
+    #cppname: HOM_Node::creationTime
+    #replaces: Cmd:opstat
+    Return the date and time when the node was created.
+
+::`modificationTime(self)` -> `datetime.datetime`:
+    #cppname: HOM_Node::modificationTime
+    #replaces: Cmd:opstat
+    Return the date and time when the node was last modified.
+
+::`creator(self)` -> Node:
+    #cppname: HOM_Node::creator
+    #replaces: Cmd:opstat
+    #status: nd
+
+::`creatorState(self)` -> `str`:
+    #cppname: HOM_Node::creatorState
+    This returns the name of the viewport tool that was used to be created.
+    This name is not set by default and is usually the empty string.
+
+::`setCreatorState(self, state)`:
+    #cppname: HOM_Node::setCreatorState
+    This sets the name of the tool that created this node. If you call this
+    with a name that differs from the node type name, you should also call
+    `setBuiltExplicitly(False)`.
+
+::`isBuiltExplicitly(self)` -> `bool`:
+    #cppname: HOM_Node::creator
+    Return whether this node was built explicitly (defaults to True).  Most
+    nodes are built explicitly, but some are implicitly created by Houdini.
+    For example, if you select geometry from multiple SOPs and then perform
+    an operation, Houdini will put down an implicit merge SOP before performing
+    that operation.  When reselecting geometry in SOPs, Houdini will
+    automatically delete any SOPs that were created implicitly.
+
+::`setBuiltExplicitly(self, built_explicitly)`:
+    #cppname: HOM_Node::setBuiltExplicitly()
+    Set whether this node was built explicitly (default value is True). If
+    set to False, this node will not show up in various menus and in the
+    Network View pane's list mode. This flag is typically used for
+    intermediate utility nodes that one is unlikely to want to change its
+    parameters.
+
+::`isTimeDependent(self)` -> `bool`:
+    #cppname: HOM_Node::isTimeDependent
+    Return whether the node is time dependent.  A time dependent node is
+    re-evaluated every time the frame changes.
+
+
+== Layout ==
+
+::`moveToGoodPosition(self, relative_to_inputs=True, move_inputs=True, move_outputs=True, move_unconnected=True)` -> [Hom:hou.Vector2]:
+    #cppname: HOM_Node::moveToGoodPosition
+    #replaces: Cmd:opautoplace
+    Moves a node to a well-spaced position near its inputs or outputs and
+    returns the new position of the node.
+
+::`layoutChildren(self, child_nodes=(), horizontal_spacing=-1.0, vertical_spacing=-1.0)`:
+    #cppname: HOM_Node::layoutChildren
+    #replaces: Cmd:oplayout
+    Automatically position all or some children of this node in the network
+    editor.
+
+    items:
+        A sequence of child [Hom:hou.NetworkMovableItem] objects to position.
+        This may include nodes, dots, and/or subnet inputs. If this sequence
+        is empty, this method will reposition all child items of this node.
+
+    horizontal_spacing:
+        A fraction of the width and height of a tile that affects the space
+        between nodes with common inputs.  If this parameter is -1, Houdini
+        uses the default spacing.
+
+    vertical_spacing:
+        A fraction of the width and height of a tile that affects the space
+        between a node and its output nodes.  If this parameter is -1, Houdini
+        uses the default spacing.
+
+::`isHidden(self)`:
+    #cppname: HOM_Node::isHidden
+    #replaces: Cmd:opget, Exp:opflag
+    Return whether the node is hidden in the network editor.  Note that Houdini
+    also uses the term "exposed" to refer to nodes that are not hidden.
+
+    If a visible node is connected to a hidden node, the network editor will
+    display dashed lines for the wire going from the visible node to the hidden
+    node.
+
+    See also [Hom:hou.Node#hide].
+
+::`hide(self, on)`:
+    #cppname: HOM_Node::hide
+    #replaces: Cmd:opset
+    Hide or show a node in the network editor.  See [Hom:hou.Node#isHidden]
+    for more information about hidden nodes.
+
+
+== Cooking ==
+
+::`cook(self, force=False, frame_range=())`:
+    #cppname: HOM_Node::cook
+    #replaces: Cmd:opcook
+    Asks or forces the node to re-cook.
+
+    frame_range:
+        The frames at which to cook the object. This should be a tuple of 2 or 3
+        ints giving the start frame, end frame, and optionally a frame
+        increment, in that order. If you supply a two-tuple `(start, end)`, the
+        increment is `1`.
+
+::`needsToCook(self, time=hou.time())` -> `bool`:
+    #cppname: HOM_Node::needsToCook
+    Asks if the node needs to re-cook.
+
+::`cookCount(self)` -> `int`:
+    #cppname: HOM_Node::cookCount()
+    Returns the number of times this node has cooked in the current session.
+
+::`updateParmStates(self)`:
+    #cppname: HOM_Node::updateParmStates()
+    Update the UI states, such as hidden and disabled, for each parameter
+    in the node.
+    
+    UI states can be expressed as conditionals (i.e. Disable
+    When) which require evaluation.  Typically in graphical Houdini the
+    Parameter Pane performs the evaluation when the node is selected in order
+    to determine how the node parameters should look in the pane.  However in
+    non-graphical Houdini or if the Parameter Pane has not yet loaded the node,
+    then the evaluation does not occur and the UI states remain at their
+    defaults causing methods such as [Hom:hou.Parm#isDisabled] and
+    [Hom:hou.Parm#isHidden] to return incorrect values.  In these cases, it
+    is recommended that [Hom:hou.Node#updateParmStates] is called.
+
+::`errors(self)` -> `tuple` of `str`:
+    #cppname: HOM_Node::errors
+    Return the text of any errors from the last cook of this node,
+    or an empty tuple if there were no errors.
+
+::`warnings(self)` -> `tuple` of `str`:
+    #cppname: HOM_Node::warnings
+    Return the text of any warnings from the last cook of this node,
+    or an empty tuple if there were no warnings.
+
+::`messages(self)` -> `tuple` of `str`:
+    #cppname: HOM_Node::messages
+    Return the text of any messages from the last cook of this node,
+    or an empty tuple if there were no messages.
+
+::`infoTree(self, verbose=False, debug=False)` -> [Hom:hou.NodeInfoTree]:
+    #cppname: HOM_Node::infoTree
+    #replaces: Cmd:opinfo
+    Returns a tree structure containing information about the node and its
+    most recently cooked data. The contents of the tree vary widely depending
+    on the node type, and the nature of its cooked data. This tree of data is
+    used to generate the node information window contents.
+
+    Setting `verbose` to `True` will cause some additional information to be
+    generated. In particular data that is expensive to calculate, or which will
+    generate a large amount of information tends to be generated only if this
+    option is turned on.
+
+    Setting `debug` to `True` will, in a few cases, cause additional
+    information to be displayed which generally will be most useful when
+    debugging the internal opreation of Houdini. For example, geometry
+    attributes will display their "data ids", which can be helpful when
+    tracking down errors in SOPs written with the HDK.
+
+::`canGenerateCookCode(self, check_parent=False)` -> `bool`:
+    #cppname: HOM_Node::canGenerateCookCode
+    Return True if the node can generate compiled cook code and False otherwise.
+
+    If check_parent is true, the parents in the ancestor hierarchy are tested
+    if any of them can generate code.
+
+::`cookCodeGeneratorNode(self, check_parent=False)` -> [Hom:hou.Node]:
+    #cppname: HOM_Node::cookCodeGeneratorNode
+    Return the node itself or a network node that contains this node and 
+    can generate compiled cook code.  For example, the generator node for 
+    a VOP node could be the SHOP node or SOP node that contains it for example.
+
+    Return None if this node cannot generate code and is not contained 
+    in a code generating node either either.
+
+::`cookCodeLanguage(self)` -> `str`:
+    #cppname: HOM_Node::cookCodeLanguage
+    Return the language of the generated cook code (i.e. VEX, RSL).
+
+    Raises [Hom:hou.OperationFailed] if this node cannot generate compiled code.
+
+::`supportsMultiCookCodeContexts(self)` -> `bool`:
+    #cppname: HOM_Node::supportsMultiCookCodeContexts
+    Return True if this node can generate compiled cook code for multiple
+    contexts (i.e. surface context, displacement context, etc.) and False otherwise.
+
+    Raises [Hom:hou.OperationFailed] if this node cannot generate compiled code.
+
+::`saveCompiledCookCodeToFile(self, file_name, context_name=None)`:
+    #cppname: HOM_Node::saveCompiledCookCodeToFile
+
+    Saves compiled VEX code to a disk file (for nodes that support this).
+    See [Hom:hou.Node#saveCookCodeToFile] for a description of the arguments.
+
+::`saveCookCodeToFile(self, file_name, skip_header=False, context_name=None)`:
+    #cppname: HOM_Node::saveCookCodeToFile
+    Saves VEX/RSL source code to a disk file (on nodes that support this).
+
+    `file_name`:
+        The file path in which to save the generated code.
+
+    `skip_header`:
+        If `True`, the method does not write a header comment at the beginning
+        of the file containing the file name and node path from which the code
+        was generated and a time stamp.
+
+    `context_name`:
+        A string containing name of the shader context for the code. This
+        option applies to nodes such as the
+        [Material Shader Builder|Node:shop/vopmaterial] which can generate
+        code for multiple context types.
+
+        For example, a Material network might contain both surface and
+        displacement shaders, so you must specify which type of shader code to
+        generate:
+
+        {{{
+        #!python
+        node("/shop/vopmaterial1").saveCookCodeToFile("myfile.vfl", context_name="surface")
+        }}}
+
+        On single-context nodes this argument is ignored.
+
+        For VEX materials, possible values are `surface`, `displacement`,
+        `light`, `shadow`, `fog`, `image3d`, `photon`, or `cvex`.
+
+        For RSL materials, possible values are `surface`, `displacement`,
+        `light`, `volume`, or `imager`.
+
+
+== Network boxes ==
+
+::`networkBoxes(self)` -> tuple of [Hom:hou.NetworkBox]:
+    #cppname: HOM_Node::networkBoxes
+    #replaces: Cmd:nbls
+    Return a list of the network boxes inside this node.
+
+::`iterNetworkBoxes(self)` -> generator of [Hom:hou.NetworkBox]:
+    #cppname: HOM_Node::networkBoxes
+    #replaces: Cmd:nbls
+    Return a generator that iterates through all the network boxes inside this
+    node.
+
+::`findNetworkBox(self, name)` -> [Hom:hou.NetworkBox]:
+    #cppname: HOM_Node::findNetworkBox
+    #replaces: Cmd:nbls
+    Return a network box with the given name inside this node, or `None` if
+    no network box with the given name exists.
+
+::`findNetworkBoxes(self, pattern)` -> `tuple` of [Hom:hou.NetworkBox]:
+    #cppname: HOM_Node::findNetworkBoxes
+    #replaces: Cmd:nbglob
+    Return a list of network boxes inside this node whose names match a
+    pattern.
+
+::`createNetworkBox(self, name=None)` -> [Hom:hou.NetworkBox]:
+    #cppname: HOM_Node::createNetworkBox
+    #replaces: Cmd:nbadd
+    Creates a network box inside this network. Raises [Hom:hou.OperationFailed]
+    if this node is not a network.
+
+    If you don't specify a `name`, Houdini gives the box a default name.
+
+    Network box names are not displayed in the network editor pane. Instead, a
+    "comment" can be specified with the [Hom:hou.NetworkBox#setComment]
+    method, and this comment will appear in the title bar of the network box.
+
+::`copyNetworkBox(self, network_box_to_copy, new_name=None, channel_reference_original=False)` -> [Hom:hou.NetworkBox]:
+    #cppname: HOM_Node::copyNetworkBox
+    #replaces: Cmd:nbcp
+    Copies a network box and returns the copy.
+
+    If `new_name` is given, the network box will be copied to a new network box
+    named new_name (a different name will be generated if there is already a
+    network box with that name).
+
+    If `channel_reference_original` is `True`, all operators created by the copy
+    will have their animatable parameters set to reference the original
+    operators.
+
+    Raises [Hom:hou.OperationFailed] if this node is not a network or if the
+    node child type does not match the network box's node type.
+
+
+== Sticky notes ==
+
+::`stickyNotes(self)` -> tuple of [Hom:hou.StickyNote]:
+    #cppname: HOM_Node::stickyNotes
+    Return a list of the sticky notes inside this node.
+
+::`iterStickyNotes(self)` -> generator of [Hom:hou.StickyNote]:
+    #cppname: HOM_Node::stickyNotes
+    Return a generator that iterates through all the sticky notes inside this
+    node.
+
+::`findStickyNote(self, name)` -> [Hom:hou.StickyNote]:
+    #cppname: HOM_Node::findStickyNote
+    Return a sticky note with the given name inside this node, or `None` if
+    no sticky note with the given name exists.
+
+::`findStickyNotes(self, pattern)` -> `tuple` of [Hom:hou.StickyNote]:
+    #cppname: HOM_Node::findStickyNotes
+    Return a list of sticky notes inside this node whose names match a
+    pattern.
+
+::`createStickyNote(self, name=None)` -> [Hom:hou.StickyNote]:
+    #cppname: HOM_Node::createStickyNote
+    Creates a sticky note inside this network. Raises [Hom:hou.OperationFailed]
+    if this node is not a network.
+
+    If you don't specify a `name`, Houdini gives the note a default name.
+
+::`copyStickyNote(self, network_box_to_copy, new_name=None)` -> [Hom:hou.StickyNote]:
+    #cppname: HOM_Node::copyStickyNote
+    Copies a sticky note and returns the copy.
+
+    If `new_name` is given, the sticky note will be copied to a new sticky note
+    named new_name (a different name will be generated if there is already a
+    sticky note with that name).
+
+    Raises [Hom:hou.OperationFailed] if this node is not a network or if the
+    node child type does not match the sticky note's node type.
+
+
+== Network dots ==
+
+::`createNetworkDot(self)` -> [Hom:hou.NetworkDot]:
+    #cppname: HOM_Node::createNetworkDot
+    Creates a network dot inside this network. Raises [Hom:hou.OperationFailed]
+    if this node is not a network.
+
+::`networkDots(self)` -> `tuple` of [Hom:hou.NetworkDot]:
+    #cppname: HOM_Node::networkDots
+    Returns a tuple of all dots in this network.
+
+
+== Node groups ==
+
+::`addNodeGroup(self, name=None)` -> [Hom:hou.NodeGroup]:
+    #cppname: HOM_Node::addNodeGroup
+    #replaces: Cmd:opgadd
+    Add a node group to the node and return the new group.
+
+    If a group of the given name already exists then this function simply
+    returns the existing group without adding a new one. If the name of the
+    group is None or an empty string, then a unique default name is
+    automatically chosen.
+
+    This function can only be called on nodes that are networks. If it is called
+    on a node that is not a network, then it raises [Hom:hou.OperationFailed].
+
+    To remove a node group, use [Hom:hou.NodeGroup#destroy].
+
+::`nodeGroup(self, name)` -> [Hom:hou.NodeGroup]:
+    #cppname: HOM_Node::nodeGroup
+    #replaces: Cmd:opgls
+    Return a node group contained by the node with the given name, or `None` if
+    the group does not exist.
+
+::`nodeGroups(self)` -> tuple of [Hom:hou.NodeGroup]:
+    #cppname: HOM_Node::nodeGroups
+    #replaces: Cmd:opgls
+    Return the list of node groups in this node.
+
+
+== Scripts ==
+
+::`runInitScripts(self)`:
+    #cppname: HOM_Node::runInitScripts
+    Runs the initialization script associated with this node's type.
+
+::`deleteScript(self)` -> `str`:
+    #cppname: HOM_Node::deleteScript
+    #replaces: Cmd:opdelscript
+    Return the script that will run when this node is deleted.
+
+::`setDeleteScript(self, script_text, language=hou.scriptLanguage.Python)`:
+    #cppname: HOM_Node::setDeleteScript
+    Sets the script that will run when this node is deleted.
+
+
+== Motion FX ==
+
+::`motionEffectsNetworkPath(self)` -> `str`:
+    #cppname: HOM_Node::motionEffectsNetworkPath
+    Return a node path representing the location for storing clips. This
+    location may or may not exist. To find or create such a network, use
+    [Hom:hou.Node#findOrCreateMotionEffectsNetwork].
+
+::`findOrCreateMotionEffectsNetwork(self, create=True)` -> [Hom:hou.chopNetNodeTypeCategory]:
+    #cppname: HOM_Node::findOrCreateMotionEffectsNetwork
+    Return a CHOP network node suitable for storing Motion Effects. By
+    default, if the node doesn't exist, it will be created.
+
+    See also [Hom:hou.Parm#storeAsClip] and
+    [Hom:hou.Node#motionEffectsNetworkPath].
+
+
+== Stamping ==
+
+::`stampValue(self, parm_name, default_value)`:
+    #cppname: HOM_Node::stampValue
+    #replaces: Exp:stamp, Exp:stamps
+    Return a copy stamping floating point or string value.  This node must be a
+    downstream stamping operator, such as a Copy SOP, Cache SOP, LSystem SOP,
+    or Copy CHOP.
+
+    `parm_name`:
+        The name of the stamping variable.
+    `default_value`:
+        The value that this function returns if Houdini is not currently
+        performing stamping, or if `parm_name` is not a valid variable
+        name.  This value may be a float or a string.
+
+    You might put the following expression in a Python parameter:
+    {{{
+    #!python
+    node("../copy1").stampValue("sides", 5)
+    }}}
+
+
+== Serialization ==
+
+::`copyItemsToClipboard(self, items)`:
+    #cppname: HOM_Node::copyItemsToClipboard
+    Given a sequence of child items (nodes, network boxes, sticky notes, etc),
+    save them to the clipboard so they can be pasted into this or another
+    network.
+
+    items:
+        A sequence of [Hom:hou.NetworkMovableItem]s that are children of this
+        node.
+
+    Raises [Hom:hou.OperationFailed] if any of the nodes or network boxes
+    are node children of this node.
+    Raises [Hom:hou.PermissionError] if you do not have permission to read
+    the contents of this node.
+
+::`saveItemsToFile(self, items, file_name, save_hda_fallbacks = False)`:
+    #cppname: HOM_Node::saveItemsToFile
+    #replaces: Cmd:opwrite
+    Given a sequence of child items (nodes, network boxes, sticky notes, etc),
+    save a file containing those items.  You can load this file using
+    [Hom:hou.Node#loadItemsFromFile].
+
+    items:
+        A sequence of [Hom:hou.NetworkMovableItem]s that are children of this
+        node.
+
+    file_name:
+        The name of the file to write the contents to.  You can use any
+        extension for this file name.
+
+    save_hda_fallbacks:
+        Set to `True` to save simplified definitions for HDAs into the file
+        along with the child nodes. Doing this allows the generated file to
+        be safely loaded into any houdini session, even if the assets used
+        in the file are not already loaded into the houdini session. Depending
+        on the use of the generated file, this information is often not
+        required and makes the files unnecessarily large.
+
+    Raises [Hom:hou.OperationFailed] if any of the nodes or network boxes
+    are node children of this node, or if the file could not be written to.
+    Raises [Hom:hou.PermissionError] if you do not have permission to read
+    the contents of this node.
+
+::`saveChildrenToFile(self, nodes, network_boxes, file_name)`:
+    #cppname: HOM_Node::saveChildrenToFile
+    #replaces: Cmd:opwrite
+    Combines separate lists of nods and network boxes into a single sequence,
+    and calls [Hom:hou.Node#saveItemsToFile]. This method is provided for
+    backward compatibility. New code should call `saveItemsToFile` directly.
+
+    nodes:
+        A sequence of [Hom:hou.Node]s that are children of this node.
+
+    network_boxes:
+        A sequence of [Hom:hou.NetworkBox]es that are contained in this node.
+        Note that the contents of the network boxes are not automatically
+        saved, so it is up to you to put them in the list of nodes.
+
+::`loadItemsFromFile(self, file_name, ignore_load_warnings=False)`:
+    #cppname: HOM_Node::loadChildrenFromFile
+    #replaces: Cmd:opread
+    Load the contents of a file saved with [Hom:hou.Node#saveChildrenToFile]
+    into the contents of this node.
+
+    Raises [Hom:hou.OperationFailed] if the file does not exist or it is not
+    the correct type of file.  Raises [Hom:hou.PermissionError] if this
+    node is a locked instance of a digital asset.  Raises [Hom:hou.LoadWarning]
+    if the load succeeds but with warnings and `ignore_load_warnings` is
+    `False`.
+
+::`loadChildrenFromFile(self, file_name, ignore_load_warnings=False)`:
+    #cppname: HOM_Node::loadChildrenFromFile
+    #replaces: Cmd:opread
+    Calls [Hom:hou.Node#loadItemsFromFile]. Provided for backward
+    compatibility. New code should call `loadItemsFromFile` directly.
+
+::`pasteItemsFromClipboard(self, position = None)`:
+    #cppname: HOM_Node::pasteItemsFromClipboard
+    Load the contents of a file saved with [Hom:hou.Node#copyItemsToClipboard]
+    into the contents of this node. If the `position` parameter is given as a
+    tuple of two float values (or equivalent, like a [Hom:hou.Vector2]), the
+    pasted items are moved such that they are centered around the provided
+    position.
+
+    Raises [Hom:hou.OperationFailed] if this node is not a network, or if
+    there are errors loading the items from the clipboard. Raises
+    [Hom:hou.PermissionError] if this node is a locked instance of a
+    digital asset.
+
+::`asCode(self, brief=False, recurse=False, save_channels_only=False, save_creation_commands=True, save_keys_in_frames=False, save_outgoing_wires=False, save_parm_values_only=False, save_spare_parms=True, function_name=None)` -> `str`:
+    #cppname: HOM_Node::asCode
+    #replaces: Cmd:opscript
+    Prints the Python code necessary to recreate a node.
+
+    `brief`:
+        Do not set values if they are the parameter's default.  Applies to the
+        contents of the node if either recurse or save_box_contents is True.
+
+    `recurse`:
+        Recursively apply to the entire operator hierarchy.
+
+    `save_box_contents`:
+        Script the contents of the node.
+
+    `save_channels_only`:
+        Only output channels.  Applies to the contents of the node if either
+        recurse or save_box_contents is True.
+
+    `save_creation_commands`:
+        Generate a creation script for the node.  If set to False, the
+        generated script assumes that the network box already exists.  When set
+        to True, the script will begin by creating the network box.
+
+    `save_keys_in_frames`:
+        Output channel and key times in samples (frames) instead of seconds.
+        Applies to the contents of the node if either recurse or
+        save_box_contents is True.
+
+    `save_parm_values_only`:
+        Evaluate parameters, saving their values instead of the expressions.
+        Applies to the contents of the node if either recurse or
+        save_box_contents is True.
+
+    `save_spare_parms`:
+        Save spare parameters as well.  When save_creation_commands is True,
+        commands for creating spare parameters will also be output.  Applies to
+        the contents of the node if either recurse or save_box_contents is
+        True.
+
+    `function_name`:
+        If a function_name is specified, the output will be wrapped in a Python
+        function.
+
+
+== Operators ==
+
+::`__eq__(self, node)` -> `bool`:
+    #cppname: HOM_Node::operator==(HOM_Node*)
+    Implements `==` between `Node` objects.
+
+    For example,  hou.root() == hou.node("/") will return `True`.
+
+    There can be multiple Python `Node` objects for the same Houdini node.
+    Two identical calls to `hou.node()` will return different Python `Node`
+    objects, with each representing the same Houdini node. Comparing these nodes
+    using `==` (which calls `__eq__`) will return `True`, while comparing them
+    using `is` (the object identity test) will return `False`.
+
+::`__ne__(self, node)` -> `bool`:
+    #cppname: HOM_Node::operator!=(HOM_Node*)
+    Implements `!=` between `Node` objects. See `__eq__()`.
+
+
+== Callbacks ==
+
+::`addEventCallback(self, event_types, callback)`:
+    #cppname: HOM_Node::addEventCallback
+    
+    Registers a Python callback that Houdini will call whenever a particular action, or event, occurs on _this particular node instance_.
+    
+    Callbacks only persist for the current session. For example, they are not saved to the `.hip` file. If you want persistent callbacks in every session, you can add them in code in `456.py` (runs when the user opens a `.hip` file). See [where to add Python scripting|/hom/locations] for more information.
+
+    `event_types`:
+        A sequence of [Hom:hou.nodeEventType] enumeration values describing the event types that will cause Houdini to call the `callback` function.
+
+    `callback`:
+        A callable Python object, such as a function or bound method. Houdini will call this function whenever one of the event types in `event_types` occurs.
+        
+        Houdini calls the function with an `event_type` keyword argument containing the [Hom:hou.nodeEventType] value corresponding to the event that triggered the callback.
+        
+        Houdini will pass additional keyword arguments depending on the event type. For example, in a callback for the `ParmTupleChanged` event, Houdini will pass a `parm_tuple` keyword argument containing a [Hom:hou.ParmTuple] reference to the parameter that changed. See [Hom:hou.nodeEventType] for the extra arguments (if any) passed for each event type.
+        
+        You can add `**kwargs` to the argument list to accept all keyword arguments, to allow the same callback to be used for different events, or to be safe from future changes:
+        
+        {{{
+        #!python
+        def event_callback(event_type, **kwargs):
+            ...
+        }}}
+
+    NOTE:
+        If you try to add the exact same callback function more than once, Houdini will still only call the function only once in response to an event. However, it may be useful to "add" the same function if you want to register it with different `event_types`.
+
+    Raises [Hom:hou.OperationFailed] if the `event_types` list argument is
+    empty.
+
+    The following example shows to set up a function that's called whenever a certain node's name changes:
+
+    {{{
+    #!python
+    
+    def name_changed(node, event_type, **kwargs):
+        print("The geometry object is now named", node.name())
+    
+    hou.node("/obj/geo1").addEventCallback(hou.nodeEventType.NameChanged, name_changed)
+    }}}
+
+    See also [Hom:hou.Node#removeEventCallback] and [Hom:hou.Node#removeAllEventCallbacks].
+
+::`removeEventCallback(self, event_types, callback)`:
+    #cppname: HOM_Node::removeEventCallback
+    Given a callback that was previously added on this node and a sequence
+    of [Hom:hou.nodeEventType] enumerated values, remove those event types from
+    the set of event types for the callback.  If the remaining set of event
+    types is empty, the callback will be removed entirely from this node.
+
+    Raises [Hom:hou.OperationFailed] if the callback had not been previously
+    added.
+
+    See [Hom:hou.Node#addEventCallback] for more information.
+
+::`removeAllEventCallbacks(self)`:
+    #cppname: HOM_Node::removeAllEventCallbacks
+    Remove all event callbacks for all event types from this node.
+
+    See [Hom:hou.Node#addEventCallback] for more information.
+
+::`eventCallbacks()` -> `tuple` of (`tuple` of [Hom:hou.nodeEventType], callback):
+    #cppname: HOM_ui::eventCallbacks
+    Return a tuple of all the Python callbacks that have been registered with
+    this node with calls to [Hom:hou.Node#addEventCallback].
+
+
+== User data ==
+
+::`setUserData(self, name, value)`:
+    #cppname: HOM_Node::setUserData
+    
+    Add/set a named string on this node instance.
+
+    `name`:
+        A unique name (key) for the user-defined data.  By using different
+        names, you can attach multiple pieces of user-defined data to a node.
+        
+    `value`:
+        The string to store.
+
+    This name/value pair is stored with the hip file and is included in the
+    output from [Cmd:opscript] and [Hom:hou.Node#asCode].
+
+    The following example illustrates how to set, access, and delete
+    user-defined data:
+
+    {{{
+    #!pycon
+    >>> n = hou.node("/obj").createNode("geo")
+    >>> n.setUserData("my data", "my data value")
+    >>> n.userData("my data")
+    'my data value'
+    >>> n.userDataDict()
+    {'my data': 'my data value'}
+    >>> n.destroyUserData("my data")
+    >>> n.userDataDict()
+    {}
+    >>> print n.userData("my data")
+    None
+    }}}
+
+    See [per-node user-defined data|Hom:nodeuserdata] for more information
+    and examples.
+
+::`userDataDict(self, name)` -> `dict` of `str` to `str`:
+    #cppname: HOM_Node::userDataDict
+    Return a dictionary containing all the user-defined name/string pairs
+    for this node.
+
+    See [Hom:hou.Node#setUserData] for more information.
+
+::`userData(self, name)` -> `str` or `None`:
+    #cppname: HOM_Node::userData
+    Return the user-defined data with this name, or `None` if no data with this
+    name exists.
+
+    See [Hom:hou.Node#setUserData] for more information.
+
+    This method can be implemented as follows:
+    {{{
+    #!python
+    def userData(self, name):
+        return self.userDataDict().get(name)
+    }}}
+
+::`destroyUserData(self, name)`:
+    #cppname: HOM_Node::destroyUserData
+    Remove the user-defined data with this name.
+
+    See [Hom:hou.Node#setUserData] for more information.
+
+    Raises [Hom:hou.OperationFailed] if no user data with this name exists.
+
+::`setCachedUserData(self, name, value)`:
+    #cppname: HOM_Node::setCachedUserData
+    Add/set a named value on this node instance.  Unlike `setUserData`,
+    values set using this method are not saved with the hip file.
+
+    `name`:
+    A unique name (key) for the user-defined data.  By using different
+    names, you can attach multiple pieces of user-defined data to a node.
+    `value`:
+    The value to store.  Unlike `setUserData`, this value may be any Python
+    object.
+
+    This name/value pair is not stored with the hip file.  It is useful for
+    nodes implemented in Python that want to save temporary values between
+    cooks, to avoid recomputing them on subsequent cooks.
+
+    The following example illustrates how to set, access, and delete
+    cached user-defined data:
+
+    {{{
+    #!pycon
+    >>> n = hou.node("/obj").createNode("geo")
+    >>> n.setCachedUserData("my data", [1, 2, {"a": "b", "c": "d"}])
+    >>> n.cachedUserData("my data")
+    [1, 2, {'a': 'b', 'c': 'd'}]
+    >>> n.cachedUserDataDict()
+    {'my data': [1, 2, {'a': 'b', 'c': 'd'}]}
+    >>> n.destroyCachedUserData("my data")
+    >>> n.cachedUserDataDict()
+    {}
+    >>> print n.cachedUserData("my data")
+    None
+    }}}
+
+    See [per-node user-defined data|Hom:nodeuserdata] for more information
+    and examples.
+
+::`cachedUserDataDict(self, name)` -> `dict` of `str` to `str`:
+    #cppname: HOM_Node::cachedUserDataDict
+    Return a dictionary containing all the user-defined name/string pairs
+    for this node.
+
+    See [Hom:hou.Node#setCachedUserData] for more information.
+
+::`cachedUserData(self, name)` -> `str` or `None`:
+    #cppname: HOM_Node::cachedUserData
+    Return the user-defined cached data with this name, or `None` if no data
+    with this name exists.
+
+    See [Hom:hou.Node#setCachedUserData] for more information.
+
+    This method can be implemented as follows:
+    {{{
+    #!python
+    def cachedUserData(self, name):
+        return self.cachedUserDataDict().get(name)
+    }}}
+
+    Note that `None` is a valid value for a key, so the most reliable way to
+    check if a key is valid is to check if it is in the result of
+    `cachedUserDataDict`:
+    {{{
+    #!pycon
+    >>> n = hou.node("/obj").createNode("geo")
+    >>> n.cachedUserDataDict()
+    {}
+    >>> print n.cachedUserData("foo")
+    None
+    >>> "foo" in n.cachedUserDataDict()
+    False
+    >>> n.setCachedUserData("foo", None)
+    >>> n.cachedUserDataDict()
+    {'foo': None}
+    >>> print n.cachedUserData("foo")
+    None
+    >>> "foo" in n.cachedUserDataDict()
+    True
+    }}}
+
+::`destroyCachedUserData(self, name)`:
+    #cppname: HOM_Node::destroyCachedUserData
+    Remove the user-defined cached data with this name.
+
+    See [Hom:hou.Node#setCachedUserData] for more information.
+
+    Raises [Hom:hou.OperationFailed] if no user data with this name exists.
+
+
+== Dynamics ==
+
+::`simulation(self)` -> [Hom:hou.DopSimulation]:
+    #cppname: HOM_DopNetNode::simulation
+    Return the simulation defined by this DOP network node.  This raises
+    an exception if this is not a dop network.
+
+::`findNodesThatProcessedObject(self, dop_object)` -> `tuple` of [Hom:hou.DopNode]:
+    #cppname: HOM_DopNetNode::findNodesThatProcessedObject
+    #replaces: Exp:dopnodeobjs
+    Given a [Hom:hou.DopObject], return a tuple of DOP nodes that processed
+    that object.  This raises an exception if this is not a dopnetwork.
+
+
+== Flags ==
+
+::`isFlagReadable(self, flag)` -> `bool`:
+    #cppname: HOM_Node::isFlagReadable
+    Return True if the specified flag is readable and False otherwise.
+
+    `flag` must be a [Hom:hou.nodeFlag] value. 
+
+::`isFlagWritable(self, flag)` -> `bool`:
+    #cppname: HOM_Node::isFlagWritable
+    Return True if the specified flag is writable and False otherwise.
+
+    `flag` must be a [Hom:hou.nodeFlag] value.
+
+::`isGenericFlagSet(self, flag)` -> `bool`:
+    #cppname: HOM_Node::isGenericFlagSet
+    Returns the value of the specific flag.
+
+    `flag` must be a [Hom:hou.nodeFlag] value. 
+
+::`setGenericFlag(self, flag, value)`:
+    #cppname: HOM_Node::setGenericFlag
+    Sets the value of the specified flag based on the `bool` `value` argument.
+
+    `flag` must be a [Hom:hou.nodeFlag] value. 
+
+
+
+
+

@@ -1,0 +1,185 @@
+#type: node
+#context: sop
+#internal: project
+#icon: SOP/project
+
+#tags: project, trim, model
+
+= Project =
+
+"""Creates profile curves on surfaces."""
+
+The Project SOP creates profile curves (also known as trim curves
+or curves-on-surface) by projecting a 3D face onto a spline surface,
+much like a light casts a 2D shadow onto a 3D surface.
+
+There are two projection methods:
+along a vector, or mapping the face directly onto the parametric
+space of the surface.
+
+After a Project node you will often want to...
+
+* Use a [Trim SOP|Node:sop/trim] to cut a hole in the projected surface
+  (as shown above).
+
+* Use a [Bridge SOP|Node:sop/bridge] to skin the profile curve to
+  another profile curve.
+
+* Use a [Profile SOP|Node:sop/profile] to extract the curve on surface
+  or remap its position.
+
+[Image:../images/ProjectBasicView.jpg]
+  
+== Additional Operations for Profile Curves ==
+
+To delete a projected curve, use a [Delete SOP|Node:sop/delete], and
+enter the profile number (e.g. 1.4 returns the fifth profile on the
+second primitive (counting starts at 0) ). You can visualize the
+number of the profiles by enabling the Profile Number icon in the
+Viewport Display options.
+
+You can group the profile curves with a [Group SOP|Node:sop/group].
+Do this by typing the profile numbers in the Pattern field. You can
+use all regular expressions.
+
+You can apply parametric affine transformations to the profile by
+using a [Primitive SOP|Node:sop/primitive]. You can also use the
+[Primitive SOP|Node:sop/primitive] to open, close, reverse, and
+cycle the profile curves.
+
+NOTE:
+    When applying transformations to a profile in the [Primitive
+    SOP|Node:sop/primitive], you can only rotate about the Z axis
+    because the projected curve is a planar curve that lives in the
+    domain of the surface. Therefore it wouldn't make any sense to
+    allow rotations in X or Y for profiles.
+
+== Example ==
+
+steps>>
+    # Place a [Circle SOP|Node:sop/circle], Type: NURBS, Radius 0.3,
+      0.3; then place a [Tube SOP|Node:sop/tube], Type: NURBS.
+
+    # Connect them into a Project op: Circle to Input1; Tube to
+      Input2.
+
+    # Append a [Trim SOP|Node:sop/trim] to the Project node. It
+      trims the surface according to the projection provided by the
+      Project node. You need to append a Trim node to a Project node
+      to get this trimming.
+
+    # Turn on the template flags on the Circle and Tube nodes; make
+      the Project op the display op.
+
+      [Image:../images/Houdini-03-1-062.jpg]
+
+== Tips ==
+
+The: Minimum Distance option is
+extremely useful, say in the following situation: You have a
+NURBS surface of a head, and you want to obtain a NURBS patch by
+projecting a hairline onto the head's surface. You could:
+
+* Template the NURBS head.
+
+* Enable the "Snap to Template" option in the Model Editor (Snap
+  options).
+
+* Draw a NURBS curve along the surface of the head where you
+  want the hairline.
+
+* Then, with the Project op, you select the Minimum Distance
+  option, and you have a profile curve with which you can trim
+  the surface of the head to obtain the patch.
+
+* Thus having obtained a NURBS patch for the scalp, you could
+  use it as the source, say for the Emit pop to grow a particle
+  system in order to produce hair.
+
+
+@parameters
+    Face Group:
+        Subset of faces (NURBS,Bezier,polygons) to project.
+    Surface Group:
+        Subset of spline surfaces to project on.
+    Cycle Type:
+        Ways of choosing projection order and sequencing:
+
+        All faces on each surface in sequence:
+            In the given domain interval
+        All faces on each surface overlapping:
+            In the given domain interval
+        One face per surface:
+        Cycled:
+            One face per surface, cycled until all surfaces have been
+            traversed
+
+    == Along Vector ==
+
+        Overview:
+            Faces are projected along a 3D vector
+        Axis:
+            Vector along which to project the faces: X, Y, Z,
+            user-defined, or minimum distance to the surface
+        Vector:
+            #channels: /projvec1 /projvec2 /projvec3
+
+            x,y,z components of projection vector
+        Side:
+            What side of the surface to project the face on:
+
+            Closest:
+                On the first side encountered in either direction
+            Farthest:
+                On the last side encountered in either direction
+        Divisions Per Span:
+            #channels: /sdivs
+
+            Number of 3D points evaluated in each span
+        Ray Tolerance:
+            #channels: /rtolerance
+
+            Precision of ray-surface intersection
+        Fit Tolerance:
+            #channels: /ftolerance
+
+            Precision of 2D fitting algorithm
+        Max UV Gap (%):
+            #channels: /uvgap
+
+            Percentage of domain to join 2 profiles
+        Order:
+            #channels: /order
+
+            Spline order of resulting profile curve
+        Preserve Sharp Corners:
+            Enable or disable fitting of sharp turns in curve
+        Super Accurate:
+            Use a very accurate, yet time consuming algorithm
+
+    == Parametrically ==
+
+        Overview:
+            Direct conversion of 3D CVs to domain points
+        U From:
+            Which of X,Y,Z must be mapped to the U parameter
+        V From:
+            Which of X,Y,Z must be mapped to the V parameter
+        Map Profile to Range:
+            Constrain the profile to the domain range below:
+        U Range:
+            #channels: /urange1 /urange2
+
+            Area of the unit U domain to be mapped on
+        V Range:
+            #channels: /vrange1 /vrange2
+
+            Area of the unit V domain to be mapped on
+        Mapping Type:
+            Uniform or chord length based conversion
+
+@related
+    - [Node:sop/trim]
+    - [Node:sop/profile]
+    - [Node:sop/primitive]
+

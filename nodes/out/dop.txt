@@ -1,0 +1,100 @@
+#type: node
+#context: out
+#internal: dop
+#icon: NETWORKS/dop
+
+= Dynamics =
+
+""" Saves the state of a DOP network simulation into files. """
+
+The Dynamics output driver generates simulation state (`.sim`) files
+from a dynamics (DOP) network. Each file contains the complete state of
+the simulation for a certain frame. You can then read the state back
+into the network using a [File DOP|Node:dop/file].  You can also
+directly point to a sequence of these files in the Files to Play
+parameter of the [Dopnet Object|Node:obj/dopnet] or [Dopnet SOP|Node:sop/dopnet].
+
+Saved state files are a persistent cache of a simulation. You can move
+these files around to run the simulation in one place and use the
+results in another. For example, you can use the hscript standalone
+utility to run a simulation on a renderfarm and save out state files,
+then play the simulation back locally by loading the state files with a
+File DOP. This would let you run multiple versions of a simulation on
+the renderfarm overnight and compare the results the next day.
+
+
+@parameters
+    Save to Disk:
+        #id: execute
+
+        Saves the simulation to disk as a sequence of .sim files.
+
+    Save to Disk in Background:
+	#id: executebackground
+
+	Starts another copy of Houdini in the background and instructs that
+	copy to save out the simulation as a sequence of .sim files.  This
+	allows one to continue working and load the .sim files as they
+	complete.
+
+    [Include:standard#valid_frame_range]
+
+    Start/End/Inc:
+	Specifies the range of frames to render (start frame, end frame, and increment). All values may be floating point values. The range is inclusive. 
+
+	These parameters determine the values of the local variables for the output driver.
+
+	    `$NRENDER`:
+		The number of frames to be rendered by the output driver.
+	    `$N`:
+		The current frame being rendered (starting at 1 and going to `$NRENDER`).
+
+    Render with Take:
+        #id: take
+
+        Uses the settings in a particular take while rendering. Choose
+        __Current__ to use the current take when rendering.
+
+    DOP Path:
+        The DOP network to render from. (You can point to a DOP within a
+        DOP network, but Houdini saves the state of the entire
+        network.)
+    Output File:
+        The file to save the simulation state to. Make sure to  [include
+        $SF in the filename|/render/expressions]  to write out
+        separate files for each frame.
+
+    Output Every Sim Frame Using $SF:
+	Every single simulation frame will be output, rather than just
+	the frames hit by the step rate of the frame range.  In this
+	mode one just has to set the entire range without worrying
+	about how substepping will be set up.
+
+	$SF should be used instead of $F in the file name in these
+	cases.
+
+    [Include:standard#mkpath]
+
+    Initialize Simulation OPs:
+        Force all simulation OPs to be reset. This includes DOP
+        Networks, POP SOPs, and other OPs that cache their results.
+
+        This is the safest way to render out a simulation, because it
+        starts the simulation from scratch and discards any partial
+        simulations you might have done with different parameters.
+        However, throwing away an already-cooked simulation can be
+        expensive, especially for relatively slow solvers such as
+        fluids.
+
+    Compress .sim Files:
+	Determines if .sim files written to disk for caching will be
+	compressed.  GZip can provide the best compression, but is
+	incredibly slow.  Blosc provides excellent compression and
+	speed so should usually be used.
+
+    Alfred Style Progress:
+	A percentage complete value is printed out as files are
+	written. This is in the style expected by Pixar's Alfred
+	render queue.
+
+    [Include:standard#scripts_tab]

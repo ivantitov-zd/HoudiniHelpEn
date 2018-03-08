@@ -1,0 +1,29 @@
+= Instancing using packed geometry and polygon soups =
+
+== Example ==
+
+Suppose that you have 5 intricate oak tree models, stored as [polygon soups|/model/primitives#polysoup] in files, with which to make a forest of 10000 trees.  Simply [copying|copytopoints] the oak tree model 10,000 times would take 10,000 times as much memory, so unless you make lightweight sprites to stand-in for most of the trees, copying the model is out of the question.
+
+[Instancing|instancing] the models onto points allows you to place them in the scene without loading the 5 trees, and when viewing, the tree models only need to be loaded once.  However, it can be awkward visualizing the placement and transformations of the trees as just one point for each.
+
+[Packed primitives|/model/packed] would enable you to have 10000 primitives in the geometry network, each referring to one of the 5 files. You could adjust the placement and transformation of each primitive, selectively viewing just one or a few of the trees as full models, or as point clouds, still only loading up to the 5 files, as needed. You can set this up using the option on the [File node|Node:sop/file] to load as packed geometry.
+
+Alternatively, you could procedurally generate 100 models of branches and trunks for the trees, each using 3 polygon soups, and use the __Pack Geometry Before Copying__ option on the [Copy node|Node:sop/copy] to pack up each of these details before copying to procedurally generate 50 tree models, each with 40 branches and a trunk, using packed primitives referring to the 100 details containing the branches and trunks. When a packed primitive is copied, it just refers to the same geometry data as the original, so there will only be 100 branch and trunk models and a set of packed primitives referring to these models.  These 50 tree models can then also be packed up, and copied to make the forest, and the result will then be:
+
+* 1 detail, for the forest, containing 10,000 packed primitives, only referring to...
+    * 50 unique details, one for each unique tree model, each containing 41 packed primitives, only referring to...
+        * 100 unique details, one for each unique branch or trunk model, each containing 3 polygon soups, and the corresponding points and vertices.
+
+The forest detail on its own takes up a bit more than 2 MB, the 50 tree details take up a total of a bit less than 1 MB, and supposing that each branch or trunk model takes up about 70 KB, the 100 branch and trunk details take up a total of about 7 MB, for a grand total of 10 MB for the entire forest.
+
+If you were to unpack just the first level of packing, you would have a forest containing 410,000 packed primitives referring to the branch and trunk models, which would take up about 89 MB, for a total of 96 MB.  If you were to unpack just the second level of packing, you would have 50 tree models of 123 polygon soups each, which would take up about 144 MB, for a total of 146 MB.  Unpacking both levels would result in a forest detail containing 1,230,000 polygon soups, taking up _28.7 GB_.
+
+(This is why Houdini forces you to [manually unpack packed geometry to edit it|/model/packed] rather than letting automatically unpacking to let you edit the geometry: it would be a rude surprise if you put down a editing node and used up all your computer's memory.)
+
+For example, supposing that a branch on one of the trees in the forest is encroaching on a path, you can unpack that tree, replacing its packed primitive with 41 branch and trunk packed primitives, translate, rotate, and scale the offending branch packed primitive, then repack the 41 packed primitives for the tree.  There will then be 51 unique details for trees.
+
+Mantra treats packed primitives as instanced, though it doesn't yet support nesting instances, so it will create 410,000 instances internally for this example, which can get memory intensive, but is feasible.  This means that significant nesting of packed primitives involves a trade off between the size of the underlying geometry and the number of instances.
+
+For example, packing a single polygon and creating a million packed primitives referring to it will take up significantly more memory than a single detail with a million polygons, but packing 1,000 polygons and referring to it 1,000 times is better than either of those.  With some careful balancing of that trade off, it is possible to render over 1 trillion cubes with vertex normals using less than 9 GB of memory.
+
+Supposing that a branch needs to be broken as a solid object using a finite element simulation, you can unpack just that tree, then unpack just that branch, and set up the simulation.  For RBD simulations, geometry often doesn't even need to be unpacked.  It can use packed fragment primitives to refer to just groups within a detail.  It also means that that using the [Copy node|Node:sop/copy] with a group and packing doesn't need to make a new detail with just the content of the group, unless the primitives are unpacked.

@@ -1,0 +1,205 @@
+= Create a custom COP with VOPs =
+
+You can create a custom compositing operation with VOPs or raw VEX.
+Custom COPs created with VEX are very similar to other generators and
+filters, with a few extra features:
+
+* All VEX-based generators have the same characteristics as  [normal
+  generators|_index] .
+
+  Generators do not have inputs. You set the image size, data format,
+  frame range and planes in the node.
+
+* VEX-based filters inherit sequence settings (image size, data format,
+  frame range, planes) from their first input.
+
+  All VEX-based filters have a  [mask input|/composite/masks]  to control the
+  effect of the filter per-pixel.
+
+VEX-based compositing operators cannot:
+
+* Change any of the sequence parameters: the length or start of the
+  sequence, the resolution or the data format of existing planes.
+
+* Write to multiple output pixel locations at a time.
+
+* Do more than one pass over the data (multi-pass algorithms).
+
+* Efficiently use globally computed data (like the average luminance of
+  the image). The node runs the VEX script for each pixel, so the global
+  data would need to be recalculated for each pixel.
+
+== Key concepts ==
+
+    * A VEX/VOP COP must write to one of the following variable sets:
+      `R`, `G`, `B`, `A` or `Cr`, `Cg`, `Cb`, `C4`. `R`, `G`, `B`, `A`
+      map directly to the Color plane's `C.r`, `C.g`, `C.b` components
+      and `Alpha`. `Cr`, `Cg`, `Cb`, `C4` map to the currently processed
+      plane's components.
+
+    * All of these variables can be read as well as written. For
+      generators, they will contain black. For filters, they will
+      contain the value of the corresponding image plane in input #1.
+
+    * X,Y return the position of the current pixel in 0-1 notation.
+      IX,IY return the position of the current pixel in 0 to XRES-1, 0
+      to YRES-1.
+
+    * Often you need to process different planes differently (like Color
+      and Alpha). You can do this by testing the `PNAME` variable
+      (current plane name) against the planes you need to process
+      ([colorname|Vex:colorname], [alphaname|Vex:alphaname], etc.).
+
+    To read other pixel locations, image planes, frames, or other
+    inputs:
+
+    VOPs:
+        The [COP Input VOP|Node:vop/copinput] allows you to pick the
+        input, plane, frame and pixel location of the pixel you want to
+        read. You can also specify how it is filtered - no filtering
+        (fast), bilinear (for sub-pixel accuracy) and full filtered
+        (slow, but good for continuous transforms or deformations)
+    VEX:
+        The [cinput|Vex:cinput], [binput|Vex:binput], and
+        [finput|Vex:finput] functions correspond to the no-filtering,
+        bilinear and full filtered input functions. VEX also has a
+        [ninput|Vex:ninput] function, which returns a 3x3 kernel of the
+        pixel and its neighbors in a matrix. This is done per-component,
+        so for color, you would need to call this 3 times.
+
+== Create a custom COP from VOPs ==
+
+    steps>>
+        # Use the  [tab menu|/basics/tabmenu]  to create a [VOP COP2
+          Generator Definition|Node:vex/cop2gen] or [VOP COP2 Filter
+          Definition|Node:vex/cop2filter] (in the __Managers__ sub-menu).
+
+        #  [Go inside|/ref/panes/network]  the node to the VOP network.
+
+        # Create a [Global Variables VOP|Node:vop/global]. You will
+          probably need to use some of the variables in your
+          definition.
+
+        # If you want to affect Color/Alpha only, use the `R,G,B,A`
+          outputs. If you want to generally affect any plane or a
+          specific plane, use `Cr,Cg,Cb,C4`. You can read the
+          corresponding input values from `R,G,B,A` or `Cr,Cg,Cb,C4`
+          (even though you can't write to both at once, you can still
+          read from any of them).
+
+        # To create parameters, connect Parameter VOPs to those inputs
+          you want to control.
+
+        # Once you've set up the VOP network, return to the VOP COP2
+          Generator/Filter Definition node. Change the name of the
+          definition to the human readable name for the new operator
+          type, and the internal name of the operator definition. You
+          can also reorder the parameters as they will appear in the new
+          node's parameter editor interface.
+
+        # Create an instance of the new operator and test it.
+
+    [Image:/images/samplevop.jpg]
+
+== Create a custom COP from VEX code ==
+
+    steps>>
+        # Create a new text file with the `.vfl` extension (for example,
+          myFunction.vfl). We recommend the name of the file match the
+          name of the VEX function inside.
+
+        # When writing the VEX function, use the context name `cop2`.
+
+        # Write the results of your function to `R,G,B,A` or
+          `Cr,Cg,Cb,C4`.
+
+        # To compile the COP to an HDA (the easiest way to use the code
+          in Houdini), use the following command line:
+          
+          {{{
+          vcc -l myfunction.hda myfunction.vfl 
+          }}}
+
+          This will produce a [Houdini Digital Asset (HDA)|/assets]
+          for your new COP, which you can then merge with other HDA
+          libs (like OPlibCOP2.hda) or  [install directly in
+          Houdini|/assets/install].
+
+    NOTE:
+        Arguments to the function show up as parameters for the new node
+        type. You can use  [#pragmas|/vex/pragmas]  to set the
+        type, name, range, menu items and disable behavior of the
+        parameters.
+
+== Create a custom building block VOP for use in COP vopnet ==
+
+    As in other VOP contexts, you can define a custom HDA VOP to be used
+    inside a COP vopnet. These HDAs will provide a snippet of VEX source
+    code to be inserted in the final VEX program represented by the COP vopnet
+    parent.
+
+    The snippet of code can be defined either through children VOPs, if the HDA is
+    a subnet, or explicitly in Operator Type Editor, if the HDA is script-based.
+
+    To create a subnet HDA, collapse selected VOP nodes into a sub-network,
+    then click ((RMB)) > __Create Digital Asset__.
+
+    To create a script HDA, click __File__ > __New Operator Type__, then choose __VEX Builder
+    Type__.
+    
+    In the __Node__ tab, specify `cop2*` for HDAs that need to appear in both __VOP
+    COP2 Generator__ and __VOP COP2 Filter__ vopnets. For HDAs intended only for __VOP
+    COP2 Generator__, use `cop2gen`, while HDAs intended only for __VOP COP2 Filter__ should use `cop2filter`.
+
+== Getting data from the COP inputs into VEX/VOPs ==
+
+    If the first input has a plane which matches a VEX parameter's name,
+    the node will use the input plane as the parameter's value
+    (effectively overriding the parameter). The node evaluates the
+    overloaded parameter from the plane on a per-pixel basis.
+
+    For example, if the COP has the following planes:
+
+    * `C{r,g,b}`
+
+    * `A`
+
+    * `fogdens`
+
+    ...and it is fed into a VEX Fog COP, the fog density will be
+    determined at each pixel by the `fogdens` plane, since the Fog
+    Density parameter's channel name is `fogdens`.
+
+== Creating new planes from exported VEX variables ==
+
+    If the VEX script for a custom COP exports a variable, Houdini
+    creates a new plane with the same name as the VEX parameter. If that
+    plane already exists in the input sequence, it is replaced by the
+    VEX version. Each VEX type maps to a COP data type:
+
+    table>>
+        tr>>
+            th>> VEX Type
+            th>> COP Type
+        tr>>
+            td>> int
+            td>> Single channel 32 bit integer
+        tr>>
+            td>> float
+            td>> Single channel 32 bit float
+        tr>>
+            td>> vector
+            td>> 3 channel 32 bit float
+        tr>>
+            td>> vector4
+            td>> 4 channel 32 bit float
+        tr>>
+            td>> matrix3
+            td>> 3 element array of 3 channel 32 bit floats
+        tr>>
+            td>> matrix4
+            td>> 4 element array of 4 channel 32 bit floats
+    New planes are created as 32 bit floating point (except for int
+    planes, which are 32 bit int) and their vector size is determined by
+    the type of variable exported (float, vector, vector4).
+

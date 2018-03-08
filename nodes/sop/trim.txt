@@ -1,0 +1,118 @@
+#type: node
+#context: sop
+#internal: trim
+#icon: SOP/trim
+
+#tags: trim, reshape, splines
+
+= Trim =
+
+"""Trims away parts of a spline surface defined by a profile curve
+or untrims previous trims."""
+
+With the Trim op you can cut out parts of a spline surface, or uncut
+previously cut pieces. When a portion of the surface is trimmed, it is
+not actually removed from the surface; instead, that part is made
+invisible. This means that you can still modify the surface (modify the
+position of its points, for instance) that is not displayed in order to
+affect the part that is displayed.
+
+The surface can be trimmed by specifying open or closed profiles as
+inside or outside regions. The profiles need not be contained within the
+domain (UV space) of the surface; they can also be nested.
+
+Open profiles are treated as follows: if both ends of the profile are
+inside the surface, the ends are connected to one another; if the
+profile's ends are outside the domain of the surface they are projected
+onto, that part of the surface appears to be cut away.
+
+You will usually need a Trim SOP, [Bridge SOP|Node:sop/bridge], or
+[Profile SOP|Node:sop/profile] after a [Project SOP|Node:sop/project].
+
+* Use a Trim SOP to cut a hole in the projected surface.
+
+* Use a [Bridge SOP|Node:sop/bridge] to skin the profile curve to
+  another profile curve.
+
+* Use a [Profile SOP|Node:sop/profile] to extract the curve on surface
+  or remap it's position.
+
+== Selection Method: Winding Rule ==
+
+    The selection method employed for clarifying overlapping trim loops
+    is the _winding rule_, which executes overlapping commands instead
+    of having them cancel each other out.
+
+
+    TIP:
+        Since only surfaces containing profile curves can be trimmed,
+        you will always need a [Project SOP|Node:sop/project] or [Carve
+        SOP|Node:sop/carve] in the chain above the Trim SOP.
+
+== Example ==
+
+    The following results were obtained by using a [Project
+    SOP|Node:sop/project] to project two NURBS circles onto a NURBS
+    grid. Then two Trim SOPs were added, one after the other, to the
+    [Project SOP|Node:sop/project]. The first Trim SOP was set to _Keep
+    Inside_, while the second Trim SOP had its operation changed as
+    indicated.
+
+    [Image:../images/Houdini-03-1-086.jpg]
+
+    The illustrations show a Gouraud shaded view of the resulting
+    geometry.
+
+
+@parameters
+    Group:
+        Subset of profiles to use as trim curves.
+    Trimming operation:
+        Lists the types of trimming operations available:
+
+        Keep Outside:
+            Remove the area of the surface enclosed by the curve.
+        Keep Inside:
+            Remove the area outside the curve.
+        Keep Natural:
+            Trim based on the natural orientation of the profiles, be
+            they open or not. Counter-clockwise profiles keep their
+            interior, generating a result similar to "Keep Inside".
+            Clockwise profiles discard their interior, similar to "Keep
+            Outside", and may require an explicit outer trim-loop if
+            none present.
+        Untrim:
+            Undo the trimming operation associated with the trim curve
+            and turn the trim curve into a plain profile curve. Use the
+            Delete operation to remove the profile entirely; this also
+            applies to explicitly built outer-trim loops, which are
+            regular profiles.
+        Change Altitude:
+            If the trim loops are viewed as contours on a map, the
+            altitude is the "sea level" which marks the transition from
+            trim in to trim out. $ALTITTUDE is the local variable
+            containing the surfaces current altitude.
+    Process profiles individually:
+        Generate a trim region out of of each profile or treat the
+        whole group as one.
+    Build outer-trim loop explicitly:
+        Generate a trim loop around the surface boundary. One is
+        created automatically when a surface is trimmed for the first
+        time if "Keep Outside" is on.
+    Trimming Tolerance:
+        #channels: /trimtol
+
+        How close two trim curves must be to each other or to the edge
+        of the patch to be considered an intersection.
+    Altitude:
+        #channels: /altitude
+
+        The new altitude for the surface.
+
+@related
+    - [Node:sop/project]
+    - [Node:sop/profile]
+    - [Node:sop/surfsect]
+    - [Node:sop/carve]
+    - [Node:sop/cookie]
+

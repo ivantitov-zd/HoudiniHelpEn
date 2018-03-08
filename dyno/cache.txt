@@ -1,0 +1,70 @@
+= Caching simulations =
+
+== Overview ==
+
+Normally, Houdini caches simulated information in memory for quick playback. The __Cache memory__ parameter on the [DOP Network node|Node:obj/dopnet] controls how much memory to use for cached simulation frames.
+
+When Houdini runs out of space in memory for new cached frames, it will drop older cached frames. If you turn on __Allow caching to disk__, instead of dropping old frames, Houdini will write them as `.sim` files to the temporary directory. Scrubbing through these on-disk frames is slower than in-memory frames, but this allows you to cache an entire large simulation. You can control the saving of these files on the __Cache__ tab of the DOP Network node.
+
+There are also times when you may want to explicitly save simulation files to disk:
+
+* When you only need to simulate the motion of objects (for example, rigid bodies) once, and then can use the saved motion to drive geometry.
+
+* When the simulation is "locked" and you want to just play it back from disk, avoiding re-simulating if parameters change.
+
+You can use controls on the [Output DOP|Node:dop/output] or the [Dynamics render node|Node:out/dop] to write out simulation files. You can use controls on the [DOP Network node|Node:obj/dopnet#playback_simulation] to set up a simulation network to play back from cached files.
+
+== Timeline coloring ==
+
+When working with simulations, the [timeline|/anim/playbar] (at the bottom of the main Houdini window) uses background colors to indicate the cached state of each frame.
+
+<span style="color:blue">Blue</span> |
+    Cached in memory.
+<span style="color:purple">Purple</span> |
+    Cached to a sim file.
+<span style="color:orange">Orange</span> |
+    Cached in memory but out-of-date (you have changed a parameter, so the cache is no longer valid).
+
+== Explicit disk caching ==
+
+By default, when __Allow caching to disk__ is on, Houdini saves on-disk cache files to the temporary directory. If these cached frames are invalidated, Houdini automatically deletes them from disk.
+
+You can turn on __Save checkpoints__ to save the on-disk cache to a known location instead, with explicit control over how often and how many frames to cache. These files _are not deleted if they're invalidated_. However, checkpoints are useful for large simulations running on render farms. If the render fails for some reason at frame 50, you can change the start frame to 50, and Houdini will re-start the simulation from the previous checkpoint (for example, frame 45) instead of having to re-simulate from frame 1.
+
+# Select the [DOP Network node|Node:obj/dopnet].
+
+# In the parameter editor, click the __Cache__ tab and turn on __Save checkpoints__.
+
+# Check the __Checkpoint files__ parameter, which controls where the sim files are written and the [filename pattern|/render/expressions] of the `.sim` files. You must use `$SF` (internal simulation framestep number) instead of `$F` (global frame number) in the filename pattern.
+
+# Set the __Checkpoint interval__ to control how often Houdini saves checkpoint files. For example, setting this to `5` will save every fifth frame.
+
+# Set the __Checkpoint trail length__ to control how many checkpoints Houdini saves at a time. If there are more checkpoints than this, Houdini will automatically delete the oldest one. This may be necessary for large simulations to prevent checkpoints from filling up the disk. 
+
+== Baking out sim files ==
+
+The [Output DOP|Node:dop/output] at the end of the simulation network has controls for writing out simulation files. These files are independent of the cache. You can keep `.sim` files between runs of Houdini, and move them between computers.
+
+# Select the Output node.
+
+# In the parameter editor, set the __Start__ and __End__ frames to simulate.
+
+# Check the __Output file__ parameter, which controls where the sim files are written and the [filename pattern|/render/expressions] of the `.sim` files.
+
+    You can use a `.sim.gz` (GZIP) or `.sim.sc` (Blosc) extension to have Houdini compress the files. This is slower but saves disk space.
+
+# Click either __Save to disk__ or __Save to disk in background__.
+
+    Saving in the background launches a new copy of Houdini in the background to run the simulation. You must save the `.hip` file before you use this option. You can monitor the background task using the render manager.
+
+You can also use the [Dynamics render node|Node:out/dop] to write out sim files. The render node is useful if you need to generate simulation data as part of a [rendering dependency|/render/batch] path. Also, because the render driver is not part of the simulation itself, changing its parameters will not cause the simulation to recook.
+
+== Playing back from saved sim files ==
+
+Once you've baked out simulation files, you can set up a DOP network to _never cook_ and only play back the contents of the simulation files.
+
+# Select the [DOP Network node|Node:obj/dopnet].
+
+# In the parameter editor, turn on __Playback simulation__ and set the filename pattern for the `.sim` files to use.
+
+    You may want to make this a channel reference to the filename parameter on the node saving out the files, so you don't have to keep the two parameters in sync manually. Right click the filename parameter on the output node and choose __Copy Parameter__. Then, on the DOP network node, right click the playback filename field and choose __Paste copied relative reference__.

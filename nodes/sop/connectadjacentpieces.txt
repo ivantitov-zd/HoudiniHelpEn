@@ -1,0 +1,95 @@
+﻿= Connect Adjacent Pieces =
+
+#type: node
+#context: sop
+#internal: connectadjacentpieces
+#icon: SOP/connectadjacentpieces
+#tags: lowlevel, tech, rbd, dynamics, breaking
+
+"""Creates lines between nearby pieces."""
+
+This node creates a set of polygons that connect points together from nearby
+pieces. This is useful for creating a [Constraint Network|Node:dop/constraintnetwork] that constrains or glues together adjacent objects in a simulation.
+
+The `name` primitive attribute is used to determine which primitives in the input geometry belong to each piece. The output geometry contains a `name` point attribute to identify the piece that each point belongs to.
+
+@parameters
+
+Connection Type:
+    Specifies how connections between nearby pieces will be created.
+
+    Adjacent Pieces from Points:
+        Each point will be connected to the closest point from another
+        piece. The __Max Connections__ parameter can be used to allow
+        connections to multiple nearby pieces.
+
+    Adjacent Pieces from Surface Points:
+        The centroids of nearby pieces will be connected together. Before
+        searching for adjacent pieces, points will be scattered across the
+        surface to aid the detection of close surfaces.
+
+Adjacent Points:
+    Connections will be made between raw points, ignoring any
+    name attribute.  This is useful if the geometry is already
+    packed, or constraints are being built for the sand solver.
+
+Assume Uniform Radius:	
+    When connection __Adjacent Points__, any `pscale` attibute found
+    will be assumed to be the same for all points.  This allows
+    a much faster query to be performed.
+
+Points per Area:
+    When connecting __Adjacent Pieces from Surfaces__, points are first seeded on the
+    surface of all the objects. There must be enough points for close
+    points to occur to detect close surfaces. This should be scaled down
+    by the square of the geometry size. For example, if your geometry is 10x bigger, you
+    should have 1/100 the points per area.
+
+Relax Iterations:
+    When connecting __Adjacent Pieces from Surfaces__, the scattered points
+    will be pushed away from each other to avoid clumping. This is done
+    gradually, to avoid chaotic behavior and to allow control over how much
+    relaxation takes place. More relaxation iterations will result in
+    points that are more separated from each other.
+
+Search Radius:
+    Specifies the maximum allowed distance when searching for nearby points.
+
+If in __Adjacent Points__ mode, this will be multiplied by any
+`pscale` attribute.  If `pscale` isn't present, it is treated
+as 1 so this refers to an absolute distance.
+
+Max Search Points:
+    Specifies an upper limit on the number of nearby points that can be
+    inspected. Lower numbers will improve performance, but run the risk
+    that only points from the same piece will be detected rather than
+    points on nearby pieces, causing connections to be missed.
+
+Max Connections:
+    Specifies an upper limit on the number of pieces that each seed point
+    can be connected to. This is primarily useful when connecting
+    __Adjacent Pieces from Points__, but may also improve the detection of __Adjacent
+    Pieces from Surface Points__. However, increasing this value will reduce performance.
+
+Offset From Centroid:
+    When connecting __Adjacent Pieces from Surface Points__, each point is moved away from the
+    centroid in the direction of the other point that it is connected to. A
+    value of 0 will leave the point at the centroid, and a value of 1 will
+    move the point to the surface of its piece.
+
+Create Length Attribute:
+    Create a primitive attribute that contains the length of each connection.
+
+Length Attribute:
+    Specifies the name of the primitive attribute used to record the length
+    of each connection.
+    
+@inputs
+
+Pieces:
+    The geometry to find adjacent pieces in.
+
+@related
+- [Node:dop/constraintnetwork]
+- [Node:sop/assemble]
+- [Node:sop/voronoifracture]

@@ -1,0 +1,116 @@
+#type: node
+#context: sop
+#internal: vdbactivate
+#icon: COMMON/openvdb
+
+#tags: vdb, volumemix, vdbcombine, vdbvisualize
+
+= VDB Activate =
+
+"""Activates voxel regions of a VDB for further processing."""
+
+[Include:volume_types]
+
+Many volume operations, such as Volume Mix and Volume VOP, only process
+active voxels in the sparse volume.  This can be a problem if you know a
+certain area in space will evaluate to a non-zero value, but it is
+inactive in your original volume.
+
+The VDB Activate SOP provides tools for manipulating this active region.
+It can also fill the newly added regions to a constant value, useful
+for interactively determining what is changing.
+
+TIP: To see the current active region, you can use the VDB Visualize SOP
+     and set it to Tree Nodes, Disabled; Active Constant Tiles, Wireframe Box; 
+     and Active Voxels, Wireframe Box.
+
+@parameters
+
+See [specifying volumes|/model/volumes#group].
+
+Source Group:
+    The vdb primitives to change the active region in.
+    
+Operation:
+    The vdb's current region is combined with the specified region
+    in one of several ways.
+
+	Union:
+	    All voxels that lie in the specified region will
+	    be activated.  Other voxels will retain their original
+	    activation states.
+	
+	Intersect:
+	    Any voxel not in the specified region will be deactivated
+	    and set to the background value.
+	
+	A - B:
+	    Any voxel that is in the specified region will be deactivated
+	    and set to the background value.
+	
+	Copy:
+	    If a voxel is outside the specified region, it is set
+	    to inactive and the background value.  If it is inside,
+	    it is marked as active.
+
+Value:
+    In the Union and Copy modes, when voxels are marked active they can also be
+    initialized to a constant value.  This will be done to all voxels that are
+    made active by the specification - including those that were already
+    active.
+
+    Thus, the Voxel Coordinats option will have the effect of setting a cube
+    area to a constant value.
+
+Position:
+    This defines a cube in SOP space.  Any voxel that touches this
+    cube will be part of the selected region.
+
+Voxel:
+    Defines minimum and maximum values of a box in voxel-coordinates.  This is
+    an inclusive range, so includes the maximum voxel. 
+
+Expand:
+    Expand the active area by the specified number of voxels.  Does not support
+    operation or setting of values.
+
+Reference:
+    Uses the second input to determine the selected region.
+
+    Bound Group:
+	Which primitives of the second input contribute to the bounding box
+	computation.
+
+    Activate by VDB Regions:
+	If turned on, only VDBs are used for activation.  They will activate
+	wherever they themselves are already active.  This can be used to
+	transfer the active region from one VDB to another, even if they are
+	not aligned.
+
+	If turned off, the bounding box of the chosen primitives are used
+	instead and activated as if they were specified as World Positions.
+
+Deactivate:
+    Any voxels that have the background value will be deactivated.  This
+    is useful for cleaning up the result of an operation that may
+    have speculatively activated a large band of voxels, but may
+    not have placed non-background values in all of them.
+
+    For example, you may have a VDB Activate before a Volume VOP
+    with Expand turned on to ensure you have room to displace the volume.
+    Then when you are done, you can use one with Deactivate to free
+    up the voxels you didn't need to use.
+
+Prune Tolerance:
+    After building the VDB grid there may be undetected constant tiles.
+    This tolerance is used to detect constant regions and collapse them.
+    Such areas that are within the background value will also be marked
+    inactive.
+
+@related
+
+- [Node:sop/vdb]
+- [Node:sop/vdbactivatesdf]
+- [Node:sop/volumevop]
+- [Node:sop/volumemix]
+

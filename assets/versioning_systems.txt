@@ -1,0 +1,63 @@
+= Two types of asset versioning =
+
+"""For historical reasons, Houdini supports two different systems for versioning assets, that support different use cases. You can use either or both at the same time."""
+
+
+== Overview ==
+
+Houdini supports two different but compatible systems for versioning assets, supporting different use cases:
+
+* You can incorporate the version number [as part of the asset's internal name|namespaces]. For example, `mynode::2.0`. This makes each version an entirely different asset.
+    
+    This allows different versions to exist in the same scene file simultaneously. When the user creates a node, they get the new version, but existing nodes use the older version and continue to work in the old way without changes.
+    
+    * You can make large-scale changes to how the node works, how it interprets inputs, its parameter interface, and so on, without breaking anything.
+        #glyph: fa-plus
+    
+    * You don't need to manually update old nodes.
+        #glyph: fa-plus
+    
+    * There is no provision to upgrade old nodes automatically.
+        #glyph: fa-minus
+
+* You can use the __Version__ field in the asset definition. If an asset instance loads and notices the asset's version string has changed since the scene file was saved, it will run an _upgrade handler script_ (if it exists). The script can edit the node instance to _transform_ it into the new version.
+
+    This can be useful if you usually make minor, backwards-compatible changes to an asset rather than big breaking changes, especially new parameters. It is mostly useful in a studio environment, where a TD does the work so the artists' tools are automatically upgraded.
+    
+    * You can automatically upgrade existing assets with new (backwards-compatible) features.
+        #glyph: fa-plus
+    
+    * You need to manually update the upgrade script and script the work of changing an old instance into a new instance, every time you update the asset. You may need to maintain the ability for the script to upgrade one of several old versions to the latest edition (for example, the script might need to be able to update any of version 1, 2, _or_ 3 to version 4).
+        #glyph: fa-minus
+
+The second system was the historical versioning solution before namespaces were added. It is retained for cases where it's still useful.
+
+NOTE:
+    Both systems will only upgrade other users automatically if your studio has a system so that central changes to an asset are propagated to users (for example, network drives or version control).
+
+
+== How to ==
+
+:task: Create a new backwards-incompatible version of an asset:
+    Create a new asset. When you choose its internal name, use the same name (and namespace) as the previous version, but give it a higher version number.
+    
+    For example, if the old asset is `mynamespace::mynode`, name the new asset `mynamespace::mynode::2.0`.
+    
+    See [namespaces and versions|namespaces] for more information.
+
+:task: Create an event handler to automatically upgrade old versions to a new version:
+    # In the asset's [type properties|/ref/windows/optype#basic], change the __Version__ field (on the __Basic__ tab).
+    
+        (You should probably work out a system for how the contents of this field changes. For example, it could be just a single increasing number.)
+
+    # In the asset's [Scripts tab|/ref/windows/optype#scripts], create or edit the `SyncNodeVersion` event handler for the asset. (Remember to set __Edit as__ to be Python instead of HScript.)
+    
+        This script will run when an instance of the asset loads and notices the asset's version string has changed since the scene file was saved.
+        
+        In this handler you can get the old version string using `kwargs["old_version"]` and the new version string as `kwargs["new_version"]`, and a [Hom:hou.Node] reference to the node instance in `kwargs["node"]`. Your script must then figure out what changes are necessary to change a node of the old version into the new version, and perform those changes on the node.
+        
+        See [how to write asset event scripts|/hom/locations#asset_events] for general information.
+
+
+
+

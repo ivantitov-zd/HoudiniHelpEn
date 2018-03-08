@@ -1,0 +1,96 @@
+#type: node
+#context: sop
+#internal: sssscatter
+#icon: SOP/sssscatter
+
+=  SSS Scatter =
+
+""" Generates a point cloud based on the input geometry that is suitable for the sub-surface scattering VOPs."""
+
+
+In order to generate an even distribution of points, the input geometry needs to be  converted to polygons. There are two "level of detail" controls available to aid in the conversion.
+
+It is generally a good idea to make the polygonal version quite dense (within reason) as surface normals of points scattered within each face will be interpolated, and could therefore result in strange illumination if the conversion is too coarse.
+
+There exists, at least in theory, a way to determine what the "optimum" number of points in the point cloud should be, given the chosen scattering distance of the material. In practice however, there are several factors that conspire against this theoretical optimum: things like curvature bias, an uneven distribution, a too-high scattering distance, etc.
+
+Nevertheless, this HDA provides a mechanism for computing an estimate of this
+optimum density in the Tab "Density Estimate". Here, once you can enter a scattering
+distance and a super sample amount, you can read off the estimated density. To 
+actually use this value in the generation itself, you need to toggle "Use Estimated
+Density" on.
+
+== Notes On The Algorithm ==
+
+The key thing that this HDA does is stabilize the attribute `ptarea` so that the total `ptarea` in the cloud remains constant across different point densities. If this were left alone, it would result in different shading for a point cloud with 1000 points, than for one with 2000 points; even if those points were distributed on the same surface.
+
+
+Internally, it calculates the total surface area (`TotalArea`) and the total point area (`TotalPtArea`), and then scales each point's `ptarea` attribute by the normalizing factor `TotalArea`/`TotalPtArea`.
+   
+@parameters
+
+== Cloud Generation ==
+
+This tab contains all the parameters that control both the polygonization of the incoming geometry, and the cloud generation.
+
+ Visualize Polygonal Conversion:
+        Toggle this on to visualize the result of the conversion to polygons. You probably want to leave this on while tweaking the level of detail parameters, and then turn it off once you're satisfied with the result.
+        
+        NOTE:
+                When this is off, the output of the HDA is a cloud  of points, which means that you'll need to set a viewport's point display to "on" if you want to see them. 
+
+Poly LOD in U:
+        This controls the polygonal level of detail in the parametric U direction of the input geometry. 
+        This parameter, in conjunction with __Poly LOD in V__, controls how fine or coarse the conversion to polygons is.
+ 
+Poly LOD in V:
+        This controls the polygonal level of detail in the parametric V direction of the input geometry. This parameter, in conjunction with __Poly LOD in U__, controls how fine or coarse the conversion to polygons is. 
+ 
+Use Estimated Density:
+        When this toggle is on, the result of the point density estimate (see __Density Estimate__ below) will be used as the total number of points in the cloud. When off, the value entered for __Number of Points__ will be used.
+        This is a non-destructive toggle, in the sense that any direct values or expressions used for the __Number of Points__ parameter will be kept intact regardless of the state of this toggle. 
+
+Number of Points:
+        This is the total number of points to distribute on the surface of the input geometry. The number or expression entered here can either be used directly, or overridden by the __Use Estimated density__ toggle, allowing for two different methods for defining this quantity.
+ 
+Curvature Bias:
+         Determines if and by how much surface curvature in the input geometry is taken into account when distributing the points.
+         The range is 0 to 1, where 0 results in curvature not taken into account at all, and 1 gives as much importance to curvature as it does to area, when distributing the points. 
+
+Random seed:
+        A random number generator (RNG) is used to place points randomly on the faces of each polygon. This is the seed given to that RNG. Different seed values result in different configurations for the generated cloud points (although the total number of points generated does not change). 
+
+== Density Estimate ==
+
+This tab contains all the parameters that control the estimation of an "optimal" number of points for the point cloud. Where what is optimum depends on the material's scattering distance and the desired super sampling.
+
+Scattering Distance:
+        This represents how far light is expected to travel (in object space) within the object, before it becomes completely extinguished.  The parameter by the same name in either of the sub-surface VOPs should match what is entered here, otherwise this estimate will be useless.
+
+Super Sample:
+        If you imagine the value entered for __Scattering Distance__ above as the radius of a circle, then this is the (approximate) number of points that will be generated for an area in the input geometry that matches the area of that circle. Think of it in a similar way as you think of the __Super Sample__ parameter for the [Mantra ROP|Node:out/ifd]. 
+
+Estimated Points:
+        This is a read-only parameter (it is always inactive). It is there to show you the result of the estimate. This is the number of points that is deemed to be appropriate given the two parameters above. It is also the number of points used to generate the cloud when __Use Estimated Density__ is toggled on. 
+
+
+== File Output ==
+
+Point clouds that are to be used for shading (i.e: within Mantra), need to be 
+saved to external files that can be loaded at render time -- not unlike texture 
+maps or any other render-time resource. These controls let you generate one or 
+a sequence of files in a format that is suitable for use at render time. These 
+are the files that you would use for the __Point Cloud File__ parameter in the 
+sub-surface VOPs. 
+
+Output Tiled Block File:
+        Pressing this button will save the file(s) to disk. The destination directory must exist. There is no progress feedback when saving long sequences -- the session will simply freeze until the process is done.
+
+Frame Range:
+        Toggle this on if you intend to save a sequence of files. When this is off and the __Output Tiled Block File__ button is pressed, a single file with the cloud for the current frame is saved. 
+
+Start/End/Inc:
+        When saving a sequence of frames, use these to specify the start frame, end frame, and frame increment for the sequence. 
+
+Output File:
+        A valid path for the files. The output directory must exist (it will not be created for you).

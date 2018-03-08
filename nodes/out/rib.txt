@@ -1,0 +1,294 @@
+﻿#type: node
+#context: out
+#internal: rman
+#icon: ROP/rman
+
+= RenderMan =
+
+"""Renders the scene using Pixar’s RenderMan renderer."""
+
+This output operator is used to drive the RenderMan rendering program. The operator sets up all necessary options and then invokes the renderer. Alternatively, the output can be saved to disk as a script file to be rendered later.
+
+Arguments may be passed to the script and variable expansion is done before calling the script.
+
+Specific parameters other than those listed below map directly to a feature in RenderMan. Various options and attributes can be set using these parameters. If a parameter is blank, then no value will be output in the RIB (i.e. the default values from the `rendermn.ini` file will be used).
+
+NOTE:
+    This renderer is not available by default. Available renderers are restricted to Mantra only. You can make RenderMan available in the [tab menu|/basics/tabmenu] by adding it in the __Edit > Preferences > Rendering__ menu.
+
+@parameters
+
+Render:
+    Renders with the last render control settings, using the path specified in __Display__.
+
+Render to MPlay:
+    Renders with the last render control settings, redirecting rendered frames to [MPlay|/mplay], instead of the specified path. Note that deep images will still be written out to their specified output path, if enabled.
+
+Render Control:
+    Opens the render control dialog to allow adjustments of the render parameters before rendering.
+    
+Valid Frame Range:
+    Render Current Frame: 
+        Renders a single frame, based on the value in the playbar or the frame that is requested by a connected output render node.
+    
+    Render Frame Range:
+        Renders a sequence of frames. If an output render node is connected, this range is generally ignored in favor of frames requested by the output render node.
+        
+    Render Frame Range (Strict):
+        Renders a sequence of frames. If an output render node is connected, this range restricts its requested frames to this frame range.
+
+Start/End/Inc:
+    Specifies the range of frames to render (start frame, end frame, and increment). All values may be floating point values. The range is inclusive. 
+    
+    These parameters determine the values of the local variables for the output driver.
+        `$NRENDER`:
+            The number of frames to be rendered by the output driver.
+        `$N`:
+            The current frame being rendered (starting at 1 and going to $NRENDER).
+            
+    For example, if the parameters are set to:
+    table>>
+        tr>>
+            th>> Start
+            th>> End
+            th>> Inc
+        tr>> 
+            td>> 10.5
+            td>> 12
+            td>> 0.5
+
+    There will be 4 frames rendered (10.5, 11, 11.5, and 12), so $NRENDER will have a value of 4. `$N` will have the value:
+    table>>
+        tr>>
+            th>> Frame
+            th>> 10.5
+            th>> 11
+            th>> 11.5
+            th>> 12
+        tr>> 
+            td>> $N
+            td>> 1
+            td>> 2
+            td>> 3
+            td>> 4
+    
+Render With Take:
+    The output driver will switch to this take before rendering to restore the current take when rendering has been completed.
+
+=== Main ===
+
+The output driver is responsible for generating RIB files. These files describe the Houdini scene to RenderMan. The Main tab determines how the RIB generation is processed.
+
+Render Target:
+    Chooses a target version of RenderMan allows you to generate a RIB targeted to a specific build of RenderMan.
+    
+RIB Backend:
+    Chooses how to drive PRMan to render the scene.
+
+    SOHO:
+        Uses [SOHO|/render/soho], Houdini's customizable Python scripted output system,
+        to generate a RIB stream.
+        
+    PRMan for Python:
+        Use PRMan's Python API to render directly. This has advantages and disadvantages
+        over SOHO.
+        
+        - It's probably faster than using SOHO, because it doesn't have the overhead
+          of writing the RIB to a file or pipe.
+        - PRMan runs in the same process as Houdini, so if PRMan crashes, Houdini may crash.
+        - Data structures in Python need to be massaged to fit properly with PRMan for
+          Python, so it may use more memory.
+    
+    Generate Python:
+        Generates a Python script that uses PRMan's Python API to render the scene.
+
+Camera:
+    The camera object which defines the scene.
+
+RiBegin:
+    The string Houdini passes to `RiBegin()` when __RIB Backend__ is __PRMan__ or __Python__.
+    See the documentation for PRMan for Python for more information.
+    The default is `__render`, which creates a rendering context.
+
+Disk File:
+    The location where the RIB file is saved to disk. You must turn on the Disk File checkbox to enable this parameter.
+
+Command:
+    The command where the RIB file is sent. This will be disabled if the RIB file is saved to disk.
+
+Block Until Render Completes:
+    When sending the output to a command, Houdini will normally return control after it is finished writing the RIB. This allows the render process to complete in the background. Turning on this parameter will force Houdini to block until the output driver finishes rendering the frame.
+    
+    When rendering a frame range, this option is automatically turned on. However, the option is not automatically turned on when rendering in an hscript or python loop construct. Therefore caution must be used or it is possible to end up starting multiple background renders.
+    
+    NOTE:
+        The rps and rkill hscript commands can be used to query or kill background renders. 
+        
+        See the [Troubleshooting|#trouble] section for more information.
+               
+[Include:standard#mkpath]
+[Include:standard#soho_skip_path]
+
+Initialize Simulation OPs:
+    If this option is turned on, all POP and DOP simulations will be put in a reset state before rendering.
+    
+== Objects ==
+    
+The parameters on this tab determine which objects and lights are included in the RIB.
+
+    The order of processing these parameters is as follows:
+    # Candidate objects/lights are selected.
+    # Forced objects/lights are added. 
+    # Objects/Lights matching the exclusion parameter are removed.
+
+Candidate Objects:
+    The geometry objects in this parameter will be included in the RIB if their display flags are turned on and their display channel is enabled.
+
+Force Objects:
+    Objects in this parameter are added to the RIB regardless of the state of their display. Objects can only be added to the RIB once.
+
+Exclude Objects:
+    Objects in this parameter are excluded from the scene, regardless of whether they are selected in the __Candidate Objects__ or __Force Objects__.
+    
+Solo Light:
+    Only lights in this parameter will be included in the RIB. This includes shadow map generation and illumination. If this parameter is set, the candidate, forced, and exclusion parameters are ignored.
+    
+    NOTE:
+        Using this parameter in conjunction with the render_viewcamera property provides a quick way of generating shadow maps for selected lights.
+
+Candidate Lights:
+    Each light in this parameter is added to the RIB if the dimmer channel of the light is not 0. The standard light sets the dimmer channel to 0 when the light is not enabled.
+    
+Force Lights:
+    The lights in this parameter are added to the RIB regardless of the value in their dimmer channels.
+
+Exclude Lights:
+    These lights will be excluded from the scene, even if they are selected in __Candidate Lights__ or Force Lights__.
+
+Visible Fog:
+    The fog/atmosphere objects in this parameter are included in the RIB if their display flags are turned on and their display channel is enabled.
+
+== Properties ==
+
+=== Display ===
+
+Hover your mouse over the parameter names and use the reference in the tool tip to look up the corresponding information in the RenderMan documentation.
+
+=== Ri AOV ===
+
+Hover your mouse over the parameter names and use the reference in the tool tip to look up the corresponding information in the RenderMan documentation.
+
+=== Hider ===
+
+Hover your mouse over the parameter names and use the reference in the tool tip to look up the corresponding information in the RenderMan documentation.
+
+=== Sampling ===
+
+Hover your mouse over the parameter names and use the reference in the tool tip to look up the corresponding information in the RenderMan documentation for the __Trace Motion Blur__ and __Pixel Samples__ parameters.
+
+Allow Motion Blur:
+    RenderMan will render the image using motion blur. The shutter parameter on the camera determines the duration of the shutter, specified as a fraction of the frame.
+          
+Xform Time Samples:
+    The number of transformation blur motion samples. Each object (unless the parameter exists on the object) will have this many transforms output over the shutter duration. Increasing this number will result in smoother sub-frame motion, at a small memory and compute expense. Any number of segments may be specified.
+        
+Geo Time Samples:
+    The number of deformation blur motion samples. Each object (unless the parameter exists on the object) will have this many copies of the geometry included in the RIB. When an object is deforming, increasing this parameter will result in smoother sub-frame motion blur.
+
+    This option has no effect objects, which use velocity blur, since velocity blur is linear by nature.
+
+    NOTE:
+        Any number of segments may be specified; however, duplicate geometry is sent down for each sample which may significantly impact the memory footprint of RenderMan. 
+    
+Motion Blur Style:
+    The type of motion blur. You can choose either a trailing, centered, or leading blur.
+    
+=== DOF ===
+
+Enable Depth of Field:
+    Hover your mouse over the parameter name and use the reference in the tool tip to look up the corresponding information in the RenderMan documentation.
+
+Focus: 
+    The lens focal distance and distance from the camera at which objects will be in focus. If the f-stop channel is also used, objects outside this distance will be blurred.
+    
+F-Stop:
+    Lens f-stop. Determines blurriness of depth-of field effects.
+
+=== Render ===
+
+Hover your mouse over the parameter names and use the reference in the tool tip to look up the corresponding information in the RenderMan documentation for the __Global Shadow Bias__, __Trace Displacements__, __Global Trace Depth__, __Enable Gaussian Texture__, __Enable Texture Lerp__, and __Volume Strategy__ parameters.
+
+Create Image From Viewing Camera:
+    Renders an image from the viewing camera. Sometimes, it is useful to skip this render, for example, when rendering shadow maps.
+
+Auto-Generate Shadow Maps:
+    Enable or disable shadow map generation. Each light also has its own controls to determine whether shadow maps will be generated.
+
+Auto-Generate Environment Maps:
+    Enable or disable environment map generation. Each object can be set up to generate an environment map of all the other objects in the scene.
+
+
+== Attributes ==
+
+Hover your mouse over the parameter names and use the reference in the tool tip to look up the corresponding information in the RenderMan documentation.
+
+== Global Illum ==
+
+Hover your mouse over the parameter names and use the reference in the tool tip to look up the corresponding information in the RenderMan documentation.
+
+== Limits ==
+
+Hover your mouse over the parameter names and use the reference in the tool tip to look up the corresponding information in the RenderMan documentation.
+
+== Paths ==
+
+Hover your mouse over the parameter names and use the reference in the tool tip to look up the corresponding information in the RenderMan documentation.
+
+== Statistics ==
+
+Hover your mouse over the parameter names and use the reference in the tool tip to look up the corresponding information in the RenderMan documentation.
+     
+== Scripts ==
+
+Each script command refers to an hscript command which will be run, regardless of the expression language selected for the parameter. The resulting string will be run as an hscript command. 
+
+NOTE:
+    It is possible to use the python, unix or source hscript commands to perform complex processing.
+
+The commands are always run when rendering occurs. The command checks the parameters of the output driver when it is rendering a range or sending output to a command.
+
+Before the render occurs, Houdini will automatically set the current hscript directory to point to the output driver.    
+
+Pre-Render Script:
+    This command is run before any RIBs are generated. It is only run once per render.
+    
+Pre-Frame Script:
+    This command is run before each RIB is generated.
+    
+Post-Frame Script:
+    This command is run after each RIB is generated.
+    
+    NOTE:
+        Although the RIB may have been generated, this does not necessarily mean that RenderMan has finished rendering the image when this command is run.
+
+Post-Render Script: 
+    This command is run one time, after all RIBs have been generated.
+    
+    NOTE:
+        Although the RIB may have been generated, this does not necessarily mean that RenderMan has finished rendering the image when this command is run.
+
+== Advanced ==
+
+When generating blobby primitives in RIB, the string parameters were hard-coded to an empty list.  SOHO will now search for a detail attribute named `RiBlobby_Strings` (case sensitive).  This value of this string will be parsed using the syntax described in the Python function shlex.split().  The resulting list of strings will be output in the `RiBlobby()` call.
+        
+@locals
+    N:
+        The current frame of the range specified. This always starts at
+        1.
+    NRENDER:
+        Total number of frames being rendered.
+            
+@related
+
+    - [mantra output driver|ifd]
+    - [RIS RenderMan output driver|ris]

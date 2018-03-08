@@ -1,0 +1,166 @@
+= Top ten basic things about dynamics =
+
+== Simulations have objects, solvers, and (usually) forces ==
+
+# Ctrl-click the [Icon:SOP/sphere] Sphere tool (__Create__ shelf tab) to create a sphere at the origin.
+
+# With the sphere selected, go to the __Rigid bodies__ shelf tab and click the [Icon:DOP/rbdobject].
+
+# Click [Icon:PLAYBAR/play_forward] Play on the playbar at the bottom of the Houdini window.
+
+The sphere falls because it's now a _simulated object_. When you first create a simulated object, Houdini automatically creates a simulation network at the object level so it has somewhere to put the nodes defining the simulated object's behavior. The network appears in the network editor at the object level as a node called `AutoDopNetwork`.
+
+<!--
+    {Image of network with sphere_object and AutoDopNetwork}
+-->
+
+TMI:
+    You can create as many simulation networks as you want of your own and manually create dynamics nodes inside, but the shelf tools will still create their nodes inside `AutoDopNetwork` unless you select a different network from the [Icon:BUTTONS/resimulate] Simulation menu's __Current Simulation__ submenu.
+
+If you double-click `AutoDopNetwork` to go inside, you can see the network Houdini created to define the simulation. (You may want to press ((L)) to have Houdini lay out the network.)
+
+<!--
+    {Image of initial dop network with annotations}
+-->
+
+The network is quite simple, but all by itself demonstrates several basic concepts of Houdini dynamics, starting with the fact that it consists of an _object_, and _solver_, and a _force_.
+
+A _dynamics object_ holds the parameters necessary to describe some _thing_ being simulated. In the network above, the sphere object's node has parameters for where to get the simulated object's geometry (it references the sphere object you created), the density, temperature, friction of the object, its initial position, rotation, velocity, and so on.
+
+A _solver_ does the work of calculating how simulated objects behave. They look at the state of the simulation and use their internal rules to modify it at each time step. In the network above, the RBD solver simulates the motion and collisions of the rigid body sphere.
+
+A _force_ is a piece of information you can attach to objects (all objects in the scene, or individual objects) that says, for example, "this object is affected by a wind" or "this object's motion is slowed by drag". In the network above, the Gravity node attaches "force data" to any objects above it (the sphere). When the solver sees the force data on the object, it knows to pull the sphere downward at each time step to simulate the effect of gravity. Tools on the [Drive Simulation shelf tab|/shelf/drivesimulation] let you add forces to a simulation.
+
+== Houdini has many different types of solvers ==
+
+These are the main 
+
+* [Rigid bodies|rbd] - Houdini has a native solver that fully integrates with the rest of DOPs, as well as Bullet and ODE solvers that are faster for certain types of geometry.
+
+
+
+* [Grid-based fluids|fluid_sourcing] 
+
+
+
+* [Particle fluids|/fluid/index] 
+
+
+
+* [Particle systems|/dopparticles/index] - lets you have particle systems (POPs) interact with dynamics simulations. For example, you can spray particles at a wall of RBD objects to knock them out.
+
+
+    
+* [Cloth and wires|cloth] 
+
+
+
+== To make two objects collide you have to merge their streams ==
+
+In other network types, [Icon:COMMON/merge] Merge nodes combine the output of the nodes that feed into them. In dynamics networks, Merge nodes create _relationships_. Relationships are a special type of data that describe which objects affect which other objects.
+
+<!--
+    {Image}
+-->
+
+The main type of relationship in dynamics is a _collision_ relationship, meaning objects will change their shape/motion/behavior when they collide with other objects. There are also _constraint_ relationships (such as pins and springs) in RBD, wire, and cloth simulations.
+
+<!--
+    {Image of pin constraints}
+-->
+
+The important thing to remember about relationships is that they take time to calculate, so to optimize the simulation, you should only create relationships between objects that really need to interact, and you should look for ways to use one-way relationships (where one object affects another but not the other way around).
+
+The [Geometry Spreadsheet|/ref/panes/geosheet] contains an affector matrix for visualizing which objects affect which.
+
+[Image:/images/dynamics/affectormatrix.png]
+
+== Visualizing the simulation in the viewport ==
+
+See [visualizing dynamics|visualize].
+
+== Turning things on and off ==
+
+Similarly to a particle or surface node network, the blue Display flag marks the "output" or "endpoint" node of the network: only nodes above and including the node with the display flag will be part of the simulation.
+
+[Image:/images/nodes/dop_node_anno.png]
+
+DOPs have a _bypass_ flag so you can check the state of the simulation with and without a given node, usually for debugging the creation of data in the details view (see below).
+
+If you want to _animate_ the presence of objects or data, keyframe the given node's __Activation__ parameter. When __Activation__ is non-zero, the node is active and affects the network. When __Activation__ is zero, the node has no effect, similar to having the bypass flag on.
+
+== The details view lets you see the internal state of a simulation ==
+
+The _details view_ is your window into the underlying objects and data of a simulation. You can [create a new details view pane in a tab|/basics/panes] or choose __Windows > Desktop > Technical__ to switch to a pane layout that already has a details pane open.
+
+The tree on the left side represents the objects in the scene and categories such as relationships, with branches representing the hierarchy of data attached to each object. The right side shows the _fields_ of the data piece selected on the left side and their values.
+
+[Image:/images/ui/details_view.png]
+
+This pane is very useful for examining the structure of the simulation. You can see which data is attached to which at the current frame and with the current display node, names and unique ids of data packets, as well as the values that make up the data.
+
+The details view updates dynamically as you play the simulation. This is very useful when you want to see how data changes over time, but it slows down playback of the simulation. You can use the arrows on the pane divisions to "collapse" the details view when you don't need it to make simulation playback smoother.
+    
+== Multiple objects and multiple solvers ==
+
+- RBD Object - __Number of Objects__, `$OBJID`
+
+- Rigid body fracture.
+
+== How the DOP network builds the simulation ==
+
+<!--
+        TBD.
+-->
+
+Network evaluates top down, left to right. For a node with multiple inputs, it evaluates top to bottom on its first input, then top to bottom on its second input, etc.
+
+== Sub-stepping ==
+
+<!--
+        TBD.
+-->
+
+To make a solver's collision detection more accurate, increase the solver's __Maximum substeps__ parameter. This will usually make the simulation take longer to calculate.
+
+You can also increase the resolution of the simulation globally with the __Timestep__ parameter on the DOP Network node containing the simulation.
+
+The dynamics engine calculates the simulation in _time steps_: the
+amount of time between the points where Houdini stops and
+re-calculates the state of the simulation. Normally this is some
+multiple of the frame time (the length of time Houdini displays each
+frame, e.g. 1/24th of a second at 24 FPS), but that's not necessary.
+Long time steps makes it easier for Houdini to run the simulation,
+but give less accurate results. Smaller time steps take longer to
+calculate, but give more accurate results.
+
+To set the time step for a dynamics network, open the parameters for the [DOP Network object|Node:obj/dopnet], click the __Simulation__ tab, and set the __Time step__ parameter.
+
+In individual solver nodes in a dynamics network, you can control
+the number of _sub-steps_ the solver breaks the default time step
+into. This lets you increase the granularity of simulation for just
+one solver, without increasing it for _every_ calculation in the
+entire simulation by changing the time step.
+
+To control sub-steps in a solver, set the solver's __Minimum substeps__ and __Maximum substeps__ parameters. Increase the __Minimum substeps__ value to have the solver break each time step into more solving steps. Make sure to limit the __Maximum substeps__ to make sure the simulation eventually finishes in a reasonable amount of time.
+
+TIP:
+    If you turn off integer frame values in the playback options and set the Step to your substep value, you can use the arrow keys to move between substeps.
+
+== Objects and simulation networks push and pull data ==
+
+In the dynamics set-up Houdini created when you turned the sphere into a simulated rigid body object, the dynamics network imports the sphere's geometry (in the [Icon:DOP/rbdobject] RBD Object node at the top of the dynamics network) out of the geometry network, and simulates its motion.
+
+Then the original sphere Geometry object's network imports the motion from the simulation _back into the object_ (in the [Icon:SOP/dopimport] DOP Import node at the bottom of the geometry network).
+
+So what you render is the original object, after it has its geometry, position, etc. modified by the dynamics network. The `AutoDopNetwork` object has its display flag (the button on the right side of the node) off by default, meaning it won't render.
+
+This is simply because Mantra is really set up to render objects, so importing the simulation motion back into an object gives you all the controls for rendering that objects have. And while technically you can render a dynamics network at the object level directly, its geometry will usually include a lot of _guides_ and _user interface geometry_ you probably don't want to render.
+
+TMI:
+    Some simulation tools, such as the Pyro FX tools, create a new object to hold the results of the simulation for rendering, instead of importing the results back into the source object. For example, if you use the [Flames|/shelf/pyro_burn] tool to create flames from source geometry, the tool creates a new `import_pyro_build` object at the object level to import the results of the simulation.
+
+== Houdini dynamics use units of kilograms, meters, and seconds ==
+
+Since solvers are simulating real-world physical processes, they need a way to relate numbers in the scene to _real-world units_. The designers of Houdini's dynamics system decided to simply use the base [SI|Wp:SI] units: 1 Houdini unit is equal to 1 meter, weights are always specified in kg, and times are always specified in seconds. Other units are always derived from meters, kilograms, and seconds (for example, density is specified as kg/m<sup>3</sup>).
+

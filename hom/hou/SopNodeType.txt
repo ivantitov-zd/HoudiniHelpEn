@@ -1,0 +1,145 @@
+= hou.SopNodeType =
+#type: homclass
+#cppname: HOM_SopNodeType
+#superclass: hou.NodeType
+#group: nodes
+
+"""This kind of NodeType contains extra attributes specific to SOP nodes."""
+
+@methods
+
+::`selectors(self, selector_indices=())` -> `tuple` of [Hom:hou.Selector]:
+    #cppname: HOM_SopNodeType::selectors
+    #replaces: Cmd:omsbindinfo, Cmd:omsls, Cmd:omswhere
+    Return all the selectors for this node type.  See
+    [Hom:hou.SopNodeType#addSelector] and [Hom:hou.Selector] for more
+    information.
+
+    {{{
+    #!python
+    def sopSelectorTypes():
+	'''Return a list of all the SOP selector type names.'''
+	selector_types = []
+	for node_type in hou.sopNodeTypeCategory().nodeTypes().values():
+	    # Skip manager nodes, like shopnets, ropnets, etc.
+	    if not isinstance(node_type, hou.SopNodeType):
+		continue
+
+	    for selector in node_type.selectors():
+		selector_type = selector.selectorType()
+		if selector_type not in selector_types:
+		    selector_types.append(selector_type)
+	selector_types.sort()
+	return selector_types
+    }}}
+
+    {{{
+    #!python
+    def sopTypeNamesUsingSelector(selector_type):
+	'''Given the name of a selector type, return a list of all the SOP
+	   node types using that selector.'''
+	node_types = []
+	for node_type in hou.sopNodeTypeCategory().nodeTypes().values():
+	    # Skip manager nodes, like shopnets, ropnets, etc.
+	    if not isinstance(node_type, hou.SopNodeType):
+		continue
+
+	    for selector in node_type.selectors():
+		if selector.selectorType() == selector_type:
+		    node_types.append(node_type)
+
+	result = [node_type.name() for node_type in node_types]
+	result.sort()
+	return result
+    }}}
+
+::`addSelector(self, name, selector_type, prompt='Select components', primitive_types=(), group_parm_name=None, group_type_parm_name=None, input_index=0, input_required=True, allow_dragging=False, empty_string_selects_all=True)` -> [Hom:hou.Selector]:
+    #cppname: HOM_SopNodeType::addSelector
+    #replaces: Cmd:omsbind
+    Add a selector to this SOP node type.  When the user creates a new instance
+    of this SOP in the viewer, Houdini will invoke all the selectors, wait
+    for the user to select geometry, and then connect input SOPs and fill in
+    group parameters to match what was selected.
+
+    `name`:
+	A name to give this selector.  The name must be unique within this
+	node type.
+
+    `selector_type`:
+	The name of the type of selector to use.  Different selectors have
+	different behaviors.  For example "prims" will select only primitives
+	and is used, for example, by the cookie SOP.  "points" will select
+	only points, and is used by SOPs like the point SOP.  "everything"
+	will select any geometry, and is used for SOPs like "xform" and
+	"blast".
+
+    `prompt`:
+	A string to display at the bottom of the viewer to instruct the user
+	what to select.
+
+    `primitive_types`:
+	A sequence of [Hom:hou.primType] enumeration values to specify what
+	primitive types are allowed.  This parameter has no effect if the
+	selector does not select primitives.  If this sequence is empty, all
+	primitive types will be allowed.
+
+    `group_parm_name`:
+	The name of the SOP node parameter containing the group field.
+	The selector will set this parameter to the string representing the
+	points, primitives, edges, etc. chosen by the user in the viewer.
+	If None, the selector will look for a parameter named "group".
+
+    `group_type_parm_name`:
+	The name of the SOP node parameter containing the menu of geometry
+	types.  If the selector can select multiple geometry types (e.g.
+	points or primitives), it will set this parameter to match the type
+	of geometry the user chose.  The transform SOP, for example, has
+	a Group Type parameter that tells it how to interpret the string in
+	the Group parameter.  If None, the selector will look for a parameter
+	named "grouptype".
+
+    `input_index`:
+	The index of the input connector on the SOP node where the selector
+	should wire input SOPs.  A cookie SOP, for example, has two input
+	connectors.  It has two selectors, one for each input connector.
+
+    `input_required`:
+	Whether or not this input is required or optional.  If the user does
+	not select any geometry and the input is not required, the selector
+	will not wire anything to its input connector.
+
+    `allow_dragging`:
+	Whether the user is allowed to select the geometry and begin
+	manipulating the handles with a single mouse drag.  A transform SOP,
+	for example, lets you select the geometry and drag it right away
+	to transform it.  Dragging the geometry forces the selector to finish
+	immediately, the selector connects the input and sets the group
+	parameter, and subsequent mouse movements are passed to the handle
+	which translates the geometry by changing parameter values.
+
+    `empty_string_selects_all`:
+	Whether or not to use an empty string in the group parameter if the
+	user selects all the geometry.  If False, Houdini will place an
+	asterisk (`*`) in the group parameter when the user selects all the
+	geometry.  Most SOPs use an empty string.
+
+    You would typically call this method from the shelf tool script
+    of a digital asset.  For example, you might put the following in
+    the Tools script section of a Python sop that transforms points (having a
+    parameter named group):
+
+    {{{
+    #!python
+    hou.sopNodeTypeCategory().nodeTypes()['$HDA_NAME'].addSelector(
+	"Points to Transform",
+	"points",
+	prompt="Select the points to transform and press Enter to complete",
+	group_parm_name="group")
+    }}}
+
+    See also [Hom:hou.Geometry#globPoints] and [Hom:hou.Geometry#globPrims]
+    for information on how to parse the strings the selector puts in the
+    group field.
+
+    See also [Hom:hou.Selector].
+

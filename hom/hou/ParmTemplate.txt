@@ -1,0 +1,375 @@
+= hou.ParmTemplate =
+#type: homclass
+#cppname: HOM_ParmTemplate
+#group: parmtemplates
+#status: nd
+
+"""Describes a parameter tuple (its name, type, etc.).  This is base class for
+all parameter templates."""
+
+ParmTemplates are most often used when describing a parameter in a digital
+asset definition's parameter interface or when describing an individual
+node's parameter layout (including its spare parameters).  A ParmTemplate
+describes a parameter and the type of data it holds, but it does not store the
+current value of a parameter; only [Hom:hou.Parm] objects inside
+[Hom:hou.ParmTuple] objects actually store parameter values.  You can think of
+a [Hom:hou.ParmTuple] as an instance of a ParmTemplate.  For example,
+the `"t"` parm tuple on geometry objects can be described by a
+[Hom:hou.FloatParmTemplate] -- it has a label of `"Transform"`, a data type of
+[Hom:hou.parmData#Float], 3 components, a naming scheme of
+[Hom:hou.parmNamingScheme#XYZW], etc.  Each geometry object node has a
+[Hom:hou.ParmTuple] named `"t"` that uses this ParmTemplate.
+
+Note that ParmTemplate objects are just data containers, and they have no
+live relationship with objects in Houdini.  For example, a [Hom:hou.Node]
+object corresponds directly to a node in Houdini, and if the node is renamed
+in Houdini [Hom:hou.Node#name] will return the new name.  ParmTemplates,
+on the other hand, do not have a live relationship.  Creating a ParmTemplate
+based on a spare parameter or asset definition parameter will simply copy the
+information into the ParmTemplate object, and modifying the object will
+not affect the spare parameter/asset parameter.
+
+Note also that ParmTemplate objects are always instances of a subclass of this
+class, so you cannot construct an instance of this class directly.
+
+To manipulate the parameters of a digital asset, you can retrieve the asset's
+current set of ParmTemplates into a [Hom:hou.ParmTemplateGroup] using
+[Hom:hou.HDADefinition#parmTemplateGroup].  You can then modify the group,
+adding parameters to it and replacing parameters in it, and save the group
+back to the asset definition with [Hom:hou.HDADefinition#setParmTemplateGroup].
+Similarly, you can change a node's parameter layout with
+[Hom:hou.Node#parmTemplateGroup] and [Hom:hou.Node#setParmTemplateGroup].
+
+You can also ask a [Hom:hou.ParmTuple] for its ParmTemplate in order to find
+out information about the parameter, such as allowed ranges of values, the
+label displayed to the user in the parameter pane, the parameter's popup
+help, etc.
+
+@methods
+
+::`clone(self)` -> [Hom:hou.ParmTemplate]:
+    #cppname: HOM_ParmTemplate::clone
+    Return a copy of this parm template.
+
+    This method can be called on an instance of a ParmTemplate subclass and an
+    instance of the subclass is properly returned.
+
+::`name(self)` -> string:
+    #cppname: HOM_ParmTemplate::name
+    Return the internal name of the parm template.  This is the name that
+    [Hom:hou.ParmTuple] objects created from this parm template will have.
+
+    Note that the names of [Hom:hou.Parm] objects inside ParmTuples based
+    off this ParmTemplate are determined by this name, the number of components
+    in this parm template, and the naming scheme.  See the
+    [namingScheme|Hom:hou.ParmTemplate#namingScheme] method for more
+    information.
+
+::`setName(self, name)`:
+    #cppname: HOM_ParmTemplate::setName
+    Change the internal name of this parm template.  Remember that
+    ParmTemplates just store data, so the name change will not have any effect
+    unless this parm template is later used to modify a parameter layout in
+    Houdini.
+
+::`label(self)` -> string:
+    #cppname: HOM_ParmTemplate::label
+    Return the name of the parameter tuple that is displayed in the parameter
+    pane.
+
+::`setLabel(self, label)`:
+    #cppname: HOM_ParmTemplate::setLabel
+    Change the name of the label that is displayed in the parameter pane.
+
+::`type(self)` -> [Hom:hou.parmTemplateType] enum value:
+    #cppname: HOM_ParmTemplate::type
+    Return the enumerated value identifying the type of this parameter.
+
+    Remember that ParmTemplate objects are always instances of a subclass of
+    this class.  The following table shows the mapping between
+    [Hom:hou.parmTemplateType] enumeration values and ParmTemplate subclasses:
+
+    Enumerated Value:
+        ParmTemplate Subclass
+    [hou.parmTemplateType.Int|Hom:hou.parmTemplateType]:
+        [Hom:hou.IntParmTemplate]
+    [hou.parmTemplateType.Float|Hom:hou.parmTemplateType]:
+        [Hom:hou.FloatParmTemplate]
+    [hou.parmTemplateType.String|Hom:hou.parmTemplateType]:
+        [Hom:hou.StringParmTemplate]
+    [hou.parmTemplateType.Toggle|Hom:hou.parmTemplateType]:
+        [Hom:hou.ToggleParmTemplate]
+    [hou.parmTemplateType.Menu|Hom:hou.parmTemplateType]:
+        [Hom:hou.MenuParmTemplate]
+    [hou.parmTemplateType.Button|Hom:hou.parmTemplateType]:
+        [Hom:hou.ButtonParmTemplate]
+    [hou.parmTemplateType.FolderSet|Hom:hou.parmTemplateType]:
+        [Hom:hou.FolderSetParmTemplate]
+    [hou.parmTemplateType.Folder|Hom:hou.parmTemplateType]:
+        [Hom:hou.FolderParmTemplate]
+    [hou.parmTemplateType.Separator|Hom:hou.parmTemplateType]:
+        [Hom:hou.SeparatorParmTemplate]
+    [hou.parmTemplateType.Label|Hom:hou.parmTemplateType]:
+        [Hom:hou.LabelParmTemplate]
+    [hou.parmTemplateType.Ramp|Hom:hou.parmTemplateType]:
+        [Hom:hou.RampParmTemplate]
+
+::`dataType(self)` -> [Hom:hou.parmData] enum value:
+    #cppname: HOM_ParmTemplate::dataType
+    Return the data type stored in [Hom:hou.Parm] instances inside
+    [Hom:hou.ParmTuple] instances corresponding to this ParmTemplate.
+
+    For example, suppose this parm tuple is a [Hom:hou.FloatParmTemplate]
+    with 3 components.  The corresponding [Hom:hou.ParmTuple] will have 3
+    [Hom:hou.Parm] objects inside it, and each will store a floating point
+    value.  In this example, this method would return
+    [hou.parmData.Float|Hom:hou.parmData].
+
+::`numComponents(self)` -> int:
+    #cppname: HOM_ParmTemplate::numComponents
+    Return the number of values stored inside [Hom:hou.ParmTuple] instances
+    of this ParmTemplate.
+    
+    For example, if this parm template has 3 components, there will be
+    3 parameter fields displayed in the parameter pane and there will be
+    3 [Hom:hou.Parm] objects inside a [Hom:hou.ParmTuple] based off this parm
+    template.
+
+::`setNumComponents(self, num_components)` -> int:
+    #cppname: HOM_ParmTemplate::setNumComponents
+    Set the number of values stored inside [Hom:hou.ParmTuple] instances of
+    this ParmTemplate.
+
+    Note that some ParmTemplate subclasses only support one component, so
+    calling this method with a value other than 1 may raise a
+    [Hom:hou.OperationFailed] exception.  Also, changing the number of
+    components may automatically change the size of the tuple of default values
+    for some ParmTemplate subclasses.
+
+::`namingScheme(self)` -> [Hom:hou.parmNamingScheme] enum value:
+    #cppname: HOM_ParmTemplate::namingScheme
+    Return the naming scheme used to name parameters inside the parm tuple for
+    this ParmTemplate.
+
+    For example, if the naming scheme is
+    [hou.parmNamingScheme.XYZW|Hom:hou.parmNamingScheme] and the parm template
+    is named `"foo"` and has 3 components, the parameters will be named
+    `"foox"`, `"fooy"`, and `"fooz"`.  On the other hand, if the naming scheme
+    was [hou.parmNamingScheme.Base1|Hom:hou.parmNamingScheme], the parameters
+    would be named `"foo1"`, `"foo2"`, and `"foo3"`.
+
+    Note that when the parm template only has 1 component, the parm name is
+    the same as the parm tuple name.
+
+    See [Hom:hou.parmNamingScheme] for more information.
+
+::`setNamingScheme(self, naming_scheme)`:
+    #cppname: HOM_ParmTemplate::setNamingScheme
+    Set the naming scheme used to name parameters inside the parm tuple for
+    this ParmTemplate to a [Hom:hou.parmNamingScheme] enum value.
+
+    See the `namingScheme` method for more information.
+
+::`look(self)` -> [Hom:hou.parmLook] enum value:
+    #cppname: HOM_ParmTemplate::look
+    Return the look of this parameter in the parameter pane.  For example,
+    a tuple of 3 floats can be displayed as a 3D vector or as an RGB color.
+
+    See [Hom:hou.parmLook] for more information.
+
+::`setLook(self, look)`:
+    #cppname: HOM_ParmTemplate::setLook
+    Set the look of this parameter to a [Hom:hou.parmLook] enum value.
+
+    See the `look` method for more information.
+
+::`help(self)` -> `str`:
+    #cppname: HOM_ParmTemplate::help
+    Return the help that Houdini displays when you hover over the parameter
+    label in the parameter pane.
+
+::`setHelp(self, help)`:
+    #cppname: HOM_ParmTemplate::setHelp
+    Set the help that Houdini displays when you hover over the parameter
+    label in the parameter pane.
+
+::`isHidden(self)` -> `bool`:
+    #cppname: HOM_ParmTemplate::isHidden
+    Return whether this parameter is hidden in the parameter pane.
+
+::`hide(self, on)`:
+    #cppname: HOM_ParmTemplate::hide
+    Marks this parameter as visible or invisible in the parameter pane.
+
+    Note that hidden parameters still exist, and can be evaluated,
+    channel-referenced, etc.  They simply will not be displayed in the
+    parameter pane.
+
+::`isLabelHidden(self)` -> `bool`:
+    #cppname: HOM_ParmTemplate::isLabelHidden
+    Return whether the label for this parameter is hidden in the parameter
+    pane.
+
+::`hideLabel(self, on)`:
+    #cppname: HOM_ParmTemplate::hideLabel
+    Hide or show the label for this parameter in the parameter pane.
+
+::`joinsWithNext(self)` -> `bool`:
+    #cppname: HOM_ParmTemplate::joinsWithNext
+    Return whether this parameter is displayed on the same line as the next
+    parameter in the parameter pane.
+
+::`joinWithNext(self)` -> `bool`:
+    #cppname: HOM_ParmTemplate::joinWithNext
+    This method is deprecated in favor of the
+    [joinsWithNext|Hom:hou.ParmTemplate#joinsWithNext] method.
+
+::`setJoinWithNext(self, on)`:
+    #cppname: HOM_ParmTemplate::setJoinWithNext
+    Sets whether this parameter is displayed on the same line as the next
+    parameter in the parameter pane.
+
+::`disableWhen(self)` -> `str`:
+    #cppname: HOM_ParmTemplate::disableWhen
+    This method is deprecated in favor of the
+    [conditionals|Hom:hou.ParmTemplate#conditionals] method.
+    
+::`setDisableWhen(self, disable_when)`:
+    #cppname: HOM_ParmTemplate::setDisableWhen
+    This method is deprecated in favor of the
+    [setConditional|Hom:hou.ParmTemplate#setConditional] method.
+
+::`conditionals(self)` -> `dict of [Hom:hou.parmCondType] enum value to string`:
+    #cppname: HOM_ParmTemplate::conditionals
+    Returns the set of conditionals currently affecting this parameter.
+
+    See the [Conditionals|/ref/windows/optype#conditionals] section of the
+    <<Operator Type Properties window>> help for more information on this
+    string.
+
+::`setConditional(self, type, conditional)`:
+    #cppname: HOM_ParmTemplate::setConditional
+    Set a conditional string of the given [Hom:hou.parmCondType] type for this 
+    parameter. This string consists of rules on how this parameter's display 
+    behaves when other parameters change. 
+    
+    See the [Conditionals|/ref/windows/optype#conditionals] section of the
+    <<Operator Type Properties window>> help for more information on this
+    string.
+
+::`tags(self) -> dict of string to string`:
+    #cppname: HOM_ParmTemplate::tags
+    Return a dictionary of extra data stored in the parm template.
+
+    Houdini uses this dictionary to attach arbitrary data to parm templates.
+    The keys in this dictionary vary depending on the ParmTemplate type
+    and its use.
+
+::`scriptCallback(self)` -> `str`:
+    #cppname: HOM_ParmTemplate::scriptCallback
+    Return the contents of the script that Houdini runs when this parameter
+    changes.  This script is most commonly used in [Hom:hou.ButtonParmTemplate]
+    objects to respond to the button being pressed.
+
+    Note that Houdini uses the tags dictionary to store the script callback
+    information.
+
+::`setScriptCallback(self, script_callback)`:
+    #cppname: HOM_ParmTemplate::setScriptCallback
+    Set the callback script to the given string.  This script runs in response
+    to a parameter change.
+
+    See the [scriptCallback|Hom:hou.ParmTemplate#scriptCallback] method for
+    more information.
+
+::`scriptCallbackLanguage(self)` -> [Hom:hou.scriptLanguage] enum value:
+    #cppname: HOM_ParmTemplate::scriptCallbackLanguage
+    Return the language of the script that Houdini runs when this parameter
+    changes.
+
+    Note that Houdini uses the tags dictionary to store the script callback
+    information.
+
+    See also the [scriptCallback|Hom:hou.ParmTemplate#scriptCallback] method.
+
+::`setScriptCallbackLanguage(self, script_callback_language)`:
+    #cppname: HOM_ParmTemplate::setScriptCallbackLanguage
+    Set the script callback language to a [Hom:hou.scriptLanguage] enum value.
+
+    See the [scriptCallbackLanguage|Hom:hou.ParmTemplate#scriptCallbackLanguage]
+    method for more information.
+
+::`setTags(self, tags)`:
+    #cppname: HOM_ParmTemplate::setTags
+    Set the dictionary of extra data stored in this parm template.
+
+    See the [tags|Hom:hou.ParmTemplate#tags] method for more information.
+
+::`asCode(self, function_name=None, variable_name=None)` -> `str`:
+    #cppname: HOM_ParmTemplate::asCode
+    Return a string containing Python statements that can be executed to
+    recreate the parameter template.  To run the string, use Python's
+    `compile`, or `execfile` functions or the `exec` statement.
+
+    `function_name`:
+        If <<function_name>> is specified, then the code returned creates a
+        Python function with the given name.  <<function_name>> must be a
+        non-zero length string consisting of only alphanumeric and underscore
+        characters.  Any invalid characters are internally converted to
+        underscores.
+
+	The function returns a reference to the newly created parameter
+	template object.
+
+    `variable_name`:
+	The name of a Python variable that the result code will assign to.
+	If `None`, Houdini uses the variable name `"hou_parm_template"`.
+
+    Here is an example of saving the output to a file and then loading 
+    it back into Houdini:
+
+    {{{
+    #!python
+    # Get a reference to the target parameter template.
+    node = hou.node("/obj/geo1")
+    parm_template = node.parm("tx").parmTemplate()
+
+    # Execute asCode and write the output script to a file.
+    code = parm_template.asCode()
+    source_file = open("create_parm_template.py", "w")
+    source_file.write(code)
+    source_file.close()
+
+    # Execute the script.  The new parameter template will be stored 
+    # in the 'hou_parm_template' variable.
+    execfile("create_parm_template.py")
+
+    # Add a spare parameter to the node using the saved parameter
+    # template.
+    node.addSpareParmTuple(hou_parm_template)
+    }}}
+
+    Here is an example of saving the output into a function in a file and then
+    calling it from Houdini:
+    
+    {{{
+    #!python
+    # Get a reference to the target parameter template.
+    node = hou.node("/obj/geo1")
+    parm_template = node.parm("tx").parmTemplate()
+
+    # Execute asCode and write the function definition to a file.
+    code = parm_template.asCode(function_name="createParmTemplate")
+    source_file = open("parmtemplatelib.py", "w")
+    source_file.write(code)
+    source_file.close()
+
+    # Call the function definition.
+    import parmtemplatelib
+    hou_parm_template = parmtemplatelib.createParmTemplate()
+
+    # Add a spare parameter to the node using the saved parameter
+    # template.
+    node.addSpareParmTuple(hou_parm_template)
+    }}}
+

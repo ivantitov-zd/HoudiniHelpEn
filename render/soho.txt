@@ -1,0 +1,156 @@
+= SOHO =
+
+== Overview ==
+
+Houdini communicates with renderers through the SOHO (Scripted Output of Houdini Objects) Python bindings. All renderers use the same process for parameter definition and evaluation. The Mantra and RenderMan output drivers are now simply front-ends to Python scripts (they are now digital assets). Each renderer can add its own parameter definitions and bindings using Python mappings.
+
+SOHO provides two main benefits:
+
+* Easy to define new render output nodes for alternative renderers. SOHO provides the interface to interrogate Houdini for necessary information to output the renderer-specific file format.
+
+* You can customize generation of render output by creating a new render node and customizing the `soho_program` parameter (see below). In some cases this may be more convenient or flexible for you than adding [rendering properties|/props] to lights, cameras, and/or render nodes.
+
+The SOHO interface is used to send geometry, object transforms, and rendering properties to a renderer. Each supported renderer has a set of predefined rendering properties. If an object has any of these properties defined as spare parameters, its value will be sent to the renderer.
+
+There are a set of predefined rendering parameters which can be added to objects (or [materials|/shade/materials]) using the "Edit Rendering Parameters" interface. There is a one to one mapping of these parameters from the Houdini interface to the renderer's properties.
+
+SOHO uses the new Material workflow to process shaders and rendering properties. For more information see the [materials|/shade/materials], [properties|/shade/properties], and [property overrides|/shade/propertyoverrides] help.
+
+The SOHO renderer property default values correspond to the target renderer's default values. If the property value is left at the default value, the property is generally not written out to the input stream for the renderer. 
+
+NOTE:
+    Changing the default value is not recommended, since SOHO and the renderer will no longer be in agreement.
+
+== How it works ==
+
+If you look at the type properties of the Mantra render output digital asset, you will see an invisible parameter called `soho_program`, which contains the Python script Houdini will run to write the output file (in the case of the Mantra driver, an IFD file).
+
+The Python script will contain code like this:
+
+{{{
+value = obj.getDefaultedFloat('vm_displacebound', 0.0)
+}}}
+
+(or, more likely, batch evaluation of properties). When a SOHO program evaluates a parameter like this, it applies the [property inheritance order|/props] so more specifically-defined properties (for example, on a shader) have priority over more broadly-defined properties (for example, on the output driver node).
+
+The SOHO API and implementation are in Python scripts in `$HFS/houdini/soho`.
+
+You can use the following parameters to control the SOHO generation process.
+
+`soho_program`:
+    The Python script to run. In this script you `import soho` and use the SOHO API to interrogate Houdini.
+    
+`soho_outputmode`:
+    What to do with the printed output of the script.
+    
+    `0`:
+        Send output to the pipe command referenced in the `soho_pipecmd` parameter (see below). Use this mode if you want to pipe the output of the script to another command (e.g. another script or the renderer itself).
+    `1`:
+        Send output to the file referenced in the `soho_diskfile` parameter (see below). Use this mode if you want to write the output of the script to a file.
+    `2`:
+        Don't do anything special with `stdout`. Use this mode if you want to decide how and where to output in the script, rather than in Houdini.
+        
+`soho_pipecmd`:
+    When `soho_outputmode` is `0`, Houdini will run this program and pipe the output of the script to it.
+    
+`soho_diskfile`:
+    When `soho_outputmode` is `1`, Houdini will redirect the output of the script to this file.
+
+`soho_compression`:
+    What type of compression to use when writing the script file.  Possible values are:
+
+    `none`:
+    No compression will be used.
+    `ext`:
+    Use the file extension on the `soho_diskfile` to determine the compression type.  If the file extension is `.sc`, BLOSC compression will be used.  If the file extension is `.gz`, gzip compression will be used.
+
+    Compression will only be performed when writing to a disk file, unless the `soho_force_compression` parameter is set.
+
+`soho_force_compression`:
+    Force evaluation of the `soho_compression` property even when writing to a pipe.
+    
+`soho_foreground`:
+    If true, blocks Houdini until the script completes. This is turned on automatically when rendering multiple frames to prevent all frames from rendering simultaneously.
+    
+`soho_initsim`:
+    If true, Houdini initializes simulation nodes. This will cause all particle and dynamics networks to start cooking from the first frame to the current frame.
+    
+    This is used when you are controlling which frames to render (see `soho_multiframe` below). If you render frame 30 and then render frame 31, you don't want to initialize the sims (thereby resimulating frames 1-30). On the other hand, if you are rendering frame 31 first, you do want to initialize the sims to properly set up the simulations states for frame 31.
+    
+`soho_multiframe`:
+    When off (the default), Houdini runs the script separately for every frame. If this parameter is on, the script is run once, and the script is responsible for rendering the frame range itself.
+    
+== How to show all available properties ==
+
+See the [render property documentation|/props/mantra] for information about the render properties.
+
+To get mantra to dump a list of properties it knows about, use the `ray_show` command. It takes an argument representing the category of properties to print.
+
+{{{
+#!sh
+
+echo ray_show device | mantra
+echo ray_show global | mantra
+echo ray_show object | mantra
+echo ray_show light | mantra
+echo ray_show image | mantra
+echo ray_show fog | mantra
+}}}
+
+== Callbacks ==
+
+SOHO supports callback functions, or _hooks_ to allow advanced users to modify or replace low-level parts of the render process.
+
+(In previous versions of Houdini, it was possible to "monkey patch" SOHO functions as a means of changing SOHO functionality. However, the callbacks are a much cleaner and future-proof method.)
+
+See `$HFS/houdini/soho/IFDhooks.py` or `$HFS/houdini/soho/RIBhooks.py` for documentation.
+
+Here's a sample hooks file:
+
+{{{
+#!python
+
+'''
+    IFDuserhooks.py
+    A simple example to illustrate the IFDhooks features
+'''
+import traceback
+from IFDapi import *
+
+def pre_lockObjects(parmlist, objparms, now, camera):
+    ''' Called before SOHO locks objects.  This allows you to modify the
+        objects that are visible to SOHO '''
+    ray_comment('IFD Hook - rendering from camera: %s' % repr(camera))
+    return False
+
+def pre_render(camlist, now, objlist, lightlist, spacelist, foglist,
+                fromlight, forphoton, cubemap, photoncam):
+    ''' Called before an image gets rendered '''
+    ray_comment('IFD Hook - Render at time: %g %s' % (now, repr(camlist)))
+    return False
+
+''' List of hooks in this file '''
+_HOOKS = {
+    'pre_lockObjects'   : pre_lockObjects,
+    'pre_render'        : pre_render,
+}
+
+def call(name='', *args, **kwargs):
+    ''' Hook callback function '''
+    method = _HOOKS.get(name, None)
+    if method:
+        try:
+            if method(*args, **kwargs):
+                return True
+            else:
+                return False
+        except Exception, err:
+            ray_comment('Hook Error[%s]: %s %s' % (name, __file__, str(err)))
+            ray_comment('Traceback:\n# %s\n' %
+                        '\n#'.join(traceback.format_exc().split('\n')))
+    return False
+}}}
+
+
+
+

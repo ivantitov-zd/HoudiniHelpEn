@@ -1,0 +1,387 @@
+#type: node
+#context: sop
+#internal: subdivide
+#icon: SOP/subdivide
+#tags: reshape, smooth, crease, subdivide, boxup
+
+= Subdivide =
+
+"""Subdivides polygons into smoother, higher-resolution polygons."""
+
+This node takes an input polygon surface (which can be piped into one or
+both inputs), and divides each face to create a smoothed polygon surface
+using a Catmull-Clark subdivision algorithm. It is similar to the Paste
+op in that it divides up all or part of a surface allowing you to
+increase areas of local detail (especially useful for avoiding the
+angular appearance often associated with polygonal models) without
+adding lots of extra geometry to the entire object. While the topology
+of the input mesh can be arbitrary, for best results all polygons should
+be convex and relatively uniform in distribution.
+
+All polygons in the left input which are specified by the "Group" field
+are used to determine the polygon mesh to subdivide. For polygon edges
+to be classified as the same edge, they must share the same points.
+Merely being physically close is not sufficient.
+
+The elements of the right input specified by the "Creases" field are
+used as creases. Each edge in a crease polygon corresponds to the edge
+in the polygon mesh which has the same point numbers. Again, point
+position is irrelevant.
+
+Vertex attributes are supported and preserved, however, instead of being
+properly subdivided they are merely linearly interpolated.
+
+== Using Subdivide ==
+                
+:task:Subdivide a polygonal surface:
+    # Select the faces or edges you want to subdivide.
+        
+    # Click the [Icon:SOP/subdivide][Subdivide|/nodes/sop/subdivide] tool on the __Polygon__ tab.
+
+    # In the [parameter editor|/ref/panes/parms], use the __Depth__ parameter to control the level of smoothness.
+
+        Each level recursively subdivides the original control polygons, so you should avoid high levels (above 3) or you will get extremely complex geometry. Add detail where it is needed (see below) rather than increasing the detail of the entire surface.
+
+:task:Add local detail:
+    # Select the faces of the subdivision surface you want to further subdivide.
+          
+    # Click the [Icon:SOP/subdivide][Subdivide|/nodes/sop/subdivide] tool on the __Polygon__ tab.
+
+        You can use this technique to add extra levels of detail to various areas and to various depths.
+
+[Image:/images/shelf/subdivide_before.png] [Image:/images/shelf/subdivide_after.png]
+
+== How to ==
+
+:task:Add local detail:
+    # After you create the initial subdivided surface, use the  [tab
+      menu|/basics/tabmenu]  to select the [Subdivide
+      operator|Node:sop/subdivide] again.
+
+    # Select the faces of the subdivision surface you want to
+      further subdivide, then press ((Enter)) to finish the
+      selection.
+
+    # You can use this technique to add extra levels of detail to
+      various areas and to various depths.
+
+:task:Crease edges interactively:
+    # Make sure the polygonal control cage is visible.
+
+    # In the viewer, use the  [tab menu|/basics/tabmenu]  to select the
+      [Crease operator|Node:sop/crease].
+
+    # Press ((3)) for edge selection mode.
+
+    # Select the edges you want to crease, then press ((Enter)) to
+      finish the selection.
+
+    # In the parameter editor, set the __Operation__ and __Crease__
+      parameters.
+
+      This adds the crease attribute to the selected edges. The
+      Subdivision node picks up the attribute and uses it to crease
+      the surface.
+
+:task:Crease edges by number:
+    * Specify faces in the Subdivision node's __Creases__ parameter
+      and then set the __Crease weight__ parameter.
+
+WARNING:
+    The RenderMan renderer will directly use the Crease attribute
+    applied by the Crease Operation, but it will _not_ be used by the
+    Mantra renderer due to patent issues.
+
+== Creases ==
+
+Creases control the strength of pull of the polygon faces on the
+subdivision surfaces, much like a magnet drawing the surface towards
+the reference polygon. They can be applied selectively using the
+Creases field to specify an input group to use.
+
+Creases work by controlling the strength of the pull of the polygon
+faces on the subdivision surfaces, like a magnet drawing the surface
+towards the reference polygon. The figure below shows the result of
+setting the _Crease Weight_ to 0, 1, 2 reading from left to right.
+As the weight increases so the pull effect strengthens and the shape
+approaches the reference polygon.
+
+[Image:../images/Subdivision-Creases.jpg]
+
+== Crease Weights and Renderman ==
+
+Crease weight attributes which are added, but not yet Subdivided are
+preserved when a rib file is generated. They are then used
+internally by RenderMan to implement subdivision surfaces during the
+rendering process.
+
+NOTE:
+    In order to output the crease weights in the rib file, your geo
+    object must have the Render page > Geometry > Polygons as
+    Subdivision Surfaces parameter set.
+
+== The Crease Algorithm ==
+
+If there is a second input:
+
+* If the Override button is enabled, each edge defined in the second
+  input will have its edge crease weight set to the value of the
+  override.
+
+* If the vertex attribute `creaseweight` exists on the second input,
+  each matching edge in the input will have its crease weight set to
+  the maximum of the vertex attributes for any shared edges.
+
+* If the primitive attribute `creaseweight` exists on the second
+  input, each polygon in the second input will set matching edges to
+  the appropriate weights.
+
+If there is no second input:
+
+* If an override is specified, the value of the override is used for
+  all edges in the sub-divided surface.
+
+* If the vertex attribute `creaseweight` exists, this attribute will
+  be used to define the crease weights on the edges of the surface.
+
+* If the primitive attribute `creaseweight` exists, this attribute
+  will be used to define the crease weights for the subdivision
+  surface.
+
+When defining crease weights on shared edges, the maximum of the
+weights of the shared edges is used. For example, if two polygons
+share an edge and the primitive attribute is used, the maximum of
+the crease weight will be used for the shared edge.
+
+When OpenSubdivision is used for refinement, the following are also considered:
+
+* If the point attribute `cornerweight` exists, this attribute will
+  be used to define corner weights on vertices of the surface.
+
+* If the group `subdivide_hole` exists, any polygons in that group will be
+  considered holes in the subdivision process.  The polygons will contribute to
+  the subdivision, but will not appear in the final surface.
+
+* If a detail attribute `osd_scheme` exists, it will override the subdivision
+  algorithm specified on the SOP.  When this attribute specifies Loop
+  subdivision, the incoming geometry must be triangulated.
+
+* If a detail attribute `osd_vtxboundaryinterpolation` exists, it will override 
+  the value of the __Point Attributes__ parameter.
+
+* If a detail attribute `osd_fvarlinearinterpolation` exists, it will override 
+  the value of the __Vertex Attributes__ parameter.
+
+* If a detail attribute `osd_creasingmethod` exists, it will override 
+  the value of the __Crease Method__ parameter.
+
+* If a detail attribute `osd_trianglesubdiv` exists, it will override 
+  the value of the __Triangle Subdivision__ parameter.
+
+Please see the [OpenSubdiv|http://graphics.pixar.com/opensubdiv/docs/subdivision_surfaces.html#boundary-interpolation-rules] documentation for further details.
+
+== Closing Cracks ==
+
+Cracks can be closed by either Pulling or Stitching, so only one of
+these two options can be chosen at a time from the Surrounding Faces
+parameter. Bias applies only to Pulling, and is disabled when
+Stitching is chosen.
+
+A crack is formed by a single edge on the non-subdivided area and
+multiple edges on the subdivided area. The 'Surrounding Faces' menu
+determines what will will happen to the single edge on the
+non-subdivided area, and in more generally, to the polygon
+containing this edge.
+
+If No Edge Division is chosen and cracks are pulled closed, all the
+points on the subdivided edges are pulled (i.e. moved) to the
+closest points on the non-subdivided edges. Bias is disabled, when
+No Edge Division is specified.
+
+If cracks are pulled with the Divide Edges option, the
+non-subdivided edge is split into many sections, so that each each
+point on the non-subdivided edge now corresponds to a new point on
+the subdivided edge. Then, points on the newly divided edge are
+joined with the points on the subdivided boundary. A Bias of 1 will
+place these joined points along the subdivided boundary. A bias of 0
+will place them along the non- subdivided boundary (and values
+between 0 and 1 will place them somewhere in between).
+
+Pulling cracks with the Triangulate option will do exactly the same
+thing as Divide Edges, except it will also triangulate the
+non-subdivided polygon. This is desirable because pulling the
+non-subdivided boundary towards the curved subdivided boundary will
+likely generate a non-planar polygon, so Triangulate will divide
+this polygon into smaller (planar) ones. Pulling cracks with a Bias
+of 1 and triangulating usually produces the nicest results.
+
+The Triangulate option is necessary because the Divide op is not
+designed to handle (very) non-planar polygons.
+
+The Stitch Cracks Together option, on the other hand, inserts new
+polygons (triangles) to close up the cracks. When No Edge Division
+is chosen, Many triangles are created, each having one vertex on one
+point of the non-subdivided edge.
+
+When Divide Boundary Edges is chosen, the non-subdivided edge is
+divided, so there are more points available to be used for
+triangles. The resulting triangles are more regularly shaped (not as
+long and skinny). The triangulate option will again triangulate the
+non-subdivided polygon, although this option is less likely to be
+used because this polygon should remain planar during stitching.
+
+<!--
+== Operation Parameters ==
+
+    Close Holes
+
+    Do Not Close:
+        Don't close holes.
+        
+    Pull Holes Closed:
+        Move points on boundary of subdivided area in order to close
+        holes formed during the subdivision.
+        
+    Stitch Holes Together:
+        Add polygons (triangles) to close the holes caused by
+        subdividing.
+        
+    == Surrounding Faces ==
+
+        No Edge Division:
+            When No Edge Division is chosen, many triangles are created,
+            each having one vertex on one point of the non-subdivided
+            edge.
+            
+        Divide Edges:
+            Divides edges surrounding the subdivided area when pulling
+            or stitching holes by inserting new polygons (triangles) to
+            close up the holes.
+            
+        Triangulate:
+            Does exactly the same thing as Divide Edges, except it also
+            triangulates the non-subdivided polygon. This is desirable
+            because pulling the non-subdivided boundary towards the
+            curved subdivided boundary will likely generate a non-planar
+            polygon, so Triangulate will divide this polygon into
+            smaller (planar) ones. Pulling holes with a Bias of 1 and
+            triangulating usually produces the nicest results.
+            
+    == Bias ==
+
+        Determines which points are moved when pulling hole closed. 0
+        means move points on subdivided area to meet boundary. 1 means
+        move points on boundary to meet subdivided area.
+-->
+
+@parameters
+
+Group:
+        Subset to use as a polygonal mesh and subdivide
+Creases:
+        Subset (of right input) to use as creases
+Algorithm:
+        Choose the algorithm used to perform subdivision.
+
+        Houdini Catmull-Clark:
+                Wses Houdini's native subdivision algorithm.
+        
+        Mantra Compatible Catmull-Clark:
+                Uses mantra-style subdivision.
+        
+        OpenSubdiv Catmull-Clark:
+                Uses the Open Subdiv library to perform subdivision.
+        
+        OpenSubdiv Loop:
+                Uses the Open Subdiv library to perform Loop subdivision (more suitable for models made of triangles).
+        
+        OpenSubdiv Bilinear:
+                Uses the Open Subdiv library to perform bilinear refinement (with no blending of vertices).
+                
+Depth:
+        #channels: /iterations
+
+        How many iterations to subdivide, higher numbers give a smoother surface.
+        
+Override Crease Weight Attribute:
+        #channels: /overridecrease
+
+        Determine if the crease sharpness should be determined by the primitive or vertex `creaseweight` attribute or by overridden by this operation.
+Crease Weight:
+        #channels: /creaseweight
+
+        If the crease weight is overridden, this is the weight used.
+Generate Resulting Creases:
+        #channels: /outputcrease
+
+        If the creases are sharper than the depth, some will still be present in the final geometry. This option determines if they will be present in the resulting geometry.
+New Group:
+        #channels: /outcreasegroup
+
+        Name of the group to place all generated creases into.
+Close Cracks:
+        Do Not Close:
+                Don't close cracks.
+    
+        Pull Cracks Closed:
+                Move points on boundary of subdivided area in order to close cracks formed during the subdivision.
+    
+        Stitch Cracks Together:
+                Add polygons to close the cracks caused by subdividing.  
+
+Boundary:
+        No Edge Division:
+                Do not divide edges.
+        Divide Edges:
+                Whether or not to divide edges surrounding subdivided area when pulling or stitching cracks.
+        Triangulate:
+                Whether or not to triangulate the polygons on the boundary of the cracks.
+    
+Bias:
+        #channels: /bias
+
+        Determines which points are moved when pulling cracks closed.
+
+
+        0:
+                Means move points on subdivided area to meet boundary.
+        1:
+                Means move points on boundary to meet subdivided area.
+
+
+Recompute Point Normals:
+        Re-evaluates point normals if they exist. If this is not set, the point normals will be interpolated in the same manner as the points.
+Smooth Vertex Attributes:
+        If on, vertex attributes will be smoothed in the same manner as the point attributes. However, vertex attributes at seams (places where points meet but the vertex attributes differ) will still be linearly interpolated. If off, the vertex attributes will be linearly interpolated. To match the Mantra subdivision rendering, this should be set to off.
+Enforce Consistent Topology:
+        If __Pull Cracks Closed__ or __Stitch Cracks Together__ is enabled, different topology might be generated depending on boundary edges between the subdivided primitives and their non-subdivided neighbors. Turning on this option will ensure that this behavior will always produce consistent topology by disregarding collinear edges.
+
+Linear Creases:
+        If this option is turned on will switch from the standard (RenderMan) style creases to Mantra's linear creases.
+
+Build Polygon Soups:
+        Creates polygon soup primitives instead of separate polygon primitives.
+
+Treat All Curves as Independent:
+        If you are subdividing polygon curves and this option is enabled, the possibility of sharing points between curves will be ignored. Each polygon will be subdivided as if each vertex has its own point. This is slightly faster, and since the viewport and Mantra make this assumption when rendering polygon curves as subdivision curves,
+        the results will be consistent.
+
+Remove Holes:
+        Remove faces identified as holes by OpenSubdiv.  This includes any faces identified in the `subdivision_hole` group on the input.
+
+Point Attributes:
+        When using OpenSubdiv for refinement, this controls how point attributes (including `P`) will be interpolated on patch boundaries.
+Vertex Attributes:
+        When using OpenSubdiv for refinement, this determines how vertex attributes (Face-Varying) will be interpolated over patches.
+Crease Rule:
+	This determines how OpenSubdiv will perform the creasing operations when subdividing.
+Triangle Subdivision:
+	When OpenSubdiv does Catmull-Clark refinement, this controls the subdivision rules when there are triangles in the cage.
+
+@related
+    - [Node:sop/crease]
+    - [Node:sop/divide]
+    - [Node:sop/smooth]
+    - [Node:sop/tridivide]
+
+

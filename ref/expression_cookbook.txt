@@ -1,0 +1,421 @@
+= Expression cookbook =
+
+"""Tips and tricks for writing expressions to accomplish various effects."""
+
+== Overview ==
+
+In Houdini, you can use expressions in parameters and in VEX snippets to accomplish complex and interesting effects with just a bit of math. This page demonstrates a few useful formulas and tricks to use in expressions.
+
+* See [expressions|/network/expressions] for the basics of HScript expressions. See [VEX|/vex/] for more about the VEX language.
+
+* On this page the expressions listed often have `ch()` functions to access values from parameters. See [spare parameters|/network/spare] for how to set up custom parameters your expressions can use.
+
+* Future versions of Houdini will move toward having users use VEX to modify geometry instead of allowing HScript expressions to modify local variables, because VEX is much faster.
+
+== Channel lookups ==
+
+Type ||
+    Hscript expression ||
+        VEX ||
+
+`int` |
+    [Exp:ch] |
+        [Vex:chi]
+
+`float` |
+    [Exp:ch] |
+        [Vex:chf]
+
+`string` |
+    [Exp:ch] |
+        [Vex:chs]
+
+`ramp` |
+    [Exp:chramp] |
+        [Vex:chramp]
+
+`vector` |
+    |
+        [Vex:chv]
+
+== Equivalencies and differences ==
+
+||
+    Expression ||
+        VEX ||
+
+Current frame |
+    `$FF` or `@Frame` |
+        `@Frame`
+
+Current time |
+    `$T` or `@Time` |
+        `@Time`
+
+Bounding box |
+    `$BBX`, `$BBY`, `$BBZ` |
+        `relbbox(0,@P).x`, `relbbox(0,@P).y`, `relbbox(0,@P).z`
+
+Centroid |
+    `$CEX`, `$CEY`, `$CEZ` |
+        {{{
+        #!vex
+        vector cent = getpointbbox_center(0);
+        // cent.x, cent.y, cent.z
+        }}}
+
+Size |
+    `$SIZEX`, `$SIZEY`, `$SIZEZ` |
+        {{{
+        #!vex
+        vector size = getbbox_size(0);
+        // size.x, size.y, size.z
+        }}}
+
+Corners |
+    `$XMIN`, `$YMIN`, `$ZMIN`, `$XMAX`, `$YMAX`, `$ZMAX` |
+        {{{
+        #!vex
+        vector min; vector max;
+        getbbox(0, min, max);
+        // min.x, min.y, min.z, max.x, max.y, max.z
+        }}}
+Raise to power |
+    `^` |
+        [Vex:pow]
+
+Trig functions |
+    Degrees |
+        Radians
+        
+        You can convert degrees to radians using the [Vex:radians] function.
+
+== Random numbers ==
+
+:fig:[Image:/images/expressions/RandomNumber.png]
+    * For examples of randomization in HScript expressions and VEX, open `$HH/help/files/RandomExample.hip`.
+        #glyph: fa-file
+
+Expression ||
+    VEX ||
+
+`rand(seed)` |
+    `random(seed)`
+
+`rand(@ptnum)`, `rand($F)` |
+    `random(@ptnum)`, `random(@Frame)`
+
+The random number functions always return the same number given the same seed value. This makes “random” values repeatable between playbacks. However, to make sure that different points/particles/objects/frames etc. get different random values, you must vary the seed.
+
+=== Choosing a random seed ===
+
+The current frame number ($F) is usually a good seed value. However:
+
+* If you need random values for sub-frames, use the fractional frame number `$FF` instead of `$F`.
+
+* If you need more than one random value, such as R, G, and B values for a random color, give each call to rand a different seed value by multiplying or adding to `$F`, for example `rgb(@Frame, @Frame * 10, @Frame * 100)`. Otherwise each call will return the same number and the color will be gray.
+
+* If you need a random number to span from `-X` to `X`, you can use `rand(seed) * (2 * X) - X`.
+
+* The random number is in the range 0-1. Use the `fit01(n, newmin, newmax)` function to map the random number to a different number range.
+
+    The `fit10` function is similar but reverses the mapping. For example, `fit10(.3, 5, 20) == 15.5`.
+    
+    The `fit(n, oldmin, oldmax, newmin, newmax)` is a more general form that lets you map any number from one range to another range. For example, `fit(3,1,4,5,20) == 15`.
+    
+    The fit functions exist in both the HScript expression language and VEX.
+
+=== Randomizing values across geometry ===
+
+:fig:[Image:/images/expressions/RandomValuesAcrossRange.png]
+    The following will randomize every primitive color on every frame.
+
+    In HScript expressions:
+
+    {{{
+    rand(@primnum)
+    rand(@primnum * 10)
+    rand(@primnum * 100)
+    }}}
+
+    In VEX:
+
+    {{{
+    #!vex
+    @Cd.r = random(@primnum * @Frame);
+    @Cd.g = random(@primnum * 10 * @Frame);
+    @Cd.r = random(@primnum * 100 * @Frame);
+    }}}
+
+== Cycling values ==
+
+:fig:[Image:/images/expressions/CyclicalValuesHScript.png]
+    * For examples of cycling values in HScript expressions and VEX, open `$HH/help/files/ModulusExample.hip`.
+        #glyph: fa-file
+
+    The modulus operator `a % b` is the same in HScript expressions, VEX, and Python. It returns the remainder after dividing `a` by `b`. This is very useful because given a value that increases continuously (such as the frame number), you can produce a value that wraps around a range of values.
+
+    NOTE:
+        If you try this with a floating point value, you can get unexpected results. For example, `3.14 % 1` returns `0.14`, and `34.999 % 5` returns `4.999`.
+
+For example:
+
+`$F` ||
+    0 |
+        1 |
+            2 |
+                3 |
+                    4 |
+                        5 |
+                            6
+`$F % 3` ||
+    0 |
+        1 |
+            2 |
+                0 |
+                    1 |
+                        2 |
+                            0
+
+== Ripples ==
+
+:fig:[Image:/images/expressions/Ripples.png]
+    * For examples of ripples in HScript expressions and VEX, open `$HH/help/files/RippleExample.hip`.
+        #glyph: fa-file
+
+To get mathematical radiating ripples, base the point position on a sin function using the distance of the point from the center of the surface.
+    
+Position Y ||
+    `sin(sqrt(($BBX - 0.5) ^ 2 + ($BBZ - 0.5) ^ 2) * 1080)`
+
+To animate this, add a time-based variable to the expression:
+
+Position Y ||
+    `sin(sqrt(($BBX - 0.5) ^ 2 + ($BBZ - 0.5) ^ 2) * 720 + $F*4)`
+￼
+== Arcs, circles, and spirals ==
+
+:fig:[Image:/images/expressions/Arcs.png]
+    * For examples of ripples in HScript expressions and VEX, open `$HH/help/files/ArcExamples.hip`.
+        #glyph: fa-file
+    
+    You can use `sin` and `cos` to generate positions along an arc or circular path.
+    
+    Position X ||
+        `cos(@ptnum * 2)`
+    Position Z ||
+        `sin(@ptnum * 2)`
+    
+(This may be useful for creating interesting effects, however you can often accomplish similar effects by creating arcs and circles with the [Circle SOP|Node:sop/circle]. For example, you can place items in a circle by creating a polygonal circle and then copying the items to the circle's points.)
+
+:fig:[Image:/images/expressions/3DSpiral.png]
+    You can create a spiral by increasing the position in the third dimension as you control the other two with `sin` and `cos`.
+
+    X ||
+        `cos(@ptnum * freq) * amplitudeX + offsetX`
+    Y ||
+        `@ptnum * amplitudeY`
+    Z ||
+        `sin(@ptnum * freq) * amplitudeZ + offsetZ`
+
+=== Logarithmic spiral in VEX ===
+
+:fig:[Image:/images/expressions/LogSpiral.png]
+    * To play with this example, open `$HH/help/files/logSpiral.hip`.
+        #glyph: fa-file
+
+The example uses channel references to get values from parameters.
+
+{{{
+#!vex
+// Expose point normals
+@N = @N;
+
+// Natural log
+float e = 2.718281828;
+
+// Calculate point positions of log spiral
+@P.x = chf("a") * pow(e, chf("b") * @ptnum * .001) * sin(@ptnum);
+@P.z = chf("a") * pow(e, chf("b") * @ptnum * .001) * cos(@ptnum);
+
+// Calculate general size of each instance
+@pscale = chf("sc") * chf("a") * pow(e, chf("b") * @ptnum * .001);
+
+// Look up color table based on point position
+@Cd = chramp("color_spectrum", @ptnum/(@numpt-1.0));
+}}}
+
+== Waveforms ==
+
+* For examples of using waveforms in HScript expressions and VEX, open `$HH/help/files/WaveFormExamples.hip`.
+    #glyph: fa-file
+
+Waveforms are very useful for generating mathematical repeating placement, size, or motion.
+
+=== Step function ===
+
+:fig:[Image:/images/expressions/StepFunction.png]
+    A step function takes a continuous input and converts it to an output in discrete steps.
+
+    `floor(@P.x * freq) * amplitude`
+
+=== Sin wave ===
+
+:fig:[Image:/images/expressions/CyclicalValues_03.png]
+    * For examples of sin waves in HScript expressions and VEX, open `$HH/help/files/SinFunctionExample.hip`.
+        #glyph: fa-file
+
+    The `sin` (and `cos`) function are useful for creating of all kinds of shapes. You can use the basic `sin` function to transform a line or surface into an oscillating wave.
+
+The general form for a geometric sin wave is:
+
+`sin ( @P.x * frequency ) * amplitude + offset`
+
+For wave motion, you could use this expression:
+
+`sin ( @Time * frequency ) * amplitude + offset`
+
+...where:
+
+`@P.x`:
+    The basis for the wave: to animate the geometry of the wave, this could be set instead to (@P.x + `@Frame`).
+
+`frequency`:
+    Controls the number of waves. You could set this to the bounding box position, $BBX, to make the waves more frequent towards the end of the line.
+    
+`amplitude`:
+    Controls the height of waves. You could set this to the bounding box position, $BBX, to flatten the waves toward the end of the line, or the current frame, @Frame, to make the waves larger as the animation progresses.
+    
+`offset`:
+    Translates the waves "up" or "down".
+
+=== Other waveforms ===
+
+:fig:[Image:/images/expressions/SquareFunction.png]
+
+    A [square wave|Wp:Square_wave] alternates between two values:
+
+    `abs(floor(@P.x * freq + offset) % 2 * amplitude))`
+
+:fig:[Image:/images/expressions/SawToothFunction.png]
+
+    A [sawtooth wave|Wp:Sawtooth_wave] increases and then resets:
+
+    `@P.x - floor(@P.x)`
+
+:fig:[Image:/images/expressions/TriangleWaveFunction.png]
+
+    A [triangle wave|Wp:Triangle_wave] bounces back and forth linearly:
+
+    `abs(@P.x * freq % amplitude - 0.5 * amplitude)`
+
+== Geometric deformations ==
+
+* For examples of deformations in HScript expressions and VEX, open `$HH/help/files/Deformation_Examples.hip`.
+    #glyph: fa-file
+
+You can alter point positions using HScript expressions in the [Point SOP|Node:sop/point], or using VEX in the [Attribute Wrangle SOP|Node:sop/attribwrangle], to create geometric deformations such as shear, taper, twist, squash, and bend.
+
+NOTE:
+    You can get the common deformations *much* more easily through the [Twist SOP|Node:sop/twist]. However, you can use these expressions if you need to customize or elaborate on the simple deformations.
+
+Remember that the equivalent of `$BBX` in VEX is `relbox(@P).x`.
+
+:fig:[Image:/images/expressions/ShearDeformation.png]
+    To _shear_ along X:
+    
+    Pos X ||
+        `@P.x + $BBY * ch("strength")`
+
+:fig:[Image:/images/expressions/TaperDeformation.png]
+    To _taper_ along Y:
+    
+    Pos X ||
+        `@P.x * (ch("strength") ^ $BBY)`
+    Pos Z ||
+        `@P.z * (ch("strength") ^ $BBY)`
+
+:fig:[Image:/images/expressions/SquashStretch01.png]
+[Image:/images/expressions/SquashStretch02.png]
+    To _squash and stretch_ along Y in HScript:
+    
+    Scale X ||
+        `1 / sqrt(ch("sy"))`
+    Scale Y ||
+        `ch("strength")`
+    Scale Z ||
+        `1 / sqrt(ch("sy"))`
+
+    In VEX:
+    
+    {{{
+    #!vex
+    v@scale = @scale;
+    @scale.x = set( 1/sqrt(ch("strength")));
+    @scale.y = ch("strength");
+    @scale.z = set(1/sqrt(ch("strength")));
+    @P.x *= @scale.x;
+    @P.y *= @scale.y;
+    @P.z *= @scale.z;
+    }}}
+
+:fig:[Image:/images/expressions/TwistDeformation.png]
+    To _twist_ along Y in HScript (note that you use `sin` in one axis and `cos` in the other):
+
+    Pos X ||
+         `(@P.x - $CEX) * cos( ch("strength") * ($BBY - 0.5)) - (@P.z - $CEZ) * sin(ch("strength")) * ($BBY - 0.5)) + $CEX`
+    Pos Z ||
+        `(@P.x - $CEX) * cos( ch("strength") * ($BBY - 0.5)) - (@P.z - $CEZ) * cos(ch("strength")) * ($BBY - 0.5)) + $CEX`
+
+    In VEX:
+    
+    {{{
+    #!vex
+    v@min = {0.0, 0.0, 0.0};
+    v@max = {0.0, 0.0, 0.0};
+    getpointbbox(0, @min, @max);
+    v@cent = (@max + @min) / 2.0;
+    f@twistX = cos(radians(chf("strength")) * (relbbox(@P).y - 0.5));
+    f@twistZ = sin(radians(chf("strength")) * (relbbox(@P).y - 0.5));
+    @P.x = (@P.x - @cent.x) * @twistX - (@P.z - @cent.z) * @twistZ + @centroid.x;
+    @P.z = (@P.x - @centroid.x) * @twistZ + (@P.z - @centroid.z) * @twistX + @centroid.z;
+    }}}
+
+:fig:[Image:/images/expressions/BulgeAndPinch.png]
+    To _bulge and pinch_ along Y in HScript:
+    
+    Pos X ||
+        `@P.x + (sin($BBY * 180) * (1 / ch("strength"))) - 1) * ($BBX - 0.5)`
+    Pos Z ||
+        `@P.z + (sin($BBY * 180) * (1 / ch("strength"))) - 1) * ($BBZ - 0.5)`
+
+    In VEX:
+    
+    {{{
+    #!vex
+    float PI = 3.1415926535897932384;
+    @P.x += (sin(relbbox(@P).y * PI) * (1.0 / chf("bulge_factor")) - 1.0) *(relbbox(@P).x - 0.5);
+    @P.z += (sin(relbbox(@P).y * PI) * (1.0 / chf("bulge_factor")) - 1.0) *(relbbox(@P).z - 0.5);
+    }}}
+
+:fig:[Image:/images/expressions/BendDeformation.png]
+
+    To _bend_ along Y in HScript:
+    
+    Pos X ||
+        `@P.x * cos($BBY * ch("strength")) - @P.y * sin($BBY * ch("strength"))`
+    Pos Y ||
+        `@P.x * sin($BBY * ch("strength")) + @P.y * cos($BBY * ch("strength"))`
+
+    In VEX:
+    
+    {{{
+    #!vex
+    @P.x *= cos(radians(relbbox(@P).y * ch("strength"))) - @P.y * sin(radians(relbbox(@P).y * ch("bend_factor")));
+    @P.y *= sin(radians(relbbox(@P).y * ch("strength"))) + @P.y * cos(radians(relbbox(@P).y * ch("bend_factor")));
+    }}}
+
+
+
+
+

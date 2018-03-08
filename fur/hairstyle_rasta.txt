@@ -1,0 +1,121 @@
+= How to |> create hair styled like dreadlocks =
+
+== Basic hair setup ==
+
+# Create a sphere at the origin by ((Ctrl+LMB)) clicking the [Icon:SOP/sphere][Sphere|/shelf/sphere] on the __Create__ shelf tab.
+
+# Dive into the sphere object and set __Rows__ and __Columns__ to `50` to get a rounder sphere.
+
+# Add hair to the sphere using the [Icon:FUR/add_fur][Add Fur|/shelf/addfur] tool on the __Hair__ shelf tab.
+
+# On the Fur object, set __Length__ to `0.6`.
+
+You will see the default hair look now. The guide hairs are sticking out straight, and each generated hair is a blend between multiple guides in it's neighborhood.
+
+== Render setup ==
+
+To get a better look at the hair, set up a quick render.
+
+# Rotate the viewport so you are looking straight down onto the sphere.
+
+# ((Ctrl+LMB)) click the [Area Light|/shelf/arealight] tool on the [Lights and Cameras|/shelf/lightsandcameras] shelf tab. This will create the light in your viewing position.
+
+# Rotate the viewport back to look straight at the sphere.
+
+# Switch to the [Render View|/ref/views/ipr] and click __Render__.
+
+You should get something like this:
+
+[Image:/images/howto/hair_rasta_step1.png]
+
+NOTE:
+        As you work through this how-to, you should be able to see the effect of your changes in the [Scene Viewer|/basics/view], but it can be a good idea to perform additional test renders as you go along.
+
+== Turn guides into thick hair strands ==
+
+For dreadlocks, you want to have each hair follow the guide that's closest to it, so you get a thick strand of many hairs around each guide.
+
+To achieve this, you can use a `clusterid` attribute. Hair is not interpolated between guides with different `clusterid`s, so if you assign each hair it's own `clusterid`, you should get the desired effect.
+
+# Dive into the fur object > guides node.
+
+# Attach a [Icon:SOP/attribwrangle][Primitive Wrangle|/nodes/sop/attribwrangle] to the `INPUT_GUIDES` node, making sure it's [display flag|Node:sop] is set.
+
+# Set the __VEXpression__ parameter to `i@clusterid = @primnum;`. This will put each primitive's index (`@primnum`) into it's `clusterid` attribute (`i@clusterid`), so each primitive will have a different value.
+
+# Go to the __Guides__ tab on the [fur object|Node:obj/fur] and reduce the __Density__ to around `50`, to get fewer and thicker strands.
+
+Here's what you should get after these adjustments:
+
+[Image:/images/howto/hair_rasta_step2.png]
+
+== Tighten the strands ==
+
+Get the hairs of each strand to pull closer to their guide.
+
+#  Go to the __Appearance > Clump__ tab on the [fur object|Node:obj/fur].
+
+# Turn on __Clump Fur__.
+
+# Set __Density__ to `50,` to match the guides.
+
+# Set __Clump Geo Source__ to __Use Guide Curves__. This will reuse the guide curves for clumping.
+
+# Set the curve to something like the screenshot below. This will make the hairs quickly move towards the guide and then continue straight.
+
+    [Image:/images/howto/hair_rasta_clumpramp.png]
+    
+# You can now control the overall effect using __Tightness__. The default of `0.5` moves the hair points halfway towards the guide. If you set `1.0` here, the hair will move all the way to the guide, resulting in a very thin strand.
+
+# On the __Basic__ tab, increase __Segments__ to `20`.
+
+    NOTE:
+        This is necessary because, with the default of `4`, the hair curves don't have enough segments to represent the steep ramp you used above, The extra segments will also be helpful to set up frizz with a high frequency.
+
+[Image:/images/howto/hair_rasta_step3.png]
+
+== Add Frizz ==
+
+Use frizz to get rid of the perfectly straight look.
+
+# Go to __Appearance > Frizz__ on the [fur object|Node:obj/fur] and set __Maximum Frizz__ to `0.25`.
+
+# Set __Frequency__ to `20`.
+
+    NOTE:
+        Remember that you increased the number of hair segments in the previous section. Without this, you wouldn't have enough points in the hair curves to represent the high frequency noise.
+        
+# Set the ramp to something like this, to get frizz all along the hair: 
+    [Image:/images/howto/hair_rasta_frizzramp.png]
+    
+    NOTE:
+        Alternatively you can ignore the ramp and set both __Minimum Frizz__ and __Maximum Frizz__ to `0.25`.
+
+[Image:/images/howto/hair_rasta_step4.png]
+
+== Shader Settings ==
+
+# Navigate to the hair shader inside the fur object (Located in `fur/shopnet1/textured_hair`).
+
+    NOTE:
+        As a shortcut, you can ((LMB)) the arrow next to the __Material__ parameter on the Fur object's __Basic__ tab.
+
+        Use ((Ctrl+LMB)) to open the shader parameters in a new window.
+
+# Reduce the hair's reflectiveness by reducing __Intensity__ on the __Reflection__ tab to `0.02`.
+
+# Turn on __Randomize__ for __Diffuse Saturation__ and __Diffuse Intensity__ on the __Randomness Tab__.
+
+# You can use the ramps to create a few bright gray hairs. Set up the ramps according to the screenshot below.
+
+[Image:/images/howto/hair_rasta_randomness.png]
+
+NOTE:
+    The random saturation and intensity values are picked from the __Source Values__ ramps. You're setting 80% of hairs to have high saturation, and about 20% to have low saturation. You're setting 80% of the hair to have a dark color, and 20% to have a bright color.
+    
+    __Important__: You're using the same seed for both ramps. This means that for each hair, the position along each ramp will be the same. In other words, a hair that is desaturated will also be bright.
+
+
+[Image:/images/howto/hair_rasta_step5.png]
+
+To style the hair, use the tools on the [Grooming Shelf|/shelf/grooming] shelf tab.

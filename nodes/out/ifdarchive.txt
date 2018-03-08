@@ -1,0 +1,157 @@
+#type: node
+#context: out
+#internal: ifdarchive
+#icon: ROP/mantra
+
+= Mantra Archive =
+
+"""Generates disk-based archives which can be used by mantra."""
+
+Archives allow Houdini to be more efficient when generating scripts for renderers since: a) Houdini can have different geometry displayed b) Houdini doesn't have to send the geometry down to the renderer every frame.
+
+Mantra archives are stored as geometry files (typically `.bgeo` files)
+and material archive files.
+
+Arguments may be passed to the script and variable expansion is done
+before calling the script.
+
+@parameters
+
+Save to Disk:
+    Begins generation of archives.
+
+Controls...:
+    Opens the render control dialog to allow adjustments of the render parameters before generating archives.
+
+Valid Frame Range:
+    Controls whether this render node outputs the current frame (__Render any frame__) or the image sequence specified in the __Start/End/Inc__ parameters (__Render Frame Range__).
+    
+    __Render Frame Range (strict)__ will render frames START to END when it is rendered, but will not allow frames outside this range to be rendered at all. __Render Frame Range__ will allow outside frames to be rendered. This is used in conjunction with render dependencies. It also affects the behavior of the 'Override Frame Range' in the Render Control dialog.
+
+    Two possible cases where you'd want the strict behavior:
+        
+    - A 60 frame walk cycle written out to a geo, but part of a larger ROP net to render out a larger frame range.
+    
+    - A texture loop from 1-20.
+
+    Otherwise, you will usually set this to non-strict.
+    
+    Render Current Frame: 
+        Archives a single frame, based on the value in the playbar or the frame that is requested by a connected output render node.
+    
+    Render Frame Range:
+        Archives a sequence of frames. If an output render node is connected, this range is generally ignored in favor of frames requested by the output render node.
+        
+    Render Frame Range (Strict):
+        Archives a sequence of frames. If an output render node is connected, this range restricts its requested frames to this frame range.
+
+Start/End/Inc:
+    Specifies the range of frames to archive (start frame, end frame, and increment). All values may be floating point values. The range is inclusive. 
+    
+    These parameters determine the values of the local variables for the output driver.
+        `$NRENDER`:
+            The number of frames to be archived by the output driver.
+        `$N`:
+            The current frame being archived (starting at 1 and going to `$NRENDER`).
+            
+    For example, if the parameters are set to:
+    table>>
+        tr>>
+            th>> Start
+            th>> End
+            th>> Inc
+        tr>> 
+            td>> 10.5
+            td>> 12
+            td>> 0.5
+
+    There will be 4 frames archived (10.5, 11, 11.5, and 12), so `$NRENDER` will have a value of 4. `$N` will have the value:
+    table>>
+        tr>>
+            th>> Frame
+            th>> 10.5
+            th>> 11
+            th>> 11.5
+            th>> 12
+        tr>> 
+            td>> $N
+            td>> 1
+            td>> 2
+            td>> 3
+            td>> 4
+    
+Render With Take:
+    The output driver will switch to this take before rendering and then restore the current take when rendering is done.
+    
+    TIP:
+        use `chs("take")` to use this value in other parameters. See the [Exp:chs] expression function for more information.
+
+== Main ==
+
+[Include:standard#mkpath]
+
+Initialize Simulation OPs:
+    Forces all simulation OPs to be reset. This includes DOP Networks, POP SOPs, and other OPs that cache their results.
+
+Objects to Archive:
+    Specifies the number of objects to archive (the number of objects in the multi-parm).
+
+Disable generation of archive 1:
+    Disables the inclusion of this object in the archive without having to delete the multi-parm parameter.
+
+Object 1:
+    The object to put into the archive.
+
+Geometry File 1:
+    The disk file in which the object should be stored. If the same disk file is specified for multiple parameters, only the first object will be stored in the archive.
+
+Material File 1:
+    When a SOP has materials applied, you can optionally save out the material properties to a separate file. This file can be used by the mantra delayed load procedural SHOP.
+
+== Properties ==
+
+You can add any rendering property to the mantra archive node. Properties change the behavior of how mantra will interpret the scene. You can add any property, even if it might not make sense to add to an output driver. For example, you can add a surface shader even though the output driver does not have any surfaces. These values will be used as default values for objects which do not have these properties defined. However, if an object has a property defined, the value assigned to the object will be used instead of the value assigned on the output driver.
+
+== Scripts ==
+
+Each script command refers to an hscript command which will be run, regardless of the expression language selected for the parameter. The resulting string will be run as an hscript command. 
+
+NOTE:
+    It is possible to use the python, unix or source hscript commands to perform complex processing.
+
+The commands are always run when rendering occurs. The command checks the parameters of the output driver when it is rendering a range or sending output to a command.
+
+Before the render occurs, Houdini will automatically set the current hscript directory to point to the output driver.    
+
+Pre-Render Script:
+    This command is run before any IFDs are generated. It is only run once per render.
+    
+Pre-Frame Script:
+    This command is run before each IFD is generated.
+    
+Post-Frame Script:
+    This command is run after each IFD is generated.
+    
+    NOTE:
+        Although the IFD may have been generated, this does not necessarily mean that mantra has finished rendering the image when this command is run.
+
+Post-Render Script: 
+    This command is run one time, after all IFDs have been generated.
+    
+    NOTE:
+        Although the IFD may have been generated, this does not necessarily mean that mantra has finished rendering the image when this command is run.
+
+@locals
+
+N:
+    The current frame of the range specified. This always starts at
+    1.
+
+NRENDER:
+    Total number of frames being rendered.
+
+@related
+
+- [Node:out/ifd]
+- [Node:out/rib]
+

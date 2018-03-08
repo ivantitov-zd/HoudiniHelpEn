@@ -1,0 +1,282 @@
+= Attribute Expression =
+
+#type:     node
+#context:  sop
+#internal: attribexpression
+#icon:     SOP/attribexpression
+#bestbet: point
+
+"""Allows simple VEX expressions to modify attributes."""
+
+== Overview ==
+
+This node runs a VEX expression for each point or primitive in the input, and uses the result to set the value of an attribute on the point/primitive.
+
+This node is faster than the old [Point SOP which it replaces|#point], because the VEX expression is compiled and can potentially run in parallel. Unlike the Point SOP, this node runs a single VEX expression to generate the attribute value instead of allowing separate expressions for each component.
+
+For more information on writing VEX expressions, see:
+
+* [VEX snippets|/vex/snippets] for information on special syntax in the expression parameter.
+
+* The full list of [VEX functions|/vex/functions/].
+
+* The [VEX chapter|/vex/] for basic information on the VEX language.
+
+
+== What happened to the Point SOP? == (point)
+
+In Houdini versions prior to 16, the Point SOP was use to modify certain common parameters using HScript expressions. In Houdini 16, trying to put down a Point node creates an Attribute Expression node instead. Why did we make this change?
+
+The Point node had real advantages of usability and ease of learning. The Point SOP's use of local variables in simple expressions was a great tool for learning trig and linear algebra for artists. So why have we replaced it with VEX?
+
+Point SOP had serious performance issues. It worked on vector components separately, limiting possibilities for parallel computation. Worse, it cannot not work with the [compiled geometry node|/model/compile] workflow which will be more and more important in the future.
+
+See [why VEX and attributes|/vex/snippets#why/] for a discussion on why VEX is the future for ad-hoc geometry manipulation in Houdini.
+
+
+== Writing the expression == (write)
+
+* The `self` variable is pre-defined as the current (input) attribute value in the expression.
+
+* You can read the values of other attributes on the geometry using `@<<name>>`. See [reading attributes in snippets|/vex/snippets#attributes] for more information.
+
+* The `@elemnum` (or `@ptnum`) pseudo-variable contains the index of the current point or primitive. This is useful as a random number seed to get different random values for each element.
+
+* Use `@Frame`, `@Time`, or `@TimeInc` in the VEX expression to reference the current frame number, time, or time increment. To access other global variables without a VEX equivalent, you can use the [Constant value|#constant] parameter.
+
+* Unlike in Wrangle nodes, you do not need to write a complete VEX statement, only a VEX expression. If you need to write a multi-line function, or require control-flow, use an [Attribute Wrangle|Node:sop/attribwrangle] instead.
+
+
+== Working with vectors == (vectors)
+
+If the attribute is scalar (a simple `int` or `float`), the expression can use `self` to refer to the current value, and simply compute a single number. For example, to increase the current value on every point, you could write:
+
+{{{
+self + 1.0
+}}}
+
+This expression will work with vector attributes as well: it will add `1.0` to each component of the vector. (In general, operators and functions that work on scalar values will work component-wise on vectors as well.)
+
+However, when working with vector attributes, you will usually need to pull the individual components out of the current value.
+
+* Or, you can simply use the array/vector indexing operator to pull out individual components: `self[0]`, `self[1]`, `self[2]`, and so on. This form is useful when the index of the attribute is itself a variable or expression.
+
+* For readability, you can optionally use `self.x`, `self.y`, and `self.z` to access the individual components.
+
+    Alternatively, you can use `self.r`, `self.g`, and `self.b` (and `self.a` in a `vector4`) when working with colors.
+
+To set individual components, use the `set()` function. For example, to half the amount of red and green and double the amount of blue in a color attribute:
+
+{{{
+#!vex
+set(self.r * 0.5, self.g * 0.5, self.b * 2.0)
+}}}
+
+
+== Constant value == (constant)
+
+Accessing keyframed values in VEX often requires creating spare parameters and referencing them using a `ch` function. This node provides a pre-made __Constant value__ parameter for this purpose so you don't have to create a spare parameter yourself.
+
+You can use HScript expressions or keyframe animation in this parameter, and refer to its value in the VEX expression using the `value` variable.
+
+NOTE:
+    The value of this parameter is computed _once_ for the input geometry. It cannot vary for each point/primitive.
+
+For example, if you need to use the current position of `geo1` in the expression, you could set the __Constant value__ to:
+
+`ch("/obj/geo1/tx")` |
+    `ch("obj/geo1/ty")` |
+        `ch("obj/geo1/tz")`
+
+Then get the values in the expression as `value.x`, `value.y`, and `value.z`.
+
+
+== Example == (eg)
+
+To do a simple random jitter of the points in the input geometry:
+
+# Set the __Attribute class__ to "Points".
+
+# Set the __Attribute__ to "Position (P)".
+
+# Set the __VEXpression__ to:
+
+    {{{
+    #!vex
+    set(self.x + rand(@elemnum) - 0.5, self.y + rand(@elemnum * 10) - 0.5, self.z + rand(@elemnum * 100) - 0.5)
+    }}}
+
+    * `set()` returns a vector. This allows us to construct a new vector value based on the components of the current vector value.
+
+    * `@elemnum` is the index of the current point. Here we use it as the seed for the random number generator, so each point will have different numbers. We further modify it (`* 10` and `* 100`) so each component so they will have different numbers.
+    
+    * `rand()` generates a number from 0-1. We subtract 0.5 from the value to move each point randomly from -0.5 to +0.5 in each direction.
+
+# You could parameterize the expression by changing it to:
+
+    {{{
+    #!vex
+    set(self.x + (rand(@elemnum) - 0.5) * chf("scale"), self.y + (rand(@elemnum * 10) - 0.5) * chf("scale"), self.z + (rand(@elemnum * 100) - 0.5) * chf("scale"))
+    }}}
+    
+    Then, click the [Icon:BUTTONS/create_parm_from_ch] Create Parameters button to automatically create a __Scale__ parameter based on the `ch()` references in the expression. You can use this new parameter to scale the jitter effect.
+
+
+== Tips and notes == (tips)
+
+* If you set __Attribute__ to "Custom" and set the __Name__ to an attribute that doesn't exist, the node will create it. In this case will probably build the expression using the value of other attributes, since `self` will be `0` (or `{0, 0, 0}`, or the empty string, or whatever the "zero" value for a given data type is).
+
+* If you're modifying, for example, the `P` (position) attribute, you can use `@P` in your expression instead of `self`. The only disadvantage is that you can't re-use the expression elsewhere as easily.
+
+* VEX trigonometry functions use radians, where HScript expression functions use degrees. You can use [Vex:radians] to convert degrees to radians.
+
+* You can use [Vex:ch] functions in the VEX expression to reference parameters on this node. You can then click the [Icon:BUTTONS/create_parm_from_ch] Create Parameters button to the right of the expression to automatically create parameters based on the `ch` calls. This lets you create interactive controls for values in the expression.
+
+* If you only want to modify one component of a vector using the expression, you can use a "trick" to make it easier. Apply the expression to each component of `self` (the [current value|#writing]), but multiply the modification by `value` (the optional [constant value|#constant]). Then set the __Constant value__ to, for example, `0, 1, 0` to modify only the Y component.
+
+    For example, the following expression would add the sin of the current point number to each component:
+    
+    {{{
+    #!vex
+    self + sin(radians(@ptnum))
+    }}}
+    
+    To modify only the Y component, you could change the expression to:
+    
+    {{{
+    #!vex
+    self + value * sin(radians(@ptnum))
+    }}}
+    
+    ...and then set the constant value to:
+    
+    {{{
+    0, 1, 0
+    }}}
+
+* Because the expression is only one line, modifying vector components individually can quickly make the expression long and difficult to work with in the parameter editor.
+
+    You can open the parameter value in a floating editor window using ((Ctrl + E)) to make it slightly easier to work with.
+    
+    Or, you might find it easier to use an [Attribute Wrangle node|Node:sop/attribwrangle] instead, where you can treat the components on separate lines.
+
+    For example, a long expression like this:
+
+    {{{
+    #!vex
+    set(self.x + rand(@elemnum) - 0.5, self.y + rand(@elemnum * 10) - 0.5, self.z + rand(@elemnum * 100) - 0.5)
+    }}}
+
+    ...becomes easier to work with as separate statements in an Attribute Wrangle:
+
+    {{{
+    #!vex
+    @P.x += rand(@elemnum * 1) - 0.5;
+    @P.y += rand(@elemnum * 10) - 0.5;
+    @P.z += rand(@elemnum * 100) - 0.5;
+    }}}
+
+* The node automatically translates your expressions into a full VEX snippet for compilation. This can be useful for debugging, or if the expressions are becoming complicated and you want to copy the generated code into an Attribute Wrangle SOP. To view the generated VEX code, click the __Generated code__ tab, then click __Update code__.
+
+* An error in the VEX code will cause the node to error. Press ((MMB)) on the node to [view the node info window|/network/nodes#info] to see the error text.
+
+    Note that row/column numbers in the error report refer to the generated code. To view the generated VEX code, click the __Generated code__ tab, then click __Update code__.
+
+* Unlike the [Attrib Create SOP|Node:sop/attribcreate], this node does not use local variables.
+
+* This node has multiple inputs so you can pipe other geometry in to reference in the expression. VEX geometry functions generally take an `input` as the first argument specifying which input to read geometry data from. To read an attribute from another input, you can prefix the attribute name with `opinput<<num>>_`, for example `v@opinput1_P` (see [reading attributes in snippets|/vex/snippets#attributes] for more information).
+
+
+@parameters
+
+Group:
+    #id: bindgroup
+
+    Which components this node will affect. This can include [group|/model/groups] names and/or component numbers. If this is blank, the node affects all input geometry.
+
+Group Type:
+    #id: bindgrouptype
+
+    If more than one type of group has the same name, or you are using component numbers in the group field, you can manually set which component type the group field should use.
+
+
+== VEXpressions ==
+
+Attribute Class:
+    #id: bindclass
+
+    What the type of component to iterate over. For example, points or primitives (polygons).
+
+Attribute VEXpressions:
+    #id: expressions
+    
+    You can add or remove additional expressions using the + and - buttons.
+
+Enable:
+    #id: enable#
+
+    Apply this expression to the input. This is useful for toggling the expression on and off to see its effect on the geometry.
+    
+Attribute:
+    #id: preset#
+
+    Choose from a list of commonly used attributes, or choose "Custom" to enter the attribute name.
+    
+Name:
+    #id: name#
+    
+    When __Attribute__ is "Custom", the name of the attribute to modify.
+    
+Type:
+    #id: type#
+
+    When __Attribute__ is "Custom", the type of the attribute to modify. If this does not match the type of the named attribute in the input geometry, the node will not error, but you may get strange results.
+    
+Constant Value:
+    The node computes the value of this parameter and makes it available in the VEX expression as the `value` variable. This is useful for grabbing keyframed values and making them available in VEX. See [how to use the constant value|#constant] for more information.
+    
+VEXpression:
+    #id: snippet#
+    
+    A VEX expression that generates the new value for the attribute. You can use `self` to refer to the input value on the current point/primitive. For a vector attribute, you can generate a new vector using `set()`, as in `set(self.x, self.y., self.z)`. See the node documentation for more information.
+
+    
+== Bindings ==
+
+Evaluation Node Path:
+    #id: vex_cwdpath
+    
+    Relative paths in VEX functions such as [Vex:ch] are relative to this node path. The default value (`.`) makes them relative to this node. This can be useful for embedding in a digital asset if you want paths to be relative to asset root.
+
+[Include:attribvop#vex_matchattrib]
+
+Include Files:
+    #id: includes
+    
+    Space separated list of files to include in the generated VEX, for example `voplib.h shading.h`. You can use this to make your own helper functions available in the expression.
+    
+Update Normals If Displaced:
+    #id: vex_updatenmls
+    
+    When __Attribute class__ is "Points" and you modify the `P` (position) attribute and not `N`, the normals in the `N` attribute will be out-of-date with the new positions. When this option is on, the node automatically updates the vertex and point normals when this occurs.
+    
+    
+== Generated Code ==
+
+Update Code:
+    #id: updatecode
+    
+    Updates the generated code field based on the expressions on the __VEXpressions__ tab. The code display does not update itself, so you should always click this before checking the code to make sure it's up to date.
+    
+Generated Code:
+    #id: generatedcode
+    
+    Displays the VEX snippet equivalent to the expressions on the __VEXpressions__ tab. This can be useful for debugging, or if the expressions are becoming complicated and you want to copy the generated code into an [Attribute Wrangle SOP|Node:sop/attribwrangle]. This is read only: changing it does not affect the node. This field does not update itself, so you should always click __Update code__ before checking it to make sure it's up to date.
+    
+    
+@related
+
+- [Node:sop/groupexpression]
+- [Node:sop/attribvop]
+- [Node:sop/attribwrangle]
+

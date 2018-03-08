@@ -1,0 +1,123 @@
+#type: node
+#context: sop
+#internal: volumerasterizehair
+#icon: SOP/volumerasterizehair
+
+#tags: volumes, merge, curve
+
+= Volume Rasterize Hair =
+
+"""Converts fur or hair to a volume for rendering."""
+
+This SOP will take curve geometry and convert it to a VDB volume suitable
+for rendering. Curves will first be converted to a point cloud by
+resampling, which are then rasterized to the resulting volume. The volume
+can contain the average hair tangent vector in the `tangentu` field which
+can be used in instead of `dPdt` in hair shaders.
+
+Using VDB volumes to render hair can speed up rendering of background
+characters with hair, since it avoids the time and memory overhead of 
+rendering curves directly. It can also be used to implement a global 
+illumination system for hair, which would otherwise be very expensive or
+noisy due the low probability involved in point sampling hair strands.
+
+@parameters
+    Voxel Size:
+        Size of the voxels in the created volumes.
+ 
+    Sampling Quality:
+        Controls the resampling point density when converting curves to
+	points. The default of 1 will create points along the curve with
+	spacing approximately equal to the voxel size. Larger value for the
+	sampling quality will decrease the point spacing, improving
+	accuracy.
+
+    Density Scale:
+        Scales the values in the resulting density volume by a constant
+	factor.
+
+    Width Scale:
+        Scales the width of the rasterized curves.
+
+    Color Shop Path:
+	Specifies a CVEX shader to be applied after resampling to create or
+	modify attributes on the resampled points. The shader may use the
+	`curveu` float parameter to determine the parametric position on
+	the curve - for example to evaluate a color ramp.
+
+    Primitives per Batch:
+	To avoid excessive memory use for the temporary resample points,
+	this parameter limits the number of primitives that are resampled
+	and rasterized at a time. Internally, a [ForEach SOP|Node:sop/foreach] iterates over
+	each batch.
+
+    Rasterize Tangent:
+	A volume containing the average hair tangent vector will be created
+	when enabled.
+
+    Tangent Voxel Scale:
+	Specify a scale on the voxel size for the generated `tangentu` field.
+
+    Tangent Filter Width:
+	Controls the minimum filter width to use when choosing a tangent
+	vector for rendering.
+
+	NOTE:
+	    When filtering, the `tangentu` field isn't averaged like
+	    density, color or other attributes. This ensures that the
+	    tangent vectors are not blended together, which could produce
+	    new invalid tangent vectors that didn't exist in the original
+	    curves. Instead, the rasterization algorithm preserves the
+	    original tangents by randomly selecting a single tangent vector
+	    for each voxel. In mantra, these tangents are randomly sampled
+	    to find a plausible tangent vector in the neighborhood of each
+	    shading point. This parameter controls the search radius used
+	    by mantra to find these candidate tangent vectors.
+
+	    In general, larger values will reduce noise but increase
+	    blurring of the tangent field while smaller values will be
+	    sharper but will render with voxel grid noise. The default of 4
+	    will allow 4^3 or 64 candidate samples which will usually
+	    render with little noise.
+
+    Color Voxel Scale:
+	Specify a scale on the voxel size for the generated Cd field, if
+	there is a `Cd` point attribute on the input geometry
+
+    Velocity Blur Type:
+	Controls the way the velocity attribute `v` is treated during
+	rasterization.
+
+	No Velocity Blur:
+	    Disable velocity blur
+	Velocity Field:
+	    Create a VDB vector field for the velocity and rasterize the
+	    particle `v` values into this field. This option will generally
+	    result in correct occlusion when rendering the volume with
+	    nearby surfaces, but it can produce incorrect results when
+	    nearby curves have different velocities.
+	Rasterize Velocity Blur:
+	    Bake the velocity blur into the generated volume by averaging
+	    along the motion path. This option will produce more consistent
+	    motion blur when nearby curves have different velocities but
+	    can lead to incorrect occlusion.
+
+    Velocity Voxel Scale:
+	Specify a scale on the voxel size for the generated v field, if
+	there is a `v` point attribute on the input geometry.
+
+    Shutter:
+	The shutter time to use for velocity blur rasterization.
+
+    Shutter Offset:
+	The shutter offset to use for velocity blur rasterization.
+
+    Blur Samples:
+	The number of motion blur samples to use for velocity blur
+	rasterization. Larger numbers of samples will produce smoother and
+	more accurate results but will take more time to compute.
+
+@related
+    - [Node:sop/volumerasterizecurve]
+    - [Node:sop/volumerasterizeparticles]
+

@@ -1,0 +1,151 @@
+#type: node
+#context: dop
+#internal: file
+#icon: COMMON/file
+
+= File =
+
+""" Saves and loads simulation objects to external files. """
+
+This node can be used to save or load simulation objects in external
+files. It can also work in an automatic mode where it saves files if
+they do not already exist, and loads files if they do exist. This node
+serves two purposes. One is to provide a cache of a simulation or some
+of the objects in a simulation that is persistent across Houdini
+sessions. The other is to allow the output of one simulation to be
+loaded into another simulation without having both simulations running
+in the same hip file.
+
+When using this node it is important to understand the relationship
+between an object and its creator node. Every object and piece of data
+in a DOP simulation keeps a record of the DOP Node that created it. This
+is how from frame to frame each object always follows the same path
+through the DOP Network. When loading objects from a file, the original
+creator node may not exist any more. Creator nodes are saved to files as
+paths relative to the owner DOP Network. 
+
+When loading a file, the DOP
+node matching that path is found and set as the creator for the object
+or data. If no matching node is found, the File DOP is set as the
+creator for the object. Data is left with no creator node because data
+does not flow through a DOP Network the way objects do, so it is not a
+problem to have data without a creator node. The File DOP also has an
+option to take ownership of all loaded objects whether a matching DOP
+node for its creator path is found or not. This is useful in cases where
+the File DOP is loading objects from another network which might have
+had DOP nodes with the same names, but which don't really represent the
+same thing.
+
+When saving objects to a file, the objects are saved at the end of a
+timestep. When loading a file, the objects are loaded at the start of
+the timestep so that they can act as affector objects for other objects
+in the scene. But these objects are protected from modification by the
+DOP Network or by any solvers. So the state of these objects at the end
+of the timestep will be exactly the same as it was at the start of the
+timestep when the objects were just loaded.
+
+It is also important to understand the difference between a File DOP
+and the simulation cache. The cache is created and maintained entirely
+automatically by the DOP Network. The cache always stores the whole
+state of a simulation, whereas the File DOP can be used to store only
+part of a simulation. The cache is deleted and recreated automatically
+when the DOP Network is changed. Having a File DOP in a DOP Network does
+not affect the operation of the cache in any way.
+
+The File DOP is like the File SOP. It injects data into a simulation, but doesn't stop the other DOPs from doing their thing. The exact behavior depends on how you have your network set up. If the File DOP is the last DOP in the chain, then the File DOP will load the .sim file contents on top of whatever the upstream DOPs did. Objects that are loaded by a File DOP are not solved on the frame in which they were loaded. So any objects loaded in this setup will not run their solvers. On the other hand, if the upstream DOPs create some objects that do not have a counterpart in the .sim file, those objects not getting loaded from the .sim file will still be sent to their solvers.
+
+If you have a DOP Network that you want to simply have load a sequence of .sim files, you should make the File DOP the only DOP in the network.
+
+NOTE:
+    When running a File DOP to frame 100, you have to load frames 1-99 as well. This is because the File DOP may not be the only node in the network. There could be other DOP nodes that modify the .sim file on each frame, and could affect the contents of the simulation on the next frame.
+
+If you are using a render farm in a case where you only ever want to load a single .sim file, you can set the File DOP parameters so that they always access just that one .sim file. Then, at each frame 1-99, the File DOP will reload the same .sim file. This operation is very fast if the file contents are identical to the in-memory contents. For even better performance, you can also set up the DOP Network to not cook until frame 100.
+
+@parameters
+    Activation:
+	When this parameter is zero, this node neither saves nor loads
+	a file. Because this node is processed only once, the object
+	specific local variables cannot be used in this node.
+    Operation Mode:
+	Indicates the mode of operation for this node.
+
+	Automatic :
+              In this mode, the File DOP looks for a file that matches the specified name. If one is found, it behaves as if it were in Read mode. Otherwise it behaves as if it were in Write mode. Note that this mode does not pay any attention to changes made to the network. 
+
+              Hitting the Recook Simulation button will not cause a File DOP in this mode to overwrite files that already exist. To force objects in this network to recook and write out updated files, you must delete the existing files on disk. 
+
+              You can also recook by changing the Operation mode to Write Files and replaying the simulation.
+	Read Files :
+	    In this mode the File DOP looks for a file with the
+	    specified name, and loads it. If a file is found, the nodes
+	    that are input to this node are not processed at all. 
+
+            If no matching file is found, this node is ignored. The input
+	    nodes are processed as if the File DOP didn't exist.
+	Write Files :
+	    In this mode the File DOP will write the specified file at
+	    the end of each timestep. Any existing file will be
+	    replaced. When viewing simulation data from the cache, files
+	    are not rewritten. They are written only at the end of a new
+	    timestep.
+	No Operation :
+	    In this mode, the File DOP does nothing. It simply passes
+	    the input objects through to the output.
+    File:
+	The name of the file to which the objects should be saved or
+	loaded. This should usually be an expression involving the
+	simulation time or simulation frame number.
+    Create Intermediate Directories:
+	Create intermediate parent directories for output files as needed.
+    Take Ownership of Loaded Objects:
+	Turning on this parameter causes the File DOP to be set as the
+	creator node for all objects loaded from the specified file.
+	This option is useful when using the File DOP to load objects
+	from a file created by a different DOP Network, where some nodes
+	in the current network may have the same names as the nodes in
+	the source network.
+
+    Match By Name:
+	Loaded objects normally will replace any object in the scene
+	with the same object id.  This allows the file dop to know
+	which objects to replace when it created the objects in an
+	earlier frame.  One problem with this is if the simulation
+	file has new objects created over time, the object ids of the
+	loaded sim might match those created by the live network.
+	
+	Instead, one can match by the name of the object.  This
+	requires that all objects in the .sim file have unique names,
+	but allows layering of simulations without concern of the
+	simulations stomping on each other.  If Match By Name is
+	turned on, any relationships stored in the .sim file will be
+	ignored to avoid them overriding live objects.
+
+    Match Prefix:
+	When Match By Name is on this prefix is prepended to the name
+	of loaded objects to determine the name that will be matched
+	with in the current sim.  This can be used to create a
+	namespace for loaded objects to ensure they don't replace live
+	objects.
+
+    Compress .sim Files:
+	Determines if .sim files written to disk for caching will be
+	compressed.  Compression can reduce the size of the disk cache
+	significantly, but can also increase the time to cache
+	significantly.  If loading or writing to cache seems slow, try
+	using uncompressed .sim files, especially with fluid sims.
+
+@inputs
+    First:
+	The objects connected to this input are saved to the file when
+	this DOP is in Write mode. When in Read mode, the node connected
+	to this input is not processed in any way unless the specified
+	file cannot be found.
+@outputs
+    First:
+	Outputs the objects loaded from the file when in Read mode. In
+	Write mode, the objects from the input are passed to this
+	output.
+@locals
+    [Include:standard_locals]
+
+

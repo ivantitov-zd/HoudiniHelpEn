@@ -1,0 +1,204 @@
+= Facial Rigging =
+
+== Morph between geometry shapes ==
+
+The [Morph tool|/shelf/morph] on the __Deform__ shelf lets you edit
+geometry at the object level, and automatically creates the necessary
+Edit and Blend Shapes nodes at the geometry level.
+
+:task:Blend between shapes:
+    # Model the "normal" shape of the surface(s). Then use the [Edit
+      operator|Node:sop/edit] and/or other surface operations (such
+      as a  [lattice deformer|Node:sop/lattice] ) to deform the
+      surface.
+
+      You _do not need to model the normal and deformed versions as
+      separate surfaces_. Because of the procedural nature of
+      Houdini, you can simply blend between the surface at two
+      different points in its construction history.
+
+      You can blend between any number of shapes (not just 2).
+
+    # At the geometry level, use the  [tab menu|/basics/tabmenu]
+      to create a [Blend Shapes node|Node:sop/blendshapes].
+
+    # Connect the various shapes you want to blend between to the
+      input of the Blend Shapes node.
+
+    # Use the __Weight__ parameters to control the blending of the
+      shapes. See below for how to make blending between two inputs
+      easier.
+
+:task:Use the Morph tool to set up blend shapes at the object level:
+
+    #  [Select the points|/basics/select]  you want to morph, then click the [Morph tool|/shelf/morph] on the __Deform__ shelf tab.
+
+    # The Morph tool essentially works like the [Edit
+      operator|Node:sop/edit] from the geometry (SOP) level. Use the
+      [transform handles|/basics/handles_xform]  to edit the selected
+      points in the viewport.
+
+    # The Morph tool automatically creates an [Edit node|Node:sop/edit] and a [Blend Shapes node|Node:sop/blendshapes] at the geometry (SOP) level for the geometry you edit.
+
+      Use the __Weight__ parameters to control the blending of the
+      shapes. See below for how to make blending between two inputs
+      easier.
+
+:task:Make blending between two inputs easier:
+    * The Blend Shapes node has separate __Weight__ sliders for each
+      input, letting you mix them arbitrarily. In a two-shape
+      scenario however, you probably only want one slider control
+      that blends between the two inputs. To do that, you need to
+      link the second slider to the first slider so it automatically
+      goes down/up as the other goes up/down.
+
+      Press ((RMB)) on the first slider's value and choose __Copy
+      Parameter__. Then press ((RMB)) on the second slider's value
+      and choose __Paste Relative Reference__. Houdini inserts a
+      parameter reference expression to the first slider. Finally,
+      to make the second slider invert the value of the first
+      slider, insert `1-` in front of the expression.
+
+:task:Use a bone angle to control deformation:
+    # You can use drive the amount of blending between the normal
+      (rest) geometry and the deformed geometry using the angle
+      between two bones of a character. This lets you do things like
+      make a muscle bulge as the character moves its arm.
+
+      Set up a Blend Shapes node and link the __Weight__ parameters
+      using the steps above.
+
+    # In the Blend Shapes node, click in the first __Weight__
+      parameter's text field to edit it.
+
+    # You can use the [boneangle|Exp:boneangle] expression function
+      to get the angle between two bones.
+
+      The `boneangle` function's result is an angle in degrees (e.g.
+      `90` or `120`). The Blend Shapes' __Weight__ parameter, on the
+      other hand, is from `0` to `1`. Use the [smooth|Exp:smooth]
+      expression function to map the minimum and maximum bone angles
+      to 0 and 1.
+
+      Finally, depending on how you connected the Blend Shapes node,
+      you may need to invert the result of the `smooth` function by
+      inserting `1-` before it. Do this if the deform is backwards,
+      for example the muscle bulges when the arm is extended instead
+      of when it's flexed.
+
+      Here's an example of a finished function. Your function will
+      probably have different values for the bone names and the
+      minimum and maximum bone angles.
+
+== Wire deform ==
+
+Character deformations, especially in the face, often must work with the
+contours of the deforming surface. Wire deformers make it possible to
+capture and deform the surface along these contours. You can then deform
+along the U direction of the curve or animate the shape of the curve to
+achieve more complex deformations.
+
+=== How to use a curve to drive deformation ===
+
+steps>>
+    # [Go to the geometry level|/ref/panes/network] containing the surfaces you
+      want to deform.
+
+    # [Draw a curve|/shelf/curve]. You can [snap the curve to the
+      surface|/model/aids] you want to deform.
+
+      [Image:/images/eyebrow_curve.jpg]
+
+    # In the  [parameter editor|/ref/panes/parms] , change the
+      curve's __Primitive type__ to NURBS.
+
+    # In the viewer, use the  [tab menu|/basics/tabmenu]  to choose the
+      [Group operator|Node:sop/group].
+
+    # Select the curve, then click ((RMB)) to finish the selection.
+
+    # In the parameter editor, change the __Group name__ to a meaningful
+      name for the deformer. In the  [network
+      editor|/ref/panes/network] , rename the group
+      operator with a meaningful name.
+
+    # In the network editor, use the tab menu to choose the [Wire
+      Capture operator|Node:sop/wirecapture].
+
+    #  [Connect|/ref/panes/network]  the geometry you want to deform to the
+      wire capture node's first input. Connect the curve's group node to
+      the wire capture node's second input.
+
+      If you want to put several wire deformers on the same piece of
+      geometry, create a [Merge node|Node:sop/merge], connect the curve
+      group nodes to the merge node's inputs, then connect the merge
+      node to the wire capture node's second input.
+
+    # In the parameter editor, click the __Capture__ tab, then click
+      __Initialize From groups__. This uses the group (or groups)
+      connected to the second input.
+
+    # Set the __U radius__ and __V radius__ parameters for the curves.
+      These options control the distance within which the curves will
+      influence the geometry.
+
+      [Image:/images/wire_capture.jpg]
+
+    # In the network editor, right-click the wire capture node's output
+      and choose the [Wire Deform operator|Node:sop/wiredeform].
+
+    # Connect the group (or merge) node's output to both the second and
+      third inputs of the wire deform node. These inputs control the
+      rest geometry and the deformed geometry.
+
+    # Turn on the wire deform node's  [display flag|/nodes/sop] . In the
+      parameter editor, click the __Deform__ tab, then click
+      __Initialize from Rest Groups__.
+
+    # Use the __U deform__ parameter to control how much the curve(s)
+      deform the geometry.
+
+    # To animate the deformer, you can keyframe the __U Deform__
+      parameter, and/or animate the shape of the
+      deformer.
+
+You may want to create  [HUD sliders|/basics/handles]  for the U deform
+parameter or the blend parameter.
+
+A real face rig will have many wire deformers representing the
+muscles that control facial expressions. You can promote the various
+parameters used to control the deformations along the curve, and any
+blends, up to the character's digital asset interface for high level
+access by animators.
+
+=== How to vary the capture radius along a wire deformer ===
+
+steps>>
+    # In the  [network editor|/ref/panes/network] , select the
+      wire capture node.
+
+    # In the Parameter pane, Alt-click the right text box of the __U
+      Radius and lookup__ parameter to set a keyframe. The channel on
+      this parameter represents scaling of the radius along the length
+      of the curve.
+
+    # Press ((RMB)) on the text field and choose __Scope Channels__.
+
+    # In the animation editor, Alt-click somewhere to the right of the
+      existing keyframe to add a second key, then Alt-click again in the
+      center of the channel.
+
+    # Drag the keys up and down to vary the radii of the wire deformer
+      along its length.
+
+      [Image:/images/lookup_channel.jpg]
+
+      In the Perspective view, you should see the radius along the
+      eyebrow wire adjusting to match the shape of the channel.
+
+      [Image:/images/eyebrow_vary.jpg]
+
+The channel defines a lookup table that controls the U radius along the
+curve. The values for the first and last key on the channel control the
+start and end of the wire with any internal keys being adjusted along
+the curve proportional to their position in time.

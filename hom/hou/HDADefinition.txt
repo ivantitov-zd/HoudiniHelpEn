@@ -1,0 +1,718 @@
+= hou.HDADefinition =
+#type: homclass
+#cppname: HOM_HDADefinition
+#group: assets
+
+"""Represents the definition of a houdini digital asset (HDA)."""
+
+A digital asset definition defines a node type and exists inside an hda file.
+The node type is implemented in terms of other nodes wired together inside
+a subnet.  These nodes inside the subnet are called the definition's contents.
+
+An hda file contains one or more digital asset definitions, and installing an
+hda file installs all the definitions in the file.  When a digital asset
+definition is installed, the node type it defines is added to Houdini.  Note
+that you can access an HDADefinition without installing it.
+
+A digital asset's algorithm is determined by the nodes inside it.  To edit
+those nodes you create an instance of the digital asset, unlock it, modify the
+contents, and save the definition.  New digital asset instances are normally
+locked, meaning that they are read-only, and they automatically update when the
+asset's definition changes.  An unlocked instance is editable, does not update
+when the definition changes, and you can save its contents to change the
+definition.
+
+To unlock a node, select __Allow Editing of Contents__ or call
+[Hom:hou.Node#allowEditingOfContents].  To save the contents of an unlocked
+node to the definition, select __Save Operator Type__ or call
+[Hom:hou.HDADefinition#updateFromNode].  To revert an unlocked instance back to
+the last saved definition and change it back into a locked instance, select
+__Match Current Definition__ or call [Hom:hou.Node#matchCurrentDefinition].
+
+See also [Hom:hou.hda] and [Hom:hou.HDAOptions].
+
+@methods
+
+== Type ==
+
+::`nodeType(self)` -> [Hom:hou.NodeType]:
+    #cppname: HOM_HDADefinition::nodeType
+    #replaces: Cmd:otinuse
+    Return the node type defined by this digital asset.  Raises
+    [Hom:hou.OperationFailed] if the digital asset is not installed.
+
+::`nodeTypeCategory(self)` -> [Hom:hou.NodeTypeCategory]:
+    #cppname: HOM_HDADefinition::nodeTypeCategory
+    #replaces: Cmd:otls
+    Return the node type category (e.g. Objects, SOPs, DOPs, etc.) for the
+    node type defined by this digital asset.  See [Hom:hou.NodeTypeCategory]
+    for more information.
+
+    It is safe to call this method if the digital asset is not installed.  If
+    the digital asset is installed, this method is equivalent to
+    `self.nodeType().category()`.
+
+::`nodeTypeName(self)` -> `str`:
+    #cppname: HOM_HDADefinition::nodeTypeName
+    #replaces: Cmd:otinuse, Cmd:otls
+    Return the name of the node type defined by this digital asset.  Raises
+    [Hom:hou.OperationFailed] if the digital asset is not installed.
+    
+    If the digital asset is installed, this method is a shortcut for
+    `self.nodeType().name()`.
+
+== Library file ==
+
+::`libraryFilePath(self)` -> `str`:
+    #cppname: HOM_HDADefinition::libraryFilePath
+    #replaces: Cmd:dsoinfo, Cmd:otgetotl, Cmd:otls
+    Return the path to the hda file containing the digital asset's definition.
+
+    Note that it is possible to save an asset with a hip file, without storing
+    it in an hda file.  In this case, this method returns `"Embedded"`.
+
+::`isInstalled(self)` -> `bool`:
+    #cppname: HOM_HDADefinition::isInstalled
+    #replaces: Cmd:otinuse
+    Return whether this definition is installed in Houdini.
+
+    It is possible to access HDADefinition objects in hda files that are not
+    installed with [Hom:hou.hda#definitionsInFile].
+
+    See also [Hom:hou.hda#installFile].
+
+== Updating and saving ==
+
+::`updateFromNode(self, node)`:
+    #cppname: HOM_HDADefinition::updateFromNode
+    Update and save the definition to match the contents of a given unlocked
+    instance of the asset.  Calling this method is the same as selecting
+    __Save Operator Type__ on the node's menu.
+
+    {{{
+    #!python
+    def saveUnlockedNodes():
+        '''Look through all the nodes in the file for unlocked digital asset
+           instances and save and lock them.'''
+        for node in hou.node("/").allSubChildren():
+            if node.type().definition() is None or node.matchesCurrentDefinition():
+                continue
+
+            node.type().definition().updateFromNode(node)
+            node.matchCurrentDefinition()
+    }}}
+
+::`save(self, file_name, template_node=None, options=None, create_backup=True)`:
+    #cppname: HOM_HDADefinition::save
+    #replaces: Cmd:otwrite
+    Save the definition into an hda file.
+
+    file_name:
+        Where to save the definition.  To save to the current hda file, use
+        the return value from [Hom:hou.HDADefinition#libraryFilePath].
+
+    template_node:
+        Either `None` or a [Hom:hou.Node] object containing an unlocked instance
+        of the digital asset that defines the definition's new contents.
+        If `None`, this method does not update the definition's contents.
+
+    options:
+        Either `None` or a [Hom:hou.HDAOptions] object that specifies extra
+        behaviors of the definition.  If template_node is not `None`, the
+        compressContents, lockContents, saveSpareParms, and
+        makeInitialParmsDefaults values of the [Hom:hou.HDAOptions] object
+        are used.  Otherwise, only the compressContents value is used.
+
+    create_backup:
+	Create a backup before modifying existing hda files.
+
+    See also [Hom:hou.HDADefinition#updateFromNode] for a way to save an
+    unlocked node's definition to the current hda file.  See also
+    [Hom:hou.HDADefinition#copyToHDAFile].
+
+::`copyToHDAFile(self, file_name, new_name=None, new_menu_name=None)`:
+    #cppname: HOM_HDADefinition::copyToHDAFile
+    #replaces: Cmd:otcopy, Cmd:otmerge
+    Copy this definition into an hda file.
+
+    file_name:
+        The hda file where the definition will be saved.  If the file does
+        not already exist, it will be created.  If it already contains
+        a definition for this node type, it will be overwritten.
+
+    new_name:
+        The new name of the node type.  If None, the definition will be
+        saved as the existing node type name.  See also
+        [Hom:hou.NodeType#name].
+
+    new_menu_name:
+        The new description of the node type that appears in the tab menu.
+        If None, Houdini will use the existing description.  Note that the
+        node type name must be unique within the hda file, so saving the
+        definition with a new description to an hda file containing a
+        definition with the old node name will still overwrite the existing
+        definition.  See also [Hom:hou.NodeType#description].
+
+== Metadata ==
+
+::`version(self)` -> `str`:
+    #cppname: HOM_NodeType::version
+    #replaces: Cmd:otversion
+    Return the user-defined version string.  By default, the version is
+    an empty string.  It is up to you how you use this version information;
+    it is passed to the [Sync Node Version|/ref/windows/optype#events]
+    event handler script for performing parameter upgrades.
+
+::`setVersion(self, version)`:
+    #cppname: HOM_NodeType::setVersion
+    #replaces: Cmd:otversion
+    Set the user-defined version string.  See [Hom:hou.HDADefinition#version]
+    for more information.
+
+::`comment(self)` -> `str`:
+    #cppname: HOM_NodeType::comment
+    #replaces: Cmd:otcomment
+    Return the user-defined comment string.  It is up to you how you use
+    the comment; it is not used by Houdini.
+
+::`setComment(self, comment)`:
+    #cppname: HOM_NodeType::setComment
+    #replaces: Cmd:otcomment
+    Set the user-defined comment.  See [Hom:hou.HDADefinition#comment]
+    for more information.
+
+::`description(self)` -> `str`:
+    #cppname: HOM_HDADefinition::description
+    Return the description for this definition's node type.  Houdini uses this
+    description for user interface elements such as the TAB menu.
+    This description is also called the operator label in Houdini.
+
+    See also [Hom:hou.NodeType#description].
+
+::`setDescription(self, description)`:
+    #cppname: HOM_HDADefinition::setDescription
+    Set the description for this definition's node type. Houdini uses this
+    description for user interface elements such as the TAB menu.
+    This description is also called the operator label in Houdini.
+    
+    See also [Hom:hou.HDADefinition#description] and
+    [Hom:hou.NodeType#description].
+
+::`icon(self)` -> `str`:
+    #cppname: HOM_HDADefinition::icon
+    #replaces: Cmd:otls
+    Return the name or path of the icon for this definition's node type.
+    Note that Houdini uses its search path to locate icons, so you do not need
+    to pass in a full path.
+
+    See also [Hom:hou.NodeType#icon].
+
+::`setIcon(self, icon)`:
+    #cppname: HOM_HDADefinition::setIcon
+    Set the icon for this definition's node type.  See
+    [Hom:hou.HDADefinition#icon] for more information.
+
+::`modificationTime(self)` -> int:
+    #cppname: HOM_HDADefinition::modificationTime
+    #replaces: Cmd:otls
+    Return the time when the definition was last modified.  This time is
+    returned as a POSIX timestamp, such as is returned by `time.time()`.
+
+    {{{
+    #!pycon
+    >>> import time
+    >>> time.ctime(hou.nodeType(hou.objNodeTypeCategory(), "toon_character").
+    ...     definition().modificationTime())
+    'Thu Nov  6 18:22:38 2008'
+    }}}
+
+::`setModificationTime(self, time=-1)`:
+    #cppname: HOM_HDADefinition::setModificationTime
+    #replaces: Cmd:ottouch
+    Set the modification time for the definition to the given POSIX timestamp.
+    If the time parameter is negative, uses the current time.
+
+    See also [Hom:hou.HDADefinition#modificationTime].
+
+::`isCurrent(self)` -> `bool`:
+    #cppname: HOM_HDADefinition::isCurrent
+    Return whether this definition is the one currently in use by Houdini.
+
+    This example shows how you can access other definitions for the same node
+    type:
+    {{{
+    #!python
+    def otherDefinitions(definition):
+        '''Given an HDADefinition object, return the other loaded definitions
+           for the same node type.'''
+        # Look through all the loaded hda files for definitions providing
+        # the same node type.
+        result = []
+        for hda_file in hou.hda.loadedFiles():
+            # Skip the hda file containing the definition that was passed in.
+            if hda_file == definition.libraryFilePath():
+                continue
+
+            for other_definition in hou.hda.definitionsInFile(hda_file):
+                if other_definition.nodeType() == definition.nodeType():
+                    result.append(other_definition)
+        return result
+    }}}
+
+    {{{
+    #!pycon
+    # Print the paths to hda files providing other definitions for a digital asset instance.
+    >>> for other_definition in otherDefinitions(hou.node("/obj/my_hda1").type().definition()):
+    ...     print other_definition.libraryFilePath()
+    /path/to/file1.hda
+    /path/to/file2.hda
+    }}}
+
+::`isPreferred(self)` -> `bool`:
+    #cppname: HOM_HDADefinition::isPreferred
+    #replaces: Cmd:otprefer
+    Return whether this definition is preferred.
+
+    After loading hda files, Houdini uses a set of rules to resolve conflicts
+    when it encounters multiple definitions for the same node type (e.g.
+    preferring the most recent hda file, preferring definitions embedded in the
+    hip file, etc.).  When these rules do not use the definition you want, you
+    can override them by explicitly marking a definition as preferred.  Houdini
+    saves this list of preferred definitions with the hip file.  Marking a
+    definition as not preferred will remove it from this list, and the normal
+    rules will apply again.
+
+::`setIsPreferred(self, preferred)`:
+    #cppname: HOM_HDADefinition::setIsPreferred
+    #replaces: Cmd:otprefer
+    Set whether this definition is preferred.  See
+    [Hom:hou.HDADefinition#isPreferred] for more information.
+
+::`embeddedHelp(self)` -> `str`:
+    #cppname: HOM_HDADefinition::embeddedHelp
+    Return the help text embedded in the digital asset.  Return an empty string
+    if no embedded help exists.
+
+    Embedded help typically comes from the __Help__ tab of the operator
+    type properties window, but it may also come from a dialog script.
+
+::`userInfo(self)` -> `str`:
+    #cppname: HOM_HDADefinition::userInfo
+    #replaces: Cmd:otls
+    Return a string containing user specified information about the
+    asset definition.
+
+::`setUserInfo(self, extra_info)`:
+    #cppname: HOM_HDADefinition::setUserInfo
+    Set user information about the asset definition.  This info isn't
+    used by Houdini so it can contain any text.
+
+::`options(self)` -> [Hom:hou.HDAOptions]:
+    #cppname: HOM_HDADefinition::options
+    Return a [Hom:hou.HDAOptions] object for the options stored in this
+    digital asset.  See [Hom:hou.HDAOptions] for more information.
+
+::`setOptions(self, options)`:
+    #cppname: HOM_HDADefinition::setOptions
+    Set this digital asset definition's options to the data in a
+    [Hom:hou.HDAOptions] object.  See [Hom:hou.HDAOptions] for more
+    information.
+
+::`extraInfo(self)` -> `str`:
+    #cppname: HOM_HDADefinition::extraInfo
+    #replaces: Cmd:otls
+    Return a string storing extra information about the asset definition that
+    isn't stored elsewhere, like the representative node, guide geometry,
+    whether default parameters are hidden, etc.
+
+    See also [Hom:hou.HDADefinition#representativeNodePath] and
+    [Hom:hou.HDADefinition#hideDefaultParameters] to more easily retrieve
+    some portions of the extra info.
+
+::`setExtraInfo(self, extra_info)`:
+    #cppname: HOM_HDADefinition::setExtraInfo
+    Set extra information about the asset definition that isn't stored
+    elsewhere, like the representative node, guide geometry, etc.  This string
+    is encoded in a specific format, so it is recommended that you only
+    call this method with values returned from
+    [Hom:hou.HDADefinition#extraInfo].
+
+::`representativeNodePath(self)` -> `str`:
+    #cppname: HOM_HDADefinition::representativeNodePath
+    Return the contents of the __Representative Node__ field on the __Basic__
+    tab of the __Type Properties__ dialog.
+
+    For object-level digital assets that contain other object nodes, it is
+    possible to make Houdini treat your digital asset like a camera or light
+    by choosing a node inside the asset to represent it.  For example, if
+    you choose a camera inside the asset as the representative node, instances
+    of the digital asset will appear in the viewport's list of camera objects.
+
+    Note that this value is also stored in the string returned by
+    [Hom:hou.HDADefinition#extraInfo].
+
+== Deletion ==
+
+::`destroy(self)`:
+    #cppname: HOM_HDADefinition::destroy
+    #replaces: Cmd:otdelete
+    Uninstall this definition and _delete it from the hda file_.  Any node
+    instances of this asset will warn that they are using an incomplete
+    asset definition.
+
+    See also [Hom:hou.hda#uninstallFile].
+
+== Embedded files ==
+
+::`sections(self)` -> `dict` of `str` to [Hom:hou.HDASection]:
+    #cppname: HOM_HDADefinition::sections
+    #replaces: Cmd:otcontentls
+    Return a dictionary mapping section names to [Hom:hou.HDASection] objects.
+    See [Hom:hou.HDASection] for more information on sections.
+
+::`hasSection(self, name)` -> `bool`:
+    #cppname: HOM_HDADefinition::hasSection
+    #replaces: Cmd:otcontentls
+    Return True if the HDA definition contains a section with the specified
+    name and False otherwise.
+
+    See [Hom:hou.HDASection] for more information on sections.
+
+::`addSection(self, name, contents="", compression_type=hou.compressionType.NoCompression)` -> [Hom:hou.HDASection]:
+    #cppname: HOM_HDADefinition::addSection
+    #replaces: Cmd:otcontentadd, Cmd:otcontentload
+    Create a new section with the specified contents.  If a section already
+    exists with this name, changes the existing contents to the new contents.
+    Note that the contents may contain binary data.  Also note that section
+    names may contain '/'.
+
+    You can optionally specify a compression type, [Hom:hou.compressionType],
+    to compress the contents.  Note that you must specify the same compression
+    type when reading the contents back to decompress them.
+
+    See [Hom:hou.HDASection] for more information on sections.  To remove
+    a section, use [Hom:hou.HDASection#destroy].
+
+    Sections can have associated properties stored in the [Hom:hou.HDADefinition#extraFileOptions].
+
+    {{{
+    #!python
+    def addSectionFromFile(hda_definition, section_name, file_name):
+        '''Add a section whose contents come from a file.  If the section
+           already exists, replace its contents.'''
+        section_file = open(file_name, "r")
+        hda_definition.addSection(section_name, section_file.read())
+        section_file.close()
+    }}}
+
+::`removeSection(self, name)`:
+    #cppname: HOM_HDADefinition::removeSection
+    Remove an existing section.  Only remove sections that you explicitly
+    added.  Do not remove the special sections that Houdini uses to store the
+    contents of the digital asset definition, or Houdini will generate errors
+    or strange side effects.
+
+    See [Hom:hou.HDASection] for more information on sections.  Note that
+    [Hom:hou.HDASection#destroy] will also remove a section.
+
+    Raises [Hom:hou.OperationFailed] if no such section exists in the
+    definition.
+
+::`extraFileOptions(self)` -> `dict` of `str` to `bool`, `int`, `float`, `str`:
+    #cppname: HOM_HDADefinition::extraFileOptions
+    Return a dictionary containing the extra options attached to sections
+    in the asset's definition.  For example, event handler scripts such as
+    OnCreated are stored as sections inside the asset, and extra metadata
+    in this dictionary determines whether Houdini runs these scripts as
+    Python as as Hscript.
+
+    These is one dictionary for the entire asset, and keys in this dictionary
+    are usually of the form section_name/option_name.  For example, if the
+    OnCreated section is marked as containing Python code, this dictionary will
+    contain "OnCreated/IsPython" set to True.
+
+    Note that the contents of this dictionary are saved in the ExtraFileOptions
+    section and are encoded in a binary format.
+
+    See also [Hom:hou.HDADefinition#setExtraFileOption] and
+    [Hom:hou.HDADefinition#removeExtraFileOption].
+
+::`setExtraFileOption(self, name, value, type_hint = hou.fieldType::NoSuchField)`:
+    #cppname: HOM_HDADefinition::setExtraFileOption
+    Set an entry in the dictionary of extra file options.  See
+    [Hom:hou.HDADefinition#extraFileOptions] for more information.
+
+    name:
+        The name of the option to set.
+
+    value:
+        An integer, float, string, [Hom:hou.Vector2], [Hom:hou.Vector3],
+        [Hom:hou.Vector4], [Hom:hou.Quaternion], [Hom:hou.Matrix3],
+        [Hom:hou.matrix4], or sequence of numbers.
+
+    type_hint:
+        Used to determine the exact [Hom:hou.fieldType] desired when the
+        specified value type is not enough to unambiguously determine it.
+
+    The following example function marks an section, such as OnCreated, as
+    containing Python code:
+    {{{
+    #!python
+    def markSectionAsPython(definition, section_name):
+        definition.setExtraFileOption(section_name + "/IsPython", True)
+    }}}
+
+::`removeExtraFileOption(self, name)`:
+    #cppname: HOM_HDADefinition::removeExtraFileOption
+    Remove an entry in the dictionary of extra file options.  See
+    [Hom:hou.HDADefinition#extraFileOptions] for more information.
+
+    Raises [Hom:hou.OperationFailed] if there is no entry in the dictionary
+    with this name.
+
+::`uncompressedContents(self)` -> `str`:
+    #cppname: HOM_HDADefinition::uncompressedContents
+    Return a string containing the data of the uncompressed `Contents` section.
+    
+    The `Contents` section consists of data in the CPIO format representing the
+    child nodes used to create a node instance of the HDA.
+
+    See also [Hom:hou.HDADefinition#parsedContents].
+
+::`parsedContents(self)` -> `tuple` of `(str, str)`:
+    #cppname: HOM_HDADefinition::parsedContents
+    Return a list of (name, value) pairs of the parsed from the `Contents` section.
+
+    The `Contents` section consists of the child nodes used to create a node
+    instance of the HDA.
+
+    See also [Hom:hou.HDADefinition#uncompressedContents].
+
+== Inputs and outputs ==
+
+::`minNumInputs(self)` -> `int`:
+    #cppname: HOM_HDADefinition::minNumInputs
+    #replaces: Cmd:otls
+    Return the minimum number of connected inputs that node instances of this
+    digital asset can have.  If these inputs are not connected, the node will
+    generate an error.
+
+    See also [Hom:hou.NodeType#minNumInputs].
+
+::`setMinNumInputs(self, min_num_inputs)`:
+    #cppname: HOM_HDADefinition::setMinNumInputs
+    Set the minimum number of connected inputs that node instances of this
+    digital asset must have.  `min_num_inputs` must be between 0 and 4,
+    inclusive.  If a node does not have the minimum number of inputs, it will
+    generate an error.
+
+::`maxNumInputs(self)` -> `int`:
+    #cppname: HOM_HDADefinition::maxNumInputs
+    #replaces: Cmd:otls
+    Return the maximum number of inputs that node instances of this digital
+    asset can have.  Return a number greater than 4 if this node type can
+    accept an unlimited number of inputs.
+
+    See also [Hom:hou.NodeType#maxNumInputs].
+
+::`setMaxNumInputs(self, max_num_inputs)`:
+    #cppname: HOM_HDADefinition::setMaxNumInputs
+    Set the maximum number of inputs that node instances of this digital
+    asset may have.  This number must be greater than or equal to the minimum
+    number of inputs.  If it is 5 or greater, Houdini will use a merge
+    SOP-style input connector that allows an unlimited number of inputs.
+    Otherwise, the node will have between 0 and 4 input connectors, each of
+    which may or may not be connected, that correspond to the subnet indirect
+    inputs inside the digital asset.
+
+    See [Hom:hou.Node#inputConnectors] and [Hom:hou.SubnetIndirectInput]
+    for more information on input connectors and subnet indirect inputs.
+
+== Parameters ==
+
+::`hideDefaultParameters(self)` -> `bool`:
+    #cppname: HOM_HDADefinition::hideDefaultParameters
+    Return whether the parameters that are common to nodes types in this node
+    type category are hidden or not.  For example, nearly all objects have
+    common translation, rotation, scale, etc. parameters, and object level
+    digital assets have these parameters by default.  If hidden, though,
+    these parameters are still there but are not displayed to the user.
+
+    Note that this value is also stored in the string returned by
+    [Hom:hou.HDADefinition#extraInfo].
+
+::`parmTemplateGroup(self)` -> [Hom:hou.ParmTemplateGroup]:
+    #cppname: HOM_HDADefinition::parmTemplateGroup
+    Return the group of parm templates corresponding to this asset definition's
+    parameter interface.
+
+    You can edit the parameter layout for this asset by getting the current
+    parameter group, modifying it, and calling
+    [setParmTemplateGroup|Hom:hou.HDADefinition#setParmTemplateGroup] with it.
+
+    See [Hom:hou.ParmTemplateGroup] for more information.
+
+::`setParmTemplateGroup(self, parm_template_group, rename_conflicting_parms=False, create_backup=True)`:
+    #cppname: HOM_HDADefinition::setParmTemplateGroup
+    Change the parameters for this digital asset.
+
+    `parm_template_group`:
+    A [Hom:hou.ParmTemplateGroup] object containing the new parameter
+    layout.
+
+    `rename_conflicting_parms`:
+        If `True`, parameters in the group with the same parm tuple names will
+        be automatically renamed.  If `False` and there are parms with the same
+        name, this method raises [Hom:hou.OperationFailed].
+
+    `create_backup`:
+	Create a backup before saving the definition the its hda file.
+
+    This method is preferred over the other parameter-related methods in this
+    class ([addParmTuple|Hom:hou.HDADefinition#addParmTuple],
+    [removeParmTuple|Hom:hou.HDADefinition#removeParmTuple],
+    [replaceParmTuple|Hom:hou.HDADefinition#replaceParmTuple],
+    [addParmFolder|Hom:hou.HDADefinition#addParmFolder],
+    [removeParmFolder|Hom:hou.HDADefinition#removeParmFolder]) because it lets
+    you more easily make manipulate parameters.  It is also faster when making
+    many parameter changes because the other methods resave the hda file after
+    each change.
+
+    See [Hom:hou.Node#setParmTemplateGroup] to change the parameter interface
+    of an individual node.
+
+::`addParmFolder(self, folder_name, in_folder=(), parm_name=None, create_missing_folders=False)`:
+    #cppname: HOM_HDADefinition::addParmFolder
+    Adds a folder to this node type's parameters.
+
+    folder_name:
+        The name of the folder that is displayed in the parameter dialog.
+
+    in_folder:
+        A sequence of folder name strings to indicate where the folder should
+        go.  If this sequence is empty, the folder will go in top level set
+        of folders.  It it is, for example, `("Transform",)`, the folder is
+        added inside the Transform folder.  If it is `("Transform", "Options")`,
+        it will go inside the Options folder inside the Transform folder.
+
+    parm_name:
+        The name of the underlying parameter tuple corresponding to the set of
+        folders.  For example, the folders in a set might be named Transform,
+        Subnet, and Controls, and these correspond to one parameter tuple
+        named, say, `'stdswitcher0'`.  The value of the parameter in this tuple
+        is the index of the folder that is open.
+
+        If this is the first folder to go in the set, `parm_name` is used as the
+        parameter name.  Otherwise, it is ignored and Houdini uses the
+        parameter name of the first folder in the set.
+
+        If this is the first folder in the set and parm_name is None, it will
+        default to `'folder0'`.  If parm_name is already in use, Houdini
+        automatically generates a unique name.
+
+    create_missing_folders:
+        Whether Houdini should create folders specified in `in_folder` that
+        do not already exist.  If this parameter is True, you can use this
+        method to add nested folders in one call.
+
+    Note that you can add folders by passing a [Hom:hou.FolderParmTemplate]
+    to the `addSpareParmTuple` method, so this method is deprecated.  Note
+    also that `addSpareParmTuple` is deprecated in favor of
+    `setParmTemplateGroup`.
+
+    See also the `removeParmFolder` and `addParmTuple` methods.
+
+    This method is deprecated in favor of `setParmTemplateGroup`.
+
+::`removeParmFolder(self, folder)`:
+    #cppname: HOM_HDADefinition::removeParmFolder
+    Remove an empty folder from this node type's parameters.
+
+    folder:
+        A _sequence of folder names_.  For example, to remove the Output
+        folder, pass in `("Output",)` and not `"Output"`.
+
+    Raises [Hom:hou.OperationFailed] if the folder does not exist or it is not
+    empty.  Use [Hom:hou.HDADefinition#removeParmTuple] to remove all the
+    parameters inside the folder before calling this method.
+
+    See also `addParmFolder`, [Hom:hou.ParmTemplateGroup#remove], and
+    [Hom:hou.ParmTemplateGroup#findFolder].
+
+    This method is deprecated in favor of
+    [Hom:hou.HDADefinition#setParmTemplateGroup].
+
+::`addParmTuple(self, parm_template, in_folder=(), create_missing_folders=False)`:
+    #cppname: HOM_HDADefinition::addParmTuple
+    Add a parameter tuple to this node type's parameters.  Houdini places the
+    new parameter at the bottom of the parameters in a particular folder.
+
+    parm_template:
+        An instance of a [Hom:hou.ParmTemplate] subclass that describes the
+        parameter.
+
+    in_folder:
+        A sequence of folder name strings to tell Houdini which folder to
+        put the parameter in.  If this sequence is empty, the parameter will go
+        in top level set of folders.  It it is, for example, `("Transform",)`,
+        the parameter is added inside the Transform folder.  If it is
+        `("Transform", "Options")`, it will go inside the Options folder inside
+        the Transform folder.
+
+    create_missing_folders:
+        Whether Houdini should create folders specified in `in_folder` that
+        do not already exist.  If this parameter is True, you can create
+        folders without having to call [Hom:hou.HDADefinition#addParmFolder].
+
+    Note that this method can add a single folder by passing a
+    [Hom:hou.FolderParmTemplate] for `parm_template`.
+
+    See also [Hom:hou.HDADefinition#replaceParmTuple].
+
+    This method is deprecated in favor of
+    [Hom:hou.HDADefinition#setParmTemplateGroup].
+
+::`removeParmTuple(self, name)`:
+    #cppname: HOM_HDADefinition::removeParmTuple
+    Remove a parameter tuple from this node type's parameters.
+
+    See also [Hom:hou.HDADefinition#addParmTuple] and
+    [Hom:hou.HDADefinition#removeParmFolder].
+
+    This method is deprecated in favor of
+    [Hom:hou.HDADefinition#setParmTemplateGroup].
+
+::`replaceParmTuple(self, parm_tuple_name, parm_template)`:
+    #cppname: HOM_HDADefinition::replaceParmTuple
+    Replace an existing parameter tuple with a new one.  The old parameter
+    tuple is removed and the new one is added in its place.
+
+    parm_tuple_name:
+        The name of the parameter tuple to replace.  Raises
+        [Hom:hou.OperationFailed] if no parameter tuple exists with this name.
+
+    parm_template:
+        A [Hom:hou.ParmTemplate] describing the new parameter tuple.
+
+    The new parameter tuple may or may not have the same name as the old one.
+    By providing a parameter tuple with the same name, you can modify an
+    existing parameter tuple.  The following example function changes the
+    definition of the asset to make a parameter tuple visible or invisible
+    in all nodes of that type.
+    
+    To show or hide a parameter in just one instance of a node, use
+    [Hom:hou.ParmTuple#hide].
+
+    To change a spare parameter on a node, use
+    [Hom:hou.Node#replaceSpareParmTuple] or [Hom:hou.Node#setParmTemplateGroup].
+
+    This method is deprecated in favor of
+    [Hom:hou.HDADefinition#setParmTemplateGroup].
+
+== Misc ==
+
+::`compileCodeSection(self, source_section, destination_section)`:
+    #cppname:  HOM_HDADefinition::compileCodeSection
+    
+    This function is deprecated. Compiled VEX code should no longer be stored
+    inside of an HDA.

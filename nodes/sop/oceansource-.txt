@@ -1,0 +1,226 @@
+= Ocean Source =
+
+#type: node
+#context: sop
+#icon: SHELF/wave_tank
+#internal: oceansource
+
+"""Generates particles and volumes from ocean "spectrum" volumes for use in simulations"""
+
+This node uses an [Ocean Spectrum|Node:sop/oceanspectrum] connected to the first input to generate particles and volumes that can be used to drive [FLIP|Node:dop/flipsolver] simulations of ocean splashes, layers, and tanks.
+
+This node can create thin layers of particles to allow simulation of only a small part of an ocean surface. It can also generate _boundary layers_ that surround the simulated liquid tank and help suppress wave reflections and preserve water volume and velocity over the duration of the simulation.  These boundary layers also enable animation of the __Center__ parameter to track a moving object.
+
+This node will usually be created via shelf tools that apply one of the following presets:
+
+__Wave Tank__:
+    Generates a full tank of particles initialized with ocean velocities, a boundary layer of particles, and a velocity field that can be used to update the simulation velocity with an [Advect By Volumes|Node:dop/popadvectbyvolumes] POP.  This preset is most useful for simulations that require a full liquid simulation including interaction with deeper parts of an ocean.
+
+__Splash Tank__:
+    Generates a thin layer of particles initialized with ocean velocities, and sink and surface fields that will remove and then replace all particles within the layer each simulation timestep.  This preset is used to simulate only the splashes that occur above the ocean surface, and generally matches the non-simulated ocean surface very well.
+
+__Wave Layer Tank__:
+    Similar to __Wave Tank__ except generates only a thin layer of particles, a surface field deeper within the ocean to use as a collision object in a simulation, and a boundary layer. This preset is used to simulate a thin layer of water that matches the low-frequency motions of the larger waves, but allows full simulation of wakes and other below-surface motion that __Splash Tank__ cannot.  It does not match the original non-simulated ocean surface as well, however.
+
+__Beach Tank__:
+    Similar to __Wave Tank__ except ramps down the ocean velocity along a specified direction to allow simulation of the natural breaking waves in the shallow water approaching a beach collision object.  The boundary layer will also be disabled along the maximum extent of the volume in the specified direction.
+
+__Flat Tank__:
+    Similar to the output from the [Particle Fluid Tank|Node:sop/particlefluidtank] with the addition of a boundary layer, allowing the tank to track a moving object by animating the Center parameter.
+
+@parameters
+
+Initialize:
+    Initialize the parameters to the specified preset.
+
+Particle Separation:
+    The smallest distance between any two generated particles in the initial configuration.
+
+Oversampling:
+    The amount to oversample the particles.  For example, a value of 2 will create twice as many particles.
+
+Grid Scale:
+    The voxel size of any volumes created will be the product of this parameter and the __Particle Separation__.
+
+Size:
+    The size of the set of particles or volumes created by this node.
+
+Center:
+    The center of the set of particles or volumes created by this node.
+
+== Particles == (particles)
+
+Create Particles:
+    Generate particles with ocean velocities within the ocean surface and the specified box.
+
+Water Level:
+    The top level of the particles _before_ being deformed by the ocean surface.  A value of zero represents the surface of the ocean.
+
+Fill Volume:
+    Fill the bottom of the tank with particles, starting at the __Water Level__ value.
+
+Layer Size:
+    Specifies the size of the layer of particles to create.
+
+Jitter Seed:
+    Random seed for creating jitter.
+
+Jitter Scale:
+    The amount of jitter to apply to the positional values of the particles.
+
+Kill Inside Collision:
+    Delete any particles inside any collision objects plugged into the second input.
+
+== Surface == (surface)
+
+Surface Field:
+    Generate a `surface` SDF volume of the specified size and resolution, according to the specified operation.
+
+    None:
+        Do not create a surface field.
+    Surface:
+        Create a surface field containing only the evaluated surface as specified on the __Surface Evaluation__ tab.
+    Boundary Layer:
+        Create a surface field containing only the boundary layer surrounding the tank.
+    Union:
+        Create a surface field containing the union of the evaluated surface and the boundary layer surrounding the tank.
+    Intersection:
+        Create a surface field containing the intersection of the evaluated surface and the boundary layer surrounding the tank.
+
+Depth:
+    The __Surface SDF__ will represent the ocean at the specified depth.  
+    This differs from simply offsetting the output surface SDF as it
+    takes into account the __Depth Falloff__ setting.
+
+Smoothing:
+    Controls the radius of the points used to generate volumes.  Higher values are more expensive but give smoother volumes.
+
+Kill Inside Collision:
+    Remove the surface inside any collision objects plugged into the second input.
+
+Visualize:
+    Visualize the generated surface.
+
+Isovalue:
+    The isosurface value at which to visualize the surface field.
+
+== Velocity == (velocity)
+
+Velocity Field:
+    Output a field containing the ocean velocity values.
+
+Max Extrap Cells:
+    When generating velocity volumes, how many voxels from the ocean surface to extrapolate velocity values.
+
+Ramp by Direction:
+    Apply a ramp to the velocity values according to direction across the volume.  This can be useful for ramping down ocean velocities as the water approaches a beach, for example.
+
+Direction:
+    The direction of the velocity ramp, in degrees, with zero being along the X-axis.  This value is specified similar to the __Wind Direction__ of the [Ocean Spectrum|Node:sop/oceanspectrum] SOP.
+
+Visualize:
+    Visualize the generated velocity field.
+
+Plane:
+    Specifies the axis along which to visualize the field.
+
+Plane Offset:
+    Where the plane should be positioned inside the volume.  This is a relative coordinate, with -1..1 being the total range, so 0 means the center of the volume.
+
+Trail Length:
+    How long, in seconds, the streamers should be.
+
+Maximum Speed:
+    The speed representing the maximum value used for coloring the streamers.
+
+== Sink == (sink)
+
+Sink Field:
+    Generate a `sink` SDF volume of the specified size and resolution, according to the specified operation.
+
+    None:
+        Do not create a sink field.
+    Surface:
+        Create a sink field containing only the evaluated surface as specified on the __Surface Evaluation__ tab.
+    Boundary Layer:
+        Create a sink field containing only the boundary layer surrounding the tank.
+    Union:
+        Create a sink field containing the union of the evaluated surface and the boundary layer surrounding the tank.
+    Intersection:
+        Create a sink field containing the intersection of the evaluated surface and the boundary layer surrounding the tank.
+
+Visualize:
+    Visualize the generated sink.
+
+Isovalue:
+    The isosurface value at which to visualize the sink field.
+
+== Boundary Layer == (boundary)
+
+Create Boundary Layer:
+    Create a small layer of particles and a volume that surround the primary particles and volumes.  Enabling this layer will increase the size of the output particle cloud and volumes by the amount specified in the __Padding__ parameters.
+
+Lower Padding:
+    The size of the layer in the negative x and z directions. Set this parameter to zero to disable the layer on any given axis.
+
+Upper Padding:
+    The size of the layer in the positive x and z directions. Set this parameter to zero to disable the layer on any given axis.
+
+Visualize:
+    Visualize the particles in the boundary layer by color.
+
+Color:
+    The color of the boundary layers particles when __Visualize__ is enabled.
+
+== Surface Evaluation == (evaluate)
+
+Type:
+    The type of surface to evaluate, __Ocean__ or __Flat__.  The parameters for the __Ocean__ type are from an embedded [Ocean Evaluate|Node:sop/oceanevaluate] SOP. The parameters for the __Flat__ type are from an embedded [Particle Fluid Tank|Node:sop/particlefluidtank] SOP.
+
+Time:
+    The time at which to evaluate the ocean surface.
+
+Downsample:
+    Downsample the incoming ocean spectrum before evaluating any ocean values.  This parameter specifies the number of powers of two to remove from the resolution of the incoming ocean spectrum. For example, if the spectrum was originally specified at resolution 10 to generate a 1024 x 1024 volume, downsampling by 2 will evaluate ocean volumes at resolution 8, a 256 x 256 volume.
+
+    TIP:
+        The same high resolution spectrum can be processed by separate [Ocean Evaluate|Node:sop/oceanevaluate] and __Ocean Source__ nodes, for example the former with no downsampling to deform surface geometry, and the latter at a downsampled resolution to generate the more expensive volume or point output.
+
+Depth Falloff:
+    Specifies how deformation and velocity values falloff as the input points lie below the ocean surface.  
+
+    None:
+        Values do not falloff below the surface.
+    Exponential:
+        All values have the same exponential falloff below the surface.
+    Exponential by Frequency:
+        Values have an exponential falloff that is scaled per wave frequency.  With this setting the contribution from small, high frequency waves falls off very quickly.  It is the most accurate setting and most expensive to compute.
+
+Falloff Scale:
+    An additional scale applied to the exponential falloff modes in __Depth Falloff__.  For the most physically accurate values this should be set to 1 in conjunction with the __Exponential by Frequency__ mode.
+
+Depth Divisions:
+    The number of divisions along the depth axis if the computed ocean are 3D, as specified by the __Depth Falloff__ parameter.  Higher values are more accurate but more expensive to calculate.
+
+Scatter Density:
+    Scatter points on the surface of the tank, which can help create flat surface for a FLIP simulation.  For a value of 1 the scattered points will be approximately separated by __Particle Separation__. Increasing this value will oversample the surface.
+
+Oversampling Bandwidth:
+    The points will be oversampled to this distance from the the surface of the tank if __Oversampling__ is enabled.  This parameter is specified in multiples of the __Particle Separation__.
+
+@inputs
+Ocean Spectrum:
+    The Ocean Spectrum volume to evaluate when the __Surface Evaluation__ type is __Ocean__.
+
+Collision Geometry:
+    Geometry used to cull particles and volumes from within collisions.
+
+@related
+
+* [Ocean Spectrum|Node:sop/oceanspectrum]
+* [Ocean Evaluate|Node:sop/oceanevaluate]
+* [Particle Fluid Tank|Node:sop/particlefluidtank]
+* [Volume|Node:sop/volume]
+* [Points from Volume|Node:sop/pointsfromvolume]
+* [FLIP Solver|Node:dop/flipsolver]
+* [POP Advect By Volumes|Node:dop/popadvectbyvolumes]

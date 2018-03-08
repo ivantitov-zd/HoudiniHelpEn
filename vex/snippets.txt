@@ -1,0 +1,399 @@
+= Using VEX expressions =
+
+#bestbet: vexpression
+
+== Overview ==
+
+Several nodes in Houdini let you write short VEX expressions or snippets of VEX code. For example, the [Point Wrangle|Node:sop/pointwrangle], [Attrib Wrangle|Node:sop/attribwrangle] geometry nodes; [Geometry Wrangle|Node:dop/geometrywrangle], and [Gas Field Wrangle|Node:dop/gasfieldwrangle] dynamics nodes, and [particle dynamics nodes|/dopparticles].
+
+These VEX expressions run on each element (point, particle, edge, primitive, voxel, depending on the node type) passing through the node. The code can read the values of node parameters and geometry attributes, and set special variables to change values in the input geometry.
+
+TIP:
+    The [Python SOP|Node:sop/python] is similar but lets you edit geometry using a Python snippet.
+
+
+== Why VEX for ad-hoc modifications? == (why)
+
+For performance reasons, Houdini is moving toward doing ad-hoc geometry modifications with VEX operating on attributes, rather than HScript expressions operating on local variables and external channel references.
+
+* Using VEX and attributes has major performance benefits over HScript expressions and local variables. It runs faster and automatically supports threading and parallel computation.
+
+* Working directly on attributes instead of local variables actually has some ease-of-use advantages, since the naming of local variables could be inconsistent with the underlying attribute's name, and inconsistent from node to node.
+
+* In HScript expressions, getting the value of an attribute that didn't already have a local variable mapping set up in the node was a chore (for example, `point(opinputpath(".",0), $PT, "my_var", 0)`). In VEX this is much easier: `v@my_var`. Since technical work in Houdini often revolves around attributes, this can actually make VEX expressions a lot simpler than the equivalent HScript expressions.
+
+* Passing information down the network on attributes is inherently friendlier to parallel processing than using external references on later nodes to data on earlier nodes.
+
+* Currently, VEX operations are supported inside [compiled SOP blocks|/model/compile], but HScript expressions using local variables cannot be compiled.
+
+* VEX has gained equivalents of most HScript expression functions, and is easier to use for things like array and string processing, with conveniences such as Python-like array/string slicing.
+
+As users work on ever-larger and more complex geometry, threading and parallel processing become more and more important to get acceptable performance. This simple fact is the reason why VEX will only become more widely used to replace HScript expressions for ad-hoc geometry manipulation.
+
+HScript will probably always be available for certain jobs where it's handier than VEX. For geometry manipulation, however, wrangling and VEX/VOPs is the way forward, and it's worthwhile to learn the new workflow.
+
+
+== Syntax ==
+
+A __VEX snippet__ parameter lets you enter a snippet of [VEX code|/vex]. See the list of [VEX functions|/vex/functions/].
+
+VEX has a concept of "contexts". Some functions are only available in certain contexts (for example, functions for accessing geometry information in the SOP context). A VEX snippet runs in the `CVEX` context.
+
+
+== Gotchas ==
+
+* Each statement *must* end with a semicolon (`;`)!
+
+* `//` and `/* ... */` can be used for comments.
+
+* In VEX, trigonometry functions such as [Vex:sin] and [Vex:cos] use radians, not degrees.
+
+* Vector attributes are handled as `@v.x` rather than `$VX`. That is, you get one `@v` vector value of which you access the `x`, `y`, or `z` component using dot notation, rather than getting three separate variable `$VX`, `$VY`, and `$VZ`.
+
+* [Vex:rand] produces vector noise when applied to a vector variable. This can be unexpected, like in the force example, where you may have expected all components of the force to be randomized equally by `@id`. Use a `float()` cast to force it scalar.
+
+
+== Accessing parameter values == (parameters)
+
+In the snippet, you can read/write the value of a parameter on the node using `<<parameter_id>>`.
+To get the internal ID of a parameter, hover over the parameter name in the parameter editor.
+The tooltip will show `Parameter: <<id>>`.
+For example, in the [Particle Color DOP|Node:dop/popcolor], the ID of the __Color__ parameter is `color`.
+
+{{{
+#!vex
+color = @Cd 
+}}}
+
+Multi-component parameters are accessed as vectors. For example, the __Position__ parameter has the internal name `t`:
+
+{{{
+#!vex
+// Set the translation
+t = {0, 1, 0};
+}}}
+
+You can use the dot operator to access individual components of the parameter:
+
+{{{
+#!vex
+// Move one unit along the X axis
+t.x = t.x + 1;
+}}}
+
+NOTE:
+    To access the value of a user created parameter, use `chv()` vex function.
+
+
+== Accessing geometry attributes == (attributes)
+
+In the snippet, you can read/write the value of an attribute using `@<<attribute_name>>`.
+For example, to read or write to the `P` (position) attribute, use `@P` in the VEX code.
+
+* Particle DOPs can access particle attributes but _can't modify them_. Instead they affect the particles by varying the parameter values per-particle. See [writing particle VEX expressions|/dopparticles/vexpressions].
+
+* In the Volume Wrangle node, you can use `@<<volume_name>>` to read or write to a volume.
+
+* If you write to a `@attribute` in the VEX code and the attribute does not exist, Houdini will create it. (The Volume Wrangle node will _not_ create new volumes this way.)
+
+Houdini knows to cast certain attributes using the appropriate VEX datatype.
+The following table lists known attributes that are automatically cast.
+(Automatic casting does *not* work if you use `@opinput<<n>>_<<name>>` to access a different input.)
+
+VEX type ||
+    Attribute names ||
+    
+`vector` (3 floats) |
+    `@P`, `@accel`, `@center`, `@dPdx`, `@dPdy`, `@dPdz`, `@Cd`, `@N`,
+    `@scale`, `@force`, `@rest`, `@torque`, `@up`, `@uv`, `@v`
+
+`vector4` (4 floats) |
+    `@backtrack`, `@orient`, `@rot`
+
+`int` |
+    `@id`, `@ix`, `@iy`, `@iz`, `@nextid`, `@pstate`, `@resx`, `@resy`, `@resz`,
+    `@ptnum`, `@vtxnum`, `@primnum`, `@numpt`, `@numvtx`, `@numprim`, `@group_*`
+
+`string` |
+    `@name`, `@instance`
+
+All other `@` references are cast as *float*.
+To manually specify the VEX datatype for an attribute,
+you must add a character representing the type before the `@` sign.
+For example, to cast the `foo` attribute as a string, you would use `s@foo`.
+
+The following table lists the available datatypes and the corresponding characters.
+
+VEX type ||
+    Syntax ||
+`float` |
+    `f@<<name>>`
+`vector2` (2 floats) |
+    `u@<<name>>`
+`vector` (3 floats) |
+    `v@<<name>>`
+`vector4` (4 floats) |
+    `p@<<name>>`
+`int` |
+    `i@<<name>>`
+`matrix2` (2x2 floats) |
+    `2@<<name>>`
+`matrix3` (3x3 floats) |
+    `3@<<name>>`
+`matrix` (4x4 floats) |
+    `4@<<name>>`
+`string` |
+    `s@<<name>>`
+
+
+=== Accessing attributes on other inputs === (other_inputs)
+
+If the node has more than one input, you can get an attribute from a different input by prefixing the name with `opinput<<inputnum>>_`, for example `v@opinput1_P`. This reads the named attribute from the same element (point/primitive/vertex) on the numbered input (where the first input is input 0, the second input is 1, and so on).
+
+The "same element" may be the element with the same index in the other input (for example, when you're processing point number 10, `@opinput1_P` would give you the `P` attribute on point number 10 in the second input).
+
+However, nodes can have an "Attribute to Match" parameter that lets you match up "same" elements based on the value of an attribute. For example, if you used `id` as the "attribute to match", and you were processing a polygon with attribute `id` set to `12`, then `@opinput1_P` would give you the `P` attribute on the polygon in the second input that also has `id` set to `12`. Check the parameters of the node in which you're writing the snippet.
+
+
+== Arrays ==
+
+You can bind arrays by appending `[]`, as in
+
+{{{
+#!vex
+i[]@connected_pts = neighbours(0, @ptnum);
+}}}
+
+For example, the following code loads the `foo` attribute as a vector
+and copies it to the `P` (position) attribute.
+You don't need to specify the type of the `P` attribute because
+it's one of the known attributes Houdini casts automatically.
+
+{{{
+#!vex
+@P = v@foo;
+}}}
+
+The following code sets the `x` component of the `Cd` attribute to
+the value of the `whitewater` attribute.
+You don't need to specify the type of the `Cd` attribute because
+it's one of the known attributes.
+You don't need to specify the type of the `whitewater` attribute because
+it's a float and unknown attributes are cast as float automatically.
+
+{{{
+#!vex
+@Cd.x = @whitewater;
+}}}
+
+TIP:
+    You only have to specify the type character the _first time_
+    you refer to the attribute in the code.
+
+You can also explicitly prototype attribute bindings.  This allows
+you to also specify the default value of the attribute which will
+be used if the attribute isn't bound.  If an attribute is created,
+it will be also set to this default value.
+
+NOTE:
+    String attributes do not currently set their defaults properly when
+    created.
+
+This is done by declaring them as a variable.  The declaration
+must start at the start of the line.  Only one variable can
+be declared in a line.  The default value must be a constant value, 
+computed values like `3*5` will fail as they are not valid initializers
+in the parameter list.
+
+The following will create a foo attribute of type vector.  If it doesn't
+exist on the input, the default value will be set to `{ 1, 3, 5 }`.
+
+{{{
+#!vex
+vector @foo = { 1, 3, 5 };
+}}}
+
+After declaring it in this manner it is not necessary to use the `v@foo`
+syntax, `@foo` will suffice as the type has been specified.
+
+Attributes prototyped in this fashion will take precedence over any
+inline definitions (such as `v@foo`).  In the future mismatched types
+or mismatched defaults may be considered an error.
+
+For more information, see the [POP Attributes|/dopparticles/attributes] page.
+
+== Declaring attributes == (declare)
+
+You can specify the type and default value of attributes before you use them like this:
+
+{{{
+#!vex
+
+float @mass = 1;
+vector @up = {0, 1, 0};
+}}}
+
+This can be useful in two ways:
+
+* It gives a default value to the variable: if the attribute (for example, `@mass`) exists, the assignment is ignored. If the attribute doesn't exist, it uses the assignment.
+
+* It specifies the data type of the attribute. After declaring the type of the `@up` attribute like this, you could just use `@up` instead of `v@up`.
+
+You *cannot* do any computation on the right side of the equals sign (`=`). The following are syntax errors:
+
+{{{
+#!vex
+
+float @mass = 1 / area;  // Error
+vector @up = set(0, 1, 0);  // Error
+}}}
+
+== Accessing globals ==
+
+Unlike in HScript expressions, you cannot use global variables such as `$F`.
+
+In a VOP, you can wire variables such as `Time` and `Frame` from the Globals
+node to use them in a VEX snippet.
+
+You can use the following implicit variables:
+
+`@Time`:
+    Float time (`$T`)
+`@Frame`:
+    Float frame (`$FF`)
+`@SimTime`:
+    Float simulation time (`$ST`), only present in DOP contexts.
+`@SimFrame`:
+    Float simulation frame (`$SF`), only present in DOP contexts.
+`@TimeInc`:
+    Float time step (`1/$FPS`)
+
+
+== Creating geometry ==
+
+You can create geometry with VEX snippets in certain nodes, such as [Attrib Wrangle|Node:sop/attribwrangle]. To be able to create geometry, the node must run in the `cvex` context, which means the [Point Wrangle|Node:sop/pointwrangle] *cannot* create geometry since it runs in the `sop` context.
+
+The [Vex:addpoint], [Vex:addprim], and [Vex:addvertex] functions let you create points, primitives, and vertices. You can alter geometry using [Vex:setattrib] and [Vex:setprimvertex]. You can remove geometry using [Vex:removepoint] and [Vex:removeprim]. To set group membership use [Vex:setpointgroup] and [Vex:setprimgroup]. Use [Vex:setprimintrinsic] to modify things like the transform of sphere primitives.
+
+It's faster to set attributes on the current element using bound variables (for example `@name = val`) rather than [Vex:setattrib]. Only use [Vex:setattrib] if you need to do set an attribute on _other_ elements. If you are using [Vex:setattrib] and are modifying a point from different source points, set the `mode` argument to `"add"` to composite the results.
+
+The geometry creation functions can run in parallel. All changes are queued and applied _after_ your VEX code has iterated over all existing geometry. This means [Vex:setattrib] will _overwrite_ changes you make through bound variables (for example `@name = val`).
+
+The first argument to the geometry creation functions is a "geometry handle", which specifies a destination for the created (this is intended to support writing to a file as an alternative to writing to the current geometry). Use `geoself()` as the first argument to specify the current geometry.
+
+{{{
+#!vex
+
+addpoint(geoself(), {0, 1, 0});
+}}}
+
+The [Vex:addprim] function can currently generate a polygon (`"poly"`) or polyline (`"polyline"`). If you create a polygon, you _must_ add vertices to the points using [Vex:addvertex]. Houdini will likely crash on a polygon that has points but not vertices.
+
+{{{
+#!vex
+
+int p1 = addpoint(geoself(), {0, 1, 0});
+int p2 = addpoint(geoself(), {1, 1, 0});
+int p3 = addpoint(geoself(), {1, 1, 1});
+
+int prim = addprim(geoself(), "poly");
+addvertex(geoself(), prim, p1);
+addvertex(geoself(), prim, p2);
+addvertex(geoself(), prim, p3);
+}}}
+
+* Nodes such as [Attrib Wrangle|Node:sop/attribwrangle] require an input or they generate an error. If you want to start with an empty geometry, wire a [Null SOP|Node:sop/null] into it.
+
+* You can inspect the topology of the geometry using [Vex:vertexpoint], [Vex:pointvertex], [Vex:vertexprim], [Vex:vertexnext], [Vex:vertexprev], and [Vex:primvertexcount].
+
+* You can read from point cloud files using the `pc*` functions ([Vex:pcopen], [Vex:pcnumfound], [Vex:pciterate], [Vex:pcimport], and so on).
+
+
+== Geometry traversal functions == (traverse)
+
+See [VEX geometry functions|geometry].
+
+
+== Accessing group membership ==
+
+A special virtual attribute of the form `@group_<<groupname>>` lets you get or set group membership for the current element.
+
+You can check if the current point/edge/primitive/particle is inn a named group by checking if `@group_<<name>> == 1`.
+
+You can add or remove the current point/edge/primitive to a group by setting the virtual `@group_<<name>>` attribute. Setting the attribute to `1` (or any non-zero value) puts the current element in that group. Setting the attribute to `0` removes the current element from that group.
+
+
+== User-defined functions ==
+
+You can define your own functions as part of a VEX snippet using the [VEX function syntax|lang#functions].
+For example:
+
+{{{
+#!vex
+
+float mysquare(float a)
+{
+  return a * a;
+}
+
+windresist = mysquare(windresist);
+}}}
+
+
+== Includes ==
+
+Any `#include` directives found in the code snippet will be automatically moved
+outside of the generated VEX function, so will behave as expected.
+
+Determining if a parameter is present for attribute binding is done by a
+simple scan of the code after pre-processing is done.  This pre-processing
+is done *only* on the code snippet; however, and does *not* process any
+`#include` files.  It can therefore be confused by `#ifdef` directives that
+depend on `#includes`.
+
+
+== Tips ==
+
+* When you're editing in the multi-line editor you can press ((Ctrl + Enter)) to "commit" the changes and update Houdini.
+
+* The VEX snippet is run at every frame (or in a simulation network, every time step).
+
+* You can exit the snippet early using the `return` statement. For example, the following VEX will only set `windresist` to `0` on brand new particles:
+
+    {{{
+    #!vex
+    
+    if (@age > 0) return;
+    
+    // If @age was > 0, we returned above, so this line
+    // only runs for particles where @age == 0
+    windresist = 0;
+    }}}
+
+
+== Troubleshooting error messages ==
+
+Your code ||
+    Problem ||
+
+`force += 2` |
+    `Syntax error, unexpected '}', expecting ';'`
+    
+    Each statement must end with a semicolon (`;`)
+
+`@v += force` |
+    `SRead-only expression given for read/write parameter`
+
+    Particle nodes cannot modify particle attributes.
+
+`x = { 0, @y, 0}` |
+
+    `Syntax error, unexpected identifier, expecting '}'.`
+
+    You cannot have varying arguments to the `{}` vector constructor. Use `set()` instead: `x = set(0, @y, 0);`.
+
+`x = set(0, $F, 0);` |
+
+    `Doesn't animate.`
+    
+    While `$F` will be evaluated, VOP networks are not time dependent so it won't animate. Use `@Frame` instead.

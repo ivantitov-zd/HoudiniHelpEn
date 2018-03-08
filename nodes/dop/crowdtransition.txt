@@ -1,0 +1,109 @@
+#type: node
+#context: dop
+#internal: crowdtransition
+#version: 3.0
+#icon: CROWDS/transition
+
+= Crowd Transition =
+
+"""Defines a transition between crowd states."""
+
+This node defines a [transition|/crowds/triggers] from one [crowd state|Node:dop/crowdstate] to another.
+The input is a [trigger|Node:dop/crowdtrigger] that initiates the transition when its condition evaluates to true.
+
+== Clip Transition Graph == (cliptransitiongraph)
+
+A [crowd object's|Node:dop/crowdobject] clip transition graph may optionally be used to control transitions between states and animation clips.
+It provides information about which clips are allowed to transition to each other, and where in the clips those transitions should occur.
+This can be used by the [Crowd Transition DOP|Node:dop/crowdtransition] to delay state transitions until an appropriate point in the current animation clip, and to smoothly blend into the next clip.
+Additionally, the clip transition graph allows per-clip control over this behavior (which is useful if the transition's __Input State__ parameter specifies multiple states, or if __Randomize Clips__ is enabled for any of the input states).
+
+The [Test Simulation: Crowd Transition SOP|Node:sop/testsim_crowdtransition] can be used to quickly preview transitions between particular clips before setting up a crowd simulation.
+
+Each point in the clip transition graph geometry represents an animation clip, and each two-point polygon represents a (one-way) transition between the clips.
+During a state transition, if the points corresponding to the input and output states' animation clips are not directly connected, the [Crowd Transition DOP|Node:dop/crowdtransition] will use the shortest path between the two clips.
+
+=== Attributes ===
+table>>
+    tr>>
+        th>> Name
+        th>> Class
+        th>> Type
+        th>> Description
+    tr>>
+        td>> `clipname`
+        td>> Point
+        td>> String
+        td>>
+            Specifies the name of an animation clip.
+    tr>>
+        td>> `agentname`
+        td>> Point
+        td>> String
+        td>>
+            This string is matched with the agent's `agentname` point attribute to avoid potential name conflicts if a crowd contains multiple agent definitions.
+            For example, two different types of agents may both have a clip named 'walk'.
+    tr>>
+        td>> `blend_durations`
+        td>> Primitive
+        td>> Float Array
+        td>>
+            For each transition region, specifies the duration (in seconds) of any transitions which start in that region.
+    tr>>
+        td>> `sync_points`
+        td>> Primitive
+        td>> Vector2 Array
+        td>>
+            For each transition region, specifies a pair of clip times (in seconds) where the two animation clips have a similar pose.
+    tr>>
+        td>> `transition_regions`
+        td>> Primitive
+        td>> Vector2 Array
+        td>>
+            Specifies ranges of clip times (in seconds) for the first animation clip where a transition is allowed to occur.
+
+@parameters
+
+Group:
+    Only affect a group of agents.
+
+Input State:
+    A string pattern that specifies which states to transition out of.
+    The state names correspond to the __State Name__ parameter on a [Crowd State|Node:dop/crowdstate] node.
+    The pattern follows the same syntax as the [match|Vex:match] VEX function.
+
+    - `*` will match all states.
+    - `* ^walk` will match all states except for the `walk` state.
+    - `walk run_*` will match the `walk` state and all states whose names begin with `run_`.
+
+Output State:
+    Name of the state to transition into. This corresponds to the __State Name__ parameter on a [Crowd State|Node:dop/crowdstate] node.
+
+Random Delay:
+    #id: randomdelay
+    Adds a random delay between when the trigger evaluates to true and when the transition begins. This is useful to avoid having many agents starting the transition at the same time.
+
+Max Random Delay:
+    #id: maxrandomdelay
+    If __Random Delay__ is enabled, specifies the maximum delay (in seconds) before the transition starts.
+
+Random Seed:
+    #id: randomdelayseed
+    Specifies the seed used when selecting a random delay time.
+
+Use Clip Transition Graph:
+    The [crowd object's|Node:dop/crowdobject] clip transition graph may optionally be used to control transitions between states and animation clips.
+    This can be used to delay transitions until an appropriate point in the current animation clip, use intermediate transition clips, and also provides information about how to smoothly blend into the new clip.
+    Additionally, the clip transition graph allows per-clip control over this behavior (which is useful if the __Input State__ parameter specifies multiple states, or if __Randomize Clips__ is enabled for any of the input states).
+
+Duration:
+    Length of the transition between states (in seconds).
+
+State Blend:
+    Specifies how the crowd solver should blend between the __Input State__ and __Output State__ as the transition progresses.
+
+@related
+- [Node:dop/crowdsolver]
+- [Node:dop/crowdstate]
+- [Node:dop/crowdtrigger]
+- [Node:dop/crowdtriggerlogic]

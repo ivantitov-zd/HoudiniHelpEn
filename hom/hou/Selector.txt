@@ -1,0 +1,191 @@
+= hou.Selector =
+#type: homclass
+#cppname: HOM_Selector
+#group: view
+
+"""Describes how Houdini should prompt the user to choose geometry in the
+viewport when creating a new SOP node instance."""
+
+Use [Hom:hou.SopNodeType#addSelector] to create a selector and add it to
+a SOP node type.  When the user creates a new instance of a node type in
+the viewer, Houdini will invoke all of its selectors sequentially.  Each
+selector prompts the user to select geometry.  When all selectors have
+been invoked, Houdini creates the new node and each selector connects
+its input nodes and fills in any group parameters on the node to match what
+was selected.
+
+@methods
+
+::`nodeType(self)` -> [Hom:hou.NodeType]:
+    #cppname: HOM_Selector::nodeType
+    Return the node type that this selector is attached to.
+
+::`destroy(self)`:
+    #cppname: HOM_Selector::destroy
+    #replaces: Cmd:omsunbind
+    Remove this selector from its node type.
+
+    See also [Hom:hou.SopNodeType#addSelector].
+
+::`name(self)` -> `str`:
+    #cppname: HOM_Selector::name
+    Return the name of this selector.  The name is unique within the node type
+    it is attached to.
+
+::`selectorType(self)` -> `str`:
+    #cppname: HOM_Selector::selectorType
+    Return the name of the type of selector to use.  Different selectors have
+    different behaviors.  For example "prims" will select only primitives
+    and is used, for example, by the cookie SOP.  "points" will select
+    only points, and is used by SOPs like the point SOP.  "everything"
+    will select any geometry, and is used for SOPs like "xform" and
+    "blast".
+
+    See [Hom:hou.SopNodeType#selectors] for example code that returns all the
+    available selector types.
+
+::`prompt(self)` -> `str`:
+    #cppname: HOM_Selector::prompt
+    A string to display at the bottom of the viewer to instruct the user
+    what to select.
+
+::`primitiveTypes(self)` -> `tuple` of [Hom:hou.primType] enum values:
+    #cppname: HOM_Selector::primitiveTypes
+    Return a sequence of [Hom:hou.primType] enumeration values to specify what
+    primitive types are allowed.
+
+    Note that if you pass an empty sequence for the `primitive_types` parameter
+    in [Hom:hou.SopNodeType#addSelector] and then call this method on
+    the newly-created selector, this method will return a tuple of all
+    primitive types.
+
+::`groupParmName(self)` -> `str`:
+    #cppname: HOM_Selector::groupParmName
+    Return the name of the SOP node parameter containing the group field.
+    The selector will set this parameter to the string representing the
+    points, primitives, edges, etc. chosen by the user in the viewer.
+    It is typically named "group".
+
+::`groupTypeParmName(self)` -> `str`:
+    #cppname: HOM_Selector::groupTypeParmName
+    Return the name of the SOP node parameter containing the menu of geometry
+    types.  If the selector can select multiple geometry types (e.g.
+    points or primitives), it will set this parameter to match the type
+    of geometry the user chose.  The transform SOP, for example, has
+    a Group Type parameter that tells it how to interpret the string in
+    the Group parameter.  For such selectors, the parameter is typically
+    named "grouptype".  For selectors that do not allow multiple geometry
+    types, this parameter is usually "".
+
+::`inputIndex(self)` -> `int`:
+    #cppname: HOM_Selector::inputIndex
+    Return the index of the input connector on the SOP node where the selector
+    should wire input SOPs.  A cookie SOP, for example, has two input
+    connectors and one selector for each input connector.
+
+::`inputRequired(self)` -> `bool`:
+    #cppname: HOM_Selector::inputRequired
+    Return whether or not this input is required or optional.  If the user does
+    not select any geometry and the input is not required, the selector will
+    not connect anything to its input connector.
+
+::`allowDragging(self)` -> `bool`:
+    #cppname: HOM_Selector::allowDragging
+    Return whether the user is allowed to select the geometry and begin
+    manipulating the handles with a single mouse click.  A transform SOP,
+    for example, lets you select the geometry and drag it right away.
+    Dragging the geometry forces the selector to finish immediately,
+    the selector connects the input and sets the group parameter, and
+    subsequent mouse movements are passed to the handle which translates
+    the geometry by changing parameter values.
+
+::`emptyStringSelectsAll(self)` -> `bool`:
+    #cppname: HOM_Selector::emptyStringSelectsAll
+    Return whether or not use an empty string in the group parameter if the
+    user selects all the geometry.  If False, Houdini will place an asterisk
+    (`*`) in the group parameter when the user selects all the geometry.  Most
+    SOPs use an empty string.
+
+::`extraInfo(self)` -> `str`:
+    #cppname: HOM_Selector::extraInfo
+    Returns an optional extra info string that contains additional settings.
+
+::`geometryTypes(self) ->` `tuple` of [Hom:hou.geometryType] enum values:
+    #cppname: HOM_Selector::geometryTypes
+    Return a tuple of [Hom:hou.geometryType] enumeration values.  This
+    tuple describes which geometry entities (e.g. points, primitives, edges,
+    etc.) the selector allows.  Note that this list is a property of the
+    selector type and you cannot specify it when creating a new selector.
+    Instead, you must choose a selector type with the desired geometry types.
+
+    See [Hom:hou.SopNodeType#selectors] for a function that returns a list of
+    all the selector types.  The following function will return the geometry
+    types for a particular selector type.
+    {{{
+    #!python
+    def geometryTypesForSelectorType(selector_type):
+	'''Given a selector type name, return the tuple of geometry types it
+	   will select.'''
+	# First find a node type that uses this selector.
+	for node_type in hou.sopNodeTypeCategory().nodeTypes().values():
+	    # Skip manager nodes, like shopnets, ropnets, etc.
+	    if not isinstance(node_type, hou.SopNodeType):
+		continue
+
+	    for selector in node_type.selectors():
+		if selector_type == selector.selectorType():
+		    return selector.geometryTypes()
+	
+	# The selector type name is invalid.
+	raise hou.OperationFailed("Invalid selector type")
+    }}}
+
+::`groupTypeParmValues(self)` -> `tuple` of `int`:
+    #cppname: HOM_Selector::groupTypeParmValues
+    Return a tuple of indices mapping geometry types to indices on the geometry
+    type parameter menu.
+
+    Whether or not a selector is ordered is a property of the selector type,
+    and you cannot specify it when creating a new selector.  Instead, you must
+    choose the appropriate selector type.  For example, the "everything"
+    selector can select primitives, primitive groups, points, point groups,
+    edges, and breakpoints.  It sets a group type menu parameter to match the
+    type of selection, and this menu must have the entries "Guess from Group",
+    "Breakpoints", "Edges", "Points", and "Primitives".  For an "everything"
+    selector, this method returns (4, 4, 3, 3, 2, 1), mapping the geometry
+    element types to 0-based entries in the menu.  For example, if the user
+    selects edges, the selector will look up the fifth element (2) and set the
+    menu parameter to the item at index 2 ("Edges").
+
+    The length of the tuple of ints is the same as `len(self.geometryTypes)`.
+    If this selector is not intended to work with a menu parameter, each
+    value in the tuple will be -1.
+
+    See also [Hom:hou.Selector#geometryTypes].
+
+::`ordered(self)` -> `bool`:
+    #cppname: HOM_Selector::ordered
+    Return whether or not this selector preserves the order in which the user
+    selected the geometry.
+
+    For example, the selector is for points and the user clicks on points 1, 0,
+    and 2, in that order, an ordered selector will set the SOP's group parameter
+    to `"1 0 2"`, while an unordered selector will set it to `"0-2"`.  For
+    SOPs where the order of the group selector matters, use ordered selectors.
+
+    Whether or not a selector is ordered is a property of the selector type,
+    and you cannot specify it when creating a new selector.  Instead, you must
+    choose the appropriate selector type.  For example, "prims" is an unordered
+    selector type, but "ordered_prims" is ordered.  See
+    [Hom:hou.Selector#geometryTypes] for a function that can be adapted to
+    determine if a selector is ordered, and see [Hom:hou.SopNodeType#selectors]
+    for a function to list all the selector types.
+
+::`componentTypes(self)` -> `tuple` of [Hom:hou.componentType] enum values:
+    #cppname: HOM_Selector::componentTypes
+    #status: ni
+
+::`geoComponentTypes(self)` -> `tuple` of hou.geoComponentType enum values:
+    #cppname: HOM_Selector::geoComponentTypes
+    #status: ni
+

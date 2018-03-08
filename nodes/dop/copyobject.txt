@@ -1,0 +1,111 @@
+#type: node
+#context: dop
+#internal: copyobject
+#icon: DOP/copyobject
+
+= Copy Objects =
+
+The Copy Objects DOP makes copies of the input simulation objects.
+Unlike the [Copy Data DOP|Node:dop/copydata], this node does not work using global
+parameters or re-evaluating the input node. Instead this node makes a
+number of identical copies of the input simulation objects. The task of
+making each object unique is left to subsequent DOP nodes. 
+
+For example,
+this node may be followed by an [RBD State|Node:dop/rbdstate] node which uses the object identifier of the copied objects to give each object a unique position.
+
+@parameters
+    Activation:
+        #channels: /activation
+
+        This node will create copies of the input objects on any
+        timestep where this parameter evaluates to a non-zero value.
+        
+        Generally this parameter will contain an expression which will
+        evaluate to one on a particular timestep, and zero all other
+        times. However other arrangements are possible to, for example,
+        create a steady stream of copies of the input objects.
+    Number of Copies:
+        #channels: /numcopies
+
+        Sets the number of objects this node should create. Note that
+        this number is independent of the number of input objects. If
+        there are 10 input object, but this parameter value is 2, then
+        only 2 new objects will be created, not 20.
+    Object To Copy:
+        #channels: /objtocopy
+
+        This parameter controls which input object will be used as the
+        source for the copy operation. This parameter is re-evaluated
+        for each copy made by this node, and so may be an expression
+        that chooses a different input object to copy based on which
+        output object is being generated. 
+        
+        This parameter may match more
+        than one input object (using wildcards or group names). The
+        Object Index parameter is used to decide which among the set of
+        matching objects to copy.
+    Object Index:
+        #channels: /objindex
+
+        This parameter helps control which input object will be used as
+        the source for the copy operation. This parameter is
+        re-evaluated for each copy made by this node, and so may be an
+        expression that chooses a different input object to copy based
+        on which output object is being generated. 
+        
+        The __Object To Copy__
+        parameter is first used to create a set of matching input
+        objects. The value of this parameter specifies which object
+        within that set to copy.
+
+
+        TIP:
+            To make duplicates of a set of objects, such as the objects
+            produced by an [RBD Fractured Object DOP|Node:dop/rbdfracturedobject], use an __Object To
+            Copy__ value of `*`, and an __Object Index__ value of `$OBJ`. Or
+            to make several copies of each input object, use an __Object
+            Index__ of `$OBJ % number_of_input_objects`. Then set the
+            __Number of Copies__ to the total number of output objects.
+
+
+    Object Name:
+        #channels: /objname
+
+        Controls the name of the output object. Often this parameter
+        will be simply use the SRCNAME local variable, which is set to
+        the name of the object being copied.
+    Copy Objects Created By This Node:
+	Normally the only objects available for copying are those in
+	the input to this node.  This is useful for creating objects
+	based on a template object as already created objects will not
+	be candidates for copying, simplifying the object index.
+
+	For splitting existing objects, however, one may need to
+	recursively split an object that was itself created by this copy
+	object.  In this case you need access to both the input
+	objects and the objects created by this node.  Note that in
+	this case you will almost always have candidate objects for
+	copying so it is important to set the Activation to only occur
+	on desired frames.  With preserve input off and copy own
+	objects off, copying would only occur when template objects
+	are first created, allowing the activation to be left at one.
+    Preserve Input Objects:
+        If this parameter is off, all input objects are destroyed once
+        the object copies are made. Turning this parameter on passes the
+        input objects untouched through this node.
+    Solve on Creation Frame:
+        For the newly created objects, this parameter controls whether
+        or not the solver for that object should solve for the object on
+        the timestep in which it was created. Usually this parameter
+        will be turned on if this node is copying objects in the middle
+        of a simulation rather than creating objects for the initial
+        state of the simulation.
+@locals
+    SRCID:
+        The unique ID of the source object.
+    SRCNAME:
+        The name of the source object.
+    [Include:standard_locals]
+
+

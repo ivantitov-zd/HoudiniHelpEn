@@ -1,0 +1,144 @@
+#type: node
+#context: sop
+#internal: uvpelt
+#icon: SOP/uvpelt
+#version: 2.0
+#tags: uvs, textures, cleanup
+
+= UV Pelt =
+
+"""Relaxes UVs by pulling them out toward the edges of the texture area."""
+
+UV Pelt operates very similar to how a tanner
+creates a pelt. Cuts are made to the geometry to produce a surface
+topologically equivalent to a disc. The boundaries of this surface are
+connected to a frame and stretched out.
+
+Any closed face can be used as a frame for the pelt. A circle is used if
+no frame is specified. A hint polygon is used to specify which section
+of the geometry to pelt after performing the cuts. The longest boundary of 
+the section containing the hint polygon is the one connected to the 
+frame. The frame is parameterized to the range `[0, 1)`. The boundary points 
+are spaced around the frame at distances in the frame's parameterization
+that are proportional to the edge length with the neighboring boundary
+point.
+
+[Include:texture_common#visualizePara]
+
+UV Pelt creates the UV vertex texture attribute if it does not already exist.
+
+NOTE:
+    UV Pelt only operates on polygons. Other geometry type such as Bezier
+    and NURBS surfaces can be converted to polygons using a Convert
+    operation prior to applying UV Pelt.
+
+[Include:/shelf/uvpelt#includeme]
+
+@parameters
+    UV Attribute:
+        #id: uvattrib
+
+        The name of the texture coordinate attribute to pelt, defaulting to `uv`.
+    Edge Cut Group:
+        #channels: /group
+
+        Edges to cut.
+    Pelting Method:
+        #channels: /method
+        Every edge is modeled as a spring. The points are placed to the position that minimizes the spring energy. The choice of Pelting Method affects the strength of individual springs.
+
+        Spring Relaxation:
+                Uses spring weights based on length of the edges and the areas of a the faces incident to the edge. 
+                
+                [Image:/images/uv/uvpelt1.png]
+
+        Tutte Barycentric:
+                Uses unit weights except at boundary points. This means that every point is placed at the mass center of its neighbors. The mass of the boundary points is given by the spring parameter. The main advantage of this method is that it always guarantees a one-to-one parametrization (with no inverted triangles) for convex boundaries. 
+                
+                [Image:/images/uv/uvpelt2.png]
+
+        Discrete Harmonic:
+                Uses a weight assignment scheme known as discrete harmonic method which minimizes angular distortion. 
+                
+                [Image:/images/uv/uvpelt3.png]
+
+    Create Output Group:
+        #channels: /outputtoggle
+
+        Indicates a primitive group should be created for the polygons
+        making up the the pelt.
+    Output Group:
+        #channels: /outputgroup
+
+        Name of the primitive group to create.
+
+    == Pelt ==
+
+        Iterations:
+            #channels: /iters
+
+            Specifies the number of iterations of the algorithm for
+            solving the UV positions.
+        Boundary Springs:
+            #channels: /k
+
+            The strength of the springs connecting the pelt boundary to
+            the frame.
+        Stiffness Attribute:
+            #channels: /stiffness
+
+            Specifies an attribute of the input geometry's points that
+            will be used to scale the strength of the springs connected
+            to the point.
+        Hint Primitive:
+            #channels: /hintprim
+
+            The primitive specifying which section of the geometry forms
+            the pelt.
+
+    == Frame ==
+        Frame:
+            #channels: /frame
+
+            The primitive to use for the frame.
+
+        U From:
+            #channels: /ufrom
+
+            The attribute of the frame used for the U coordinate.
+        V From:
+            #channels: /vfrom
+
+            The attribute of the frame used for the V coordinate.
+        Use Range:
+            #channels: /userange
+
+            Indicates the UV coordinates should be moved to the ranges
+            specified with U Range and V Range.
+        U Range:
+            #channels: /urange
+
+            The location of the left and right edges, respectively, of
+            the texture
+        V Range:
+            #channels: /vrange
+
+            The location of the bottom and top edges, respectively, of
+            the texture
+        Orientation:
+            #channels: /orientation
+
+            Specifies where on the frame to position the first boundary
+            point (the boundary point closest to the hint polygon).
+        Weight Attribute:
+            #channels: /weight
+
+            Specifies an attribute of the frame's points that will guide
+            the process of connecting boundary points to the frame.
+
+@related
+    - [Node:sop/uvproject]
+    - [Node:sop/uvquickshade]
+    - [Node:sop/texture]
+    - [Node:sop/uvunwrap]
+

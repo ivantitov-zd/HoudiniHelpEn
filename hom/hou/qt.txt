@@ -1,0 +1,476 @@
+= hou.qt =
+#type: hommodule
+#cppname: HOM_qt
+#group: ui
+
+"""Module containing Qt related functions."""
+
+
+@functions
+
+== Window Creation ==
+
+These functions create top-level window widgets with either PySide or PyQt.
+The window widgets and their contents are automatically styled with the Houdini
+style sheet.
+
+::`createDialog() -> `QWidget`:
+    #cppname: HOM_qt::createDialog
+    Create and return a new PySide or PyQt widget with the look of a Houdini
+    dialog.  The Houdini style sheet is applied to the widget and its
+    descendents.
+
+::`createMenu()` -> `QMenu`:
+    #cppname: HOM_qt::createMenu
+    Create and return a new PySide or PyQt menu widget with the look and feel
+    of a native Houdini menu.  Use this function for unparented, standalone
+    popup menus (i.e. context menus).  Do not use this function for menus that
+    are attached to other widgets, typically done with a `setMenu(menu)` call.
+
+::`createToolTip()` -> `QWidget`:
+    #cppname: HOM_qt::createToolTip
+    Create and return a new PySide or PyQt widget with the look and feel of a
+    Houdini help tooltip window.  
+    
+    The returned widget has the following additional methods:
+    - `setTitle(title)`
+      
+      Set the tooltip's title text.
+
+    - `setText(text)`
+
+      Set the tooltip's main help text.
+
+    - `setHotkey(hotkey)`
+
+      Set a hotkey to display in the tooltip.  This is the hotkey (if any) used
+      to trigger the action of the widget that the tooltip is showing help for.
+
+    - `setHelpUrl(url)`
+
+      Set a help URL for the tooltip.  When the tooltip window is visible and
+      the open-help hotkey (i.e. F1) is pressed, then Houdini will open the
+      help browser pointing to the help URL.  The help URL can either be a
+      fully qualified URL or a help path in Houdini's help system such as
+      "/nodes/sop/torus".
+
+    - `setTargetWidget(widget)`
+
+       Attach the tooltip window to the given PySide or PyQt widget.  This
+       causes the tooltip window to automatically appear when the mouse hovers
+       over the widget and disappear when the mouse leaves the widget.
+       This is a convenience method for when you do not want to write code for
+       managing the visibility of the tooltip window and you know in advance
+       which widget you want the tooltip for.
+
+    Here is an example of using a tooltip window for a fictional button that
+    bakes out geometry files when triggered:
+    {{{
+    #!python
+    # Create the tooltip.
+    tooltip = hou.qt.createToolTip()
+    tooltip.setTitle("Bake Geometry")
+    tooltip.setText("Click this button to bake out geometry.")
+    tooltip.setHelpUrl("/path/to/bake/geo")
+
+    # Create the button.
+    from PySide2 import QtWidgets
+    button = QtWidgets.QPushButton()
+    button.setText("Bake Geometry")
+
+    # Attach the tooltip to the button.
+    tooltip.setTargetWidget(button)
+    }}}
+
+    Creating a tooltip for every widget can be expensive and redundant.  If you
+    want tooltips for several widgets then a more efficient approach is to
+    create a single, global tooltip window that floats between widgets when
+    they are hovered over by the mouse.  In that scenario instead of calling
+    `setTargetWidget` you would set up event listeners that would manually
+    update, position and display the tooltip window when a widget is hovered
+    over by the mouse.
+
+    Here is an example of having a global tooltip window floating between three
+    button widgets:
+    {{{
+    #!python
+    from hutil.Qt import QtCore
+    from hutil.Qt import QtWidgets
+
+    # Create a global tootip window.
+    theToolTip = hou.qt.createToolTip()
+
+    class ButtonWithToolTip(QtWidgets.QPushButton):
+	"""This is a simple button class with tooltip help."""
+	def __init__(self, text, help_text):
+	    self.setText(text)
+	    self.helpText = help_text
+
+	def event(self, 
+	    """This is a built-in event handler recognized by PySide and PyQt.
+	    
+	    It is triggered when an event occurs for this widget.
+	    """
+	    if event.type() == QtCore.QEvent.Type.ToolTip:
+		theToolTip.setTitle(self.text())
+		theToolTip.setText(self.helpText)
+		
+		# Position the tooltip and display it.
+		theToolTip.move(event.globalX() + 20, event.globalY())
+		theToolTip.show()
+	    elif event.type() == QtCore.QEvent.Type.Leave:
+		theToolTip.hide()
+
+	    return False
+
+    # Create three buttons with tooltip support.
+    red_button = ButtonWithToolTip("Red", "This is the red button.")
+    green_button = ButtonWithToolTip("Green", "This is the green button.")
+    blue_button = ButtonWithToolTip("Blue", "This is the blue button.")
+    }}}
+
+::`createWindow()` -> `QWidget`:
+    #cppname: HOM_qt::createWindow
+    Create and return a new PySide or PyQt widget with the look of a normal
+    Houdini window.  The Houdini style sheet is applied to the widget and its
+    descendents.
+
+
+== Widget Creation ==
+
+These functions create Houdini widgets with either PySide or PyQt.  The widgets
+are configured to look like native Houdini widgets but they do not
+automatically apply the Houdini style sheet.  To completely style a widget, you
+must apply the style sheet to the top-level window widget that contains the
+widget or call `setStyleSheet(hou.qt.styleSheet())` on the widget if it is not
+parented.
+
+::`createCheckBox()` -> `QCheckBox`:
+    #cppname: HOM_qt::createCheckBox
+    Create and return a checkbox widget.
+
+    The returned widget has the following additional methods:
+    - `setTextColor(color)`
+
+      Set the color of the checkbox's text label.  The `color` argument
+      must be a `QtGui.QColor` object.  You can call [Hom:hou.qt#getColor] to
+      create a `QtGui.QColor` object for a built-in Houdini color.
+      
+    - `setDisabledTextColor(color)`
+
+      Set the color of the checkbox's text label when the checkbox is disabled.
+      The `color` argument must be a `QtGui.QColor` object.  You can call
+      [Hom:hou.qt#getColor] to create a `QtGui.QColor` object for a built-in
+      Houdini color.
+
+::`createComboBox()` -> `QComboBox`:
+    #cppname: HOM_qt::createComboBox
+    Create and return a widget that is a combined button and popup list 
+    (i.e. menu button).
+
+::`createFileChooserButton()` -> `QToolButton`:
+    #cppname: HOM_qt::createFileChooserButton
+    Create and return a button that when clicked opens a Houdini file chooser
+    dialog.  You can obtain the dialog's selected file by connecting to the
+    button's `fileSelected` signal.
+
+    The returned widget has the following additional methods:
+    - `setFileChooserCollapseSequences(on_or_off)`
+
+      Set whether the chooser dialog collapses sequences of files with common
+      numeric patterns into patterns containing $F.  Default is `False`.
+      
+    - `setFileChooserDefaultValue(default_value)`
+
+      Set the default contents of the file name field in the chooser dialog.
+      Default is `None`.
+
+    - `setFileChooserFilter(file_filter)`
+
+      Set the chooser dialog's file filter.  The file filter must be
+      a [Hom:hou.fileType] enumeration value.  Default is `hou.fileType.None`.
+
+    - `setFileChooserImageChooser(on_or_off)`
+
+      Set whether the chooser dialog shows image thumbnails.
+      Default is `False`.
+
+    - `setFileChooserMode(mode)`
+
+      Set the chooser dialog's [Hom:hou.fileChooserMode] to say if the user
+      is being prompted for a file to read from, write to, or either.
+      Default is `hou.fileChooserMode.ReadAndWrite`.
+
+    - `setFileChooserPattern(pattern)`
+
+      Set the chooser dialog's pattern so that only files matching the pattern
+      (and anything restricted by the file type) will be listed.  Default is
+      `None` (match everything).
+
+    - `setStartDirectory(start_dir)`
+    
+      Set the directory that the chooser dialog should initially start in
+      when opened.  Default is `None`.
+
+    - `setFileChooserTitle(title)`
+
+      Set the chooser dialog's title.  Default is None.
+
+    - `setFileChooserMultipleSelect(on_or_off)`
+
+      Set whether the chooser dialog allows multiple selected files.
+      Default is `False`.
+
+    The returned widget has the following additional signals:
+    - `fileSelected`
+
+      This signal is triggered when the file chooser dialog is opened and the
+      user selects a file from the dialog.  The signal passes back one
+      argument, the file path that was selected.
+
+    Here is an example of creating a file chooser button for PNG image files
+    and then connecting to its `fileSelected` signal:
+    {{{
+    #!python
+    def outputSelectedFile(file_path):
+	print "This file was selected: ", file_path
+
+    chooser_button = hou.qt.createFileChooserButton()
+    chooser_button.setFileChooserFilter(hou.fileType.Image)
+    chooser_button.setFileChoooserPattern("*.png")
+    chooser_button.fileSelected.connect(outputSelectedFile)
+    }}}
+
+::`createMenuBar(parent)` -> `QMenuBar`
+    #cppname: HOM_qt::createMenuBar
+    Create and return a menu bar that is parented to the `parent` widget.
+
+::`createMenuButton(menu)` -> `QPushButton`
+    #cppname: HOM_qt::createMenuButton
+    Create and return a button that when clicked opens an action menu.
+    `menu` must be a `QMenu` object.
+
+    Raise [Hom:hou.OperationFailed] exception if `menu` is not a
+    [Hom:hou.OperationFailed] object.
+
+::`createNodeChooserButton()` -> `QToolButton`:
+    #cppname: HOM_qt::createNodeChooserButton
+    Create and return a button that when clicked opens a Houdini node chooser
+    dialog.  You can obtain the dialog's selected node by connecting to the
+    button's `nodeSelected` signal.
+
+    The returned widget has the following additional methods:
+    - `setNodeChooserFilter(filter)`
+
+      Set the chooser dialog's node filter.
+      The filter must be a [Hom:hou.nodeTypeFilter] enumeration value.
+      Default is `hou.nodeTypeFilter.NoFilter`.
+
+    - `setNodeChooserRelativeNode(relative_to_node)`
+
+      Point the chooser dialog to a [Hom:hou.Node] for relative paths, or to
+      `None` if relative paths are not supported.  Passing in a node enables
+      the dialog's Use Relative Paths checkbox.  Default is `None`.
+
+      If the relative node is set and the user checks the Use Relative Paths
+      checkbox then the chooser dialog returns a relative path to the node.
+
+    - `setNodeChooserInitialNode(initial_node)`
+
+      Set the node that the chooser dialog initially selects.  
+      Default is `None`.
+
+    The returned widget has the following additional signals:
+    - `nodeSelected`
+
+      This signal is triggered when the node chooser dialog is opened and the
+      user selects a node from the dialog.  The signal passes back one
+      argument, the [Hom:hou.Node] object that was selected.
+
+    Here is an example of creating a node chooser button for object nodes and
+    then connecting to its `nodeSelected` signal:
+    {{{
+    #!python
+    def outputSelectedNode(node):
+	print "This node was selected: ", node.path()
+
+    chooser_button = hou.qt.createNodeChooserButton()
+    chooser_button.setNodeChooserFilter(hou.nodeTypeFilter.Obj)
+    chooser_button.nodeSelected.connect(outputSelectedNode)
+    }}}
+
+
+::`createParmDialog(node)` -> `QWidget`:
+    #cppname: HOM_qt::createParmDialog
+    #status: ni
+    Create and return a new parameter dialog for the [Hom:hou.Node] object
+    specified by the `node` argument.  The parameter dialog is a mirror of the
+    Parameter Pane that is locked to the specified node.
+
+    Note that it is not possible to access the widgets that are contained in
+    the parameter dialog.
+
+::`createParmWidget(parm_template)` -> `[Hom:hou.QtParmWidget]`:
+    #cppname: HOM_qt::createParmWidget
+    #status: ni
+    Create and return a new PySide or PyQt widget that has the look and feel of
+    the Houdini parameter widget defined by the [Hom:hou.ParmTemplate] object
+    specified by the `parm_template` argument.
+
+::`createSeparator()` -> `QFrame`:
+    #cppname: HOM_qt::createSeparator
+    Create and return a new PySide or PyQt frame widget with the look of a
+    Houdini separator.
+
+
+== General UI ==
+
+::`createIcon(name, width=32, height=32)` -> `QIcon`:
+    #cppname: HOM_qt::_createIcon
+    Create and return a new PySide or PyQt QIcon instance from an icon in the
+    Houdini search path. If the icon is an .svg file then the width and height
+    parameters determine the icon size. Otherwise, the size of the icon image
+    file is used.
+
+    Raise [Hom:hou.OperationFailed] if no icon with the specified name exists.
+    
+    For example:
+    {{{
+    #!python
+    help_icon = hou.qt.createIcon("BUTTONS_help", 64, 64)
+    help_button.setIcon(icon)
+    }}}
+
+
+::`getColor(color_name)` -> `QColor`:
+    #cppname: HOM_qt::getColor
+    Return a QColor object for Houdini resource color with the specified name.
+    Resource colors are defined in the Houdini color scheme files (look for
+    `*.hcs` files in $HFS/houdini/config).
+
+    Raise [Hom:hou.OperationFailed] if no color with the specified resource
+    name exists.
+    
+    TIP:
+        You can use [Hom:hou.ui.colorFromName] to get a HOM color object
+        instead of a Qt color object.
+
+::`mainWindow(self)` -> `QWidget`:
+    #cppname: HOM_qt::_mainWindow
+    Return a QWidget instance representing the main Houdini window.  This
+    method is helpful for parenting a PySide or PyQt dialog to the main window.
+    Parenting to the main window keeps the dialog alive for the lifetime of the
+    window so that the dialog is not destroyed prematurely by Python.
+    Parenting also causes the dialog to inherit the Houdini style sheet set on
+    the main window.
+    
+    Here is an example of parenting a dialog to the main window:
+    {{{
+    #!python
+    from hutil.Qt import QtCore
+
+    dialog = MyDialog()
+    dialog.setParent(hou.qt.mainWindow(), QtCore.Qt.Window)
+    dialog.show()
+    }}}
+
+    Note that a parented dialog will be alive even when it is closed.  If you
+    want to destroy the dialog when it is closed then you need to implement the
+    _closeEvent_ method handler and unparent the dialog.  For example:
+    {{{
+    #!python
+    import Qt.QtWidgets as QtWidgets
+
+    class MyDialog(QtWidgets.QFrame):
+        ...
+        
+        def closeEvent(self, event):
+        self.setParent(None)
+    }}}
+
+::`floatingPanelWindow(self, panel)` -> `QWidget`:
+    #cppname: HOM_qt::_floatingPanelWindow
+    Return a QWidget instance representing the window for the provided
+    [Hom:hou.FloatingPanel]. If the provided `panel` is `None`, this method
+    returns the `mainWindow`. This method is helpful for parenting a PySide
+    or PyQt dialog to a particular floating panel. Parenting to a panel keeps
+    the dialog alive for the lifetime of the panel so that the dialog is not
+    destroyed prematurely by Python. Parenting also causes the dialog to
+    inherit the Houdini style sheet set on the main window, and depending on
+    the dialog configuration, can keep the dialog on top of the floating panel.
+    
+    Here is an example of parenting a dialog to the panel that contains a
+    particular pane tab:
+    {{{
+    #!python
+    from hutil.Qt import QtCore
+
+    panetab = hou.ui.findPaneTab('panetab1')
+    panel = panetab.pane().floatingPanel()
+    dialog = MyDialog()
+    dialog.setParent(hou.qt.floatingPanelWindow(panel), QtCore.Qt.Window)
+    dialog.show()
+    }}}
+
+::`styleSheet()`:
+    #cppname: HOM_qt::styleSheet
+    Return the Houdini style sheet.  Apply the style sheet to widgets so that
+    they look like native Houdini widgets.  Note that child widgets
+    automatically inherit the style sheet from the parent.
+
+    {{{
+    #!python
+    import Qt.QtWidgets as QtWidgets
+
+    stylesheet = hou.qt.styleSheet()
+
+    parent_widget = QtWidgets.QWidget()
+    parent_widget.setStyleSheet(stylesheet)
+
+    child_button = QtWidgets.QPushButton()
+    child_button.setText("Hello World")
+
+    # Parenting the child button inherits the parent's Houdini style sheet.
+    child_button.setParent(parent_widget)
+    }}}
+
+
+== Sizing ==
+
+::`inchesToPixels(inches)` -> `float`:
+    #cppname: HOM_qt::inchesToPixels
+    Converts inches to pixels, accounting for both Qt and Houdini's dpi
+    settings.
+
+::`pixelsToInches(pixels)` -> `float`:
+    #cppname: HOM_qt::pixelsToInches
+    Converts pixels to inches, accounting for both Qt and Houdini's dpi
+    settings.
+
+
+== Event Processing ==
+
+::`skipClosingMenusForCurrentButtonPress()`:
+    #cppname: HOM_ui::skipClosingMenusForCurrentButtonPress
+    
+    Normally a mouse button event sent to any Qt widget in the Houdini process
+    will cause all open Houdini menus to close. However if a mouse button
+    event to a Qt widget is what causes a Houdini menu to open (such as
+    through a call to [Hom:hou.NetworkEditor.openNodeMenu]), it is necessary
+    to disable this automatic menu closing temporarily. Otherwise the menu
+    that was just opened would be immediately closed. This method does exactly
+    this, disabling the automatic menu closing until the next mouse button
+    release event, at which time the automatic menu closing is re-enabled.
+
+::`qtKeyToUIKey(qtkey, qtkeymodifiers)` -> `dict` of `str` to `int`:
+    #cppname: HOMUI_qt::qtKeyToUIKey
+    
+    Converts a Qt key with Qt modifiers into a UI key and UI modifiers if
+    possible.
+
+::`qtKeyToString(qtkey, qtkeymodifiers, qtkeystring)` -> `bool`:
+    #cppname: HOMUI_qt::qtKeyToString
+    
+    Converts a Qt key with Qt modifiers and the key evevnt's text into a string
+    that is suitable for UI display or to pass to the hot key manager.
+

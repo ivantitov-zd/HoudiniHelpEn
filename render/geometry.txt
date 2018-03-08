@@ -1,0 +1,85 @@
+= Saving IFD geometry =
+
+"""When you generate an IFD file for rendering, you can choose whether to "inline" the geometry in the IFD file, or store the geometry in external files."""
+
+== Overview ==
+
+An [IFD file|ifd] is a _scene description file_, containing all the information (lights, cameras, geometry, shaders, render properties, and so on) necessary to render a frame. Mantra takes an IFD file (generated from a Houdini scene) and renders it.
+
+The IFD file also has any geometry needed to render the scene (for example, character skins, props, and so on). There are two methods for storing the geometry:
+
+Temporary geometry files (default):
+     Writes the geometry into temporary files and references the temp files in the IFD. This has several benefits:
+     
+     * IFD generation can be faster, because Houdini can write the IFD and the geometry files in parallel, instead of writing each piece of geometry into the IFD one at a time.
+     
+     * IFD reading can be faster, because Mantra can load the external geometry files in parallel.
+     
+     * Total disk space used is smaller, because the external geometry files can use compression options not implemented inside IFD.
+    
+     * Geometry can be shared across frames. Each IFD file represents a single frame. When writing multiple IFD files for an animation, Houdini can detect static geometry and have the IFD files reference the same external file across multiple frames. If you have a lot of static geometry (for example, sets and props), this can be a significant saving.
+
+Inline geometry:
+    Writes the geometry into the IFD file as binary. This can make the IFD file very large and it can take a long time to generate the IFD file. The benefit is that one file contains everything you need to render, so it may be easier to track assets.
+
+    Note that Houdini supports a type of geometry called [packed disk primitives|/model/packed]. This type of geometry is represented in Houdini as just a reference to geometry in a file on disk, and the geometry is streamed from disk as-needed. When this type of geometry is included in an IFD "inline", only the file reference is written to the IFD, and Mantra streams the geometry from disk just like Houdini, so this type of geometry will not bloat the IFD or slow generation.
+    
+    The downside of using packed disk primitives to speed up the IFD compared to using temporary geometry files (see below) is that you must manually manage the geometry files.
+
+
+== Where to store geometry files ==
+
+Houdini may generate a large number of geometry files with an IFD. You may need to manage where the files are stored to avoid running out of disk space, and/or to make the accessible across the network for a render farm.
+
+The Mantra render node has two separate parameters for storing render geometry files.
+
+[IncludeProp:vm_tmpsharedstorage]
+
+[IncludeProp:vm_tmplocalstorage]
+
+(These are actually [render properties|/props/], so you could, for example, vary them by camera. See [other properties|#advanced] below.)
+
+
+== How to ==
+
+:task: Set up where Houdini writes temporary geometry files:
+    # In the main menus choose __Render > Edit Render Node > <<render node>>__ to show the render node in the parameter editor.
+
+    # Click the __Driver__ tab.
+    
+    # Set the __Shared temp storage__ field to a directory where you want Houdini to write the render geometry files.
+    
+        The default is `$HIP/ifds/storage` (`$HIP` is the directory containing the scene file).
+        
+        If you're sending jobs to a render farm, you should make sure this is on a network drive so other machines can read the geometry files.
+    
+    TIP:
+        You don't usually need to change the __Local temp storage__ directory. This is where Houdini saves temporary geometry files when streaming directly to Mantra (for the interactive render view). The only reason to change it might be to choose a directory on a faster drive like an SSD.
+
+:task: Set up Houdini to inline geometry:
+    # In the main menus choose __Render > Edit Render Node > <<render node>>__ to show the render node in the parameter editor.
+
+    # Click the __Driver__ tab.
+    
+    # Find the __Save geometry inline__ checkbox.
+
+        * When the checkbox is on, Houdini writes geometry into the IFD file.
+    
+        * When the checkbox is off, Houdini writes geometry to temporary files.
+    
+    The default is off (that is, to write geometry to external temporary files instead of inlining).
+
+
+== Advanced == (advanced)
+
+* If you know your geometry won't change, you can add this render property and turn it on to speed up interactive rendering by not regenerating geometry files:
+
+    [IncludeProp:vm_reuseoutlinecache]
+
+* The __Save geometry inline__ checkbox is a render property. You can [add it to individual objects|/props/] to set whether each object's geometry should be inlined or written to temporary files.
+
+    [IncludeProp:vm_inlinestorage]
+
+
+
+

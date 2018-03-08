@@ -1,0 +1,319 @@
+= Attributes =
+
+A particle system is first and foremost driven by attributes. Here are some of the attributes understood by the solvers.
+
+The attributes are listed with the `@` style prefix to give the full type. No prefix means float.
+
+There are two suggested methods for creating attributes: [POP VOP|Node:dop/popvop] and [POP Wrangle|Node:dop/popwrangle]. 
+
+In a  [POP VOP|Node:dop/popvop], you can use a [Bind Export VOP|Node:vop/bind] to write out your desired attribute. 
+
+In a [POP Wrangle|Node:dop/popwrangle] you can use a prototype to specify the attribute and default.
+
+{{{
+int @id = -1;
+point @orient = {0, 0, 0, 1};
+}}}
+
+NOTE:
+    The expression after the equals must be a simple constant expression.
+
+@attributes
+
+Houdini will use the `Cd` (diffuse color) point attribute to color particles.
+
+== State ==
+
+`age`:
+    #type: float
+    
+    Time in seconds since the particle was born. To get the relative time, useful for fading effects, use `@nage`.
+    
+`nage`:
+    #type: float
+    #readonly: yes
+    
+    `@age` divided by `@life`. Implicit attribute, you cannot write to this.
+    
+`life`:
+    #type: float
+    
+    Time in seconds the particle is allowed to live. When `@age>@life`, the particle will be marked dead.
+    
+`id`:
+    #type: int
+    #default: -1.
+    
+    A unique id for the particle that remains the same throughout a single simulation. Always use `@id` rather than `@ptnum` to avoid things changing when particles are deleted. Use `findattribval()` to look up the point number that corresponds with an id.
+    
+== Linear Physics ==
+
+The particle solver uses the standard `v` (velocity) attribute as the direction of the particle. Use `length(@v)` to get the speed of the particle.
+
+`force`:
+    #type:
+    
+    Forces on the particle for this frame.
+    
+`mass`:
+    #type: float
+    #default: 1.0
+    
+    Inertia of the particle.
+
+`spinshape`:
+    #type: vec3
+    #default: (1, 1, 1)
+
+    This is multiplied by `@pscale` to determine the rough shape of the particle for the purpose of rotational inertia.
+
+`drag`:
+    #type: float
+    #default: 1.0
+    
+    How much the particle is dragged by any wind effects.
+    
+`dragexp`:
+    #type: float
+
+    A value from 1 to 2. An exponent of 1 means that a particle is dragged to the wind velocity by an amount proportional to the difference in speeds. A value of 2 makes it the square of the speeds. The latter causes fast moving particles to be crushed faster, and has less influence on particles already near the wind speed.
+    
+    The default is set by a parameter on the solver.
+
+    This is used for both angular and linear drag.
+
+`dragshape`:
+    #type: vec3
+    #default: (1, 1, 1)
+
+    How much the particle is dragged in each of its local axes.  Should be proportional to the cross section of the particle as seen down each axis.
+
+`dragcenter`:
+    #type: vec3
+    #default: (0, 0, 0)
+
+    If specified, drag forces will also generate torques on the particle based on the difference between the center of drag and the center of mass.  The center of mass is always taking to be the particle position.  This provides a local offset to the particle.
+    
+`targetv`:
+    #type: float
+    
+    The local wind speed. Thought of as the goal, or target, velocity for the particle.
+    
+`airresist`:
+    #type: float
+    
+    How important it is to match the wind speed. This differs from the drag in that it is measuring a property of your wind force, which likely varies by space, rather than a property of the particle which remains the same as the particle moves.
+    
+`speedmin`, `speedmax`:
+    #type: float
+    
+    Limit of the speed, in units per second, that a particle can move. Particles can temporarily exceed this due collision effects, this acts as a hard clamp every timestep after force computation.
+
+== Angular Physics ==
+
+`p@orient`:
+    #type: vec4
+    #default: (0, 0, 0, 1)
+
+    The orientation of the particle. This is used for stamping onto particles and for figuring out "local" forces.  A particle with an orient attribute no longer is considered to be facing in the direction it is traveling. This is a quaternion.
+        
+`w`:
+    #type: vec3
+    
+    Angular speed of the particle. This can be thought of as a vector giving the rotation axis with its magnitude being the spin rate. Spin rate is in radians per second.
+    
+`torque`:
+    #type: vec3
+    
+    The equivalent of force for spins. No inertial tensor (the equivalent of mass) is currently supported.
+        
+`targetw`:
+    #type: vec3
+    
+    The goal spin direction and speed for this particle.
+    
+`spinresist`:
+    #type: float
+    
+    How important it is to match the `targetw`.
+    
+`spinmin`, `spinmax`:
+    #type: float
+    Limits on the speed in radians per second that a particle can spin. 
+
+== State ==
+
+`dead`:
+    #type: int
+    
+    Whether a particle is living (0) or dead (1). A dead particle is deleted in the Reaping stage. This is done as the final stage of the solver and after the post-solve nodes, so you normally do not see any dead particles unless you turn off Reaping. `@dead>0` is a way to group all dead particles. `@dead==0 `will group the live ones.
+
+`stopped`:
+    #type: int
+    
+    Whether a particle is moving (0) or stopped (1).  It preserves its velocity, but no longer integrates its position, velocity, orientation, or angular velocity.  Note that direct changes to these can still be performed - such as a Look At POP altering the orientation.
+    
+`stuck`:
+    #type: int
+    
+    Whether a particle is free (0) or stuck (1). A stuck particle will be teleported to the position path every frame.  It will inherit the velocity of the surface it is stuck to.
+    
+`sliding`:
+    #type: int
+    
+    Whether a particle is free (0) or sliding along a surface (1). A sliding particle is allowed some motion, but it then tries to re-project itself to its position path object. It can't transfer between objects, but it can change which primitive/uv coordinates it is on in this process.
+
+`cling`:
+    #type: float
+    
+    Sliding particles apply a force inwards (according to surface normal) to the object they are attached to.  This helps them stay on around bends.
+
+`pospath`:
+    #type: string
+    
+    This string stores a path to the object that the particle is interested in. It is the path to a file on disk or an absolute `op:` path.  (`op:` paths can support references to DOP objects.)
+    
+`posprim`:
+    #type: int
+    Default: -1.
+    
+    Which primitive in the path geometry whose position we wish to refer to.
+    
+`posuv`:
+    #type: vec3
+    
+    Where on the primitive. This is NOT texture uvs, but parametric uvs. The `primuv` VEX command can be used to look up attributes using this.  This is a vector because some primitives (such as polysoups, tetrahedrons, volumes) may store three coordinates. 
+        
+== Collisions ==
+
+`hittotal`:
+    #type: int
+    
+    The cumulative total of all hits for the particle.  Corresponds to the
+    `$NUMHIT` of old POPs.
+
+    A particle may collide multiple times within a substep, giving
+    a `i@numhit` greater than one.  However, `i@hittotal` will only
+    be incremented once on that substep, making it easier to build
+    triggers.
+
+    Additional [POP Collision Behavior|Node:dop/popcollisionbehavior] nodes may double count collisions if their __Compute Hit Total__ is on.
+    
+`has_pprevious`:
+    #type: int
+    
+    This attribute is 1 if `@pprevious` contains valid values.
+
+`pprevious`:
+    #type: vec3
+    
+    Stores the position of the particle on the previous frame. This is used in collision detection to ensure collisions can be registered regardless of how the particle moves.
+    
+`hitnum`:
+    #type: int
+    
+    The number of times the particle collided in the last [POP Collision Detect|Node:dop/popcollisiondetect]. `@hitnum>0` can group all the particles that hit once. Only the first hit is stored in the attributes.  Corresponds to `$JUSTHIT` of the old POPs.
+    
+`hitpath`:
+    #type: string
+    
+    The path to the object that was hit. A path to a file on disk or an op: path.
+    
+`hitprim`:
+    #type: int
+    #default: -1
+    
+    The primitive hit. This could be -1 if it the collision detector couldn't figure out which primitive owns the collision. The [POP Solver|Node:dop/popsolver] tries to recover from this with `@xyzdist`.
+    
+`hituv`:
+    #type: vec3
+    
+    The position on the primitive. This is in parametric UV space, *not* texture UV.
+
+`hitpos`:
+    #type: vec3
+    
+    Where the hit actually occurred. Usually a `primuv` on `P` will give you this, but if the colliding object was moving it won't.
+    
+`hitnml`:
+    #type: vec3
+    
+    The normal of the surface at the time of the collision.
+    
+`hitv`:
+    #type: vec3
+    
+    The velocity of the surface at the time of the collision.
+
+`hittime`:
+    #type: float
+    
+    When the collision occurred, that could be within a frame.
+    
+`hitimpulse`:
+    #type: float
+    
+    Created by the [Gas Impact to Attributes node|Node:dop/gasimpacttoattributes], this records
+    how much of an impulse was needed for the collision resolution.
+    The Add Impact Data has to be enabled on the POP Solver as well.
+    
+    This varies with timestep.
+        
+`bounce`:
+    #type: float
+    
+    When particles bounce off another object, this controls how much energy they keep in the normal direction.  A value of 1 will keep all the energy, a value of 0 will come to a stop. It is multiplied with the bounce value of the other object.
+    
+    The default is controlled by a parameter on the [POP Object|Node:dop/popobject].
+
+`bounceforward`:
+    #type: float
+
+    When particles bounce off another object, this controls how much energy they keep in the tangential direction. A value of 1 will cause the particle to keep moving tangentially, ie, a perfect bounce.  A value of 0 will bring the particles to a stop relative to the collision object in the tangential direction.  A value of -1 will cause the particles to retro-reflect.  A value of 2 will cause them to gain energy with every collision. It is multiplied by the bounce forward value of the other object.
+    
+    The default is controlled by a parameter on the [POP Object|Node:dop/popobject].
+
+`friction`:
+    #type: float
+
+    When particles bounce off other objects, they are slowed down in the tangential direction proportional to how hard they hit the object. A value of 0 will bounce off with no momentum transfer.  Higher values will increase how much the particles will stick to the collision object's speed. This is multiplied by the friction of the other object.
+    
+    The default is controlled by a parameter on the [POP Object|Node:dop/popobject].
+
+`collisionignore`:
+    #type: string
+    #default: ""
+
+    Objects that match this pattern will not be collided during the [POP Solver|Node:dop/popsolver] collision stage.  This does not affect the [POP Collision Detect|Node:dop/popcollisiondetect], just the implicit collisions during solve.  Both object names and object ids can be matched by the expression.  Therefore, `0 torus*` will avoid colliding with the first DOP object and all DOP objects whose names start with torus.
+
+== Misc ==
+    
+`s@instancepath`:
+    #type: string
+    
+    Geometry to copy onto each particle. This is either a path to a file on disk or an `op:` path. If a file path, you can use the Mantra Point Instancing to render it. If it has op: paths, use the [Instance SOP|Node:sop/instance] to first harden all the `op:` paths. File paths will remain references.
+
+`nearest`:
+    #type: int
+    #default: -1
+
+    `@id` of the closest particle.  Could also be `@ptnum` if the `id` attribute was missing.  Created by the [Proximity POP|Node:dop/popproximity]. Value of -1 if nothing within the search range.
+
+`nearestdist`:
+    #type: float
+    #default: -1
+
+    Distance to the nearest particle.  -1 if nothing in range.  Created by the [Proximity POP|Node:dop/popproximity].
+
+`numproximity`:
+    #type: int
+    #default: 0
+
+    Number of particles within the specified range.  Created by the [Proximity POP|Node:dop/popproximity].
+
+@related
+
+:: [/model/attributes]
+:: [/crowds/attributes]
+
+

@@ -1,0 +1,262 @@
+= HeightField Output =
+
+#type:     node
+#context:  sop
+#internal: heightfield_output
+#icon:     SOP/heightfield_output
+
+"""Exports height and/or mask layers to disk as an image."""
+
+If you save to a deep raster format (such as Houdini's `.pic`, or EXR) you can store any number of layers in the file. For regular image formats, the node can store up to four layers by packing them into the color channels (RGBA).
+
+TIP:
+    To read a heightfield and/or mask to an image file, use [HeightField File|Node:sop/heightfield_file].
+
+
+@parameters
+
+== Image Output ==
+
+Save to Disk:
+    #id: execute
+    
+    Click to save the input volumes to the given file.
+
+Filename:
+    #id: output_file
+    
+    Path to the image file to write. The node guesses the image format to write from the file extension.
+    
+    If __Divide into tiled maps__ is on, the node will write to filenames with additional tiling information. For example, `/path/name.<<tileinfo>>.ext`.
+    
+Output Type:
+    #id: out_type
+    
+    Whether to pack the layer data into color channels, or use separate image planes. This depends on the image format you are writing to.
+    
+    Packed Raster:
+        Each layer is packed into a channel of the output image. Use this option for regular image format such as PNG.
+        
+    Deep Raster:
+        Each layer is written as a separate deep raster plane in the output image. Use this option for deep raster formats such as Houdini's `.pic`, or EXR.
+
+Format:
+    #id: out_format
+    
+    The number of color channels to write, for formats that support different numbers of color channels (such as TIFF).
+
+    RGBA:
+       Write four channels. Use this with formats that support an alpha channel, such as PNG.
+        
+    RGB:
+       Write three channels. Most image formats support this.
+
+    Single Channel:
+       Write a single channel. Use this with formats that support grayscale images, such as TIFF and PNG.    
+
+Type:
+    #id: output_type
+    
+    The bit depth to use, for formats that support different bit depths (such as `.pic`, EXR, and PNG). If the image format doesn't support the chosen type, the node will downsample the data to fit the format. For example, if you try to write 16b floating point to JPEG, the node will downsample the data to 8b fixed.
+
+    8b Fixed:
+        Stores values from 0-1, quantized to 256 levels. Numbers outside 0-1 are clamped.
+    
+    16b Fixed:
+        Stores values from 0-1, quantized to 65535 levels. Numbers outside 0-1 are clamped.
+
+    16b Floating Point:
+        Low precision floating point which supports values between +/-65535.
+        Values between 0 and 1 have better precision than 8b, but worse than 16b Fixed.
+
+    32b Floating Point:
+        Exact representation (matches the layer precision used in Houdini). Not supported by most image formats (use with `.pic` or EXR).
+
+Use Resolution:
+    #id: specify_res
+    
+    Scale the volume data to a specific image size. When this is off, the output image uses the volume's resolution.
+
+Resolution:
+    #id: resolution
+    
+    When __Use resolution__ is on, the output image resolution to use.
+
+Output File Sequence:
+    #id: trange
+    
+    Output separate images for each frame in a given frame range. When this is off, clicking __Save to disk__ writes the data at the current frame to a fixed filename. When this is on, __Save to disk__ writes separate files for each frame with the frame number included in the filename.
+
+Frame Range:
+    #id: f
+    
+    When __Output file sequence__ is on, the frame range and frame increment to generate images for.
+
+
+== Terrain Layers ==
+
+These controls specify which layers to save. When __Output type__ is "packed raster", you can specify one layer to pack into each available channel (according to the __Format__). When __Output type__ is "deep raster", you can instead specify space separated lists of layers to save as named image planes.
+
+
+~~~ Packed raster ~~~
+
+TIP:
+    If the checkbox next to a color channel is not on, but the image format requires that color channel exist, the channel will be filled with 0s in the output image.
+
+Red:
+    #id: red_channel
+    
+    When the checkbox is on, save this named layer to a color channel of the image.
+
+Output Range:
+    #id: red_out_range
+    
+    How to remap values in the data into the range the image can support. This is generally necessary with 8 bit and 16 bit fixed formats, which can only store values from 0-1.
+    
+    No Remapping:
+        Store the value as-is, clamping out-of-range values.
+        
+    Auto Remap:
+        Remaps values from their detected full range to the __To Range__.
+        
+    Manual Remap:
+        Remaps values from the __From Range__ to the  __To Range__. 
+
+From Range:
+    #id: red_from_range
+    
+    When the __Output Range__ is "manual remap", the the source range to map from.
+    
+To Range:
+    #id: red_to_range
+    
+    When the __Output Range__ is "auto remap" or "manual remap", the output range to map to. For 8 bit and 16 bit fixed formats, this should be 0-1.
+
+Green:
+    #id: green_channel
+    #contentfrom: #red_channel
+
+Output Range:
+    #id: green_out_range
+    #contentfrom: #red_out_range
+    
+From Range:
+    #id: green_from_range
+    #contentfrom: #red_from_range
+    
+To Range:
+    #id: green_to_range
+    #contentfrom: #red_to_range
+    
+Blue:
+    #id: blue_channel
+    #contentfrom: #red_channel
+
+Output Range:
+    #id: blue_out_range
+    #contentfrom: #red_out_range
+    
+From Range:
+    #id: blue_from_range
+    #contentfrom: #red_from_range
+    
+To Range:
+    #id: blue_to_range
+    #contentfrom: #red_to_range
+
+Alpha:
+    #id: alpha_channel
+    #contentfrom: #red_channel
+
+Output Range:
+    #id: alpha_out_range
+    #contentfrom: #red_out_range
+    
+From Range:
+    #id: alpha_from_range
+    #contentfrom: #red_from_range
+    
+To Range:
+    #id: alpha_to_range
+    #contentfrom: #red_to_range
+
+
+~~~ Deep raster ~~~
+
+Layers:
+    #id: deep_raster_layers
+
+    A space-separated list of layer names (or patterns) to write as image panes. The values are written unaltered, so only use this parameter if the image format supports the full range of values in your data.
+    
+(0,1) Layers:
+    #id: deep_raster_layers01
+    
+    A space-separated list of layer names (or patterns) to write remapped to the 0-1 range.
+
+(-1,1) Layers:
+    #id: deep_raster_layers_11
+
+    A space-separated list of layer names (or patterns) to write remapped to the -1-1 range. Only use this parameter if the image format supports negative numbers.
+
+
+== Tiling ==
+
+Divide into tiled maps:
+    #id: tile_output
+
+    Divide the layer data into tiles and output a separate image for each tile. 
+    
+Tile Method:
+    #id: tile_method
+    
+    How to divide the volume into tiles.
+
+    Tile Size:
+        Generate tiles of a fixed maximum size, computing the number of tiles.
+        
+    Number of Tiles:
+        Generate a fixed number of tiles, computing the size.
+
+Tile Size:
+    #id: tile_size
+    
+    The horizontal and vertical size of individual tiles, when __Tile Method__ is "tile size".
+
+Number of Tiles:
+    #id: num_tiles
+    
+    The horizontal and vertical number of tiles, when __Tile method__ is "number of tiles".
+    
+File Naming:
+    #id: file_naming
+    
+    Writing out multiple images per frame requires different filenames per tile. The generated names can be one of several standard naming conventions.
+
+    UDIM:
+        Use the UDIM numbering scheme for the tiles. The UDIM naming scheme places tile (0,0) at 1001 and generally uses 10 as the X tile stride. Tile (4,2) would be placed at 1001+4+2x10, or 1025.
+
+    UV Tile:
+        Numbers the column and row separately, starting at 1. Tile (4,2) would be u5_v3. 
+
+    Frames:
+        Numbers the tiles as a flat list of frames, by column then row.
+
+    XY Tile:
+        Numbers the column and row separately, starting at 0. Tile (4,2) would be x4_y2.
+
+UDIM Stride:
+    #id: udim_stride
+    
+    When __File naming__ is "UDIM", the amount to increment the tile number at each row, usually 10.
+
+Pad Tile Numbers:
+    #id: tile_padding
+    
+    When __File naming__ is "UV Tile" or "Frame", zero-pad tile numbers to this many digits.
+
+    
+@related
+
+- [Node:sop/heightfield_file]
+
+

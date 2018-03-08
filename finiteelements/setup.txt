@@ -1,0 +1,179 @@
+= Setting up <| finite elements =
+
+
+== Shelf tools ==
+
+Use the tools on the [Solid shelf tab|/shelf/solid] to set up solid objects.
+
+NOTE:
+    The [Solid Object|Node:dop/solidobject], [Hybrid Object|Node:dop/hybridobject], [Organic Mass|/shelf/organicmass], and [Organic Tissue|/shelf/organictissue] tools will convert the selected object into a simulated solid or hybrid object. If the selected geometry is not already made of tetrahedrons, the tools will insert SOPs into the source geometry's network to convert the geometry to tets and then import those.
+
+[Icon:DOP/solidobject] |
+    #width: 56px
+    
+    [Solid Object|Node:dop/solidobject] |
+        #width: 25%
+        
+        Creates a soft [Solid Object|Node:dop/solidobject] from the selected geometry. You can change the object's physical properties using parameters on the Solid Object node.
+
+[Icon:DOP/hybridobject] |
+    [Hybrid Object|Node:dop/hybridobject] |
+        Creates a [Hybrid Object|Node:doop/hybridobject] from the selected geometry, simulating a solid interior mass contained within a skin of polygons.
+
+[Icon:SHELF/squid] |
+    [Organic Mass|/shelf/organictissue] |
+        Creates a [Solid Object|Node:dop/solidobject] from the selected geometry that is pliant and elastic, similar to muscle and fat.
+
+[Icon:SHELF/organic_tissue] |
+    [Organic Tissue|/shelf/organictissue] |
+        Creates a [Hybrid Object|Node:doop/hybridobject] from the selected geometry with a skin that wrinkles and gathers. 
+
+[Icon:DOP/fracturedsolidobject] |
+    [Fractured Solid Object|/shelf/fracturedsolidobject] |
+        Pre-fractures the geometry of the selected object, and sets up the `fracturepart` attribute on the pieces so they will stick together. This tool is mostly useful to show the nodes used in a pre-fracturing workflow. See [the section on fracturing below|#fracture].
+
+[Icon:DOP/clothbodycollider] |
+    [Surface collider|/shelf/clothbodycollider] |
+        Creates a [Static object|Node:dop/staticobject] from animated, deforming geometry, with the proper settings so it will collide with finite element (cloth or solid) objects.
+        
+        See [collisions|collisions] for more information.
+
+[Icon:DOP/surfacecollisionparms] |
+    [Volume collider|/shelf/rigidcollider] |
+        Creates a [Static object|Node:dop/staticobject] from non-deforming geometry, with the proper settings so it will collide with finite element (cloth or solid) objects.
+        
+        See [collisions|collisions] for more information.
+
+[Icon:SHELF/cloth_follow_animation] |
+    [Constrain Points to Target|/shelf/clothfollowanimation] |
+        This tool constrains points to the object’s target animation. You can also use it to re-attach existing constraints. You can select an existing constraint during the first step in which case the tool will become a re-attachment tool. 
+
+[Icon:DOP/embedhighresobject] |
+    [Embed Highres Object|/shelf/embedhighresobject] |
+        Lets you select a low-resolution solid object and an object containing high-resolution geometry. This lets you simulate a low resolution and apply the results to high resolution geometry (see [embedding|#embed] below). This tool works by modifying the geometry networks and changing the settings on the [Solid object|Node:dop/solidobject]'s __Geometry__ tab.
+
+
+== Useful parameters ==
+
+The shelf tools will create a [Solid Object|Node:dop/solidobject] or [Hybrid Object|Node:dop/hybridobject], and a [Finite Element Solver|Node:dop/finiteelementsolver] node in the simulation network. You can use the parameters on these nodes to control the behavior of the simulated objects.
+
+
+=== Solver ===
+
+* The most important parameter on the solver is __Substeps__. If you have a simulation where the amount of movement from frame to frame is large compared with the size of the tetrahedrons, you may need to increase the substeps to get more accurate and more stable results.
+
+* The __Integrator type__ can give solid objects connected to the solver very different physical behavior:
+
+    * The default BE1 integrator is more physically realistic at small substeps. It settles down fairly quickly.
+
+    * The ABEZ integrator retains more energy, more lively, keeps moving longer.
+    
+    The look of the two integrator types will converge as you increase substeps so they both get closer to reality.
+
+
+=== Object ===
+
+* The __Initialize behavior__ popup contains physically realistic presets for some substances.
+
+* The __Shape Stiffness__ controls how strongly a Solid Object locally retains its original shape. The higher this is, the stronger the internal forces that prevent the object from deforming, and the more rigid an object becomes.
+
+* The __Volume Stiffness__ controls how much a Solid Object locally retains volume.
+
+    Pressing an object flat has a tendency to make it wider. This is called the Poisson effect. Increasing Volume Stiffness increases this effect. Some materials, such as cork, don't have this effect at all.
+    
+    The notions of shape preservation and volume preservation are often confused. Volume stiffness should never be used by itself, it always needs to be balanced with __Shape Stiffness__.
+    
+    Don't make __Volume Stiffness__ larger than approximately 2x the __Shape Stiffness__.
+
+
+== Embedding == (embedding)
+
+The shelf tools set up an _embedded_ solid simulation where the original hi-res source geometry is embedded in a low-res simulated tet-mesh. Deformations and fractures that occur on the simulated mesh are applied to the high-res object. (See [about embedding|about#embedding] for more information.)
+
+You can set the embedded geometry manually on the object's __Deformation__ tab using the __Embedded geometry__ parameter.
+
+
+== Constraining points == (constraints)
+
+You can constrain certain points on a solid object to keep their position (hard constraint) or _try_ to keep their position (soft constraint).
+
+# Select the solid object.
+
+# On the __Solid__ shelf, click the [Icon:SHELF/cloth_follow_animation] Constrain Points to Target tool.
+
+# Select the points you want to constrain and press ((Enter)).
+
+    The tool adds a [Target Constraint|Node:dop/targetconstraint] node that creates a constraint on the selected points.
+
+# In the parameter editor, set the constraint __Type__ on the Target Constraint node.
+
+    * If you set it to "Hard", the points will not move at all.
+    
+    * If you set it to "Soft", you can use the parameters on the __Soft controls__ tab to set the force and damping the solver will use to try to keep the points in place.
+
+
+== Animating the geometry == (target)
+
+You can animate the simulated geometry in a few ways.
+
+* You can animate attributes of the rest geometry other than position and orientation. On the [Solid Object node|Node:dop/solidobject]'s __Deformation__ tab, turn on __Rest shape__.
+
+    You can specify "target geometry", an animated/deforming version of the model geometry that the solver tries to blend with the simulated version of the object. On the [Solid Object node|Node:dop/solidobject]'s __Geometry__ tab, turn on __Target deformation__.
+
+    Both options are set up to use the source geometry by default. You can change the paths to point to nodes in a SOP network.
+
+    The solver applies forces to the object to try to move the simulated object's points toward the corresponding point positions on the target geometry. It's important to remember that these forces are "competing" with all the other forces acting on the object (such as gravity).
+
+    The __Target stiffness__ parameter specifies how much force the solver applies "toward" the target. Depending on the object's mass and the other forces acting on it, you may need to enter large values to see an effect.
+
+    The "target" forces added by the solver will sometimes push the simulated object _past_ the target. The solver then tries to push the solver back toward the target in the other direction, leading to a yo-yo effect. You can dampen this effect by turning up the __Target damping__ value.
+
+    The target geometry should have velocity (`v`) attributes on the points. Use a [Trail SOP|Node:sop/trail] to add velocity attributes to animated geometry.
+    
+    Expert users can control targeting at the vertex level using the `pintoanimation`, `targetstiffness`, `targetdamping`, `targetP`, and `targetV` vertex attributes.
+
+* You can change attributes and even topology (adding and removing tetrahedrons) of the object's `Geometry` data using a [SOP solver|Node:dop/sopsolver]. The [Finite element solver|Node:dop/finiteelementsolver] can cope with the simulated geometry changing between steps.
+
+    An expert could even implement their own fracturing technique in a SOP solver and combine it with the finite element solver using a [Multisolver|Node:dop/multisolver] setup.
+    
+    It should also be possible to refine the tetrahedron mesh during the simulation using a [Tetrahedralize SOP|Node:sop/tetrahedralize] inside a SOP solver.
+    
+* You can use hard and soft cloth [constraints|#constraints] to move individual points of the tetrahedron mesh.
+
+
+== Tips and notes ==
+
+* You can use the [Clip node|Node:sop/clip] to delete one side of a solid object to see the tetrahedron layout inside.
+
+* Watch out for is the ratio between __Shape Stiffness__ and __Volume Stiffness__. When the __Volume Stiffness__ is set considerably higher than the __Shape Stiffness__ (more than 2x), the results will usually be unstable.
+
+* Tips for simulating wood:
+
+    * Use an [embedded high-res object|#embedding]. Use splintery geometry as high resolution geometry, and use a regular mesh as the low-res geometry.
+
+    * To create long splinter-like tetrahedrons in the high-res geometry, create a shortened version of your model, tetrahedralize it, then use a [Transform|Node:sop/xform] to scale the resulting mesh back to the same length of the model.
+
+
+== Troubleshooting ==
+
+* For higher quality, increase __Substeps__ on the finite element solver. This is usually the first answer for most problems.
+
+* If you see objects interpenetrating instead of colliding, increase __Collision passes__ on the finite element solver.
+
+* If you have a massive _rotational_ change between frames, you'll have to increase the FPS of the scene (like filming in slow motion), because increasing substeps won't help in that case.
+
+* If you're doing a simulation with fracturing, but you're getting _too much_ fracturing at once, try the following:
+            
+    * Group together chunks of tetrahedrons. Use the [Solid Fracture SOP|Node:sop/solidfracture] to creating a `fracturepart` attribute. Tets with the same `fracturepart` value will stay together.
+    
+    * Increase the __Fracture threshold__ on the [Solid Object|Node:dop/solidobject]. This will increase the amount of force necessary to separate pieces.
+    
+    * Increase the number of substeps on the finite element solver (not the DOP network).
+
+* `Encountered badly shaped tetrahedrons when calculating forces`: This means there are bad tetrahedrons in one of your Solid Objects. See the guidelines for creating tet meshes below.
+    
+* `Exceeded the maximum linear solve iterations`: The linear solve generally takes fewer iterations when more substeps are used. Try re-running the sim using a higher __Substep__ until the problem goes away.
+
+* `Found nodes with near-zero masses`: The solver can't work in a stable way if parts of your object have masses that are zero or very close to zero. Check if there are any tetrahedrons in your geometry that have zero volume, or if there are any polygons with zero area. If that doesn't work, make sure that the __Mass Density__ parameter on the Solid Object and the corresponding multiplier attributes on the geometry are all nonzero and positive.
+
+

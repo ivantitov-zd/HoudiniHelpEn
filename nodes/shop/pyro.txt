@@ -1,0 +1,629 @@
+= Pyro =
+
+#type: node
+#context: shop
+#internal: pyro
+#version: 3.0
+#icon: SHELF/fireball
+
+"""Flexible, production-quality fire and smoke shader."""
+
+== Overview ==
+
+This shader can be used to create realistic renders of smoke, fire and explosion simulations or procedurally generated volumes. It is used by many of the tools on the [Pyro FX Shelf|/shelf/pyro].
+
+This shader relies on a set of volumes to do it's work. Their names are set on the __Smoke Field__, __Fire Intensity Field__ and __Fire Temperature Field__ tabs. These also provide additional, fine-grained control over each a volume.
+
+* The __Smoke Field__ provides the smoke density.
+
+* The __Fire Intensity Field__ controls the intensity of light emitted by the fire.
+
+* The __Fire Temperature Field__ is converted to the fire's color.
+
+NOTE:
+    This is a SHOP shader, which means it cannot be [layered|/shade/layering] with other shaders.
+
+    If you need to do this, or if you need more control, you can use [Pyro Core Shader VOP|/nodes/vop/pyroshadercore] which this shader is based on.
+
+@parameters
+
+== General ==
+
+Provides a simple, compact interface for defining the overall look.
+
+=== Smoke ===
+
+Density Scale:
+    #id: s_densityscale
+    Controls the overall density. This is multiplied with the [Smoke Field|#smokefield]'s value.
+
+    _The figure below shows the effect of a relative change by various factors:_
+
+    [Image:/images/nodes/shop/pyro_s_densityscale.png]
+
+Smoke Brightness:
+    #id: s_int
+    Controls the overall smoke brightness. This is multiplied with the __Smoke Color__ and the __Cd__ volume, if __Tint Smoke Color with Cd__ is enabled.
+
+    _The figure below shows the effect of a relative change by various factors:_
+
+    [Image:/images/nodes/shop/pyro_s_int.png]
+
+Smoke Color:
+    #id: s_color
+    Controls the overall smoke color.
+
+Tint Smoke Color with Cd:
+    #id: s_tintwithcd
+    Tint the smoke's color using a color volume.
+
+    This can either be a set of 3 volumes named __Cd.x__, __Cd.y__ and __Cd.z__ or a single __VDB Vector Volume__ named __Cd__.
+
+Scattering Phase:
+    #id: shade_phase
+    Controls the direction in which light entering the volume is scattered. At the default of `0`, light scatters evenly in all directions (isotropic scattering). Positive values up to `1` scatter more and more in the same direction as the incoming light, Negative values down to `-1` scatter backwards.
+
+    In reality, this effect depends on type of particles suspended in the volume.
+
+    _The figure below shows the effect of various values on smoke lit from behind by a green light:_
+    [Image:/images/nodes/shop/pyro_shade_phase.png]
+
+=== Fire ===
+
+Intensity Scale:
+    #id: fi_int
+    Scales the fire's emission intensity. This is multiplied with [Fire Intensity Field|#fireintensityfield]'s value
+
+    _The figure below shows the effect of a relative change by various factors:_
+
+    [Image:/images/nodes/shop/pyro_fi_int.png]
+
+Temperature Scale:
+    #id: fc_int
+    Scales the fire's temperature. This is multiplied with [Fire Temperature Field|#firetemperaturefield]'s value.
+
+    The fire's color depends on it's temperature.
+
+    _The figure below shows the effect of a relative change by various factors:_
+
+    [Image:/images/nodes/shop/pyro_fc_int.png]
+
+Temp>Color Mapping:
+    #id: fc_colormode
+    The method to use for mapping temperature to a color.
+
+    Constant:
+	Ignore temperature and set a global color.
+    Ramp:
+	Map temperature to color using a color ramp.
+    Physical (Black-Body):
+	Converts physical color temperatures to RGB color values and intensities, with some additional artistic controls.
+
+Constant Color:
+    Sets the fire color uniformly, ignoring temperature.
+    #id: fc_constantcolor
+
+Input Range:
+    #id: fc_rampmin
+    Sets the range of temperatures that map to the ramp.
+
+Ramp:
+    #id: fc_colorramp
+    The colors within the __Input Range__ are mapped to the colors set on this ramp.
+
+Color Temp in Kelvin:
+    #id: fc_bbtemp
+    This sets the color temperature correpsonding to a temperature field value of `1.0`.
+
+Adaptation:
+    #id: fc_bbadapt
+    Manipulates the low end of the generated intensity.
+
+Burn:
+    #id: fc_bbburn
+    Manipulates the high end of the generated intensity.
+
+=== Shadows ===
+
+Shadow Density:
+    #id: s_shadowint
+    Controls the overall density of shadow's cast by the smoke.
+
+    _The figure below shows the of effect various values:_
+
+    [Image:/images/nodes/shop/pyro_s_shadowint.png]
+
+Shadow Color:
+    #id: s_shadowclr
+    The color of shadows cast by the smoke.
+
+=== Filtering ===
+
+Filter:
+    #id: ftype
+    The type of filter to use for field shape controls and noise.
+
+    Point:
+	Takes a single sample, no filtering.
+    Box:
+	Applies a box filter.
+    Gaussian:
+	Applies a gaussian filter. Produces the smoothest results.
+
+Scale:
+    #id: fscale
+    A scale on the width of the filter.
+
+== Smoke Field == (smokefield)
+
+The controls on this tab allow you to change the look of the __Smoke Field__. The operations are performed in the order they're listed in.
+
+Density Volume:
+    #id: s_volumename
+    The name of the smoke density volume to be rendered.
+
+=== Shape ===
+Fit to Range (Unclamped):
+    #id: s_fitenable
+    Maps a range of input values to a different output range.
+
+Source Range:
+    #id: s_fitsrcmin
+    The range of input values.
+
+Target Range:
+    #id: s_fitdestmin
+    The range of output values.
+
+Use Lookup Ramp:
+    #id: s_rampenable
+    Maps input values to the ramp values, giving find-grained control over the shape of the field.
+
+    Use __Fit to Range__ to controls which range of values is used to look up the ramp.
+
+Ramp Boundaries:
+    #id: s_rampextl
+    #contentfrom: /nodes/vop/rampfilter#lbt
+
+Ramp:
+    #id: s_ramp
+    The lookup ramp.
+
+Contour:
+    #id: s_contourenable
+    Increases or decreases contrast for values at the _bottom_ of the
+    input range. This is sometimes useful to control feathering in volume
+    fields.
+
+Soft Clip:
+    #id: s_sclipenable
+    Increases or decreases contrast for values at the _top_ of the
+    input range. This is sometimes useful to control feathering in volume
+    fields.
+
+Clamp at Lower Limit:
+    #id: s_lowlimitenable
+    Clamp values to a lower limit.
+
+Clamp at Upper Limit:
+    #id: s_highlimitenable
+    Clamp values to an upper limit.
+
+Final Scale:
+    #id: s_amp
+    A multiplier on the final value.
+
+=== Noise ===
+
+Enable:
+    #id: s_noiseenable
+    Whether to add any noise to this field.
+
+Mode:
+    #id: s_noisemode
+    Controls how the noise is applied to this field.
+
+    Offset (Field + Noise):
+	The noise value is added to the field value.
+
+    Scale (Field + Noise):
+	The field value is multiplied with the noise value.
+
+Type:
+    #id: s_noisebasis
+    #contentfrom: /nodes/vop/unifiednoise#basis
+
+Frequency:
+    #id: s_noisefreq
+    #contentfrom: /nodes/vop/unifiednoise#freq
+
+Offset:
+    #id: s_noiseoffset
+    #contentfrom: /nodes/vop/unifiednoise#offset
+
+Period:
+    #id: s_noiseperiod
+    #contentfrom: /nodes/vop/unifiednoise#period
+
+==== Fractal ====
+
+Fractal Type:
+    #id: s_noisefractal
+    #contentfrom: /nodes/vop/unifiednoise#fractal
+
+Max Octaves:
+    #id: s_noiseoct
+    #contentfrom: /nodes/vop/unifiednoise#oct
+
+Lacunarity:
+    #id: s_noiselac
+    #contentfrom: /nodes/vop/unifiednoise#lac
+
+Roughness:
+    #id: s_noiserough
+    #contentfrom: /nodes/vop/unifiednoise#rough
+
+==== Warping ====
+
+Enable Lattice Warp:
+    #id: s_noisedolwarp
+    #contentfrom: /nodes/vop/unifiednoise#dolwarp
+
+Accumulate Lattice Warp:
+    #id: s_noiseaccuml
+    #contentfrom: /nodes/vop/unifiednoise#accuml
+
+Freq:
+    #id: s_noisedispfreq
+
+Enable Gradient Warp:
+    #contentfrom: /nodes/vop/unifiednoise#dogwarp
+    #id: s_noisedogwarp
+
+Accumulate Gradient Warp:
+    #id: s_noiseaccumg
+    #contentfrom: /nodes/vop/unifiednoise#accuml
+
+Flow Rotation:
+    #id: s_noiseflowrot
+    #contentfrom: /nodes/vop/unifiednoise#flowrot
+
+==== Output Correction ====
+
+Bias:
+    #id: s_noisecc_dobias
+    #contentfrom: /nodes/vop/unifiednoise#cc_dobias
+
+Gain:
+    #id: s_noisecc_dogain
+    #contentfrom: /nodes/vop/unifiednoise#cc_dogain
+
+Complement:
+    #id: s_noisecc_inv
+    #contentfrom: /nodes/vop/unifiednoise#cc_inv
+
+Output Range (Clamped):
+    #id: s_noisecc_dorng
+    #contentfrom: /nodes/vop/unifiednoise#cc_dorng
+
+Final Amplitude:
+    #id: s_noisecc_amp
+    #contentfrom: /nodes/vop/unifiednoise#cc_amp
+
+== Fire Intensity Field == (fireintensityfield)
+
+The controls on this tab allow you to change the look of the __Fire Intensity Field__, which controls the fire's emission intensity. The operations are performed in the order they're listed in.
+
+Density Volume:
+    #id: fi_volumename
+    The name of the smoke density volume to be rendered.
+
+=== Shape ===
+Fit to Range (Unclamped):
+    #id: fi_fitenable
+    Maps a range of input values to a different output range.
+
+Source Range:
+    #id: fi_fitsrcmin
+    The range of input values.
+
+Target Range:
+    #id: fi_fitdestmin
+    The range of output values.
+
+Use Lookup Ramp:
+    #id: fi_rampenable
+    Maps input values to the ramp values, giving find-grained control over the shape of the field.
+
+    Use __Fit to Range__ to controls which range of values is used to look up the ramp.
+
+Ramp Boundaries:
+    #id: fi_rampextl
+    #contentfrom: /nodes/vop/rampfilter#lbt
+
+Ramp:
+    #id: fi_ramp
+    The lookup ramp.
+
+Contour:
+    #id: fi_contourenable
+    Increases or decreases contrast for values at the _bottom_ of the
+    input range. This is sometimes useful to control feathering in volume
+    fields.
+
+Soft Clip:
+    #id: fi_sclipenable
+    Increases or decreases contrast for values at the _top_ of the
+    input range. This is sometimes useful to control feathering in volume
+    fields.
+
+Clamp at Lower Limit:
+    #id: fi_lowlimitenable
+    Clamp values to a lower limit.
+
+Clamp at Upper Limit:
+    #id: fi_highlimitenable
+    Clamp values to an upper limit.
+
+Final Scale:
+    #id: fi_amp
+    A multiplier on the final value.
+
+=== Noise ===
+
+Enable:
+    #id: fi_noiseenable
+    Whether to add any noise to this field.
+
+Mode:
+    #id: fi_noisemode
+    Controls how the noise is applied to this field.
+
+    Offset (Field + Noise):
+	The noise value is added to the field value.
+
+    Scale (Field + Noise):
+	The field value is multiplied with the noise value.
+
+Type:
+    #id: fi_noisebasis
+    #contentfrom: /nodes/vop/unifiednoise#basis
+
+Frequency:
+    #id: fi_noisefreq
+    #contentfrom: /nodes/vop/unifiednoise#freq
+
+Offset:
+    #id: fi_noiseoffset
+    #contentfrom: /nodes/vop/unifiednoise#offset
+
+Period:
+    #id: fi_noiseperiod
+    #contentfrom: /nodes/vop/unifiednoise#period
+
+==== Fractal ====
+
+Fractal Type:
+    #id: fi_noisefractal
+    #contentfrom: /nodes/vop/unifiednoise#fractal
+
+Max Octaves:
+    #id: fi_noiseoct
+    #contentfrom: /nodes/vop/unifiednoise#oct
+
+Lacunarity:
+    #id: fi_noiselac
+    #contentfrom: /nodes/vop/unifiednoise#lac
+
+Roughness:
+    #id: fi_noiserough
+    #contentfrom: /nodes/vop/unifiednoise#rough
+
+==== Warping ====
+
+Enable Lattice Warp:
+    #id: fi_noisedolwarp
+    #contentfrom: /nodes/vop/unifiednoise#dolwarp
+
+Accumulate Lattice Warp:
+    #id: fi_noiseaccuml
+    #contentfrom: /nodes/vop/unifiednoise#accuml
+
+Freq:
+    #id: fi_noisedispfreq
+
+Enable Gradient Warp:
+    #contentfrom: /nodes/vop/unifiednoise#dogwarp
+    #id: fi_noisedogwarp
+
+Accumulate Gradient Warp:
+    #id: fi_noiseaccumg
+    #contentfrom: /nodes/vop/unifiednoise#accuml
+
+Flow Rotation:
+    #id: fi_noiseflowrot
+    #contentfrom: /nodes/vop/unifiednoise#flowrot
+
+==== Output Correction ====
+
+Bias:
+    #id: fi_noisecc_dobias
+    #contentfrom: /nodes/vop/unifiednoise#cc_dobias
+
+Gain:
+    #id: fi_noisecc_dogain
+    #contentfrom: /nodes/vop/unifiednoise#cc_dogain
+
+Complement:
+    #id: fi_noisecc_inv
+    #contentfrom: /nodes/vop/unifiednoise#cc_inv
+
+Output Range (Clamped):
+    #id: fi_noisecc_dorng
+    #contentfrom: /nodes/vop/unifiednoise#cc_dorng
+
+Final Amplitude:
+    #id: fi_noisecc_amp
+    #contentfrom: /nodes/vop/unifiednoise#cc_amp
+
+== Fire Temperature Field == (firetemperaturefield)
+
+The controls on this tab allow you to change the look of the __Fire Temperature Field__, which is convert to the fire's color. The operations are performed in the order they're listed in.
+
+Density Volume:
+    #id: fc_volumename
+    The name of the smoke density volume to be rendered.
+
+=== Shape ===
+Fit to Range (Unclamped):
+    #id: fc_fitenable
+    Maps a range of input values to a different output range.
+
+Source Range:
+    #id: fc_fitsrcmin
+    The range of input values.
+
+Target Range:
+    #id: fc_fitdestmin
+    The range of output values.
+
+Use Lookup Ramp:
+    #id: fc_rampenable
+    Maps input values to the ramp values, giving find-grained control over the shape of the field.
+
+    Use __Fit to Range__ to controls which range of values is used to look up the ramp.
+
+Ramp Boundaries:
+    #id: fc_rampextl
+    #contentfrom: /nodes/vop/rampfilter#lbt
+
+Ramp:
+    #id: fc_ramp
+    The lookup ramp.
+
+Contour:
+    #id: fc_contourenable
+    Increases or decreases contrast for values at the _bottom_ of the
+    input range. This is sometimes useful to control feathering in volume
+    fields.
+
+Soft Clip:
+    #id: fc_sclipenable
+    Increases or decreases contrast for values at the _top_ of the
+    input range. This is sometimes useful to control feathering in volume
+    fields.
+
+Clamp at Lower Limit:
+    #id: fc_lowlimitenable
+    Clamp values to a lower limit.
+
+Clamp at Upper Limit:
+    #id: fc_highlimitenable
+    Clamp values to an upper limit.
+
+Final Scale:
+    #id: fc_amp
+    A multiplier on the final value.
+
+=== Noise ===
+
+Enable:
+    #id: fc_noiseenable
+    Whether to add any noise to this field.
+
+Mode:
+    #id: fc_noisemode
+    Controls how the noise is applied to this field.
+
+    Offset (Field + Noise):
+	The noise value is added to the field value.
+
+    Scale (Field + Noise):
+	The field value is multiplied with the noise value.
+
+Type:
+    #id: fc_noisebasis
+    #contentfrom: /nodes/vop/unifiednoise#basis
+
+Frequency:
+    #id: fc_noisefreq
+    #contentfrom: /nodes/vop/unifiednoise#freq
+
+Offset:
+    #id: fc_noiseoffset
+    #contentfrom: /nodes/vop/unifiednoise#offset
+
+Period:
+    #id: fc_noiseperiod
+    #contentfrom: /nodes/vop/unifiednoise#period
+
+==== Fractal ====
+
+Fractal Type:
+    #id: fc_noisefractal
+    #contentfrom: /nodes/vop/unifiednoise#fractal
+
+Max Octaves:
+    #id: fc_noiseoct
+    #contentfrom: /nodes/vop/unifiednoise#oct
+
+Lacunarity:
+    #id: fc_noiselac
+    #contentfrom: /nodes/vop/unifiednoise#lac
+
+Roughness:
+    #id: fc_noiserough
+    #contentfrom: /nodes/vop/unifiednoise#rough
+
+==== Warping ====
+
+Enable Lattice Warp:
+    #id: fc_noisedolwarp
+    #contentfrom: /nodes/vop/unifiednoise#dolwarp
+
+Accumulate Lattice Warp:
+    #id: fc_noiseaccuml
+    #contentfrom: /nodes/vop/unifiednoise#accuml
+
+Freq:
+    #id: fc_noisedispfreq
+
+Enable Gradient Warp:
+    #contentfrom: /nodes/vop/unifiednoise#dogwarp
+    #id: fc_noisedogwarp
+
+Accumulate Gradient Warp:
+    #id: fc_noiseaccumg
+    #contentfrom: /nodes/vop/unifiednoise#accuml
+
+Flow Rotation:
+    #id: fc_noiseflowrot
+    #contentfrom: /nodes/vop/unifiednoise#flowrot
+
+==== Output Correction ====
+
+Bias:
+    #id: fc_noisecc_dobias
+    #contentfrom: /nodes/vop/unifiednoise#cc_dobias
+
+Gain:
+    #id: fc_noisecc_dogain
+    #contentfrom: /nodes/vop/unifiednoise#cc_dogain
+
+Complement:
+    #id: fc_noisecc_inv
+    #contentfrom: /nodes/vop/unifiednoise#cc_inv
+
+Output Range (Clamped):
+    #id: fc_noisecc_dorng
+    #contentfrom: /nodes/vop/unifiednoise#cc_dorng
+
+Final Amplitude:
+    #id: fc_noisecc_amp
+    #contentfrom: /nodes/vop/unifiednoise#cc_amp
+
+@related
+
+- [Node:shop/mantrasurface]
+- [Node:shop/principledshader]
+- [Pyro Core Shader VOP|Node:vop/pyroshadercore]

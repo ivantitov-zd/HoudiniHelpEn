@@ -1,0 +1,127 @@
+#type: node
+#context: sop
+#internal: polybevel
+#icon: SOP/polybevel
+
+#tags: reshape, polygons, model, fillet, boxup
+
+= PolyBevel =
+
+"""Bevels points and edges."""
+
+In the simplest case of zero repetition, this node
+replaces points and edges with faces. With more repetition,
+it replaces those faces with more faces, leading to
+smoother bevels.
+
+This is useful for rounding off sharp edges on polygonal
+geometry.
+You can also use it to increase detail in facial features
+by beveling edge loops around eyes and mouths.
+
+steps>>
+    # To bevel corners, select the corner points. To bevel
+      edges, select the edges.
+    
+    # Choose Poly Bevel.
+
+NOTE:
+    _Relative_ inset is calculated as a percentage of the primitive's
+    size. If the original object changes size/shape, the size of the
+    bevel will change. If you want the bevel to always be the same size,
+    use the Absolute parameter instead.
+
+WARNING:
+    If you modify the original (upstream) geometry after creating the
+    bevel node, the bevel may break.
+
+    In this case, use the [Fuse operator|Node:sop/fuse] to re-fuse the
+    points and re-apply the bevel. See  [repairing
+    polygons|/model/repair_polys]  for information.
+
+[Include:/shelf/polybevel#includeme]
+    
+@parameters
+    Group:
+        The edges or points to bevel.
+    Bevel Type:
+        At zero repetition, all four bevel types result in identical
+        outputs (that is, single surfaces are formed in place of selected
+        points and edges). The difference between the bevel types is
+        characterized by the way each adds detail to the resulting
+        beveled faces with increasing repetition values. There are four
+        bevel types:
+
+        Flat:
+            The bevel surfaces remain flat, but are divided into
+            symmetric sets of new geometry.
+        Low Density Round:
+            Edges are rounded with additional geometry added in place of
+            flat bevel surfaces with curvatures that approximate the
+            original edges. Faces that replaced corners in edge and
+            point beveling are substituted by minimal additional
+            geometry to maintain a sense of curvature around the
+            original corner. The low density round is often a better
+            option than the high density round in the cases of beveling
+            irregular geometry and large sets of geometry because it is
+            unlikely to produce unexpected or overlapping geometry in
+            the corner areas.
+        High Density Round:
+            Edges in the high density round bevel are treated in the
+            same way as in the low density round bevel. However, faces
+            that replaced corners in edge and point beveling are
+            substituted by multiple quad patches between adjacent
+            boundary edges. It is important to note that there is not
+            necessarily continuity between patches that share a common
+            boundary edge and that this lack of continuity becomes more
+            apparent at higher repetitions. It is recommended that the
+            subdivide sop be used for further smoothness. In the case of
+            point beveling, the high density round may not be the best
+            choice for obtaining a rounded corner. One alternative is to
+            corner bevel the point and smooth the resulting geometry
+            from the corner bevel using the divide sop.
+        Corner:
+            This bevel type maintains the shape of the original geometry
+            while additional geometry are introduced.
+            
+    Default Entity:
+    	With no group selection made, the default entity parameter 
+    	determines if the operation bevels all points or edges of the
+    	geometry. This parameter has no effect if a group is specified.
+    	
+    Relative Inset:
+        #channels: /relinset
+
+        Inset is interpreted as a ratio of the distance from a
+        primitive's vertices to its center. This type of inset is
+        bounded. It is the best choice when bevellng large sets of
+        geometry, facial features, and in cases where very different
+        sizes of primitives are involved.
+    Absolute Inset:
+        #channels: /absinset
+
+        Inset is interpreted as an absolute length from either a vertex
+        along an corresponding edge or from an edge along its
+        perpendicular. This type of inset is generally not bounded. It
+        is useful when beveling symmetrical geometry, small sets of
+        geometry consisting of primitives with similar sizes, and in
+        cases where the desired inset is explicitly known.
+    Repetitions:
+        #channels: /repetitions
+
+        Repetitions is a measure of the quantity of additional geometry
+        introduced. It correlates to twice the number of geometry added
+        in place of an edge and to twice the number of segments each
+        edge of the new face created in place of a point is divided
+        into.
+    Recompute Point Normals:
+        Re-evaluates point normals if they exist. If this is not set,
+        the point normals will be interpolated in the same manner as the
+        points.
+
+@related
+    - [Node:sop/extrude]
+    - [Node:sop/polyextrude]
+    - [Node:sop/subdivide]
+    - [Node:sop/divide]
+

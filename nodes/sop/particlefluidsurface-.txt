@@ -1,0 +1,158 @@
+#type: node
+#context: sop
+#internal: particlefluidsurface
+#icon: SOP/particlefluidsurface
+#index: no
+
+#tags: fluid, surface
+
+= Particle Fluid Surface =
+
+"""Generates a polygonal surface around the particles from a particle fluid simulation."""
+
+Connect geometry containing the particle field from a particle fluid simulation to `Input 1` of this node to generate a surface around the particle field.  Any set of points may be used as an input to this SOP, provided the `pscale` point attribute is defined in the input.  If it's not, a default `pscale` value of 0.1 is used for all inputs points.
+
+Optionally, volume primitives may be subtracted from the surface prior to polygonization using the second input.
+
+This SOP is similar to [Volume Surface|Node:sop/volumesurface] since both create a surface over either a volume or particles; however, they are used for different purposes. The Volume Surface SOP is intended for static objects and create one surface over all volumes, whereas Particle Fluid Surface is intended for objects that have motion and create separate surfaces over individual clusters. For example, the Volume Surface SOP can be used to simulate a ski trail on a mountain, and the Particle Fluid Surface could be used to simulate a river.
+
+See the [Particle Fluid Solver|Node:dop/particlefluidsolver] dynamics help for examples of how to use this SOP.
+
+TIP:
+    Adding the [Peak SOP|Node:sop/peak] after this node, with a very low __Distance__ value such as `0.01`, will make your simulation appear less blobby. This is useful for simulating any organic fluid, such as splashing water.
+
+@parameters
+
+== Surface == 
+Use this tab to specify basic surface parameters.
+
+Step Size:
+    The polygon size to use when polygonizing the surface.
+
+Point Radius Scale:
+    This SOP generates geometry using an implicit function similar to the one used when
+    generating geometry around metaballs.  Namely, each particle in the input has associated with it a radius of influence in which it can affect the surface.  Initially, this radius is established by each particle's `pscale` attribute.  This parameter scales that radius of influence.  Increasing this parameter causes each point on the generated surface to be sampled from a larger set of a particles.  This means that the resulting surface may appear smoother, but will also have less detail.  Similarly, decreasing this
+    parameter causes each point on the generated surface to be sampled from a smaller set of particles, potentially resulting in more detail at the cost of making the surface less smooth.
+
+Method:
+    Average Position, or Metaball.
+
+Surface Distance:
+    Controls the thickness of the surface around the particle field. Larger values here create a surface which lies farther away from the fluid particles.  Smaller values may force the fluid surface to wrap the particles more tightly, but may also cause
+    the surface to lie inside of the particle field.  This parameter is scaled internally by the __Point Radius Scale__ parameter.
+
+Surface Tightness:
+    Increasing this parameter has the effect of tightening the surface around the fluid particles.
+
+Kernel:
+    Specifies the interpolating [metaball kernel|/nodes/sop/metaball#kernels].
+
+Weight:
+    Specifies the weight of each metaball.
+
+Exclude Lone Particles:
+    When this option is enabled, particles with no neighbor's within their support radii are excluded from the surfacing calculation.
+
+Build Polygon Soup:
+    When this option is enabled, a polygon soup primitive will be created instead of separate polygon primitives.
+
+== Bounding Box == 
+Use this tab to specify a bounding box in which the surface should be generated.
+
+Override Bounding Box:
+    Only generate surface polygons inside of the explicitly specified bounding box.
+
+Minimum Bound:
+    The minimum boundaries of the user-defined bounding box.
+
+Maximum Bound:
+    The maximum boundaries of the user-defined bounding box.
+
+== Collision Volumes == 
+Use this tab to specify volume primitives to be subtracted from the fluid surface.  This can be used to ensure that the generated surface does not penetrate other objects in the scene.
+
+Subtract Collision Volumes:
+    When this option is enabled, volume primitives specified in `Input 2` are subtracted from the fluid surface.
+
+Collision Offset:
+    The distance from the collision volume at which subtraction occurs.
+
+== Attributes == 
+This tab is used to transfer point attributes from the input particle field to the generated surface.
+
+TIP:
+    Use this tab to transfer the velocity attribute `v` onto the fluid surface so that the generated surface has a velocity vector defined for motion blur.
+
+Attributes:
+    Specifies the list of point attributes to transfer from the particles to the fluid surface.
+Compute Normals:
+    Computes normals based on the gradient of the fluid density.
+
+== Speed Stretching == 
+This tab is used to produce the effect of the fluid surface stretching backwards along its velocity vector.  
+
+NOTE:
+    This feature is incompatible with the __Exclude Lone Particles__ parameter found in the __Surface__ tab.
+
+Enable Speed Stretching:
+    When this parameter is enabled, the SOP stretches the surface in the opposite direction of each particle's velocity vector.
+
+Particle Duplicates:
+    Speed stretching is accomplished by making copies of a particle along its velocity vector.  This parameter controls the number of copies of each particle that are used.
+
+Scale Stretch Length:
+    When this parameter is enabled the distance at which particles are trailed behind input particles is scaled on a per-particle basis by the particle scale of each input particle.
+    This is useful when inputs to the SOP have varying particle scales.
+
+Stretch Fraction:
+    Each input particle is stretched according to the length of its velocity vector scaled by this parameter.
+
+Maximum Stretch Length:
+    The maximum distance that any particle may be stretched.
+
+Particle Size Ratio:
+    Setting this parameter to anything other than one will cause the duplicated stretch particles to differ in size from the original particle.  This controls the ratio in size of the smallest stretch particle (which is positioned farthest away from the original
+    particle) to the original particle.
+
+== Filtering ==
+Filtering can be used to smooth out small details in the generated
+surface, while also tightening the surface around the input particles.
+
+TIP:
+    Setting __Method__ in the __Surface__ tab to "Metaball" generates a surface that encloses the input particles.  Filtering can then be used to refine this surface to make it appear smoother and more fluid-like.
+
+Enable Filtering:
+    Enables/disables the filtering feature.
+
+Filter Steps:
+    Filtering is an iterative process.  This parameter controls the number of filter iterations to perform.  Increasing the number of filter steps further smooths out details in the generated surface and, depending on the __Filter Tightness__ parameter, may cause the surface to further shrink around its input particles.  More detailed geometry (surfaces with smaller __Step Size__ parameters) will require more steps to achieve the same effect as less detailed surfaces.
+
+Filter Width:
+    When this SOP generates a surface, it computes surface density values on a grid with cell sizes specified by the __Step Size__ parameter. Filtering is achieved by blending together values from each grid cell and some number of adjacent cells.  This parameter controls the number of grid cells involved in each blend operation.
+
+Filter Tightness:
+    Increasing this parameter causes the filtering operation to "shrink" the generated surface.  This effect can be used to move the generated surface closer to the input particle field.
+
+    NOTE:
+        This feature works primarily when __Metaball__ is specified in the __Method__ parameter.  Its effect is somewhat counter-intuitive when __Average Position__ is specified in this parameter.
+
+Filter Attributes:
+    When this parameter is enabled, attributes transferred to the surface also have their values filtered.
+
+@inputs
+
+Particle Fluid Field:
+    The particle geometry to generate a surface around.
+
+Collision Volumes:
+    Volume primitives to subtract from the fluid surface.
+
+@outputs
+
+Output:
+    The fluid surface.
+
+@related
+
+- [Node:dop/particlefluidobject]
+- [Node:dop/particlefluidsolver]

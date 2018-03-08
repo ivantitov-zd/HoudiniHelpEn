@@ -1,0 +1,159 @@
+#type: node
+#context: dop
+#internal: gascalculate
+#icon: DOP/gas
+
+= Gas Calculate =
+
+"""A microsolver that performs general calculations on a pair of
+fields."""
+
+The Gas Calculate DOP is a microsolver used in building larger fluid
+simulations. The [Fluid Solver|Node:dop/fluidsolver] and [Smoke Solver|Node:dop/smokesolver] DOPs that allow
+microsolvers to be added before or after the main solver step to extend
+or tweak the simulation. Alternatively, enterprising people may attempt
+to build an entire new solver out of microsolvers.
+
+The Gas Calculate DOP performs many different operations on a pair of
+fields. It can be used to scale or blend two fields. Another use is to
+find the intersection or union of signed distance fields by using the
+Maximum or Minimum function.
+
+
+@parameters
+    Dest Field:
+        The result of the operations is stored into this field. This
+        field is also used as the first source operand in the
+        calculation.  The type of this field can be scalar, vector, or matrix.  The source field should match this type.  Index fields can also be used, but only if the operation is constant, ie, consists of Copy calculation type with no source field.
+
+	    The Dest Field can be a space separated list of fields, in which case the operation is performed on each in turn.  The fields do not have to all be the same type.
+    
+    Source Field:
+        This is used as the second operand in the calculation.  It can be a list of fields in which case they are matched pairwise with __Dest Fields__. SDFs can also be used. If there are more dest than source, the extra do not get a source field.
+        
+    Source Index:
+        Instead of the source field, this index field will be treated
+        as a field of object ids.  For each voxel, the corresponding
+        object will be looked up and its property used as the source
+        value.  There can only be one index field.
+    Source Property:
+        The property of the object referenced by the index field to
+        use as the source value.
+
+            Friction:
+                The friction physical parameter.  A point attribute of
+                "friction" will override this.
+            Dynamic Friction:
+                The dynamic friction physical parameter.  A point attribute of
+                "dynamicfriction" will override this.
+            Bounce:
+                The bounce physical parameter.  A point attribute of
+                "bounce" will override this.
+            Temperature:
+                The temperature physical parameter.  A point attribute of
+                "temperature" will override this.
+            Rigid Velocity:
+                The velocity of the object treating it as a rigid
+                body.  Only the angular velocity and linear velocity
+                will be used, no local deformation will be taken into
+                account.
+            Point Velocity:
+                The velocity of the object attempting to take into
+                account deformation by using point history.  This only
+                works if the topology does not change.
+            Volume Velocity:
+                Uses the SDF representation of the object to detect
+                deformation.  Does not require a fixed topology over
+                time, but cannot detect tangential velocities.
+
+    Dest Blend:
+        This is used as the destination value for blending. it must be
+        a scalar field.
+    Source Blend:
+        This is used as the source value for blending. it must be a
+        scalar field.
+    Blend Method:
+        The destination and source blend fields are used to blend the
+        result of the gas calculation onto the destination field. The
+        two values that are blended are the original destination field
+        and the result of the calculation, including the post
+        multiplication and addition. If blend fields are not present,
+        they are considered to have a value of zero.
+
+        The original value of the destination field is A, the value of
+        the source field is B. The destination blend value is Wa and the
+        source blend value is Wb. The value D is written to the
+        destination field.
+
+        No Blending:
+            No blending is performed and the blending fields are
+            ignored.
+
+            `D = B`
+
+        Weighted Average:
+            The blend fields are used as weights and are
+            normalized.
+
+            `D = (Wa * A + Wb * B) / (Wa + Wb)`
+
+        Weighted Sum:
+            The blend fields are used as weights and are not
+            normalized.
+
+            `D = Wa * A + Wb * B`
+
+        Net New Source:
+            Does a weighted average but with the weight for the
+            source field being how much "extra" additional material
+            it has. This matches the expected blending for density
+            where the densities were mixed using Maximum.
+
+            `D = (Wa * A + max(Wb - Wa, 0) * B) / (Wa + max(Wb - Wa,
+            0))`
+
+        Net New Volume:
+            Selects from the source field only if the source blend
+            field represents being inside a volume (less than zero)
+            and the destination blend field represents being outside
+            a volume (greater than zero). This corresponds to
+            copying only for the net new volume that would result
+            from doing a Minimum of the two SDFs.
+
+            if `(Wb < 0 and Wa >= 0) D = B else D = A`
+
+
+    [Include:standard_gas_calculate]
+
+    Dest, Source, Blend Pre-Add, Pre-Mul, Convert, Scale:
+	The destination and source blending fields, `W`, are set to
+	`W' = W * m + a`.
+
+	The conversion is then applied to the result.  SDF to Fog will
+	map negative values to 1 and positive values to 0 with values
+	lying within the one cell boundary getting linearly
+	interpolated values.  SDF to Surface will map cells on the
+	zero boundary to 1 and those more than one cell away from the
+	boundary to 0.  Absolute will take the absolute value of the
+	field.
+
+	The scaling factor is then applied to the result.  A length
+	scale will multiply by the voxel size, area by the size
+	squared, and volume by the size cubed.
+
+    [Include:standard_gas_timestep]
+
+    [Include:standard_solver_parms]
+
+@inputs
+    [Include:standard_data_inputs]
+
+@outputs
+    [Include:standard_data_outputs]
+
+@locals
+    [Include:standard_data_locals]
+
+    [Include:standard_locals]
+
+

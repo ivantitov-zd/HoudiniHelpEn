@@ -1,0 +1,322 @@
+#type: node
+#context: pop
+#internal: source
+#icon: POP/source
+
+#tags: create, emit
+
+= Source =
+
+"""Emits particles from geometry."""
+
+TIP:
+    To set particle attributes on the points of the emitter geometry (so
+    the emitted particles inherit them at birth), connect a [Point
+    SOP|Node:sop/point] to the emitter SOP and use the attributes on the
+    __Particle__ and __Force__ tabs.
+
+NOTE:
+    A POP automatically adapts to the AOP-space of the object it is
+    cooking from, just as if it had a built-in [Object Merge SOP|Node:sop/merge]. To
+    override this behavior, turn on the __Ignore Transform Object__
+    parameter.
+
+[Include:/shelf/emitfromgeometry#includeme]
+
+TIP:
+    If you want the particles to inherit the velocity of the source
+    geometry they are emitting from, the geometry must have a
+    velocity attribute (`v`) on the points or primitives (depending
+    on where the particles are emitted from).
+    
+    You can use a [Trail surface node|Node:sop/trail] to add the
+    velocity attribute to the geometry, with the __Compute Velocities__
+    option. You can copy the velocity attribute to a different level
+    of the source geometry (for example, points to primitives) with the
+    [Attrib Promote surface node|Node:sop/attribpromote].
+
+@parameters
+
+== Source ==
+
+Emission Type:
+    Where on source geometry to emit particles from.
+
+    Points (ordered):
+        Emit particles from each point in the source geometry,
+        in order. Primitives (for example, primitive sphere)
+        have only one point from which to emit particles.
+    Points (random):
+        Same as "Points (ordered)", but emits particles from
+        points in random order. This order does not change over
+        time: the same randomized sequence repeats over and
+        over.
+    Prim center (ordered):
+        Birth particles from the center of each primitive in the
+        source geometry, in order. This is useful when used in
+        combination with the __Rotate to Template__ parameter in
+        the [Primitive SOP|Node:sop/primitive].
+    Prim center (random):
+        Same as "Prim center (ordered)", but emits particles
+        from primitive centers in random order. This order does
+        not change over time: the same randomized sequence
+        repeats over and over.
+    Prim center (attribute):
+        Use the attribute named in the __Distribution
+        Attribute__ parameter below as the probability that a
+        primitive will emit a particle.
+
+        Primitives where the attributes is less than or equal to
+        0 will not emit particles.
+
+        For primitives where the attributes is over 0, for each
+        particle to be emit, the probability that a primitive
+        will emit it is equal to that primitive's attribute
+        value divided by the sum of the attribute values of all
+        the primitives.
+
+        You use the [Measure SOP|Node:sop/measure] to create an
+        attribute on primitives that records the surface area,
+        then use that attribute here so primitives with greater
+        surface area emit particles more often.
+
+    Edges (ordered):
+        Emit particles from each spline/polygon edge in the
+        source geometry, in order. The birth points are along
+        continuous intervals on the curve, not just from CVs or
+        points.
+    Edges (random):
+        Same as "Edges (ordered)", but emits particles from
+        edges in random order. This order does not change over
+        time: the same randomized sequence repeats over and
+        over.
+    Edges (attribute):
+        See "Prim center (attribute)" above.
+    Surfaces (ordered):
+        Emit particles from each UV spline surface or mesh type
+        in the source geometry, in order. If there is no surface
+        but only a spline curve, then emit particles from the
+        curve. For polygons are used, only emits particles from
+        the polygon edges.
+    Surfaces (random):
+        Same as "Surfaces (ordered)", but emits particles from
+        surfaces in random order. This order does not change
+        over time: the same randomized sequence repeats over and
+        over.
+    Surfaces (attribute):
+        See "Prim center (attribute)" above.
+    Volume:
+        Emit particles from inside the volume of the source
+        geometry. The behavior is undefined if the source
+        geometry is not closed.
+    Metaballs:
+        Emit particles from inside the volume of a metaball,
+        according to the __Density Threshold__ and __Density Minimum__
+        parameters below.
+        
+Geometry Source:
+    Specifies the SOP to use.
+
+
+    Use Parameter Values:
+        Use the SOP specified in the __SOP__ parameter below.
+    Use First Context Geometry:
+        Use the SOP connected to the POP network's first input.
+    Use Second Context Geometry:
+        Use the SOP connected to the POP network's second input.
+    Use Third Context Geometry:
+        Use the SOP connected to the POP network's third input.
+    Use Fourth Context Geometry:
+        Use the SOP connected to the POP network's fourth input.
+SOP:
+    Path to the SOP (when __Geometry source__ is set to __Use
+    Parameter Values__).
+    
+Source Group:
+    Subset of all points/primitives in the source geometry to
+    emit from.
+
+Ignore Transform Object:
+    Particles normally use the object space of the SOP being cooked.
+    Turn this parameter on to not transform into the space of the
+    cooking SOP.
+
+Sample Threshold:
+    #channels: /samplethreshold
+    Give up birthing when the sampling failures meet or exceed the
+    specified threshold.  Increase this value to permit the operator
+    to try for longer before giving up.
+
+Distribution Attribute:
+    When __Emission type__ is "Prim center (attribute)", "Edges
+    (attribute)", or "Surfaces (attribute)", the attribute to
+    use as the probability of emitting a particle.
+
+Density Threshold:
+    #channels: /threshold
+
+    When __Emission type__ is "Metaballs", continue sampling
+    points until the summed density exceeds this threshold.
+
+Density Minimum:
+    #channels: /densitymin
+
+    When __Emission type__ is "Metaballs", points with densities
+    less than or equal to this value will not emit particles.
+
+Use Metaball Density:
+    Use the metaball density function as the probability of
+    emitting a particle, so denser areas emit particles more
+    often.
+
+
+== Birth ==
+
+This operator has two methods for emitting particles. You can
+use these methods together or separately:
+
+* *Impulse* creates a certain number of particles each time the
+  node cooks.
+
+* *Constant* creates a certain number of particles per second.
+
+Impulse Activation:
+    #channels: /impulseactivate
+
+    Turns _impulse_ emission on and off. Impulse emits the number of
+    particles in the __Impulse birth rate__ below each time the
+    operator cooks. A value of 0 means off, any other value means
+    on.
+
+Impulse Birth Rate:
+    #channels: /impulserate
+
+    Number of particles to emit each time the node cooks (when
+    __Impulse activation__ is on).
+
+Constant Activation:
+    #channels: /impulseactivate
+
+    Turns _constant_ emission on and off. Impulse emits the number
+    of particles in the __Constant birth rate__ below each second. A
+    value of 0 means off, any other value means on.
+
+Constant Birth Rate:
+    #channels: /impulserate
+
+    Number of particles to emit per second (when __Constant
+    activation__ is on).
+    
+Birth Probability:
+    #channels: /probmin /probmax
+
+    Number of particles to emit per source point.
+
+Birth Group:
+    Name of a group to put the new points into.
+
+Preserve Group:
+    If the __Birth group__ already exists, append the new particles
+    to the group instead of replacing its contents.
+
+Life Expectancy:
+    #channels: /life
+
+    How long the particle will live (in seconds).
+
+Life Variance:
+    #channels: /lifevar
+
+    Particles will live the number of seconds in __Life
+    expectancy__, plus or minus this number of seconds. Use 0 for no
+    variance.
+
+Accurate Births:
+    Recook source geometry before emission of each particle.
+
+    This ensures particles are emitted from the correct location
+    when the source geometry is animated. If the shape of the
+    source geometry does not change, you should turn this option
+    off.
+
+== Attributes ==
+
+Inherit Attributes:
+    A list of names/patterns of attributes to inherit from the
+    source geometry.
+
+Create Local Variables:
+    Create local variables corresponding to inherited
+    attributes.
+
+[Include:commonParms#inheritVeloParms/]
+
+[Include:commonParms#veloAttrParms/]
+
+== Add Attributes ==
+
+The parameters on this tab let you control which and how
+attributes are initialized on
+the emitted particles. See the POP locals page for explanations
+of these variables.
+
+Add ID Attributes:
+    Add ID and parent attributes to the created particles.
+
+Add Generation Attribute:
+    Add the generation attribute to the created particles.
+
+Add Origin Attribute:
+    Add the origin attribute to the created particles. The origin
+    attribute holds an arbitrary number that can help you identify
+    the source of a particle.
+
+Add Speed Attribute:
+    Add speed attribute. In Houdini, the speed attribute is the
+    length of the velocity vector.
+    
+Use as Origin:
+    Controls what Houdini sets as the value of a particle's origin
+    attribute (the identity of the geometry that emitted the
+    particle). This lets you distinguish the origin of a particle
+    later.
+
+
+    index:
+        Set the origin to the value of the __Origin index__
+        parameter below.
+    index + geo num:
+        Sets the hit ID to the value of the __Origin index__
+        parameter, _added to_ the number of the geometry operator
+        the particle was emitted from.
+
+        Typically, you would use large steps for the __Origin
+        index__ parameter (hundreds or thousands) so you can still
+        distinguish different origins after the geometry number is
+        added.
+
+        For example, you could have two Source POPs with origin
+        index settings of 100 and 200. When the [Source POP|Node:pop/source] adds the
+        geometry number to the origin index, you would get origins
+        like 101, 102, 205, 210, and so on. As long as there is no
+        geometry number larger than 99, you can still distinguish
+        the different POPs.
+
+Origin Index:
+    #channels: /originindex
+
+    Number to use as the value of the origin attribute on emitted particles (when __Add origin attribute__ is
+    on). This lets you distinguish different origins.
+
+@locals
+
+These variables refer to the _source geometry's_ properties.
+[Include:gen_locals]
+
+@related
+
+- [Node:pop/location]
+- [Node:pop/split]
+- [Node:pop/stream]
+- [Node:pop/drag]
+

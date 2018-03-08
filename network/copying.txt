@@ -1,0 +1,137 @@
+= Parameter references =
+#bestbet: reference
+
+"""How to create references between parameters and create node copies that reference the original."""
+
+== Overview ==
+
+Often you want the to base the values of certain parameters on one node on the values of parameters on another node. Or you need the same node with the same or similar settings in two places in a network.
+
+You can copy and paste parameter values and nodes, but it's tedious and error-prone to remember to update all the copies when you change something. It's also impractical to copy and paste an animated value across all frames.
+
+*Channel references* let you compute the value of one parameter based on the value of another parameter, possibly on a different node. This lets you duplicate values, or make values relative to other values, and have Houdini automatically update them whenever they change.
+
+*Reference node copies* create a duplicate of a node where every parameter on the node is channel referenced to the corresponding parameter on the original. You can unlink individual parameters to customize the copy. This lets you re-use the same node in multiple places, and have Houdini automatically update them.
+
+TIP:
+    #glyph: fa-link
+    
+    Houdini will automatically update all references to a node if you rename it.
+
+
+== Copying and pasting references == (link)
+
+:task: Link one parameter to another:
+    # Right click the *source* parameter and choose __Copy parameter__.
+    
+    # Select the node with the *destination* parameter.
+    
+    # Right click the *destination* parameter and choose __Paste relative references__.
+        
+        This creates a relative reference from the destination back to the source. For example, `ch("../sphere1/tx")`
+
+        If the source and destination are in different networks, or if you might move the destination node, you can paste an absolute reference instead using __Paste other > Paste absolute references__.
+    
+    TIP:
+        For parameters with multiple components (for example, a position parameter with X, Y, and Z values) you can click individual component text boxes, or click the parameter label to affect all components at once.
+
+:task: Make the value of one parameter relative to another:
+    # Link the parameters using a channel reference (see above).
+    
+    # Modify the expression in the *destination* parameter to perform some calculation on the value from the `ch()` function.
+    
+    For example, to make one object `A` always be half the size of object `B`, reference `A`'s __Scale__ parameter on `B`, but change the  `ch("../A/sx")` expressions to `ch("../A/sx") / 2`.
+
+:task: Unlink a linked parameter:
+    Right-click the *destination* parameter and choose __Delete channels__.
+
+:task: Create a reference copy of a node:
+    Right click the node you want to copy and choose __Actions > Create reference copy__.
+    
+    Houdini creates a copy of the node where every parameter is linked to the corresponding parameter on the original.
+    
+    To change individual parameters on the copy, first unlink them (see above).
+
+
+== Referencing parameter values == (referencedata)
+
+This is similar to copying and pasting references (above), but lets you choose the data to reference from a chooser instead of first navigate to and copying from the other node.
+
+:task: Create a reference to another parameter:
+     # Right click the parameter you want to reference another parameter and choose __Reference > Scene Data__.
+     
+     # In the chooser window, use the tree control to open the branch representing the node containing the parameter you want to reference. Then, under the node open the Parameters branch and find the parameter you want to reference. Select the parameter and click __Accept__.
+    
+     This feature builds a [Exp:ch] expression for you that references the parameter on the other node.
+     
+     TIP:
+         For parameters with multiple components (for example, a position parameter with X, Y, and Z values) you can click individual component text boxes, or click the parameter label to affect all components at once.
+
+
+== Referencing transforms == (xforms)
+
+Referencing an object node's Translate, Rotate, and/or Scale parameters gives you that node's _local_ transform. Getting the _world_ transform can be much trickier when writing an expression by hand. Use the reference menu to easily reference transforms without having to manually write the expressions.
+
+:task: Create a reference to an object node's transform:
+    # Right click the parameter you want to reference a transform and choose __Reference > Scene Data__.
+    
+    # In the chooser window, use the tree control to open the branch representing the node whose transform you want to reference. Then, under the node open the Transforms branch.
+    
+    # Select the transform (Local, Relative World, or World) you want to reference.
+    
+        "Relative World" inserts expressions to change the referencing node's current transforms into the referenced transform.
+    
+        You can select an overall transform, such as World, to automatically create references to all components of the transform, or open the branch and select an individual component of the transform.
+    
+    This feature builds an expression for you that references the transformation of the other node and converts the coordinate space if necessary. These expressions can be quite complex for World transforms, involving multiple expression statements in a block. You can open an expression in a multi-line editor by right-clicking the text box and choosing __Expression > Edit Expression__.
+
+
+== Referencing bounding boxes == (bboxes)
+
+You can reference the property of a geometry node's bounding box such as the size and minimum and maximum boundaries.
+
+:task: Create a reference to a geometry node's bounding box:
+    # Right click the parameter you want to reference a bounding box and choose __Reference > Scene Data__.
+    
+    # In the chooser window, use the tree control to open the branch representing the node whose bounding box you want to reference. Then, under the node open the Bounding Box branch.
+    
+    # Select the bounding box property (Minimum, Maximum, Size, Centroid) you want to reference.
+    
+    This feature builds an expression for you that references the bounding box property of the other node.
+
+
+== Referencing attribute values == (attrs)
+
+You can reference the value of an [attribute|/model/attributes] on a point, primitive, or global in the geometry held by a geometry node.
+
+As you may know, in a geometry node, you can use `@<<attrname>>` as a shorthand to reference an attribute on the point/primitive/global currently being processed. However, this reference function has no concept of geometry "being processed", but rather references data in finished geometry cached on a node. That means you must specify a point or primitive (or global) to read the attribute value from.
+
+:task: Create a reference to another parameter:
+    # Right click the parameter you want to reference another parameter and choose __Reference > Scene Data__.
+     
+    # In the chooser window, use the tree control to open the branch representing the node containing the parameter you want to reference. Then, under the node open the Attributes branch. Then open the Points, Primitives, 
+     
+    # Select the attribute and click __Accept__.
+     
+    # If you specified a point, primitive, or vertex attribute, Houdini switches to selection mode in the viewport. Select the point, primitive, or vertex you want to read the attribute value from, then press ((Enter)).
+    
+    This feature builds a [Exp:point], [Expr:prim], or [Exp:vertex] expression for you that references the attribute on the specified geometry.
+
+    TIP:
+        For parameters with multiple components (for example, a position parameter with X, Y, and Z values) you can click individual component text boxes, or click the parameter label to affect all components at once.
+
+
+== Referencing local variables ==
+
+Many nodes have _local variables_ you can use in expressions to reference information from the node as it cooks. There are also "local variables" that represent global state such as the current integer frame (`$F`), the current fractional frame (`$FF`), the current time (`$T`), the start frame and end frame (`$FSTART` and `$FEND`), and so on.
+
+Usually it's faster to just type the variable directly, but using the reference menu can be convenient if you've forgotten the name of a variable or aren't sure what variables are available.
+
+You can use the reference menu to create a local variable reference, instead of just typing the variable manually. This may be useful if you've forgotten the name of the local variable, since you can choose it from a list.
+
+:task: Create a reference to a local variable:
+    # Right click the parameter you want to reference another parameter and choose __Reference > Local Variable__.
+    
+    # Select a variable name in the list and click __Accept__.
+    
+

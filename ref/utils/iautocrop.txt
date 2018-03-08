@@ -1,0 +1,98 @@
+﻿= iautocrop =
+
+"""Crops images based on pixel values."""
+
+Auto-crops an image by shrinking the resolution or data window size to fit the image. This can be used to create smaller files by cutting out black space. 
+
+== Synopsis ==
+
+{{{
+iautocrop [-b border_padding] [-c crop_value] [-f] [-i] [-n] [-p analyze_planes] [-q] [-r] infile [outfile]
+}}}
+    
+where:
+
+`-b`:
+    Specify border padding of the crop area. Once the crop area is determined,
+    an addition number of pixels can be added to each side, creating a slightly
+    larger image. The default is zero.
+
+`-c`:
+    Specify the crop value. All values less that the `crop_value` are considered
+    to be safe to crop away. The default is zero.
+
+`-f`:
+    Fully crop the image. If a format supports a data window, normally the data
+    window is set and the resolution left intact. This option will instead 
+    change the resolution of the image instead of setting the data window.
+    Formats that do not support a data window are fully cropped by default, 
+    otherwise this is off by default.
+
+`-i`:
+    Information mode only. Print the crop region that would be applied rather
+    than writing a file.
+
+`-n`:
+    Only create a new file if a cropping is needed. This is ignored if 
+    `-r` (replace file) is used. If not specified, the source file is copied
+    to the destination file if the crop region is the same.
+
+`-p`:
+    Specify a list of planes to analyze when comparing pixel values to the 
+    crop value. The default is `C A` (color and alpha). A `*` indicates that
+    all planes will be considered when determining the crop area.
+
+`-q`:
+    Quiet mode. Don't print errors or warnings. `-i` will still print its output 
+    if given, but other messages will be suppressed.
+
+`-r`:
+    Replace original file with the cropped version. `outfile` does not need to be given and will be ignored.
+
+
+== Description ==
+
+Auto-crop shrinks the resolution or data window to the "interesting area" of 
+an image. This region is always rectangular. The pixels outside the area of 
+interest have values less than the `crop_value` (default 0). For multi-plane 
+images, such as .pic or .exr, the planes to analyze for the crop region can be
+specified with the `-p` option (the default is analyze `C` and `A`).
+
+Cropping can be done in-place (overwriting the image) with the `-r` option, or
+to a different file if a second filename is given.
+
+Some image formats support a data window, where the resolution of the image is
+not the same as the area containing the image data. Often this is used as a 
+compression or performance feature. By default, these formats will have their
+data window adjusted to match the auto-cropped region (unless `-f`, full crop, is
+specified). Formats that do not support data windows will be fully cropped,
+meaning their resolution will be changed to the crop area.
+
+== Examples ==
+
+   To adjust the data window of an EXR image to all color values zero and above:
+
+   {{{
+   iautocrop -p "C" example.exr cropped.exr
+   }}}
+
+   To replace an image with a fully cropped version of itself:
+
+   {{{
+   iautocrop -f -r image.pic
+   }}}
+
+   To adjust the data window of an EXR image with a small buffer area of 3 
+   pixels around the image data:
+
+   {{{
+   iautocrop -b 3 -r example.exr
+   }}}
+
+   To print the crop region of all pixels at least 10% gray in a JPEG:
+
+   {{{
+   iautocrop -i -c 0.1 image.jpg
+   }}}
+
+

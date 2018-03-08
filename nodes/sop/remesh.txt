@@ -1,0 +1,147 @@
+= Remesh =
+
+#type: node
+#context: sop
+#internal: remesh
+#icon: SOP/remesh
+#tags: polygons, topology, boxup, model
+
+"""Recreates the shape of the input surface using "high-quality" (nearly equilateral) triangles."""
+
+== Overview ==
+
+This node tries to maximize the smallest angle in each triangle.
+(A "high quality" triangle mesh is one where all angles are as close as possible to 60 degrees.)
+
+This node does two types of remeshing:
+
+Fixed length:
+    The node tries to equalize all edge lengths, giving triangles of equal size.
+
+Adaptive:
+    The node uses bigger triangles in broad areas and smaller triangles in detailed areas.
+    This uses allows you to represent the original surface with fewer triangles.
+    However, since edge lengths vary, this mode will have fewer equilateral triangles than fixed length.
+
+Before remeshing |
+    [Image:/images/nodes/sop/remesh_squid_before.png]
+Fixed length |
+    [Image:/images/nodes/sop/remesh_squid_fixed.png]
+Adaptive |
+    [Image:/images/nodes/sop/remesh_squid_adaptive.png]
+
+You can "harden" certain edges to make the remesher preserve them.
+This is useful for keeping sharp corners and preserving seams.
+
+== Attributes ==
+
+You can add [point attributes|/model/attributes] to the input surface to give "hints" to the remesher.
+
+Name ||
+    Datatype ||
+        Description ||
+`targetmeshsize` |
+    Float |
+        An initial target edge length for the edges incident to each point.
+        If the value is <= 0, the attribute is ignored.
+        The remesher adjusts this value to prevent violation of your selected gradation.
+`minmeshsize` |
+    Float |
+        A minimum target edge length.
+        If `targetmeshsize` is less than this value, the remesher uses this value.
+`maxmeshsize` |
+    Float |
+        A maximum target edge length.
+        If `targetmeshsize` is greater than this value, the remesher uses this value.
+
+@parameters
+
+Hard Edges Group:
+    An [edge group|/model/groups] containing the "hard" edges.
+    The remesher may subdivide hard edges, but will preserve them in the output.
+    The remesher always preserves boundary (unshared) edges
+    and non-manifold edges (edges shared by three or more polygons).
+    Use the [Group Geometry SOP|Node:sop/group] to create edge groups.
+    
+    For example, the remesher changes the shape of a cube by trying to create good triangles.
+    Adding the corner edges to a "hard edges" group preserves the shape of the cube.
+    
+    [Image:/images/nodes/sop/remesh1.png]
+    [Image:/images/nodes/sop/remesh3.png]
+    [Image:/images/nodes/sop/remesh2.png]
+    
+Iterations:
+    Increasing this increases the quality of the generated mesh but takes more time.
+    The first few iterations take longer to perform than later iterations,
+    but later iterations have decreasing benefit.
+    Typically the maximum useful number of iterations is 3 to 4.
+    
+    If you set the iterations to `0`,
+    the node will generate the `targetmeshsize` attribute when __Export size function__ is on,
+    and may subdivide edges and polygons,
+    but will not generate new high-quality triangles.
+
+Recompute Normals:
+    Compute new normals for the generated mesh.
+        
+Smoothing:
+    The amount of additional smoothing to apply after remeshing.
+
+== Fixed Length ==
+
+Target Edge Length:
+    How long (in Houdini units) you want the triangle edges to be.
+
+Use Input Points Only:
+    Restricts the remesher to only use the points from the input geometry.
+    This can severely limit the remesher's ability to generate good triangles.
+
+== Adaptive ==
+
+Gradation:
+    The rate at which edge lengths are allowed to change from one triangle to the next.
+    Higher values generate fewer triangles but overall quality is lower.
+    
+Density:
+    Higher values give more, smaller triangles.
+    If __Gradation__ is high, this parameter will have less effect.
+    
+    Values less than `1` can coarsen/decimate the mesh,
+    however the [PolyReduce node|Node:sop/polyreduce] is better for that.
+
+Min Edge Length:
+    A global minimum edge length.
+    Increasing this can substantially improve performance with affecting the output.
+    
+    If you want to set a minimum size only in certain areas,
+    use the `minmeshsize` point attribute to set a minimum length
+    for edges that include the point.
+
+Max Edge Length:
+    A global maximum edge length.
+    
+    If you want to set a maximum size only in certain areas,
+    use the `maxmeshsize` point attribute to set a maximum length
+    for edges that include the point.
+
+Export Size Function:
+    Create the `targetmeshsize` point attribute on the generated mesh.
+    The attribute contains the "best" edge size the remesher calculated at each point.
+
+Visualize Size Function:
+    Sets the point color attribute (`Cd`)
+    to visualize the "best" edge size the remesher calculated at each point.
+    This can give you a sense of where the remesher is generating small and large triangles
+    in case where the edges are hard to distinguish in the viewer.
+
+    [Image:/images/nodes/sop/remesh_squid_visualize.png]
+
+@related
+
+- [Node:sop/divide]
+- [Node:sop/triangulate2d]
+- [Node:sop/tridivide]
+- [Node:sop/polyreduce]
+- [Node:sop/polysplit]
+- [Node:sop/tridivide]
+

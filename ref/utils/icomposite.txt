@@ -1,0 +1,244 @@
+= icomposite =
+
+== Synopsis ==
+
+{{{
+icomposite [-v] [-w width] [-h height] [-f] [-c] [command]
+}}}
+
+Composites layers of images, provides some simple image processing, and resizes images. Arbitrary filters can be specified when scaling images.
+
+== Options ==
+
+-v:
+    Operate verbosely by outputting the current scanline and the current composite sub-operation as they are executed.
+    
+-w <<width>>:
+    The output horizontal resolution is set to <<width>>.
+    
+-h <<height>>:
+    The output vertical resolution is set to <<height>>. Normally, all frames are scaled in X and Y to match the resolution of the largest input image. Occurrence of either the width or the height options, cause the input and output frames to be scaled to the specified values, while the vertical resolution is set to preserve the width/height ratio of the largest input image.
+    
+-f:
+    The input images are filtered (using a box filter) to the desired output resolution. Normally, the input images are sampled. Filtering takes longer than sampling, but gives better results when scaling images.
+    
+-c:
+    Normally, ic will terminate the current composite operation if an error occurs when opening or reading an image file. The -c option indicates that the composite operation should continue even if such an error occurs. If this happens, a blank image is loaded in place of the one which caused the error. Note that this may cause the resulting composite to be incorrect.
+    
+-B:
+    Backwards compatible (Houdini 2.5 and prior) image scaling. No extra filter support.
+    
+-F:
+    Specify filter type for reading of images (entering "icomposite -" lists the available filters).
+    
+<<command>>:
+    Any single input line which can be supplied to ic in interactive mode can also be supplied here.
+    
+== Composite Operators ==
+
+A unary operator is applied to one image such as:
+
+claw.pic over back.pic
+
+The <em>0.7</em> is a <em>Constant</em>, a positive real number. Constants, except those used in a constant image, cannot exceed one.
+
+A constant image is an image containing one solid color. It may be included as a composite element (typically for use as a background element) and is specified as red, green, blue and, optionally, alpha values enclosed within square brackets:
+
+{{{
+[1 0.7 0.5] [0.8 0.5 0.4 0.8]
+}}}
+
+The second example includes alpha. In the first example, alpha is not present and defaults to one. The constants should be real values in the range zero to one.
+
+dissolve <<value>> <<image>>:
+    The subject image is dissolved by the amount given as the constant with the operator. This means that the red, green, blue and alpha channels are all multiplied by the supplied value.
+    
+darken <<value>> <<image>>:
+    The subject image is darkened by the amount given as the constant with the operator. This means that only the red, green and blue channels are multiplied by the supplied value. The alpha channel is left unmodified by the darken operator.
+    
+opaque <<value>> <<image>>:
+    Only the alpha channel of the subject image is multiplied by the amount given as the constant with the operator. This has the effect of creating a luminescent element which adds color information without obscuring the background elements.
+    
+mono <<value>> <<image>>:
+    The subject image is made more monochrome by the amount given, where one is fully monochrome, zero leaves the colors unchanged, and values between result in partially monochrome images.
+    
+gamma <<value>> <<image>>:
+    Gamma correction is applied to each of R, G and B of the subject image. A value more than one makes the picture brighter, and vice versa.
+
+channel <<chans>> <<image>>:
+    The subject image has its channels copied, swapped or replaced according to the combination and order of the four characters in the supplied chan string.
+    
+    The first character represents what is placed in the output red channel, the second character the output green channel, etc.
+
+    The character r represents the input red channel, z represents a channel containing zero (black), and o represents a channel containing one (full value).
+    
+    For example, bbba copies blue into the red and green channels, while blue and alpha remain unchanged. rgba leaves the picture unchanged. aaaz copies alpha into the rgb channels and zero in the alpha channel.
+    
+alpha <<value>> <<image>>:
+    The subject image has its red, green and blue channels multiplied by its alpha channel.
+    
+setup <<value>> <<image>>:
+    The subject image is boosted by value in pixels where alpha is greater than zero, and is untouched where alpha is zero. The setup operator will boost low luminance levels of an image (based on alpha) to be above the given lower limit, usually to accommodate zero-black keying. For example:
+    
+    {{{
+    icomposite abekas:34.rgb = setup .075 claw.pic
+    }}}
+    
+    If there is non-zero alpha in a pixel, the luminance would be boosted to be a minimum of .075. Any colors in the image over .075 luminance would remain unchanged.
+    
+even <<image>>:
+    Maintain only the even scanlines of the subject image (i.e. erase all odd scanlines to black). Since ntsc frames result in the bottom scanline being odd, this operator assumes that the first scanline of an image file is odd.
+    
+odd <<image>>:
+    Maintain only the odd scanlines of the subject image (i.e. erase all even scanlines to black). Since ntsc frames result in the bottom scanline being odd, this operator assumes that the first scanline of an image file is odd.
+    
+<<image>> cross <<image>>:
+    The cross operator is the only binary operator which requires a constant operator value. This operator performs a cross-dissolve of two elements. The operation "A cross 0.4 B" is equivalent to dissolve 0.6 A plus dissolve 0.4 B. It is provided as a separate operator for efficiency and convenience.
+    
+<<image>> over <<image>>:
+    The over operator is likely the most commonly used composite operation. It places its left operand over top of its right operand. The foreground element survives everywhere, while the background element survives only where the foreground does not have full coverage.
+    
+<<image>> plus <<image>>:
+    The plus operator results in the simple addition of each channel of the left and right operands. The sums are clipped to the maximum channel value.
+    
+<<image>> minus <<image>>:
+    The minus operator results in the simple subtraction of each channel of the right operand from the left operand. The results are clipped to the minimum channel value of zero.
+    
+<<image>> diff <<image>>:
+    The diff operator results in the absolute value of the difference between the right operand from the left operand.
+    
+<<image>> multiply <<image>>:
+    The multiply operator results in the simple multiplication of each channel of the left and right operands. Channel values are treated as fixed point values between zero and one for the purposes of this operator.
+    
+<<image>> inside <<image>>:
+    The inside operator results in the survival of the left operand anywhere that the right operand has coverage.
+    
+<<image>> outside <<image>>:
+    The outside operator results in the survival of the left operand anywhere that the right operand does not have coverage.
+    
+<<image>> atop <<image>>:
+    The atop operator places its left operand atop its right operand. The result is that the left operand survives wherever the right operand has coverage and elsewhere only the right operand survives. Thus, A atop B is the union of A inside B and B outside A.
+    
+<<image>> xor <<image>>:
+    The xor (exclusive or) operator provides the union of A outside B and B outside A. In other words, the result is everything that does not overlap in the two elements.
+    
+== Grammar ==
+
+icomposite has a formal grammar. The allowed syntax is defined by the following. The unary operators dissolve, darken, opaque, mono, gamma, alpha, even and oddhave equal precedence which is higher than the binary operators. Binary operators are left associative (i.e. a over b over c is equivalent to (a over b) over c).
+
+{{{
+Composite: FILENAME = Expression
+Expression: FILENAME
+            | Constant_Frame
+            | dissolve Constant Expression
+            | darken Constant Expression
+            | opaque Constant Expression
+            | mono Constant Expression
+            | gamma Constant Expression
+            | channel Channels Expression
+            | alpha Expression
+            | even Expression
+            | odd Expression
+            | Expression cross Constant Expression
+            | Expression plus Expression
+            | Expression minus Expression
+            | Expression diff Expression
+            | Expression multiply Expression
+            | Expression over Expression
+            | Expression atop Expression
+            | Expression outside Expression
+            | Expression inside Expression
+            | Expression xor Expression
+            | (Expression)
+
+Constant_Frame: [Constant Constant Constant Constant]
+                | [Constant Constant Constant]
+}}}
+
+icomposite performs compositing operations as described in the paper "Compositing Digital Images" (Computer Graphics, Volume 18, Number 3, Thomas Porter and Tom Duff, July 1984). All elements used in composite operations (except the alpha operator, described below) assume that the red, green and blue channels have been pre-multiplied by their corresponding alpha channel as do most renderers. This means that frames without pre-multiplied r, g, b channels cannot be used directly in composite operations, except possibly as background elements.
+    
+The alpha operator converts a non-pre-multiplied image into the required pre-multiplied format. Thus, any frames without pre-multiplied color channels should first have the alpha operator applied to them (see examples below).
+    
+== Example ==
+
+{{{
+icomposite ip = mono .5 $HH/pic/Mandril.pic
+}}}
+
+icomposite Either gets one command from the command line or it reads image composite sentences from its standard input and performs the operations required to generate the requested composite image.
+
+When reading commands interactively, each line of input is a single composite operation or sentence. Environment variables denoted with a leading $ are first expanded.
+
+The following are some examples of composite sentences which may be provided as input to ic. Some samples are fairly complex. The use of (...) signals to ic to do the operations between parentheses first. The use of `[...]` means it is an image with a constant color given by the three rgb or four rgba numbers inside:
+
+{{{
+cd $HFS/demo/ImageTools
+ip = claw.pic over back.pic
+junk.pic = claw.pic outside back.pic
+ip = dissolve .5 claw.pic over ([0.3 0.1 0.1 0.25] atop back.pic)
+ip = marble.pic multiply [.5.7 1] 
+ip = back.pic minus [0.25 0 0] over [0.3 0.2 0.1]
+fields.pic = even claw.pic plus odd back.pic over [.2.1.1]
+ip = (darken 0.7 (object.pic inside shadow.matte) atop 
+object.pic) over .bg.pic
+ip = (marble.pic cross 0.7 air.pic) outside claw.pic over 
+back.pic
+ip = gamma 1.3 back.pic
+}}}
+
+{{{
+icomposite -F gauss -w 640 -h 486 ip = $HH/pic/Mandril.pic
+}}}
+
+{{{
+icomposite -F box -w 640 ip = $HH/pic/Mandril.pic
+}}}
+
+== Interactive Composite Mode ==
+
+If no composite command is given on the command line, icomposite goes into its interactive mode where the user can type many commands. If input is from a terminal then icomposite prompts for a composite sentence with the string =>.
+
+Press ((Ctrl + C)) to terminate the command unless a composite operation is under way, in which case only the in-progress composite is interrupted. If it is not being run interactively, then interrupt signals will always terminate the command.
+
+Each input line is individually interpreted until the end of file is reached.
+
+An input line starting with the character '!' is interpreted as a shell command and executed.
+
+== Notes ==
+
+- icomposite does not accept file names containing any of the following  
+  characters:
+
+  {{{
+  [] () = ; !
+  }}}
+
+  ...or filenames that look like a real number (e.g. 123).
+
+- Errors are handled very simplistically, so you will typically get something
+  like, "Syntax error on line 1".
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

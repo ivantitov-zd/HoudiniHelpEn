@@ -1,0 +1,162 @@
+= hou.Matrix3 =
+#type: homclass
+#cppname: HOM_Matrix3
+#group: utility
+
+"""A 3x3 matrix of floating point values."""
+
+3x3 matrices are typically used in Houdini to represent a 3D rotation (with
+a possible scale).  Most places in Houdini use [Hom:hou.Matrix4], which can
+store generation 3D transformations (including translations).
+
+Note that you can construct a general transformation Matrix4 from a Matrix3
+by writing `hou.Matrix4(matrix3)`.
+
+@methods
+
+::`__init__(self, values)`:
+    #cppname: HOM_Matrix3::HOM_Matrix3
+    #replaces: Exp:matrix
+    Return a new Matrix3.  You can pass no parameters (the result will contain
+    all zeros), a float (the result's diagonal values will contain that float
+    and the rest is all zeros), a sequence of 9 floats, or a sequence of
+    sequences of 3 floats.
+
+    {{{
+    #!pycon
+    >>> hou.Matrix3()
+    <hou.Matrix3 [[0, 0, 0], [0, 0, 0], [0, 0, 0]]>
+
+    >>> hou.Matrix3(1)
+    <hou.Matrix3 [[1, 0, 0], [0, 1, 0], [0, 0, 1]]>
+
+    >>> hou.Matrix3((0, 1, 2, 3, 4, 5, 6, 7, 8))
+    <hou.Matrix3 [[0, 1, 2], [3, 4, 5], [6, 7, 8]]>
+
+    >>> hou.Matrix3(((0, 1, 2), (3, 4, 5), (6, 7, 8)))
+    <hou.Matrix3 [[0, 1, 2], [3, 4, 5], [6, 7, 8]]>
+    }}}
+
+    Note that Houdini's matrices are stored in row-major order, so the matrix's
+    contents are grouped by row.
+
+::`at(self, row, col)` -> `double`:
+    #cppname: HOM_Matrix3::at
+    Return the value of the matrix at the given row and column.
+
+    Raises IndexError if the row or column are not between 0 and 2, inclusive.
+    Note that negative indices will not index from the end.
+
+::`setAt(self, row, col, value)`:
+    #cppname: HOM_Matrix3::setAt
+    Set the value of the matrix at the given row and column.
+
+    Raises IndexError if the row or column are not between 0 and 2, inclusive.
+    Note that negative indices will not index from the end.
+
+::`asTuple(self)` -> `tuple` of `float`:
+    #cppname: HOM_Matrix3::asTuple
+    Return the contents of the matrix as a tuple of 9 floats.
+
+::`asTupleOfTuples(self)` -> `tuple` of `tuple` of `float`:
+    #cppname: HOM_Matrix3::asTupleOfTuples
+    Return the contents of the matrix as a tuple of tuples of 3 floats.
+
+::`setTo(self, tuple)`:
+    #cppname: HOM_Matrix3::setTo
+    Set this matrix's contents.  The sequence may contain either 9 floats
+    or 3 sequences, each with 3 floats.
+
+    See [Hom:hou.Matrix3#__init__] for examples of suitable parameter values.
+
+::`setToIdentity(self)`:
+    #cppname: HOM_Matrix3::setToIdentity
+    Set this matrix to the multiplicative identity, having 1's in the diagonal.
+
+    The matrix will contain the values
+    `[[1, 0, 0], [0, 1, 0], [0, 0, 1]]`.  Note that you can construct a new
+    matrix with these values using `hou.Matrix3(1)`.
+
+::`setToZero(self)`:
+    #cppname: HOM_Matrix3::setToZero
+    Set this matrix to contain all zeros.
+
+    Note that you can construct a new matrix with all zeros with
+    `hou.Matrix3()`.
+
+::`__add__(self, matrix3)` -> [Hom:hou.Matrix3]:
+    #cppname: HOM_Matrix3::__add__
+    Add two matrices by adding corresponding entries together and return a new
+    matrix.  This method lets you write `m1 + m2`, where `m1` and `m2` are
+    Matrix3 objects.
+
+::`__sub__(self, matrix3)` -> [Hom:hou.Matrix3]:
+    #cppname: HOM_Matrix3::__sub__
+    Subtract another matrix from this one, subtracting corresponding entries,
+    and return a new matrix.  This method lets you write `m1 - m2`, where `m1`
+    and `m2` are Matrix3 objects.
+
+::`__mul__(self, matrix3_or_scalar)` -> [Hom:hou.Matrix3]:
+    #cppname: HOM_Matrix3::__mul__
+    Multiply this matrix by another matrix or by a scalar, returning a new
+    matrix.  This method lets you write `m1 * m2`, where `m1` and `m2` are
+    Matrix3 objects, or `m1 * s`, where `s` is a float.
+
+    See [Wikipedia's matrix multiplication
+    page|Wp:Matrix_multiplication] for details on how
+    each element in the result is computed.  Also see [Hom:hou.Matrix4].
+
+::`preMult(self, matrix3)` -> [Hom:hou.Matrix3]:
+    #cppname: HOM_Matrix3::preMult
+    Returns `matrix3 * self`.  Note that `__mul__` returns `self * matrix3`,
+    which is a different result because matrix multiplication is not
+    commutative.
+
+::`determinant(self)` -> `double`:
+    #cppname: HOM_Matrix3::determinant
+    Return the determinant of the matrix.
+
+    See [Wikipedia's determinant page|Wp:Determinant].
+
+::`extractRotates(self, rotate_order="xyz")` -> [Hom:hou.Vector3]:
+    #cppname: HOM_Matrix3::extractRotates
+    Return a Vector3 of Euler angles, in degrees, representing the rotation
+    component of this matrix.  Rotating about the coordinate axes in the
+    specified order by these amounts will yield the rotation contained in this
+    matrix.
+
+    rotate_order:
+	A string containing a permutation of the letters `x`, `y`, and `z`
+	that determines the order in which rotations are performed about
+	the coordinate axes.
+
+    Raises [Hom:hou.OperationFailed] if the matrix does not represent a valid
+    rotation matrix (e.g. it is singular) or the rotate order is not a
+    permutation of the string `'xyz'`.
+
+    See also [Hom:hou.Matrix4#explode] and [Hom:hou.Matrix4#extractRotates].
+
+::`inverted(self)` -> [Hom:hou.Matrix3]:
+    #cppname: HOM_Matrix3::inverted
+    Return the inverse of this matrix.
+    
+    Raises [Hom:hou.OperationFailed] if the matrix is not invertible.
+    Otherwise,
+    `(self * self.inverted()).isAlmostEqual(hou.Matrix3(1))` is True.
+
+    See [Wikipedia's invertible matrix
+    page|Wp:Invertible_matrix] for more information.
+
+::`transposed(self)` -> [Hom:hou.Matrix3]:
+    #cppname: HOM_Matrix3::transposed
+    Return the transpose of this matrix.  The result is such that
+    `self.at(i, j) == self.transposed().at(j, i)` for `0 <= i,j <= 2`.
+
+    See [Wikipedia's transpose page|Wp:Transpose]
+    for more information.
+
+::`isAlmostEqual(self, matrix3, tolerance=0.00001)` -> `bool`:
+    #cppname: HOM_Matrix3::isAlmostEqual
+    Returns whether this matrix is equal to another, within a
+    tolerance.
+

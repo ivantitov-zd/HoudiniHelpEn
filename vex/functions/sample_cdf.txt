@@ -1,0 +1,82 @@
+= sample_cdf =
+
+#type: vex
+#context: all
+#tags: pbr, bsdf, sampling
+#group: sampling
+
+"""Samples a CDF."""
+
+See [Vex:create_cdf] and [Vex:create_pdf] for more information.
+
+:usage: `int sample_cdf(float cdf[], float uniform_rand)`
+
+    Returns the index of the sampled CDF.
+
+:usage: `void sample_cdf(float cdf[], float uniform_rand, int &index, float &x)`
+:usage: `void sample_cdf(float cdf[], float uniform_rand, int &index, float &x, float &pdf)`
+
+    Writes the index of the sampled CDF and extra information to output arguments.
+
+:arg:cdf:
+    The CDF to sample from (created with [Vex:create_cdf]).
+
+:arg:uniform_rand:
+    A uniform random variable (must be in range <0,1>).
+
+:arg:index:
+    The function writes the index of the CDF element that was sampled to this variable.
+
+:arg:x:
+    The function writes the coordinate of the CDF element that was sampled to this variable.
+
+:arg:pdf:
+    The function writes the PDF of the CDF element that was sampled to this variable.
+
+
+@examples
+
+CDFs are useful when sampling from distributions. For example, a CDF of
+light source power could be created. This would allow sampling
+of lights with a probability based on power. This is an example of a
+discrete CDF, where sampling selects among a fixed set of probabilities.
+Such a CDF could be created as follows:
+
+{{{
+#!vex
+// Iterate over all lights, sampling their power
+int[] li = getlights();
+float values[];
+resize(values, len(li));
+int nsamples = 256;
+int sid = israytrace ? SID : newsampler();
+vector s, pos, clr;
+float scale;
+for (int i = 0; i < len(li); i++)
+{
+    for (int j = 0; j < nsamples; j++)
+    {
+        nextsample(sid, s.x, s.y, "mode", "nextpixel");
+        sample_light(li[i], P, s, Time, pos, clr, scale);
+        values[i] += luminance(clr);
+    }
+    values[i] /= nsamples;
+}
+
+// Create a CDF of the power distribution
+float cdf[] = create_cdf(values);
+
+// Randomly select a light based on power distribution
+nextsample(sid, s.x, s.y, "mode", "nextpixel");
+int index = 0;
+sample_cdf(cdf, s.x, index);
+
+// Do something with the selected light
+// li[index] ...
+}}}
+
+
+@related
+
+- [Vex:create_cdf]
+- [Vex:create_pdf]

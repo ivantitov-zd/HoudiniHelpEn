@@ -1,0 +1,212 @@
+#type: node
+#context: sop
+#internal: ray
+#icon: SOP/ray
+
+#tags: project, model
+
+= Ray =
+
+"""Projects one surface onto another."""
+
+The Ray operator projects rays from each point of the first input
+geometry in the direction of its normal, and then moves the point to any
+geometry the ray hits from the second input.
+
+You can use this node to drape clothes over surfaces, shrink-wrap one
+object with another, and other similar effects.
+
+[Include:/shelf/ray#includeme]
+
+== Example ==
+
+steps>>
+    # Place a Grid node, set its __Orientation__ to "XY Plane", and
+      translate it in Z by 2.5. Turn its template flag on.
+
+    # Append a Point node to the Grid and change __Keep Normal__ to __Add Normal__ on the standard tab of the parameter editor.
+
+    # Place a Sphere node, set its geometry type to NURBS, set its
+      radius to 2,2,2, and translate it in Z by -2.5 .
+
+    # Turn on the display of [Icon:VIEW/display_point_normals] point normals in the viewer's right side toolbar.
+
+    # Append a Ray node to the Point node and connect the Sphere to
+      the right input. Turn on its display flag.
+
+    # Turn the __Intersect farthest surface__ checkbox on to move
+      the projected plane onto the "back" of the sphere.
+
+The Ray op will move the points of the Grid in the direction of the
+point normals. The first surface of the Collision Source (right
+input) will be where those points of the grid will rest. You can
+make those points rest on the other side of the sphere by enabling
+the Intersect Farthest Surface option. This means that the points
+should continue to project to the farthest surface of the collision
+source.
+
+@parameters
+    Group:
+        Group of primitives or points to project.
+    Entity:
+        Project points or primitives.
+    Collision Group:
+        Group of primitives to project on.
+    Method:
+
+        Project Rays:
+            Points are projected along their normals until intersecting
+            with collision geometry.
+        Minimum Distance:
+            Points are placed on the closest point on the collision
+            geometry. This method does not use point normals. Use it to
+            shrinkwrap or project one primitive onto another.
+    Direction from:
+	How to determine the direction to send rays.
+
+	Vector:
+	    A ray direction vector is explicitly provided.
+	Normal:
+	    Normals are computed, if necessary, on the input and used
+	    as the ray direction.
+	Attribute:
+	    A given attribute is used. It should be a 3-float vector
+	    attribute giving the direction to send the rays in.
+    Ray Direction:
+	Direction to project rays from each point.
+    Direction Attribute:
+	The point attribute to use to determine ray direction.
+    Show Guide Geometry:
+	Controls if the geometry being instanced onto is drawn.  Does
+	not affect the behavior, only the viewport.
+    Transform Points:
+        Move the intersected geometry.
+    Intersect Farthest Surface:
+        Ray source is projected to farthest collision surface instead of
+        the closest.
+    Point Intersection Normal:
+        Ray point normals gets value of collision normals at points of
+        intersection. These are the surface normals and not interpolated
+        point normals. If you want the interpolated point normals, you
+        will need to turn on __Get Point Attributes__ and specify the N
+        attribute. In that case, this option will have no effect.
+    Point Intersection Distance:
+        Ray point dist attribute gets value of distance to collision
+        source.
+    Reverse Rays:
+        Set this to make rays fire in the direction opposite to the
+        normals.
+    
+    Ray Tolerance:
+        Controls the tolerance of the ray intersection. Due to numerical round off, otherwise watertight geometry might let rays pass through it.  The ray tolerance decreases the chance of ray leakage by allowing near misses to count as hits. For very small geometry, you may want to decrease the default to avoid false positives.  Likewise, very large geometry may need a higher value.
+    
+    Scale:
+        #channels: /scale
+
+        When transforming points scale the intersection path.
+    Lift:
+        #channels: /lift
+
+        Offset surface in normal direction after the points have been
+        transformed to their new locations.
+    Bias:
+        #channels: /bias
+
+        The minimum distance along the normal from the original position
+        of the point where the rays will look for intersections. This
+        allows you to offset the starting position of the rays.
+    Max Distance:
+        #channels: /maxraydist
+
+        The maximum distance from the original position of the point the
+        rays will look at. No ray intersections outside this range will
+        be detected.  If __Method__ is __Minimum Distance__, any points
+        farther from the surface than this will not be moved.
+    Sample:
+        #channels: /sample
+
+        Number of rays sent per point. If greater than 1, rays are
+        randomly perturbed and combined using the method specified in
+        __Ray Combiner__.
+    Jitter Scale:
+        #channels: /jitter
+
+        Controls perturbation of extra rays.
+    Ray Combiner:
+        This option lets you specify how information from extra rays is
+        used.
+
+        Average ray:
+            The fired rays that hit the second input's geometry are
+            averaged. The point is then moved along its normal direction
+            by the average distance. If you turned on __Point
+            Intersection Normal__, the resulting normal is also the
+            average from all the fired rays.
+        Median ray:
+            The median length ray that hits the second input's geometry
+            is found. The point is then moved along its normal direction
+            by the median ray's length. If you turned on __Point
+            Intersection Normal__, the resulting normal is taken from
+            the median ray.
+        Shortest ray:
+            The shortest ray that hits the second input's geometry is
+            found. The point is then moved along its normal direction by
+            this ray's length. If you turned on __Point Intersection
+            Normal__, the resulting normal is taken from the shortest
+            ray.
+        Longest ray:
+            The Longest ray that hits the second input's geometry is
+            found. The point is then moved along its normal direction by
+            this ray's length. If you turned on __Point Intersection
+            Normal__, the resulting normal is taken from the longest
+            ray.
+    Seed:
+        #channels: /seed
+
+        Seeds the random number generator.
+    Create Point Group:
+        Point group of all successful intersections.
+    Ray Hit Group:
+        Name of the point group.
+    Prim Num Attribute:
+        #id: primnumattrib
+
+        When enabled, an attribute will be output indicating the number of the primitive hit by each point.  Enable this and __Prim UVW Attribute__ for use with
+        [Attribute Interpolate|Node:sop/attribinterpolate], to have the points stick on deforming geometry.
+    Prim UVW Attribute:
+        #id: primuvwattrib
+
+        When enabled, an attribute will be output indicating the coordinates where each point hit, in the parameter space of the primitive each point hit.
+        Enable this and __Prim Num Attribute__ for use with [Attribute Interpolate|Node:sop/attribinterpolate], to have the points stick on deforming geometry.
+    Get Point Attributes:
+        This allows you to extract point attributes from the hit
+        surface. The extracted attribute will take on an interpolated
+        value according to where the surface is hit. This option works
+        with the __Ray Combiner__ option: the attribute value will
+        either come from the average attribute value from all the hits
+        or the value associated with the median length, shortest or
+        longest ray. The interpolated attribute values are not
+        normalized.
+    Point Attributes:
+        Specify the point attributes from the second input that you want
+        to extract. If the attributes you specify do not exist in the
+        first input, they will be created. If the attributes you specify
+        have the same name but a different size or type in the first
+        input, they will be overwritten. If you specify the normal
+        attribute here (N), the __Point Intersection Normal__ option
+        will have no effect and the final normal set to each point will
+        be computed by interpolating the point normal from the target
+        surface.
+@inputs
+    Ray points or primitives:
+        The geometry to project onto the geometry in the second input.
+        This geometry must have point normal attributes (use the [Point
+        operator|Node:sop/point] to add them).
+    Collision primitives:
+        The geometry on which to project.
+
+@related
+    - [Node:sop/creep]
+    - [Node:sop/paste]
+    - [Node:sop/project]
+

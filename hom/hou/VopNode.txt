@@ -1,0 +1,299 @@
+= hou.VopNode =
+#type: homclass
+#cppname: HOM_VopNode
+#superclass: hou.Node
+#group: vex
+
+"""Represents a VOP (VEX Operator) node."""
+
+@methods
+
+== Shader Information ==
+
+::`shaderName(self, as_otl_path=True, shader_type_name=None)` -> `str`:
+    #cppname: HOM_VopNode::shaderName
+    Return the name of the shader defined by this VOP (if it is an embedded
+    shader) or the shader name defined by the shop in which this VOP resides.  
+    If `as_otl_path` is True,
+    returns an `opdef:` path to the SHOP type. The `shader_type_name` is
+    a string indicating the shader context type to use; some nodes may provide
+    several shader types, and each may have a different name. This is applicable
+    only to multi-context shader nodes, such as a vopnet material shop.
+
+::`shaderCode(self, shader_type=hou.shaderType.Surface)` -> `str`:
+    #cppname: HOM_VopNode::shaderCode
+    Returns the generated VEX or RSL code for this VOP, using the given 
+    shader type to control output context. If the VOP is a subnet that can be 
+    packaged up as an encapsulated shader, then the specific code to define an 
+    encapsulated shader is output. Otherwise, the code generated for the 
+    entire VOP network is output.
+
+::`shaderLanguageName(self)` -> `str`:
+    #cppname: HOM_VopNode::shaderLanguageName
+    Returns the name of the language the shader is written in.
+
+::`shaderString(self, render_type=None, shader_type=hou.shaderType.Surface, as_encapsulated=False)` -> `str`:
+    #cppname: HOM_VopNode::shaderString
+    Returns the string that encodes the shader name and parameter values
+    suitable for specifying as a shader assignment in an input stream acceptable
+    by the renderer of a given type. If the VOP is material that provides
+    a few shader contexts (eg, surface and displacement), it is necessary to
+    provide the shader type explicitly. If as_encapsulated is true,
+    the returned shader string will encode the shader as embedded in the parent
+    shader with parameters referencing the parent, if needed.
+
+::`code(self)` -> `str`:
+    #cppname: HOM_VopNode::code
+    Returns the VEX or RSL code that defines this node.
+
+::`outerCode(self)` -> `str`:
+    #cppname: HOM_VopNode::outerCode
+    Returns the outer code associated with this node.
+
+== Inputs and Outputs ==
+
+::`inputDataTypes(self)` -> tuple of `str`:
+    #cppname: HOM_VopNode::inputDataTypes
+    Returns a tuple of all input data types for this node. Data types for input
+    connectors that are hidden are also included.
+
+    The strings returned by this method can be used to set the Type parameter
+    on a Parameter or Constant VOP.
+
+::`isInputGroupExpanded(self, group)` -> `bool`:
+    #cppname: HOM_VopNode::isInputGroupExpanded
+    Returns `True` if the group with the name specified by `group` is expanded
+    in the Network View. The `group` parameter should be a value returned
+    by the [Hom:hou.VopNode#inputGroupName] method. Returns the current
+    expanded state of the group even if the group is not currently visible
+    due to the setting of the input/output detail flags. Returns `True` if the
+    group name is not valid.
+
+::`inputGroupNames(self)` -> tuple of `str`:
+    #cppname: HOM_VopNode::inputGroupNames
+    Returns the names of the input groups on this VOP Node. Note that not all
+    groups will contain any inputs, and so not all groups will be visible in
+    the Network View. Use the [Hom:hou.VopNode#inputsInGroup] method to
+    determine which inputs are part of a particular group.
+
+::`inputsInGroup(self, group)` -> tuple of `int`:
+    #cppname: HOM_VopNode::inputsInGroup
+    Returns the input index values of all inputs that appear in the group with
+    the name specified in `group`. This parameter should be a value returned
+    by the [Hom:hou.VopNode#inputGroupName] method. This method returns the
+    same set of inputs whether the group is expanded or collapsed. Returns an
+    empty tuple if the group name contains no inputs or is not a recognized
+    group name.
+
+::`inputIndexOrder(self)` -> tuple of `int`:
+    #cppname: HOM_VopNode::inputIndexOrder
+    Return a tuple of integers which represent input index numbers that can be
+    passed to [Hom:hou.Node#setInput] and related functions. The order of the
+    index numbers represents the order in which those inputs appear in the
+    network view tile for this object. This ordering is affected by the
+    way inputs are grouped together on the parameter pane for this node.
+
+::`outputDataTypes(self)` -> tuple of `str`:
+    #cppname: HOM_VopNode::outputDataTypes
+    Returns a tuple of all output data types for this node. Data types for
+    output connectors that are hidden are also included.
+
+    The strings returned by this method can be used to set the Type parameter
+    on a Parameter or Constant VOP.
+
+::`setInputGroupExpanded(self, group, expanded)`:
+    #cppname: HOM_VopNode::setInputGroupExpanded
+    Sets the expanded state of the input group with the name specified by the
+    `group` parameter. This controls the appearance of this input group in the
+    Network View. Pass a group value of `None` to expand or collapse all input
+    groups.
+
+::`isInputCompatible(self, idx, other, other_idx, allow_conversions = False) -> `bool`
+    #cppname: HOM_VopNode::isInputCompatible
+    Return `True` if input `idx` of this object can be connected to output
+    `other_idx` of node `other`. Two inputs can be connected if they are of
+    the same data type. If the `allow_converions` parameter is set to `True`,
+    a more permissive check is done which accepts an input connection if the
+    output data type can be automatically converted to the input data type
+    without an explicit conversion node (such as a float output to a vector
+    input).
+   
+== Controlling Input Nodes ==
+
+::`insertParmGenerator(self, input_name, parm_gen_type, reference_input_defaults)` -> [Hom:hou.VopNode]:
+    #cppname: HOM_VopNode::insertParmGenerator
+    Creates a parameter or a constant node and wires it into an input
+    specified by input_name on this node.  `parm_gen_type` must be a value of
+    [Hom:hou.vopParmGenType].  If `reference_input_defaults` is True, this node
+    will reference the defaults of the newly created node.
+    
+    A resultant parameter or constant node is returned.
+
+::`insertParmGeneratorsForAllInputs(self, parm_gen_type, reference_input_defaults)` -> dict of `str` to [Hom:hou.VopNode]:
+    #cppname: HOM_VopNode::insertParmGeneratorsForAllInputs
+    Creates parameter or constant nodes and wires them into unconnected inputs
+    on this node.  `parm_gen_type` must be a value of
+    [Hom:hou.vopParmGenType].  If `reference_input_defaults` is True, then
+    this node will reference the defaults of the newly created nodes.
+    
+    A dictionary is returned with input names for keys and [Hom:hou.VopNode]
+    objects for values.
+
+::`deleteIndependentInputNodes(self, input_index):, make_parm_node, reference_input_defaults)` -> `bool`:
+    #cppname: HOM_VopNode::deleteIndependentInputNodes
+    Deletes a chain of nodes wired into a particular input if and only if 
+    they are wired only into the specified input on this node. Returns true
+    if nodes were deleted, false otherwise.
+
+::`setIsInputVisible(self, input_name, is_visible)`:
+    #cppname: HOM_VopNode::setIsInputVisible
+    Shows or hides an input connector of this node. The input is specified 
+    by input_name. The connector is shown if is_visible is True, and hidden 
+    otherwise.
+
+::`isInputVisible(self, input_name)` -> `bool`:
+    #cppname: HOM_VopNode::isInputVisible
+    Returns True if the input connector specified by input_name on this node 
+    is visible, False otherwise.
+
+== Flags ==
+
+::`setDebugFlag(self, on)`:
+    #cppname: HOM_VopNode::setDebugFlag
+    #replaces: Cmd:opset
+    Turns the node's debug flag on or off.
+    The value of the `on` argument must be True or False.
+
+    Raises [Hom:hou.PermissionError] if the node is unwritable.
+
+::`isDebugFlagSet(self)` -> `bool`:
+    #cppname: HOM_VopNode::isCompressFlagSet
+    #replaces: Exp:opflag, Cmd:opget
+    Returns True if the node's debug flag is turned on.  Returns False
+    otherwise.
+
+::`setDetailLowFlag(self, on)`:
+    #cppname: HOM_VopNode::setDetailLowFlag
+    #replaces: Cmd:opset
+    Turns on or off the low detail flag for this node's inputs and outputs.
+    With this flag turned on, all inputs and outputs to this node will appear
+    in the network view as connecting to a single location on the node. This
+    flag does not affect the operation of this node, only its appearance in
+    the network view. The value of the `on` argument must be True or False.
+
+    Raises [Hom:hou.PermissionError] if the node is unwritable.
+
+::`isDetailLowFlagSet(self)` -> `bool`:
+    #cppname: HOM_VopNode::isDetailLowFlagSet
+    #replaces: Exp:opflag, Cmd:opget
+    Returns True if the node's low detail flag is turned on.  Returns False
+    otherwise.
+
+::`setDetailMediumFlag(self, on)`:
+    #cppname: HOM_VopNode::setDetailMediumFlag
+    #replaces: Cmd:opset
+    Turns on or off the medium detail flag for this node's inputs and outputs.
+    With this flag turned on, only connected inputs and outputs to this node
+    will be visible in the network view. This flag does not affect the
+    operation of this node, only its appearance in the network view. The value
+    of the `on` argument must be True or False.
+
+    Raises [Hom:hou.PermissionError] if the node is unwritable.
+
+::`isDetailMediumFlagSet(self)` -> `bool`:
+    #cppname: HOM_VopNode::isDetailMediumFlagSet
+    #replaces: Exp:opflag, Cmd:opget
+    Returns True if the node's medium detail flag is turned on.  Returns False
+    otherwise.
+
+::`setDetailHighFlag(self, on)`:
+    #cppname: HOM_VopNode::setDetailHighFlag
+    #replaces: Cmd:opset
+    Turns on or off the high detail flag for this node's inputs and outputs.
+    With this flag turned on, all inputs and outputs to this node will appear
+    in the network view, whether they are connected to another node or not.
+    This flag does not affect the operation of this node, only its appearance
+    in the network view. The value of the `on` argument must be True or False.
+
+    Raises [Hom:hou.PermissionError] if the node is unwritable.
+
+::`isDetailHighFlagSet(self)` -> `bool`:
+    #cppname: HOM_VopNode::isDetailHighFlagSet
+    #replaces: Exp:opflag, Cmd:opget
+    Returns True if the node's high detail flag is turned on.  Returns False
+    otherwise.
+
+::`bypass(self, on)`:
+    #cppname: HOM_VopNode::bypass
+    #replaces: Cmd:opset
+    Turns the node's bypass flag on or off.  When the bypass flag is
+    on, the node will have no effect on the scene. The value of the 
+    `on` argument must be True or False.
+
+    Raises [Hom:hou.PermissionError] if the node is unwritable.
+
+::`isBypassed(self)` -> `bool`:
+    #cppname: HOM_VopNode::isBypassed
+    #replaces: Exp:opflag, Cmd:opget
+    Returns True if the node's bypass flag is turned on.  Returns False
+    otherwise.
+
+::`setCompressFlag(self, on)`:
+    #cppname: HOM_VopNode::setCompressFlag
+    #replaces: Cmd:opset
+    Turns the node's compress flag on or off. If the compress flag is True,
+    this node will not show a preview image in the Network View. If the
+    compress flag is False, a preview image will be shown in the Network View.
+    The value of the `on` argument must be True or False.
+
+    Raises [Hom:hou.PermissionError] if the node is unwritable.
+
+::`isCompressFlagSet(self)` -> `bool`:
+    #cppname: HOM_VopNode::isCompressFlagSet
+    #replaces: Exp:opflag, Cmd:opget
+    Returns True if the node's compress flag is turned on.  Returns False
+    otherwise. The compress flag controls whether or not a preview image is
+    shown for this node in the Network View.
+
+::`setMaterialFlag(self, on)`:
+    #cppname: HOM_VopNode::setMaterialFlag
+    #replaces: Cmd:opset
+    Turns the node's material flag on or off. If the material flag is True,
+    it indicates that this node is meant to be used as a material to be
+    assigned to objects or geometry. It will appear in material node choosers
+    and be saved to IFDs generated with the option to save all materials
+    turned on.
+
+    Raises [Hom:hou.PermissionError] if the node is unwritable.
+
+::`isMaterialFlagSet(self)` -> `bool`:
+    #cppname: HOM_VopNode::isMaterialFlagSet
+    #replaces: Exp:opflag, Cmd:opget
+    Returns True if the node's material flag is turned on.  Returns False
+    otherwise. The material flag indicates whether this node is intended for
+    use as a material to be assigned to objects or geometry.
+
+::`extraBindings(self)` -> tuple of `str`:
+    #cppname: HOM_VopNode::extraBindings
+    Returns the list of extra bindings the VOP node would add
+    to the generated code.  Implemented specifically for Snippet VOPs,
+    this allows one to determine what bindings will be created by
+    any adhoc @ references.
+
+== Other ==
+
+::`currentSignatureName(self)` -> `str`:
+    #cppname: HOM_VopNode::currentSignatureName
+    Returns the current signature name of this node. The HDA nodes may provide
+    several valid signatures, and this function returns the name of the
+    currently used signature. A signature is defined by a set of input types
+    and each set is assigned a name.
+
+::`parmDefinerNode(self)` -> [Hom:hou.VopNode]:
+    #cppname: HOM_VopNode::parmDefinerNode
+    Return the Parameter VOP node that defines the parameter that this node is
+    bound to.  This method only applies to Parameter VOP nodes.
+
+    Return None if this node is not a Parameter VOP or if this node is the
+    definer node.
+

@@ -1,0 +1,101 @@
+= Deep camera maps =
+
+== Overview ==
+
+Deep camera maps are rendered images, where semi-transparent areas (such as volumes) between the camera and the nearest opaque surface are stored with depth information. Each pixel in the image is represented as a curve describing how the transparency value changes across the depth of the scene. This allows you to composite rendered images and have the semi-transparent areas blend correctly according to their depth.
+
+[Image:/images/render/xdsm1.jpg]
+[Image:/images/render/xdsm2.jpg]
+[Image:/images/render/xdsm3.jpg]
+
+Deep camera maps are useful for objects with high transparency across the object, such as swarms of sprites and clouds (volumes). You should render each such object as a separate DCM. DCMs let you render transparent objects separately from the objects that interact with them, allowing much more flexibility in compositing.
+
+The main drawback of deep camera maps is high _disk space overhead_, given the amount of information stored per pixel. A 2K (2048x1080) DCM frame can typically take 1-2 _GB_ of disk space, and the typical space budget for a shot might be 1 _TB_. Another drawback is that, since they are added in compositing, objects in DCMs cannot receive shadows.
+
+Houdini only supports storing DCMs in the `.rat` or `.exr` texture file format. The same image can contain a deep camera map (depth per pixel information) and [deep rasters|deeprasters] (extra image planes).
+
+== How to ==
+
+To render a deep camera map, you must add two rendering properties to the camera or render driver node.
+
+:task:Set up a camera or render output node to render as a DCM:
+    # Select the camera or render driver node.
+    
+    # In the parameter editor, click the [Icon:BUTTONS/gear] Gear menu and choose __Edit rendering parameters__.
+    
+    # In the tree sub-pane on the left, open the "Mantra" folder, then "Output".
+    
+    # Select the [DCM Filename|/props/mantra#vm_dcmfilename] and [Deep Resolver|/props/mantra#vm_deepresolver] properties and click the [Icon:BUTTONS/move_to_right] button to move them to the __Existing parameters__ side. This adds the properties to the node's parameter interface.
+        
+    # Click __Accept__.
+
+    # In the node's parameter editor, click the __Output__ tab. (On a render driver node, __Output__ is a sub-tab of __Properties__.)
+    
+    # Set the __Deep resolver__ parameter to __Deep shadow resolver__. Set the __DSM filename__ to the name of the RAT or EXR file you want to save the  into, for example `$HIP/textures/$OS_$F_dcm.rat`.
+    
+        (`$HIP` is the directory containing the current file. `$OS` is the name of the current node. `$F` is the frame number.)
+
+    When you render, mantra will write out the DCM _in addition to_ the output image.
+
+:task:Customize trade-offs between accuracy and file size:
+    Several properties allow you to decrease depth compositing accuracy in order to reduce the size of DCM files. If the object in the DCM is not detailed or the distance between the near and far clipping planes is small, depth compositing accuracy is less important and these properties can be very useful.
+
+    * Add the [DCM compression|/props/mantra#vm_dcmcompression] property and increase it to throw out more samples.
+
+    * Add the [DCM Z Storage|/props/mantra#vm_dcmzstorage] property and change it from "32 bit float" to "16 bit float". This halves the number of bits used to represent the depth of samples.
+    
+        If this setting is too low, you will see stair-stepping and "temporal buzzing" in animation.
+    
+    * Add the [DCM Z-bias|/props/mantra#vm_dcmzbias] property and increase it. Samples within this value of each other are merged.
+    
+:task:Composite two rendered DCMs together:
+    Use the [DSM Merge render node|Node:out/dsmmerge] or the [dsmmerge command line utility|/ref/utils/dsmmerge].
+
+:task:Convert a DCM file into a flat image:
+    Use the [DSM Flatten compositing node|Node:cop2/dsmflatten].
+
+== DCM tips ==
+
+* *Pre-multiply the diffuse component* by the opacity in the shader.
+
+* Every object needs its own DCM.
+
+* Use `$OS` (name of the current node) in the DCM file name to keep DCMs separate.
+
+== Using deep maps in shaders ==
+
+In VOPs, see the [Shadow Map VOP|Node:vop/shadowmap], 
+
+In VEX, see [Vex:teximport], [Vex:shadowmap], and [Vex:dsmpixel]. For example:
+
+{{{
+#!vex
+cvex 
+dsminfo(string map="foo.rat") 
+{ 
+   string   names[], name; 
+   float   Pz[]; 
+   vector   Of[]; 
+   vector   res; 
+   int      x, y; 
+
+   if (teximport(map, "texture:resolution", res)) 
+       printf("%s resolution: %g\n", map, res); 
+   teximport(map, "texture:channelnames", names); 
+   printf("%d channels:\n", arraylength(names)); 
+   foreach (name; names) 
+       printf("\t'%s'\n", name); 
+
+   x = res[0] * .5; 
+   y = res[1] * .5; 
+   if (dsmpixel(map, "Pz", x, y, Pz) && 
+       dsmpixel(map, "Of", x, y, Of)) 
+   { 
+       int      i, n; 
+       n = arraylength(Pz); 
+       printf("Depth complexity[%d,%d] = %d\n", x, y, n); 
+       for (i = 0; i < n; i++) 
+      printf("\tZ=%g, Of=%g\n", Pz[i], Of[i]); 
+   } 
+}
+}}}

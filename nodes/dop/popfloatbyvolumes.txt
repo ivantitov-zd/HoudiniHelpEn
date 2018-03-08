@@ -1,0 +1,135 @@
+#type: node
+#context: dop
+#internal: popfloatbyvolumes
+#icon: POP/floatbyvolumes
+
+= POP Float by Volumes =
+
+"""A POP node that floats particles on the surface of a liquid simulation."""
+
+The Float by Volumes POP is designed to make it easy to float oriented particles on the surface of a liquid simulation for debris or other effects.  Because the particles are oriented, geometry instanced onto the particles with the [Instance POP|Node:dop/popinstance] will appear to float properly in the liquid.  This DOP applies several operators to the particle system:
+
+- [Floating|#floating] underwater particles to the surface, similar to the [Force POP|Node:dop/popforce].
+- [Advection|#advection] of the particles with the velocity field of the liquid simulation to make the particles flow with the liquid, similar to the [Advect By Volumes POP|Node:dop/popadvectbyvolumes].
+- [Align|#spin] the specified particle axis with the surface normal of the liquid to make particles float upright, similar to the [Look At POP|Node:dop/poplookat].
+- [Spin|#spin] the particles by the vorticity of the velocity field, similar to the [Spin by Volumes POP|Node:dop/popspinbyvolumes].
+
+Often the liquid simulation will be simulated as a separate pass and the velocity fields read off disk. However, the particles can be live-linked to an existing simulation.
+
+NOTE:
+    The [Whitewater Solver DOP|Node:dop/whitewatersolver] is usually a superior approach for non-oriented, ballistic whitewater effects.
+
+This operator modifies the `force`, `vel`, `P`, `torque`, `w`, `targetw`, `spinresist`, and `orient` attributes.
+
+@parameters
+    [Include:standard_pop_parms#commonMain/]
+
+    [Include:popCommonParms#massParms/]
+
+    Field Source:
+        The source of the liquid simulation volumes.  The context geometry refer to the inputs of this DOP Network.
+    
+    SOP:
+        The SOP path which has an SDF volume and three volumes to be interpreted as the x, y, and z components of the velocity field.  These are often the result of importing the surface and velocity fields from a liquid simulation.  You can directly link to a fluid simulation with something like `/obj/AutoDopNetwork:smoke/vel`.
+    
+    DOP Object:
+        The name of a DOP Object in the same simulation as this.
+    
+    Surface Field Name:
+        The name of the surface SDF field that tracks the interior of the liquid in the liquid simulation.
+
+    Velocity Field Name:
+        The name of the velocity fields that contain the velocity of the liquid simulation.
+    
+    == Floating == (floating)
+    Isosurface:
+        Specifies the SDF value for the top of the liquid surface.  Decreasing this value will make objects float deeper within the liquid.
+
+    Falloff Distance:
+        The scale of any operators applied by this POP will start falling off at this distance below the surface.  Below this depth the particles are fully floating.
+
+    Buoyancy:
+        The buoyancy force applied to any particles below the surface as specified by the __Isosurface__ and __Falloff Distance__.
+
+    == Advection == (advection)
+    Advection Type:
+        There are several different ways to update a particle system in response to an external velocity field.  They are broadly categorized as Force, Velocity, and Position updates.
+
+        The __Update Force__ will adjust the acceleration of the particles according to the force scale, and the velocity field.  This acts like the [Force POP|Node:dop/popforce].
+
+        __Update Velocity__ directly changes the velocity of the particles by blending in the velocity field, causing them to swiftly match the velocity field.
+
+        __Update Position__ directly moves the particle positions.  This is useful as it allows the particles own velocity to be considered independently of the bulk fluid velocity.  __Update Position__ is similar to what the [Gas Advect DOP|Node:dop/gasadvect] would perform.
+
+    Velocity Scale:
+        A uniform scale to apply to the velocity field before any of the force applications.
+    
+    [Include:standard_pop_parms#airresistanceParms/]
+
+    Velocity Blend:
+        In __Update Velocity__ mode, the amount to mix in the field velocity every timestep.
+
+    == Spin == (spin)
+    Type:
+        How to re-orient particles:
+
+        Immediate:
+            Instantaneously face the desired orientation.  Useful for initializing orientations, but jerky if applied in animation.
+        Turn:
+            Re-orient the particle but cap the total it can spin to a maximum number of degrees per second.
+        Spin:
+            Applies a torque on the particle for it to spin into the desired direction.
+    
+    Align Scale:
+        Scales the torque applied to orient the particle's __Align Reference__ to match the liquid surface normal.
+
+    Align Resistance:
+        How strong an influence the alignment force should have on the particle.  Higher values will cause it to orient to the surface normal faster.
+
+    Align Degrees Per Second:
+        How fast, in degrees per second, that the particle's __Align Reference__ should orient to match the liquid surface normal.
+
+    Align Reference:
+        The direction in particle space that should be aligned to the liquid surface normal.  For example, a value of 0,1,0 will make the Y-axis of the particle float upright on the surface.
+
+    Spin Scale:
+        A scale for the vorticity of the liquid simulation's velocity field, used to spin particles.
+
+    Spin Resistance:
+        How strong an influence the vorticity force should have on the particle.  Higher values will cause it to match the field vorticity faster.
+
+    Spin Angular Velocity Blend:
+        The amount to mix the field vorticity into the particle angular velocity every timestep.
+            
+    == Bindings ==
+
+    [Include:standard_pop_parms#bindingsParms/]
+
+    Delete Internal Attributes:
+        To save memory, this POP deletes internal particle attributes that can be useful as debugging aids or for further processing, in which case they should be removed from this list.
+
+        `floatscale`:
+            The 0-1 amount of float forces applied to the particle.
+        `floatdir`:
+            The goal alignment direction for the particle, corresponding the surface normal of the liquid surface.
+
+@inputs
+    [Include:standard_pop_inputs]
+
+@outputs
+    [Include:standard_pop_outputs]
+
+@locals
+    [Include:standard_data_locals]
+
+    [Include:standard_locals]
+
+
+
+@related
+    - [Node:dop/popforce]
+    - [Node:dop/popadvectbyvolumes]
+    - [Node:dop/poplookat]
+    - [Node:dop/popspinbyvolumes]
+    - [Node:dop/popinstance]
+    - [Node:dop/whitewatersolver]

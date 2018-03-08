@@ -1,0 +1,178 @@
+#type: node
+#context: sop
+#internal: wiredeform
+#icon: SOP/wiredeform
+
+#tags: reshape, capture, character
+
+= Wire Deform =
+
+"""Deforms geometry captured to a curve via the Wire Capture node."""
+
+
+@parameters
+    Group:
+        Optional point group to limit the points which are deformed. If
+        empty, all points are deformed.
+    Rest Group:
+        Specifies the primitive groups to used for deforming from the
+        second input. This is currently only used for the Initialize
+        From Rest Groups parameter button.
+
+    == Parameters ==
+
+        Blending:
+            Specifies the method used for blending displacements for
+            points which are affected by more than one primitive. The
+            current options are:
+
+            Max Displace:
+                The individual displacements are added together and the
+                length of the result is clamped to the maximum of the
+                individual ones.
+            Biased Displace:
+                The result is a normalized weighted average using the
+                individual displacement lengths raised to the exponent
+                specified in the Tension parameter.
+            Weighted:
+                The result is normalized weighted average of the
+                individual displacements according to their weight value
+                assigned by WireCapture. Each weight is raised to the
+                exponent specified by the Tension parameter.
+        Tension:
+            If the Blending parameter is Biased Displace or Weighted,
+            then this specifies the exponent used. The larger the value,
+            the greater the bias will be towards the larger weight
+            values giving a higher "tension".
+        Transform Local Frame:
+            Controls the rotation of the local frames on the curve
+            (wire). Rotating a local frame causes the deformed point on
+            a geometry to rotate around the curve point that captured
+            it. Aligning local frame on the curve makes the deformed
+            points follow the curve more closely. The current options
+            are:
+
+            No Transform:
+                The local frames on the curve will not be aligned with
+                the local frames of the deforming curve. The deformed
+                geometry will be only translated.
+            Align Tangent:
+                Only the tangent vector of the rest frame will be
+                aligned with the local tangent of the deforming curve.
+                This option will rotate the deformed geometry so that
+                any vector on a rest geometry that was parallel to the
+                capturing tangent of the curve will appear to be
+                parallel to the tangent of the deforming curve.
+            Align Tangent And Attrib Normal:
+                If a normal attribute is specified for the deforming
+                curve then the deformed geometry is rotated so that any
+                vector that was parallel to the normal in the rest
+                arrangement will be also parallel in the deformed
+                space.
+        Treat Polygons As Lines:
+            This specifies the behavior used for closed polygon
+            primitives when told to shift points along primitives in the
+            U Deform parameter. If on, then the tangents shoot off at
+            first and last vertices of the closed polygon primitive. If
+            off, then the tangent of the last vertex will shoot off from
+            right before it wraps to the first vertex. The value of this
+            parameter should be the same as the one specified in the
+            WireCapture SOP used.
+	Recompute Point Normals:
+	    If enabled, this will recompute the point normals after
+	    deformation.
+	Assume Only Coordinate Changes In Input:
+	    Enables the assumption that only point positions need to be
+	    re-cached when the input geometry has changed to allow faster
+	    cooking. Unpredictable results will occur with this enabled if
+	    attributes or topology changes.
+
+        Visualize Weighting:
+            If on, this will generate point color attributes reflecting
+            the wire capture weights.
+        Visualize Type:
+            This specifies the type of visualization used when Visualize
+            Weighting is turned on.
+
+            Single Primitive:
+                Shows the weight of each primitive along a color
+                gradient. For points affected by multiple primitives, it
+                will use the blended deformation weight for coloring.
+            Multiple Primitives:
+                Uses a blend of primitive colors found in the second
+                input. If they don't exist, then Single Primitive is
+                used.
+        Visualize Mode:
+            This specifies the gradient used for visualization.
+
+            Infra-red:
+                Utilizes the entire color spectrum where they range from
+                blue (0) to red (1).
+            White to Red:
+                Provides a gradient which varies from white (0) to red
+                (1).
+            Grayscale:
+                Provides a gradient which ranges from black (0) to white
+                (1).
+            Black Body:
+                Ranges from black (0) to red, yellow, then white (1).
+        Zero Weight Point Color:
+            This specifies the color used for points which are not
+            affected by any capture primitives when using the Multiple
+            Primitive visualize type.
+
+    == Deform ==
+
+        Initialize From Rest Primitives:
+            This will initialize the parameters below using the
+            primitives found in the second input. An entry is created
+            for each primitive using it's primitive number.
+        Initialize From Rest Groups:
+            This will initialize the parameters below using the
+            primitive groups found in the second input. An entry is
+            created for each named primitive group.
+        Number of Deformers:
+            This specifies the number of deformer parameter sets that we
+            wish deform. Each set below has a toggle to indicate whether
+            it should be active.
+        Primitive:
+            This specifies the primitive group for which the Scale, U
+            Deform, and Clamp to Ends parameters apply.
+        Scale:
+            The specifies a radial scale around the deforming primitive
+            to apply.
+        U Deform:
+            This specifies a parametric u range to deform the points
+            along their capturing primitives. The first component
+            specifies the new start u value and the second component
+            gives the new end u value. The start value must be less than
+            or equal to the end value. These values are relative to the
+            U Range values of their corresponding primitive specified in
+            the WireCapture SOP. For example, if the point was captured
+            to a primitive using the u range of `[0.3,0.7]`, then the U
+            Deform parameters will map a value of 0 to 0.3 and a value
+            of 1 to 0.7.
+        Clamp to Ends:
+            If on, then when the U Deform parameters cause points to be
+            extended beyond the length of the deforming primitive, they
+            will be clamped to the maximum/minimum u values. If off,
+            then the points are allowed to extend off the primitive
+            using the tangents at the end points.
+@inputs
+    First:
+        Input geometry to deform. Must be first captured using
+        WireCapture.
+    Second:
+        Rest primitives. Must match third input in terms of number of
+        primitives and their order. This should be the same as the
+        second input into the WireCapture SOP. If it is desired that the
+        points be deformed long a different path, then they may be
+        modified from the second input of the WireCapture.
+    Third:
+        Deforming primitives. Must match second input in terms of number
+        of primitives. This is typically a Edit SOP branched off from
+        the sop piped in the second input.
+
+@related
+    - [Node:sop/wirecapture]
+

@@ -1,0 +1,226 @@
+#type: node
+#context: cop2
+#internal: light
+#icon: COP2/light
+
+= Lighting =
+
+"""Adds a light to the image."""
+
+This operator adds a light to the image. The light can be directional or
+non, and have ambient, specular and diffuse components. The image can be
+a flat image, an image with a bump map, or a deep raster image
+containing point and/or normal planes.
+
+== Flat Lighting ==
+
+    Flat lighting requires no extra information. It assumes the image is
+    a flat plane, and applies the lighting equation to the pixels. The
+    image occupies the area (0,0,0) to (1,1,0).
+
+    The light position should have a positive Z value. The center of the
+    image is (0.5, 0.5, 0). The distance the light is from Z=0
+    determines the brightness and the light's shape (if a cone line is
+    used).
+
+== Bump Map Lighting ==
+
+    Bump Map lighting requires a bump map, which can be produced with
+    the Bump COP. This type of lighting is similar to Flat lighting,
+    except that the surface normals are perturbed based on the bump
+    map.
+
+    To adjust the height of the bumps, you will need to brighten or dim
+    the bump map with a Bright COP. Or, if the bump map was created with
+    the Bump COP, adjust the Bump Height parameter there.
+
+== Deep Raster (3D) Lighting ==
+
+    3D lighting can be done with the help of Point and Normal maps,
+    which can be generated from the Deep Raster tab of the Mantra ROP.
+    If only a Point map is present, the Lighting COP will attempt to
+    build normals from the point positions. If only a Normal map is
+    present, the process is similar to that of Bump Map lighting, and
+    the points are assumed to be in the range (0,0,0) to (1,1,0).
+
+    The light can be placed anywhere relative to the 3D points. It is
+    useful to use the viewport inspect function (((i))) to determine the
+    3D point values so the light can be positioned more accurately.
+
+== Volumetric Lighting ==
+
+    Volumetric lighting can be used with any of the above lighting
+    techniques, though it is most effective when used with 3D lighting.
+    Volumetric lighting adds an atmospheric light-scattering effect so
+    that the cone of light can be seen.
+
+    Since volumetric lighting is quite time consuming to compute, it is
+    a good idea to get all your other lighting parameters setup first,
+    and then enable this option.
+
+If the alpha plane is scoped, the amount of light at each point is placed
+in it.
+
+[Include:copvexnode]
+
+[Include:coppixelparms#coppixeldescription/]
+
+[Include:copmaskparms#copmaskdescription/]
+
+
+@parameters
+
+    == Lighting ==
+
+        Surface Type:
+            Specifies the type of surface lighting to use:
+
+            Flat:
+                Image has uniform normals and uniform depth.
+            Bump Map:
+                Image has bumped normals and uniform depth.
+            Point & Normal:
+                Image has normal & point maps for 3D lighting.
+            Point Only:
+                Image has a point map for pseudo-3D lighting.
+            Normal Map:
+                Image has uniform depth and varying normals.
+        Eye Distance:
+            #channels: /eyedistance
+
+            The distance from the eye to the image (at Z=0).
+        Ambient:
+            #channels: /ambcolr /ambcolg /ambcolb /ambcola
+
+            The ambient component of the light.
+        Diffuse:
+            #channels: /lightdiffr /lightdiffg /lightdiffb /lightdiffa
+
+            The diffuse component of the light.
+        Specular:
+            #channels: /lightspecr /lightspecg /lightspecb /lightspeca
+
+            The specular component of the light.
+        Correct for Aspect Ratio:
+            If the image is not square, this adjusts the coordinates so
+            that spotlights are still circular.
+        Color Operation:
+            How to apply the light to the existing image:
+
+            Light Existing Color:
+	        The image color is used as the color of the surface,
+		and the lighting calculation replaces it.
+            Add to Existing Color:
+	    	The image color is used as the color of the surface,
+		and the lighting calculation is added to it.
+	    New Lighting Only:
+	        The image color is ignored, and replaced by the
+                new lighting. This will show only the ambient, diffuse
+		and specular colors.
+
+    == Material ==
+
+        This tab allows you to change the diffuse and specular models.
+
+        Diffuse Model:
+            The type of diffuse model to use:
+
+            Simple:
+                Simple dot product model.
+            Oren-Nayar:
+                Rougher material model, like clay.
+        Diffuse Roughness:
+            #channels: /diffrough
+
+            The roughness for the Oren-Nayar model.
+        Specular Model:
+            The specular model to use, Phong or Blinn.
+        Exponent:
+            #channels: /specexp
+
+            The Phong specular exponent.
+        Roughness:
+            #channels: /specrough
+
+            The Blinn roughness parameter.
+
+    == Light ==
+
+        Light position and orientation.
+
+        Position:
+            #channels: /lightpos1 /lightpos2 /lightpos3
+
+            The position of the light. In Flat, Bump Map and Normal Map
+            modes, the image coordinates are {0,0,0} (bottom left) to
+            {1,1,0} (top right).
+        Attenuation:
+            #channels: /atten
+
+            The distance at which the light is at 50% intensity.
+        Directional Light:
+            If on, the light is directional.
+        Direction:
+            #channels: /direction1 /direction2 /direction3
+
+            The direction vector of the light.
+        Cone:
+            #channels: /coneangle
+
+            The cone size of the light, in degrees.
+        Cone Falloff:
+            #channels: /fallangle
+
+            The falloff cone size of the light, in degrees.
+        Falloff:
+            The falloff function for the light.
+
+    == Volumetric ==
+
+        Adds volumetric light effects. Takes quite a bit longer to
+        compute.
+
+        Atmosphere Scatter:
+            #channels: /atmosphere
+
+            The amount of light scatter the atmosphere causes. Higher
+            numbers produce foggier lights.
+        Light Falloff:
+            #channels: /atfalldist
+
+            The distance that the volumetric fog extends away from the
+            light.
+        Falloff Function:
+            The volumetric fog falloff function.
+        Light Core Size:
+            #channels: /lsize
+
+            Increases or decreases the light hotspot size.
+        Ray March Step:
+            #channels: /atmos_step
+
+            The step size when marching through the light volume.
+            Smaller values produce finer results at the expense of
+            computation time.
+
+    == Planes ==
+
+        Bump, Point Normal Planes in 2nd input:
+            If on, all the specified planes are in input 2, otherwise
+            they are in input 1.
+        Bump, Point, Normal Name:
+            The name of the corresponding input planes.
+    [Include:copmaskparms#copmaskparms/]
+
+    [Include:coppixelparms#coppixelparms/]
+
+@locals
+    [Include:coplocalvars]
+
+
+@related
+    - [Node:cop2/bump]
+    - [Node:cop2/dof]
+    - [Node:cop2/emboss]
+    - [Node:cop2/fog]
+

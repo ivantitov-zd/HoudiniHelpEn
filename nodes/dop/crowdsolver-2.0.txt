@@ -1,0 +1,160 @@
+#type: node
+#context: dop
+#internal: crowdsolver
+#version: 2.0
+#icon: CROWDS/crowdsolver
+
+= Crowd Solver =
+
+"""Update crowd agents based on the custom steerforces and adjusting animation playback of clips"""
+
+Crowd Solver is used to integrate custom steerforces as well as set animation data that is used by agents. The steer forces use custom weights to control their overall effect. The weighting is normalized based on all of the steer forces. The main attributes driving the animation behavior are the `clipnames` (names of the current clips being played), `cliptimes` (current time of the clip being played) and `clipweights` (weights when blending multiple clips together in state transitions).
+
+@parameters
+Start Frame:
+    Start frame of the simulation.
+   
+== Particle Behavior ==
+
+Update Particles:
+    Specifies whether the embedded POP solver is enabled. This should be disabled when using this solver as a microsolver.
+Orientation Constraint:
+    Min Speed:
+        Minimum speed of the agent before change of orientation can occur (this will prevent agents flipping/jittering back and forth at very low speeds).
+Speed Constraint:
+        The speed of the agent will be scaled based on agent orientation/facing direction and velocity direction. Value of zero will result in speed unaffected, where at __Max Angle__ the speed will be zero. Any values in between will be linearly scaled 0 to 1.
+    Min Angle:
+         Minimum angle between agent and its velocity when speed is at its full.
+    Max Angle:
+        Maximum angle between agent and it's velocity where speed is zero.
+    Drag:
+        Overall drag applied to the agents.
+Up Constraint:
+        Determines how the Up vector is set.
+    Attribute:
+        Vector attribute Up is used for orientation
+    Perpendicular to Velocity:
+        Up vector is rotated to be perpendicular to velocity vector. Useful when agents such as birds are moving around in 3d space.
+
+== Avoidance ==
+
+This controls affect how the agent interact with each other to prevent/avoid self intersections.
+
+Agent Avoidance:
+    This will generate an avoidance force that causes the agents to avoid each other based on their anticipated time to collision.
+Agent Group:
+    Allows user to specify a subgroup of agents.
+Weight:
+    Weighting of the force used to prevent intersections. Higher values will cause the force to have more effect.
+Force Scale:
+    Scaling factor for the avoidance force that is used to alter agent path to avoid other agents.
+Anticipation Time:
+    How far into the future an agent will look for possible collisions (this uses current velocity to project the possible distance). The maximum distance for which an agent considers another agent as a neighbor is the minimum of the agent's current speed multiplied by the Anticipation Time, and the Neighbor Distance. 
+Neighbor Distance:
+    Maximum distance an agent searches for other agents when determining agent avoidance force.
+Max Neighbors:
+    Maximum number of nearest neighbors to an agent to consider when computing the agent avoidance force.
+
+== Look At ==
+
+This controls agent head override (direction the agents are looking at). To create a target `agentlookat` DOP should be used.
+
+Agent Look At:
+    This enables the effect.
+Agent Group:
+    Allows user to specify a subgroup of agents.
+Eye Offset:
+    Additional offset to the lookat target (depending on rigs some head bones pivots might be set around neck region this will allow to shift the eye line)
+Limit Head Turn Per Frame:
+    This will limit how fast the head turns to face new direction.
+Head Turn Angle:
+    How fast the agent head bone can turn.
+
+== Terrain ==
+
+This controls how agents are projected on the ground/terrain. It also allows for feet projection on the terrain and agent tilt when navigating uneven terrain.
+
+Agent Projection:
+    This will project the agents on the given terrain.
+Agent Group:
+    Allows user to specify a subgroup of agents.
+Source:
+    Source for the terrain object (SOP path or DOP object)
+Mode:
+        Controls direction of the agent projection.
+    Direction Vector:
+        Use the direction specified.
+    Up Attribute:
+        Use the agent Up attribute.
+Offset:
+    Additional offset that will shift all agents up or down.
+Agent Feet Adaption:
+    This controls how feet/terrain penetrations is resolved.
+Agent Group:
+    Allows user to specify a subgroup of agents.
+Ankle Offset:
+    Height of the ankle pivot position relative to the ground.
+Toe Offset:
+    Height of the toe pivot position relative to the ground.
+Lean Angle Per Frame:
+    How fast the agent can lean when moving over uneven terrain.
+Backward Lean:
+    Minimum backwards tilt when walking down an incline.
+Forward Lean:
+    Maximum forwards tilt when walking up an incline.
+
+== Animation Behavior ==
+    This controls how the agent animation clips are played (speed/retiming).
+Inplace Mocap:
+        These controls affect the animation that is played when using 'inplace' animation.
+    Allowed Variance: 
+        This sets how much the speed of the agent can vary with respect to the Inplace Gate Speed set on the [Crowd State DOP|Node:dop/crowdstate].
+Locomotion Mocap:
+        These controls affect the animation that is played when using 'locomotive' animation.
+    Mocap Influence:
+        Determines mocap influence on the overall movment of the agent. When agent animation is baked as locomotive, the gross world movement/orientation of the agent is removed from original animation and saved as separate _locomotion_ data. This control will apply that motion to the agent.
+    Sim Influence:
+        Determines how much existing forces in the crowd simulation will affect the agent movement. 
+Source Blend Lookup:
+    The lookup curve that is used when animation transitions from source state to destination state.
+Destination Blend Lookup:
+    The lookup curve that is used when animation transitions from source state to destination state.
+
+== Substeps ==
+
+Min Substeps:
+    The POP solver will always enforce this minimum number of substeps.
+
+    This should only rarely need to be changed.
+Max Substeps:
+    The POP solver will not break the simulation down in to more
+    substeps than this value.
+
+CFL Condition:
+    The CFL condition is a factor used to automatically determine what
+    size substep the scene requires. The idea is to control the distance
+    that a particle can travel in a given substep.
+
+    For example, when this parameter is set to 0.5, the solver will set
+    the length of each substep such that no particle travels more than
+    50% of the size of the smallest particle in a substep.
+
+Quantize to Max Substeps:
+    Always use substeps that divide up the frame by __Max Substeps__.  For example,
+    if __Max Substeps__ is set to 4, but the __CFL Condition__ only requires 3 substeps,
+    the solver will take frame steps of 0.25, 0.5, and 0.25.  This option can be useful for
+    re-using input geometry that has been cached to file at increments of 1/__Max Substeps__.
+
+Timescale:
+    An overall scale applied to the actual timestep. This parameter can be animated.
+            
+
+@inputs
+    Crowd Source object, Crowd State nodes, Crowd Transition nodes.
+
+@outputs
+    Agent primitives.
+
+@related
+- [Node:sop/agentprep]
+- [Node:dop/crowdstate]

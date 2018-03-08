@@ -1,0 +1,217 @@
+﻿= Vector =
+
+#type: node
+#context: chop
+#internal: vector
+#icon: CHOP/vector
+
+"""Performs vector operations on a set or sets of channels."""
+
+Vector math has several useful operations for use with channels, such as projections, dot products and distance/length calculations. This can be used for determining whether objects are facing each other, how far they are apart, or the angle between them. 
+
+This CHOP separates input channels into vectors based on the __Vector Mask__ parameter, and applies a vector operation to each set individually. Two inputs can be used for binary vector operations. If the second input does not have as many vectors as the first, Vector cycles through the second input's vectors.
+
+NOTE:
+        Channels that are not assigned to a vector mask will not be processed or present in the output.
+
+Some vector operations produce a scalar result. In this case, the vector channels are removed and replaced with a single channel, whose name depends on the operation performed (such as 'dist', 'dot' or 'angle'). 
+
+Additionally, an optional test can be done, comparing the vector operation results to a constant value or other vector channels. The result of this test can be used to remove vector channels or to produce zero/one channels representing where these vectors fail or pass the test. The __Test__ tab 
+contains the parameters for the vector test.
+
+@parameters
+
+== Vector ==
+
+   Operation:
+      Specifies which vector operation to perform on the vectors.
+
+      Magnitude of A:
+         Computes the magnitude of A and replaces the vector channels with a
+	 single scalar channel, 'len'. If more than one vector is processed,
+	 the wildcard replacement is appended to 'len' (ie, (tx3,ty3,tz3) would
+	 produce len3). Only one input is required for this operation; the
+	 second input is ignored.
+
+      Normalize A:
+         Reduces the vector to a unit-length vector. Only one input is required
+	 for this operation; the second input is ignored.
+
+      Distance between A and B:
+         Computes the straight-line distance between A and B, as if they were 
+	 points. This replaces the vector channels with a single channel named
+	 'dist'.
+
+      A dot B:
+         Computes the dot product of a vector from input 1 (A) with a vector 
+	 from input 2 (B). If more vectors exist in A than B, the B vectors
+	 cycle back to the first vector. This replaces the vector channels with
+	 a single channel named 'dot'.
+
+      Normalized A dot B:
+         Computes the dot product of A and B, but normalizes A and B first. 
+	 This replaces the vector channels with a single channel named 'dot'.
+
+      Angle between A and B:
+         Computes the angle between the two vectors, A and B, in degrees. This
+	 replaces the vector channels with a single channel named 'angle'.
+
+      A cross B:
+      	 Computes the cross product of A and B. Both vectors must have exactly
+	 three components. The cross product is the vector that is orthogonal
+	 to both A and B.
+
+      Scalar Project B onto A:
+         The scalar projection of B onto A determines the length of the vector
+	 produced when B is projected onto A. This replaces the vector channels
+	 with a single channel named 'proj'.
+
+      Vector Project B onto A:
+         Projects the vector B onto the vector A, so that the result is parallel
+	 to A, and the magnitude is proportional to the angle between A and B.
+
+      Add:
+         Adds vector A to B.
+
+      Subtract:
+         Subtracts vector A from B.
+
+      Reverse Subtract:
+         Subtracts vector B from A.
+
+      No operation:
+         Passes vector A through as-is. Generally only useful when used with
+         __Perform Vector Test__ to compare vectors.
+
+   Vector Mask:
+      A set of patterns which describe the members of the vectors. A wildcard
+      `*` can be used to match more than one vector. A single vector will
+      contain one channel from each pattern with the same wildcard replacement
+      (ie, `tx* ty* tz*` would process vectors like `(tx1,ty1,tz1)` and 
+      `(txa,txb,txc)`.
+
+   Vector Mask B:
+      An optional parameter which sets the vector mask for vectors in the
+      second input (B vectors), in case they happen to represent a different
+      vector quantity (such as N, P or V). If disabled, the __Vector Mask__
+      is used.
+
+   Vector Mask C:
+      The vector mask for the third comparison input, similar to the above two.
+      If disabled, the __Vector Mask__ is used.
+
+   Align:
+      For two-input vector operations, this parameter specifies which frame
+      range to use if the inputs' frame ranges differ, and how to sample the
+      inputs.
+
+      Extend to Min/Max:
+            Find the earliest start and latest end, and extend all
+            inputs to that range using the extend conditions.
+      Stretch to Min/Max:
+            Find the earliest start and latest end, and stretch every
+            input channel's start and end to that range.
+      Shift to Minimum:
+            Find the earliest start and shift all input channels so they all
+            start at that index. All channels are extended to the length
+            of the longest one.
+      Shift to Maximum:
+            Find the latest end and shift all input channels so they all end
+            at that index. Extend all channels to the length of the
+            longest one.
+      Shift to First Interval:
+            Shift all input channels to the start of the first channel and
+            sample all inputs using the first input's range.
+      Trim to First Interval:
+            Trim all input channels to first channel's range.
+      Stretch to First Interval:
+            Stretch all input channels to the first channel's range.
+      Trim to Smallest Interval:
+            Trim all input channels to the smallest start/end interval. The
+            start and end values may not come from the same channel.
+      Stretch to Smallest Interval:
+            Stretch all channels to the smallest start/end interval. The
+            start and end values may not come from the same channel.
+
+== Test ==
+    A comparison test can be run after the initial vector operation, which 
+    can remove vectors that fail the test or produce a channel containing the
+    samples which passed or failed for each vector.
+
+    Perform Vector Test:
+       Enables the vector test on the result of the vector operation,
+       which compares the result to a constant value or another input.
+
+    Result Vector Test:
+       Describes how the vector is compared, with one of the inequality 
+       operations listed.
+
+    Test Against:
+       The vector result is compared to a constant (__Vector Constant__) or
+       vector/scalar channels from one of the three inputs.
+
+    Vector Constant:
+       This parameter is the constant when __Test Against__ is set to Constant.
+       It will either have all fields enabled (if the vector result is a vector
+       quantity) or only the first field enabled (if the result is a scalar).
+
+    Test Result:
+        The output of the vector test can be the original vectors, modified 
+	vectors, or an on/off channel containing the test results.
+
+	Keep Original Vector A:
+	   If the test passes, the original A Vector is kept in the output. If
+	   the test failed, the vector channels are removed. This is useful
+	   for eliminating points or directions that fail the test in order
+	   to thin out the number of channels for faster downstream cooking.
+
+	Keep Result Vector:
+	   If the test passes, the result of the vector operation is kept in
+	   the output. If the test failed, it is removed.
+
+        Pass/Fail Channel:
+           A single channel is created called 'test' for each vector, with the
+	   suffix of the vector appended to it. This channel is 1 for samples
+	   where the test passed, and 0 for where it failed. This can be used
+	   for controlling a Blend or Switch CHOP. 
+
+    Pass If:
+       When determining whether to keep or discard a channel (when
+       __Test Result__ is Keep Original Vector or Keep Result Vector), the
+       test may pass for some samples and fail for others. Since a channel 
+       can only be entirely removed or entirely kept, vector channels that
+       pass on some samples and fail on others must be resolved.
+
+       All Samples Pass:
+          All samples in the vector test must pass the test in order for the
+	  vector channels to be kept.
+
+       One Sample Passes:
+          Only one sample needs to pass the vector test in order for the 
+	  vector channels to be kept.
+
+       A Fraction of the Samples Pass:
+          A specified fraction (from 0.0 to 1.0) of the samples must pass
+	  the test in order for the vector channels to be kept.
+       
+    Pass Fraction:
+       If __Pass If__ is set to 'Fraction of the Samples Pass', this sets
+       the fraction of samples which must pass in order for the test to be
+       considered successful. Zero means none need to pass, while 1.0 means
+       that all samples must pass. 
+     
+[Include:common#common]
+
+@locals
+
+    C:
+        The current channel (0 to NC-1).
+    NC:
+        The total number of channels.
+
+@related
+    - [Node:chop/blend]
+    - [Node:chop/object]
+    - [Node:chop/math]
+    - [Node:chop/switch]
+

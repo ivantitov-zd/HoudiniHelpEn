@@ -1,0 +1,537 @@
+= hou.ParmTemplateGroup =
+#type: homclass
+#cppname: HOM_ParmTemplateGroup
+#group: parmtemplates
+
+"""A group of parameter templates used to represent the parameter layout of
+a node or the parameters in a digital asset definition."""
+
+This class stores a group of [Hom:hou.ParmTemplate] objects.  You can create an
+empty group, create a group from a sequence of parm templates, or create a
+group from the parameter definitions of a digital asset or from a particular
+node's current parameter layout.  Similarly, you can set an asset's parameters
+or a node's parameter interface to the contents of a parameter group.
+
+You can get an asset's parm templates with
+[Hom:hou.HDADefinition#parmTemplateGroup] and set them with
+[Hom:hou.HDADefinition#setParmTemplateGroup].  Similarly, you can get an
+individual node's parameter definition with [Hom:hou.Node#parmTemplateGroup]
+and set it with [Hom:hou.Node#setParmTemplateGroup].  When setting a node's
+parameter interface, any parms that are not in the node's type's set of parms
+will be added as spare parameters.  Similarly, if parameters in the node's type
+are not present in the group, they will be automatically added at the end
+and made invisible.  Also, if they exist but the types, labels, looks, naming
+schemes, etc are different, Houdini will discard all changes you attempt to
+make to these reserved parameters except for visibility settings.
+
+Note that ParmTemplateGroups store their own copy of the parm templates.
+Asking for the parm templates in a group will return a copy of the parm
+templates; modifying those copies will not change the contents of the group.
+For example, to change a parameter in a group you cannot simply call
+[find|Hom:hou.ParmTemplateGroup#find] and modify the [Hom:hou.ParmTemplate] it
+returned.  Instead, you must call [replace|Hom:hou.ParmTemplateGroup#replace].
+
+It is important to understand the difference between folder parm templates and
+folder set parm templates when using ParmTemplateGroups.  Folder sets
+correspond directly to [Hom:hou.ParmTuple] objects -- there is one parm tuple
+(that contains one parm) for each set of folders, and changing the value
+of that parm changes which folder is displayed.  Individual Folders, on the
+other hand, do not directly correspond to [Hom:hou.ParmTuple] objects, but they
+are used in Houdini's <<Type Properties>> dialog and they make it easy to add
+individual folders and control which parameters are inside a folder.
+Unlike a [Hom:hou.FolderSetParmTemplate], a [Hom:hou.FolderParmTemplate] stores
+the set of parm templates inside that folder.  When a node or definition's
+parameters are set to the contents of a parm template group, the folder sets
+are determined and the parm tuple name for the set is the name of the first
+folder in that set.  The names of the other folders in the set are not used.
+
+ParmTemplateGroups use folder parm templates instead of folder set parm
+templates.  Attempting to add a FolderSetParmTemplate to a group will raise
+[Hom:hou.OperationFailed].  Asking a parm tuple for its parm template, on the
+other hand, may return a folder set but will never return a folder.
+Previously, folder parameter templates and parm template groups did not exist,
+so the only way to add folders were with special methods like
+[Hom:hou.HDADefinition#addParmFolder] and [Hom:hou.Node#addSpareParmFolder].
+Now that that they exist, you may create folders by passing folder parm
+templates to [Hom:hou.HDADefinition#addParmTuple] and
+[Hom:hou.Node#addSpareParmTuple].  However, using parm template groups is
+preferred over calling these methods.
+
+Note that folder parm templates are also used to represent multiparm blocks,
+much like the <<Type Properties>> dialog does.  The folder parm template's
+[Hom:hou.folderType] determines whether it is a folder or a multiparm block.  
+Unlike folder parm templates, which do not correspond directly to parameter
+instances, a multiparm parm template does correspond to an integer parameter
+that controls the number of instances of the multiparm.
+
+@methods
+
+::`__init__(self, parm_templates=())`:
+    #cppname: HOM_ParmTemplateGroup::HOM_ParmTemplateGroup
+    Create a new group from an optional sequence of parm templates.  If none
+    are passed in, the new group will be empty.
+
+    Because groups and folder parm templates can both be constructed using
+    a sequence of contained parm templates, it is possible to construct a
+    parm template group with parameters inside folders using a single
+    expression.  The following example creates a group with two folders
+    and with parameters inside each of those folders:
+
+    {{{
+    #!pycon
+    >>> group = hou.ParmTemplateGroup((
+    ... hou.FolderParmTemplate("folder", "Physical", (
+    ...     hou.FloatParmTemplate("mass", "Mass", 1),
+    ...     hou.FloatParmTemplate("density", "Density", 1),
+    ... )),
+    ... hou.FolderParmTemplate("folder", "Divisions", (
+    ...     hou.FloatParmTemplate("divisions", "Divisions", 3),
+    ...     hou.ToggleParmTemplate("laser", "Laser Scan", default_value=True),
+    ... )),
+    ... ))
+    >>> group.entries()
+    (<hou.FolderParmTemplate name='folder' label='Physical' folder_style=Tabs>,
+    <hou.FolderParmTemplate name= 'folder' label='Divisions' folder_style=Tabs>)
+    >>> group.entries()[0].parmTemplates()[0]
+    <hou.FloatParmTemplate name='mass' label='Mass' length=1 naming_scheme=XYZW look=Regular default_value=(0,)>
+    >>> group.entriesWithoutFolders()
+    (<hou.FloatParmTemplate name='mass' label='Mass' length=1 naming_scheme=XYZW look=Regular default_value=(0,)>,
+     <hou.FloatParmTemplate name='density' label='Density' length=1 naming_scheme=XYZW look=Regular default_value=(0,)>,
+      <hou.FloatParmTemplate name='divisions' label='Divisions' length=3 naming_scheme=XYZW look=Regular default_value=(0,0,0)>,
+       <hou.ToggleParmTemplate name='laser' label='Laser Scan' default_value=True>)
+    }}}
+
+    Raises [Hom:hou.OperationFailed] if any of the parm templates in the
+    sequence are [Hom:hou.FolderSetParmTemplate] objects.
+
+::`find(self, name)` -> [Hom:hou.ParmTemplate] or `None`:
+    #cppname: HOM_ParmTemplateGroup::find
+    Search in this group for a parm template whose name matches the specified
+    one.  Return a copy of the parm template or `None` if no match was found.
+
+    Note that this function returns a copy of the parm template stored in this
+    group.  Modifying the copy will not affect the parameters in this group.
+    The following example shows how to use the `find` and `replace` methods to
+    modify the `"pos"` parm template in the group:
+    {{{
+    #!pycon
+    >>> parm_template = group.find("pos")
+    >>> parm_template.setLabel("Position")
+    >>> parm_template.replace("pos", parm_template)
+    }}}
+
+    If you created the group from existing parameters, folder parm templates in
+    the same folder set will share the same name, so searching for a folder
+    using this method may return the first folder in the folder set.  To
+    instead search for a folder by its folder label, use
+    [findFolder|Hom:hou.ParmTemplateGroup#findFolder].
+
+    Note that, in general, the group does not prevent you from adding two
+    parameters with the same name.  In this case, searching for a parameter
+    with this name will return the first one.  Note, though, that when
+    when setting this group to a node or asset definition's parms, either
+    the duplicate parameters will be renamed on an exception will be raised.
+    See the `rename_conflicting_parms` parameter to
+    [Hom:hou.HDADefinition#setParmTemplateGroup] for more information.
+
+::`findIndices(self, name_or_parm_template)` -> tuple of `int`:
+    #cppname: HOM_ParmTemplateGroup::findIndices
+    Search in this group for a parm template and return a tuple of integers
+    corresponding to the indices of the parm in the group.  Return an empty
+    tuple if no match was found.
+
+    `name_or_parm_template`:
+        Either the name of the parm template or another [Hom:hou.ParmTemplate]
+        object to compare against when searching for a match.
+
+    If the parm template was found and it is not inside any folders, the
+    result tuple will contain a single integer with the index of the parm
+    template.  Otherwise, the first entry will be the index of a folder inside
+    the group, the next will be an index of a folder inside that folder, and
+    so on until the last index is an index of a parm template inside a folder.
+
+    See also
+    [findIndicesForFolder|Hom:hou.ParmTemplateGroup#findIndicesForFolder].
+
+::`findFolder(self, label_or_labels)` -> [Hom:hou.FolderParmTemplate] or `None`:
+    #cppname: HOM_ParmTemplateGroup::findFolder
+    Search in this group for a folder parm template with the given label.
+    Return a copy of the [Hom:hou.FolderParmTemplate] or `None` if the
+    folder wasn't found.
+
+    `label_or_labels`:
+        Either a string containing the folder's label or a tuple of strings
+        containing the labels of containing folders as well as the folder's
+        label.
+
+    Note that a folder parm template's label is what appears in the interface
+    in the parameter dialog.  The folder parm template's name is used to
+    determine the name of the parm tuple for the folder set, if the folder is
+    the first in the folder set.  See the documentation for this class for
+    more information.
+
+::`findIndicesForFolder(self, label_or_labels)` -> tuple of `int`:
+    #cppname: HOM_ParmTemplateGroup::findIndicesForFolder
+    Search in this group for a folder parm template with the given label.
+    Return an empty tuple if no match was found.
+
+    See [findFolder|Hom:hou.ParmTemplateGroup#findFolder] for a description of
+    the parameter and [findIndices|Hom:hou.ParmTemplateGroup#findIndices] for a
+    description of the return value.
+
+    Note that this method does not accept a parm template.  However, if you
+    have a folder parm template and want to find its indices, simply call
+    [findIndices|Hom:hou.ParmTemplateGroup#findIndices] on the folder parm
+    template.
+
+::`entryAtIndices(self, indices)` -> [Hom:hou.ParmTemplate]:
+    #cppname: HOM_ParmTemplateGroup::entryAtIndices
+    Given a sequence of integer indices return a copy of the
+    [Hom:hou.ParmTemplate] object at that location.  The indices are of
+    the format returned by [findIndices|Hom:hou.ParmTemplateGroup#findIndices].
+
+    Like the [Hom:hou.ParmTemplate#find] and [Hom:hou.ParmTemplate#entries]
+    methods, this method returns a copy of the parm template stored inside
+    this group.  Modifying the copied parm template will not affect the
+    contents of this group.  Use [replace|Hom:hou.ParmTemplateGroup#replace] to
+    change a parm template.
+
+    Raises [Hom:hou.OperationFailed] if the indices are invalid, including when
+    the indices sequence is empty.
+
+    This method could be implemented as follows:
+    {{{
+    #!python
+    def entryAtIndices(self, indices):
+        if len(indices) == 0:
+            raise hou.OperationFailed("Invalid indices")
+        parm_template = self.entries()[indices[0]]
+
+        # If there are multiple indices then we should have just looked up
+        # a folder parm template.
+        for index in indices[1:]:
+            parm_template = parm_template.parmTemplates()[index]
+        return parm_template
+    }}}
+
+::`containingFolder(self, name_or_parm_template)` -> [Hom:hou.FolderParmTemplate]:
+    #cppname: HOM_ParmTemplateGroup::containingFolder
+    Return a copy of the [Hom:hou.FolderParmTemplate] in this group containing
+    a parm template.
+
+    `name_or_parm_template`:
+        Either the name of the parm template or another [Hom:hou.ParmTemplate]
+        object to compare against when searching for a match.
+
+    Raises [Hom:hou.OperationFailed] if the parameter is not inside the
+    group or is not inside a folder.
+
+::`containingFolderIndices(self, name_or_parm_template_or_indices)` -> tuple of `int`:
+    #cppname: HOM_ParmTemplateGroup::containingFolderIndices
+    Return the indices of the folder in this group containing a given parm
+    template.  Return an empty tuple if no match was found.
+
+    See [replace|Hom:hou.ParmTemplateGroup#replace] for a description of the
+    parameter and [findIndices|Hom:hou.ParmTemplateGroup#findIndices] for a
+    description of the return value.
+
+    Raises [Hom:hou.OperationFailed] if the parameter is not inside the
+    group or is not inside a folder.
+
+::`entries(self)` -> tuple of [Hom:hou.ParmTemplate]:
+    #cppname: HOM_ParmTemplateGroup::entries
+    Return a tuple containing copies of the parm templates inside this group.
+
+    Note that folders are returned as [Hom:hou.FolderParmTemplate] objects,
+    and each folder parm template contains the parm templates inside it.
+    Use [Hom:hou.FolderParmTemplate#parmTemplates] to access the elements in
+    a folder.
+
+    The following example creates a function named `allParmTemplates` that
+    returns a single sequence of parm templates, including folders, for
+    all parm templates in the group:
+    {{{
+    #!python
+    def allParmTemplates(group_or_folder):
+        for parm_template in group_or_folder.parmTemplates():
+            yield parm_template
+
+        # Note that we don't want to return parm templates inside multiparm
+        # blocks, so we verify that the folder parm template is actually
+        # for a folder.
+            if (parm_template.type() == hou.parmTemplateType.Folder and
+            parm_template.isActualFolder()):
+                for sub_parm_template in allParmTemplates(parm_template):
+                    yield sub_parm_template
+    }}}
+
+    See also the [parmTemplates|Hom:hou.ParmTemplateGroup#parmTemplates]
+    method.
+
+::`parmTemplates(self)` -> tuple of [Hom:hou.ParmTemplate]:
+    #cppname: HOM_ParmTemplateGroup::parmTemplates
+    This method is simply an alias for the
+    [entries|Hom:hou.ParmTemplateGroup#entries] method.
+
+    It makes it easier to search down through a parm template group for items
+    nested in folders, since the [Hom:hou.FolderParmTemplate] class also has
+    a method named `parmTemplates`.  The following example shows how to look
+    up the labels for a folder parameter given its indices:
+    {{{
+    #!python
+    def folderLabels(parm_template_group, indices):
+        container = parm_template_group
+        result = []
+        for index in indices:
+            container = container.parmTemplates()[index]
+            result.append(container.label())
+        return result
+    }}}
+
+::`entriesWithoutFolders(self)` -> tuple of [Hom:hou.ParmTemplate]:
+    #cppname: HOM_ParmTemplateGroup::entriesWithoutFolders
+    Return a tuple containing all the non-folder parm templates inside this
+    group.  The output is the flattened set of parm templates in the group,
+    and includes the non-folder parms inside folders.
+
+    Like [entries|Hom:hou.ParmTemplateGroup#entries], this method returns a copy
+    of the parm templates inside this group.
+
+    Note that this function does not return parm templates for entries inside
+    multiparm blocks.
+
+    Also see the [entries|Hom:hou.ParmTemplateGroup#entries] method for the
+    example function `allParmTemplates`.
+
+::`replace(self, name_or_parm_template_or_indices, parm_template)`:
+    #cppname: HOM_ParmTemplateGroup::replace
+    Replace a parm template inside this group with another parm template.
+
+    `name_or_parm_template_or_indices`:
+        Either the name of the parm template being replaced, a copy of the parm
+        template, or a tuple of integer indices that identify the parm template
+        and any containing folders.
+
+    This method changes the contents of this group.  Note that it stores a
+    copy of the parm template in the group, so future changes to the parm
+    template passed in will not affect the group.
+
+    See the [find|Hom:hou.ParmTemplateGroup#find] method for a simple example
+    of how to use this method.
+
+    Note that parm templates for reserved parameters (for example, the
+    transform parameters in object-level digital assets) can be replaced
+    in the parm template group, but all aspects of reserved parameters except
+    for their visibility and join settings will be restored to their defaults
+    when you save this group to a node or asset definition.
+
+    Raises [Hom:hou.OperationFailed] if the parm template doesn't exist.
+
+::`insertBefore(self, name_or_parm_template_or_indices, parm_template)`:
+    #cppname: HOM_ParmTemplateGroup::insertBefore
+    Insert a parm template inside this group before an existing one.  The
+    new parm template will be in the same folder as the existing one.
+
+    See [replace|Hom:hou.ParmTemplateGroup#replace] for a description of the
+    name/parm template/indices parameter.
+
+    Use [appendToFolder|Hom:hou.ParmTemplateGroup#appendToFolder] to add an
+    entry to a empty folder.  Use [append|Hom:hou.ParmTemplateGroup#append] to
+    add an entry to an empty parm template group.
+
+::`insertAfter(self, name_or_parm_template_or_indices, parm_template)`:
+    #cppname: HOM_ParmTemplateGroup::insertAfter
+    Insert a parm template inside this group after an existing one.  The
+    new parm template will be in the same folder as the existing one.
+
+    See [replace|Hom:hou.ParmTemplateGroup#replace] for a description of the
+    name/ parm template/indices parameter.
+
+    Use [appendToFolder|Hom:hou.ParmTemplateGroup#appendToFolder] to add an
+    entry to a empty folder.  Use [append|Hom:hou.ParmTemplateGroup#append] to
+    add an entry to an empty parm template group.
+
+::`append(self, parm_template)`:
+    #cppname: HOM_ParmTemplateGroup::append
+    Add a parm template after all existing parm templates, outside of
+    any folder.
+
+    See also [appendToFolder|Hom:hou.ParmTemplateGroup#appendToFolder].
+
+::`addParmTemplate(self, parm_template)`:
+    #cppname: HOM_ParmTemplateGroup::addParmTemplate
+    This method is simply an alias for the
+    [append|Hom:hou.ParmTemplateGroup#append] method.
+
+    It makes it easier to treat parm template groups and
+    [Hom:hou.FolderParmTemplate] objects uniformly, since
+    [Hom:hou.FolderParmTemplate] has an
+    [addParmTemplate|Hom:hou.FolderParmTemplate#addParmTemplate] method.
+
+::`appendToFolder(self, label_or_labels_or_parm_template_or_indices, parm_template)`:
+    #cppname: HOM_ParmTemplateGroup::appendToFolder
+    Add a parm template to the bottom of an existing folder.
+
+    Note that you cannot add to a folder by simply looking up the folder parm
+    template and calling [Hom:hou.FolderParmTemplate#addParmTemplate] on it,
+    because asking for a folder will return a deep copy.  The parm templates
+    inside the copied folder will be separate from those inside this group,
+    and modifying the folder will not affect the group.  Consider the following
+    example:
+
+    {{{
+    #!pycon
+    >>> folder = group.findFolder("Transform")
+    # "folder" now has its own copy of the parms inside it.
+    >>> folder.addParmTemplate(new_parm_template)
+    # "folder"'s parm templates are updated, but the group's parm templates are
+    # unchanged.
+
+    >>> group.appendToFolder(folder, new_parm_template)
+    # The group is modified.  "folder"'s contents are unchanged.
+    }}}
+
+::`remove(self, name_or_parm_template_or_indices)`:
+    #cppname: HOM_ParmTemplateGroup::remove
+    Remove a parm template from the group.  Note that if you remove a folder,
+    all of the parm templates in the folder are also removed.
+
+    See [replace|Hom:hou.ParmTemplateGroup#replace] for a description of the
+    name/parm template/indices parameter.
+
+    Raises [Hom:hou.OperationFailed] if the parm template could not be found.
+
+::`hide(self, name_or_parm_template_or_indices, on)`:
+    #cppname: HOM_ParmTemplateGroup::hide
+    Hide a parameter by making it invisible.  The parameter still exists in
+    the group, but parameter dialogs will not display it.
+
+    See [replace|Hom:hou.ParmTemplateGroup#replace] for a description of the
+    name/parm template/indices parameter.
+
+    This method could be implemented as follows:
+    {{{
+    #!python
+    def hide(self, name_or_parm_template_or_indices, on):
+        parm_template = self.find(name_or_parm_template_or_indices)
+        parm_template.hide(on)
+        self.replace(name_or_parm_template_or_indices, parm_template)
+    }}}
+
+    See also [hideFolder|Hom:hou.ParmTemplateGroup#hideFolder] and
+    [Hom:hou.ParmTemplate#hide].
+
+::`hideFolder(self, label_or_labels, on)`:
+    #cppname: HOM_ParmTemplateGroup::hideFolder
+    Hide a folder and all the parameters in it.
+
+    You may pass in either a string containing a single folder name or
+    a sequence of strings to indentify a nested folder.  For example,
+    the sequence `("Render", "Dicing")` identifies the `Dicing` folder inside
+    the `Render` folder.  The folder is hidden if `on` is `True` and unhidden
+    if it is `False`.
+
+    The following example hides the Transform parameter in a geometry object:
+    {{{
+    #!pycon
+    >>> group = geo_node.parmTemplateGroup()
+    >>> group.hideFolder("Transform", True)
+    >>> geo_node.setParmTemplateGroup(group)
+    }}}
+
+    The following example hides the Dicing folder inside the Render folder
+    on a geometry object:
+    {{{
+    #!pycon
+    >>> group = geo_node.parmTemplateGroup()
+    >>> group.hideFolder(("Render", "Dicing"), True)
+    >>> geo_node.setParmTemplateGroup(group)
+    }}}
+
+    This method could be implemented as follows:
+    {{{
+    #!python
+    def hideFolder(self, label_or_labels, on):
+        self.hide(self.findFolder(label_or_labels), on)
+    }}}
+
+    See also [hide|Hom:hou.ParmTemplateGroup#hide].
+
+::`isHidden(self, name_or_parm_template_or_indices)` -> `bool`:
+    #cppname: HOM_ParmTemplateGroup::isHidden
+    Return whether the given parameter is itself hidden or lies inside
+    a hidden folder.
+
+    See [replace|Hom:hou.ParmTemplateGroup#replace] for a description of the
+    name/parm template/indices parameter.
+
+    Note that if the parameter is inside a hidden folder but the parameter is
+    not marked as hidden, calling [Hom:hou.ParmTemplate#isHidden]
+    on the parm template will return `False`, while this method will return
+    `True`.
+
+::`isFolderHidden(self, label_or_labels)` -> `bool`:
+    #cppname: HOM_ParmTemplateGroup::isFolderHidden
+    Return whether a folder or one of its containing folders is hidden.
+
+    Note that if a folder is inside a hidden folder but this folder is
+    not marked as hidden, calling [Hom:hou.ParmTemplate#isHidden]
+    on the folder parm template will return `False`, while this method will
+    return `True`.
+
+    You may pass in either a string containing a single folder name or
+    a sequence of strings to indentify a nested folder.  For example,
+    the sequence `("Render", "Dicing")` identifies the `Dicing` folder inside
+    the `Render` folder.  The folder is hidden if `on` is `True` and unhidden
+    if it is `False`.
+
+::`clear(self)`:
+    #cppname: HOM_ParmTemplateGroup::clear
+    Remove all parm templates from this group.
+
+::`asDialogScript(rename_conflicting_parms=False, full_info=False)`:
+    #cppname: HOM_ParmTemplateGroup::asDialogScript
+    Return a string containing the dialog script file contents corresponding
+    to this parm template group.
+
+    Houdini saves parameter definitions in this format when saving digital
+    asset definitions (in the `DialogScript` section of the digital asset) and
+    when saving parameter layouts of nodes.
+
+    The default behaviour for reserved parameters is to output `baseparm`
+    tokens for reserved parameters so that it is resistant to changes in their
+    definition. To change this, use `full_info=True`.
+
+::`setToDialogScript(dialog_script)`:
+    #cppname: HOM_ParmTemplateGroup::setToDialogScript
+    Set the contents of this group to match the parameters defined by the
+    given dialog script string.
+
+    Raises [Hom:hou.OperationFailed] if there is an error in the dialog script
+    contents.
+
+::`asCode(self, function_name=None, variable_name=None)`:
+    #cppname: HOM_ParmTemplateGroup::asCode
+    Return Python code that will recreate this group.
+
+    `function_name`:
+        If not `None`, the returned code will create a Python function.
+
+    `variable_name`:
+        The name of the variable that will be assigned the newly-created
+        parm template group.
+
+::`sourceNode(self)` -> [Hom:hou.Node] or `None`:
+    #cppname: HOM_ParmTemplateGroup::sourceNode
+    Return the node that the parameter template group was generated from.
+    If the group was not generated from a node, then return None.
+
+    Raises [Hom:hou.ObjectWasDeleted] if the source node has been destroyed.
+
+::`sourceNodeType(self)` -> [Hom:hou.NodeType] or `None`:
+    #cppname: HOM_ParmTemplateGroup::sourceNodeType
+    Return the node type that the parameter template group was generated from.
+    If the group was not generated from a node type, then return None.
+
+    Raises [Hom:hou.ObjectWasDeleted] if the source node type has been
+    destroyed.

@@ -1,0 +1,618 @@
+﻿= HScript language guide =
+
+#order: -10
+
+[List of HScript commands|/commands/]
+
+== Variables ==
+
+In HScript, you can assign strings to variables with the set command: 
+
+Set a variable:
+    `set x = "hello"`
+    
+Set a global variable:
+    `set -g x = "hello"`
+    
+    or
+    
+    `setenv x = "hello"`
+    
+Unset a variable:
+    `set -u x`
+    
+A variable name must begin with letter or an underscore (`_`), followed by any number of letters, numbers or underscores.
+
+To use a variable in a command, prefix its name with a dollar sign ($):
+
+{{{
+> set foo = "bar"
+> echo $foo
+bar
+}}}
+
+You can optionally enclose the name of the variable in curly braces ({}) to prevent the variable name from running into surrounding text:
+
+{{{
+> echo ${foo}baz
+barbaz
+}}}
+
+In addition, when you use curly braces HScript will expand variable references in the name before looking up its value. This lets you simulate simplistic arrays:
+
+{{{
+set foo1 = Padma
+set foo2 = Mohammed
+for i = 1 to 2 echo ${foo$i} end
+Padma
+Mohammed
+}}}
+
+In HScript, variables can be local or global (sometimes called system variables).
+
+Local variables are local to the script being run. When the script is finished, the variable disappears. Local variables cannot be used outside the script in which they're defined. To create or set a local variable, use `set`. The variables created by the `for` and `foreach` loops are always local.
+
+Global variables are available to all scripts and to any programs started by Houdini. To create or set a global variable, use `setenv` or `set -g`.
+
+=== Variable modifiers === (modifiers)
+
+You can add modifiers to the end of variable names to edit the returned value. These modifiers do not change the value stored in the variable, they only change the value returned by the variable reference with the modifier.
+
+To modify the variable value, add `:<<code>>` to the end of the variable name. For example:
+
+{{{
+> set afile = /home/matt/bin/foo.bar
+> echo $afile:e
+bar
+> echo ${afile:e}
+bar
+}}}
+
+The available codes are:
+
+`:h`:
+    (Head) The path part of a pathname (that is, the path up to the filename).
+    
+    {{{
+    > echo ${afile:h}
+    /home/matt/bin
+    }}}
+    
+`:t`:
+    (Tail) Just the filname part of a pathname.
+    
+    {{{
+    > echo ${afile:t}
+    foo.bar
+    }}}
+    
+`:e`:
+    The extension on the end of the filename.
+    
+    {{{
+    > echo ${afile:e}
+    bar
+    }}}
+    
+`:r`:
+    (Root) All parts of a pathname _except_ the extension.
+    
+    {{{
+    > echo ${afile:r}
+    /home/matt/bin/foo
+    }}}
+    
+`:s/<<ptrn>>/<<repl>>/`:
+    Substitute occurrences of pattern <<ptrn>> with <<repl>>.
+    See the `:g` and `:a` modifiers below.
+    
+    {{{
+    > echo ${afile:s}/foo/baz/
+    /home/matt/bin/baz.bar
+    }}}
+    
+`:u`:
+    Convert the value to uppercase.
+    See the `:g` and `:a` modifiers below.
+    
+    {{{
+    > set str = Hello There
+    > echo ${str:u}
+    HELLO THERE
+    }}}
+    
+`:l`:
+    Convert the value to lowercase.
+    See the `:g` and `:a` modifiers below.
+    
+    {{{
+    > set str = Hello There
+    > echo ${str:l}
+    hello there
+    }}}
+    
+Use the following prefixes to modify the behavior of the codes:
+
+`:g`:
+    (Global) Treat the string as a whitespace-delimited list of strings, and apply the
+    following code to each component independently.
+    
+`:a`:
+    (All) Recursively apply the following code as many times as possible.
+    
+For example:
+
+{{{
+#!hscript
+set A = "foo1 foo2 foo3 foofoo4"
+
+$A:u == "Foo1 foo2 foo3 foofoo4"
+$A:u:u == "FOo1 foo2 foo3 foofoo4"
+$A:gu == "Foo1 Foo2 Foo3 Foofoo4"
+$A:gu:u == "FOo1 Foo2 Foo3 Foofoo4"
+$A:au == "FOO1 FOO2 FOO3 FOOFOO4"
+
+$A:s/foo/bar/ == "bar1 foo2 foo3 foofoo4"
+$A:s/foo/bar/:s/foo/bar/ == "bar1 bar2 foo3 foofoo4"
+$A:gs/foo/bar/ == "bar1 bar2 bar3 barfoo4"
+$A:as/foo/bar/ == "bar1 bar2 bar3 barbar4"
+}}}
+
+== Put the output of a command in a variable ==
+
+Unlike expression functions, HScript commands are not functions and do not have return values. They just print output to the textport. If you try to assign the result of a command to a variable, as in:
+    
+{{{
+set objects = opls /obj
+}}}
+
+...you'll just get the string `"opls /obj"` in the `$objects` variable. However, you can capture the output of a command as a string and put it in a variable to achieve the same effect. To capture the output of a command, put it inside a run expression function and then use backquotes to evaluate the expression in HScript. Essentially, you're calling HScript inside an expression (to get a return value) inside HScript.
+
+{{{
+set objects = `run("opsls /obj")`
+echo $objects
+model ambient1 light1 light2 light3 cam1
+}}}
+
+== Redirect the output of a command to a file ==
+
+To redirect the output of an HScript command to a file, use `>filename` in the command. To append to the file instead of overwriting it, use `>>filename`. To redirect the error output and the standard output of a command, use `>&filename`.
+
+When using the unix command to launch an external process, you may want to do redirection in the external shell instead of in the textport. Enclose the argument in single quotes to prevent the Houdini command interpreter from acting on the redirection before the external shell can see it.
+
+{{{
+unix myscript.pl '>output.txt'
+}}}
+
+== Control structures ==
+
+=== if ===
+
+The if statement executes a block of commands if a condition is true. You can optionally test alternate conditions with else if and execute a block of code if all other conditions fail with else.
+
+{{{
+if condition1 [then]
+    commands to execute if condition is true
+else if condition2
+    commands to execute if condition2 is true
+else
+    commands to execute otherwise
+endif
+}}}
+
+For example:
+
+{{{
+if ( $F == 1 ) then
+    echo Frame One
+else
+    echo Not Frame One
+endif
+}}}
+
+Currently, statements inside the `if` clause must occur on separate lines. That is, statements like `if ($F == 1) echo Frame One` will not work.
+
+=== for ===
+
+The `for` statement loops over a block of statements, incrementing a "counter" variable from a start number to an end number, optionally by a certain step.
+
+{{{
+for count_variable = start to end [step stepsize]
+    commands to loop
+end
+}}}
+
+Do not add a $ before the name of the count variable in the for statement. For example:
+  
+{{{
+for i = 1 to 3
+    echo $i
+end
+
+for i = 1 to 100 step 3
+    echo $i
+end
+}}}
+
+=== foreach ===
+
+The `foreach` statement loops over a block of statements, setting a variable to the next element in a list each time.
+
+{{{
+foreach iterator_variable (list_string)
+    commands to loop
+end
+}}}
+
+For example:
+    
+{{{
+foreach i ( a b c )
+    echo $i
+end
+
+foreach object ( `run("opls -d")` )
+    echo Object $object
+end
+}}}
+
+HScript does not have a real list or array type. The list the for each statement loops over is a string that HScript splits into elements the same way it parses the command line into arguments. See how HScript splits up the command line.
+
+=== while ===
+
+The `while` statement loops over a block of statements as long as a condition is true. while condition commands to loop while condition is true end For example: 
+
+{{{
+set i = 0
+while ( $i < 10 )
+    set i = `$i+1`
+    echo $i
+end
+}}}
+
+=== break/continue ===
+
+The break statement exits the current loop prematurely. The continue statement ends the current iteration of a loop prematurely and starts the next one. 
+
+== Condition operators ==
+
+You can use these operators in the if and while structures:
+
+`()`:
+    Grouping, precedence.
+
+`== != < > <= >=`:
+    Comparison: equal, not equal, less-than, greater-than, less-than or equal, greater-than or equal.
+
+`&& ||`:
+    Logical and, logical or.
+
+You can enclose HScript expressions in parentheses for clarity, but it is not necessary:
+
+{{{ 
+for i = 1 to 10
+...
+end
+
+for (i = 1 to 10)
+...
+end
+}}}
+
+== Quoted strings ==
+
+Text inside single quotes (`'`) is not expanded.
+
+Text inside double quotes (`"`) has variables expanded.
+
+A double-quoted string is considered one argument.
+
+A backslash character (`\\`) escapes the next character. For example, to use double-quotes in a string: `"I had a \\"great\\" time."`.
+
+When a string doesn't require variable expansion, use single quotes to speed up evaluation.
+
+If you have two quoted strings next to each other with no spaces, they are considered a single argument.
+
+For example:
+  
+{{{
+set foo = "Hello world"
+echo '$foo='"$foo"
+$foo=Hello world
+}}}
+
+...the echo command has one argument: `'$foo=Hello world'`.
+
+HScript evaluates backquotes with a higher priority than double quotes. If a double-quoted argument encloses a back-quoted string, the back-quoted string may contain double quotes without terminating the initial double quote delimiter. 
+
+For example, the string:
+    
+{{{
+foo`ch("/obj/geo1/tx")`
+}}}
+
+...is considered a single argument.
+
+As a general rule, do not include spaces between backquotes and what's inside them. Houdini may not evaluate them if there are extra spaces.
+
+== Comments ==
+
+Everything following a `#` character on a line is considered a comment. To use a literal `#` in an unquotes string without starting a comment, put a backslash (`\\`) in front of it.
+
+== Splitting the command line ==
+
+Houdini splits input lines into words at space characters. The special characters `; < > ( ) =` form separate words and Houdini will insert spaces around these characters in unquoted strings. HScript is very lax about arguments. Basically anything it doesn't understand as a command or option, it will treat as a string. This can be useful when not having to put quotes around something makes multiple levels of quoting easier. However, it may insert extra spaces around special characters in unquoted strings.
+
+As a general rule, you should put quotes around strings you don't want HScript to alter.
+
+== Using the HScript textport ==
+
+The textport lets you input HScript commands and see the results. To open a new textport window, choose `Windows > HScript textport`. To put a textport in a pane, open the pane's Pane menu and choose __Textport__.
+
+- Quick copy and paste: select text, then click ((MMB)) to immediately paste it into the command line.
+
+- Quick help: type help command_name to print a text version of the command's online help in the textport.
+
+- Type ahead: you can start typing new commands before Houdini has finished executing the current command. Houdini will execute the "buffered" commands when it's done.
+
+- Scrolling: use Page up and Page down to scroll, or press ((RMB)) to grab the contents of the window and drag.
+
+- Continuation: if you press ((Enter)) in a command line that's not finished (for example, in the middle of a for loop), the command line will continue until you finish the open block (with end).
+    
+- Command history
+
+    Recall a previous command on the command line:
+        Press ((Up)) and ((Down)) to move through the history of previous commands. You can edit the text of the recalled command before executing it.
+        
+    Repeat the last command:
+        Type !! on the command line.
+        
+    Repeat a previous command:
+        Type !-num on the command line to execute the command from num entries ago. For example, type `!-5` to repeat the fifth most recent command.
+        
+    Repeat the last command matching a pattern:
+        Type !string on the command line to execute the previous command containing string.
+        
+    View the command history:
+        Use the history command to print the command history.
+
+- Create aliases of commonly used commands
+
+    In HScript you can use the alias command to assign are frequently used command, often with arguments, to a new command name. For example, if you find you frequently need to list the names of the objects in the scene, you can assign the command to the shorter, easier to type alias `objs`.
+    
+    {{{
+    alias objs "opls /obj"
+    }}}
+    
+    Now typing objs on the command line will execute opls /obj.
+    
+    HScript's alias expansion is not as sophisticated as `csh`. For example, there is no recursive alias expansion; the following sequence of commands will not produce the expected result:
+    
+    {{{
+    alias opcd opcf
+    alias cd opcd
+    }}}
+    
+    The cd alias will result in an `unknown command "opcd"` message since the alias expansion terminates after the first expansion.
+    
+    Also, HScript's alias expansion does not include the history meta-character substitution feature of `csh`.
+
+== hscript standalone application ==
+
+The `hscript` application is in `$HFS/bin`. Running it on the system command line will give you a console similar to the textport in which you can run HScript commands and see the results.
+
+The hscript application lets you write batch scripts that exercise the full power of Houdini without having to start up the entire graphical interface.
+
+Use `hscript -q` on the command line to suppress the version information the utility normally prints when it starts up. This is useful when you're redirecting the output of the hscript standalone process.
+
+== Create and use script files ==
+
+You can encapsulate a group of commands in a script file so you can reuse its functionality. Simply create a text file containing the commands you want to run. In general, you'll want to save the script file in the script path, for example in `$HOME/houdiniversion/scripts`.
+
+In scripts, you can use the exit statement to exit the script prematurely. This exits all loops cleanly. HScript does not support setting an "exit status" like a UNIX shell, but you can use a global variable to achieve the same thing.
+
+You can pass arguments to the script when you run it to customize its behavior. To use arguments in the script file, use `$argn` variables:
+    
+`$arg0` is set to the name of the script as it was called.
+
+`$arg1, $arg2, $arg3,` etc. are set to the arguments passed in to the script. 
+
+`$argc` is set to the number of arguments passed in to the script. For example, if the script is called with myscript first second third (three arguments), $argc is 3.
+
+To do simple parsing of the command line, or to work with a variable number of arguments, you can use the shift command. The shift command removes the first argument and shifts all the remaining arguments down, so `$arg1` is now what was `$arg2`. So, you can iterate through all the arguments by processing the value of `$arg1`, then calling shift to move the next argument into `$arg1`.
+
+You can also read input from the user with the read command.
+
+=== Run a script ===
+
+Run a script in the script path. Type the script name (with the .cmd extension), followed by any arguments: myscript.cmd hello 15 Run any script file from disk. Use the source command and the filename, followed by any arguments:
+    
+source ~/myscript.cmd 1 10 hello
+
+=== The Houdini script path ===
+
+The HOUDINI_SCRIPT_PATH environment variable contains a list of directories to search for scripts. It includes `$HFS/houdini/scripts` (for factory-installed scripts), `$HSITE/scripts` (for site-specific scripts), `$JOB/scripts` (for job-specific scripts), and `$HOME/houdniversion/scripts` (for each user's scripts).
+
+If a script file is in the path, you can run the script by typing its name (with the .cmd extension) in Houdini.
+
+Scripts in directories later in the path will override scripts with the same name earlier in the path. You can use this feature to replace factory-installed scripts (such as `123.cmd`) with your own scripts by putting script files with the same name in `$HOME/houdniversion/scripts`.
+
+== Run scripts in response to events ==
+
+Startup:
+    `$HFS/houdini/scripts/123.cmd`
+    
+    Houdini runs this script when it first starts up. It does not run again if you choose `File > New`. This script contains a lot of code to set up the initial Houdini environment (including loading the initial geometry). If you want to change something in this file, you should copy it to somewhere higher in the script path (for example, `$HOME/houdniversion/scripts`) and modify that copy. `123.cmd` is the startup script for Houdini FX. Other products such as Halo, Alfred, etc. use separate startup scripts in scripts/ named for the product.
+
+Open or create a new scene file:
+    `path/scripts/456.cmd`
+    
+    Houdini runs this script after you open a saved scene. This script does not exist in a factory install. If you create it somewhere in the script path (for example, `$HOME/houdniversion/scripts`), Houdini will run the script whenever a new scene opens, including on `File > New`.
+    
+Create a node:
+    `$HFS/houdini/scripts/op_type/op_internal_name.cmd`
+    
+    When you create a node, Houdini runs the corresponding script in a subdirectory of scripts/.
+
+    (Some operators have scripts in the factory install that perform various tasks, including preserving compatibility with scene files from old versions of Houdini, while other operators do not have any scripts.)
+
+    This is very useful for customizing the behavior of built-in operators, or enhancing custom operators (digital assets) you create.
+
+    You can create a new script with the proper directory structure and name in the script path (for example, `$HOME/houdniversion/scripts/sop/box.cmd` for the Box SOP) to have Houdini run the script when you create a node with the operator.
+
+    To get the internal name of an operator, choose `Tools > Operator Type Manager` and look under __Internally defined operators__.
+
+Delete a node:
+    To set a script to run when a certain node is deleted, click the [Icon:BUTTONS/gear] Gear menu in the node's parameter editor and choose __Edit deletion script__.
+    
+    This is useful when you create a custom operator that has associated nodes you want to delete if the main node is deleted. For example, the built-in bone objects have deletion scripts that delete supporting nodes such as the kinematic solver CHOPs if the bones are deleted. You can set the deletion script for node in HScript with the opdelscript command. Digital asset events See scripting digital assets.
+
+Select scripts:
+    Houdini lets you run a custom script when the user selects a particular object in the viewer. Set the object's Select script parameter (on the __Misc__ tab). The value of the parameter is interpreted as HScript, however you can also choose to call an external script file. Houdini runs this script when you select the object in the viewer with the Select or Pose tools. It does not run when you select the node in the network editor, or select the object as part of using another tool.
+    
+    Possible uses for this feature include creating user interfaces (such as "switch" or "button" objects that change things in the scene when you click them) and debugging (using message to pop up information about an object when you select it).
+    
+    Houdini runs the script in the context of the object that was selected. Use opcf .. to go up to the network level in which the selected object lives. One very useful trick is to use the opset command to set the properties (such as the display flag) of other objects when you click an object. For example, you can create a simple interface where clicking an "on" Null turns makes a group of objects visible, and clicking an "off" Null turns the objects invisible.
+    
+    Houdini makes these variables available to the select script. You can use them to modify the behavior of the script. To see the the value of these variables for a given object, you can use the message command in a selection script. For example, if you put the following script in the Select script parameter of an object:
+        
+    {{{
+    message $SELECT_NAME
+    }}}
+    
+    ...when you select the object, Houdini will pop up a window showing the object's name.
+    
+    `SELECT_NAME`:
+        The name of the selected object. SELECT_PATH The path to the selected object.
+    `SELECT_SHIFT`, `SELECT_ALT`, `SELECT_CTRL`:
+        When these variables are set to 1 it means the corresponding modifier key was held down when the user selected the object.
+    `SELECT_MOVE`:
+        Normally, a select script on an object prevents you from dragging the object directly (you must select the object, which triggers the script, then drag a handle). Unset this variable to allow the user to drag the object directly while still executing the selection script.
+    `SELECT_PICK`:
+        Unset this variable to make this node become __not__ selected.
+        
+    To unset a variable, use `set -u <<varname>>`.
+
+== Example script ==
+
+You can also take a look at the scripts included with Houdini for examples of real-world HScript.
+
+{{{
+# Script for a guessing game (guess.cmd)
+
+# First, get a random seed
+
+set foo = `system(date)`
+set seed = `substr($foo, 14, 2)``substr($foo, 17, 2)`
+
+# Then, pick a random number
+
+set num = `int(rand($seed)*100)+1`
+
+set guess = -1
+echo Guess a random number between 1 and 100.
+
+while ( "$guess" != "$num" )
+    echo -n Enter guess (q to quit): "
+    read guess
+    
+    if ( "$guess" == q || "$guess" == "") then
+        break;
+    endif
+    
+    # Convert to a number
+    set iguess = `atof($guess)`
+    
+    if ( $iguess &lt; $num ) then
+        echo Too low
+    else if ( $iguess > $num ) then
+        echo Too high
+    else
+        echo Spot on!
+    endif
+end
+
+echo The number was $num
+}}}
+
+== Useful scripts included with Houdini ==
+
+123.cmd:
+    Run when Houdini FX starts up. `houdinicore.cmd` (formerly `hescape.cmd`) serves a similar purpose for Houdini Core. See event scripts.
+    
+defaultscene.cmd
+    Creates the default scene when Houdini starts up. See event scripts.
+    
+fixnodename.cmd:
+    Performs prefix and suffix substitution on node names.
+    
+    Type fixnodename in the textport with no arguments to see its usage.
+    
+pickandcenter.cmd:
+    Takes an object name as an argument and centers that object in the viewer. This is intended to be run whenever you select a particular object. Use pickandcenter `$OS` as the selection script to call this script on the object you selected.
+    
+traverse.cmd:
+    Takes the name of a command as an argument, and recursively calls that command on every node and sub-node.
+    
+uniquename.cmd:
+    Takes a base object name and a variable name as arguments, and sets the named variable to a name (constructed from the base object name plus a number) which is guaranteed to be unique at the time the command is called. You can also use the `-v` flag of the `opadd` command to get the name of a node after you create it.
+    
+== Call host system commands ==
+
+Use the `ucd` and `unix` commands to start the language's runtime as an external process.
+
+Houdini passes any global HScript variables to the external process as environment variables, and sets the status variable to the exit code of the command.
+
+Houdini includes dedicated HScript commands to call typical host system commands, such as `uls` to list the contents of a directory, `urm` to remove a file, and `upwd` to print the current directory. To make your code portable to non-UNIX systems such as Windows, use these HScript commands instead of explicitly calling the equivalent UNIX utility (ls, rm, pwd, etc.).
+
+table class="compact">>
+    tr>>
+        td>>Change the current directory
+        td>>`ucd`
+    tr>>
+        td>>Print the current directory
+        td>>`upwd`
+    tr>>
+        td>>List the contents of a directory
+        td>>`uls`
+    tr>>
+        td>>Create a new directory
+        td>>`umkdir`
+    tr>>
+        td>>Remove a file
+        td>>`urm`
+    tr>>
+        td>>Start a host system command
+        td>>`unix`
+
+== Refer to viewers and viewports in commands == (viewers)
+
+Viewers have names with the form "desk.pane.type", where:
+    
+- desk = The name of the desk containing the viewer pane.
+- pane = The name of the viewer pane.
+- type = "world", "particle", or "texture", depending on the contents of the pane.
+
+To see a list of all viewers, use "viewls -n". For most viewer-related commands, you can specify more than one viewer at a time, and/or use wildcards in viewer names.
+
+A viewer can be subdivided into up to four viewports (such as top, left, front, and perspective). Viewports have names with the form "desk.pane.type.viewport", where:
+    
+- desk = The name of the desk containing the viewer pane.
+- pane = The name of the viewer pane.
+- type = "world", "particle", or "texture", depending on the contents of the pane.
+- viewport = The name of the viewport within the viewer pane. You can change the name of a viewport in the viewport's display options editor. To list all viewports, use "viewls -n -v" (to show what viewer each viewport is in, just use "viewls -v"). 
+
+For most viewport-related commands, you can specify more than one viewer at a time, and/or use wildcards in viewer names. You can also use the name of a viewer to refer to all viewports in the viewer. For example instead of `"viewcamera -c cam1 Build.panetab1.world.persp1 Build.panetab1.world.top1 ..."`, you could do `"viewcamera -c cam1 Build.panetab1.world.*"` or just `"viewcamera -c cam1 Build.panetab1.world"`.
+
+Most viewport-related commands work on view-memories as well as viewports. View-memories have the format `"desk.pane.type:memory"`, where memory is a number from 1-9 or a name. The first three components (desk name, pane name, type) can have wildcards. To list all view-memories, use `viewls -n -l`.
+
+The `viewlayout` command controls the number and layout of viewports in a viewer pane.
+
+== HScript tips and tricks ==
+
+- Use commandecho on to make Houdini print the HScript commands it executes internally in the textport.
+- Maximum line length for a Houdini command is 8 KB after all expansions.
+- Maximum number of arguments on a command line is 1024.
+- Maximum number of number of nested if statements in a single source file is 128. 
+- Maximum number of source files is limited by the system limit on open files.
+- No limit for nested loops.

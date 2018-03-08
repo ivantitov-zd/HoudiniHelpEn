@@ -1,0 +1,40 @@
+= Streams =
+
+Streams are a more efficient way of using groups. [Icon:POP/group][Groups|Node:dop/popgroup] are generally used if you only want to affect particles a couple of times. [Icon:POP/stream][Streams|Node:dop/popstream] are more useful when you want to do several things to a group of particles. If you press ((MMB)) on the solver, you can see the names of all the streams in the network. By default, stream names are the same as the nodes that create them.
+
+A stream is basically a group that you can split off into a separate chain and then merge back together before the solver, which is useful when trying to determine what is happening in the network. It also prevents you from having to reference the group in each node you want to affect.
+
+For example, say you have a [Icon:POP/location][POP Location|Node:dop/popstream] followed by a [Icon:POP/color][POP Color|Node:dop/popcolor] node to color the particles blue. Then you create a separate [POP Stream|Node:dop/popstream] with a rule `ingroup = @P.y < -5;` and another [POP Color|Node:dop/popcolor] node to color the particles green. This means that any time the particles drop below a certain point, they will turn green. You can wire both streams into a [Merge DOP|Node:dop/merge] and into the [Icon:DOP/popsolver][POP Solver|Node:dop/popsolver].
+
+[Image:/images/dopparticles/stream3.png]
+
+This is more apparent if you add a [Icon:POP/force][POP Force|Node:dop/popforce] node to push the particles back up, which are then dragged down by gravity.
+
+[Image:/images/dopparticles/stream4.png]
+
+[Image:/images/dopparticles/stream5.png]
+
+
+You could go even further and create another [Icon:POP/stream][POP Stream|Node:dop/popstream] with a rule `ingroup = @P.x > 12;` and another [Icon:POP/color][POP Color|Node:dop/popcolor] node to color the particles purple. This means that any time the particles pass 12 on the X axis, they will turn purple. 
+
+[Image:/images/dopparticles/stream8.png]
+
+One of the benefits of using streams instead of groups is that it's very easy to see the breakdown of what is happening in the network. If groups were used to do this, everything would be in a single chain.
+
+[Image:/images/dopparticles/stream9.png]
+
+To better understand how streams work, if you disconnect `popstream2` from the [Icon:POP/location][POP Location|Node:dop/popstream] and connect it to the bottom of the `popstream1` chain, you can see that the both rules are followed. Now, any time the particles drop below a certain point _and_ are past 12 on the X axis, they will turn purple.
+
+[Image:/images/dopparticles/stream6.png]
+
+[Image:/images/dopparticles/stream7.png]
+
+NOTE:
+        There can only be one, solid wire from every generator node to the [Icon:DOP/popsolver][POP Solver|Node:dop/popsolver]. If you don't have a solid path, the generator will not be run. If you have multiple solid paths, it may run multiple times. Some nodes like [Icon:POP/stream][POP Stream|Node:dop/popstream] and [Icon:POP/split][POP Replicate|Node:dop/popreplicate] can create reference inputs, which are displayed as dotted lines. These can be used to start new streams that are subsets of other streams.
+
+Streams are implemented by creating point groups. The parameter named `streamname` on a POP node informs the system that this node is expected to create a group called `stream_chs("streamname")` Usually this defaults to `$OS`, allowing for sensibly named streams. Since point groups are used, it is possible for a particle to belong to more than one stream. However, when applying a POP node, all the streams will be joined together. So even if a particle is in more than one stream, it will still only be affected by the POP node at most once.
+
+If a POP node has no stream input, i.e., no up-chain nodes have a `streamname` parameter, it will then apply to all the particles. Therefore, a [Icon:POP/force][POP Force|Node:dop/popforce] with no inputs will apply to all particles. While you can restrict the [Icon:POP/force][POP Force|Node:dop/popforce] to a subset using the group option, successive nodes will not be restricted to that group, their stream will be the entire set of particles.
+
+TIP:
+        The [Icon:POP/attractor][POP Attract|Node:dop/popattract] node can refer to other streams in sibling chains.

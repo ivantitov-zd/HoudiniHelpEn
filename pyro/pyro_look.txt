@@ -1,0 +1,138 @@
+= Pyro look development =
+
+You should try reading [how the Pyro solver works|pyro] to understand the relationship between the different fields used by the solver. The speed or shape isn't controlled through a single parameter but a combination of many parameters.
+
+== Before you begin ==
+
+* [How to visualize what's going on in your simulation|/dyno/visualize]
+* [How Houdini's pyro effects work|pyro]
+
+== Sources ==
+
+See [pyro sourcing|pyro#sources] for information on how pyro networks use source geometry.
+
+* For more interesting fire/smoke, try a more interesting source geometry shape. For example, using a tube might give more interesting results than a sphere because of the vertical sides of the tube producing stacked fire/smoke.
+
+* In the pyro network, try pulsing the source: animate the __Scale source volume__ parameter on the [Source Volume DOP|Node:dop/sourcevolume] up and down.
+
+* On the [Fluid source node|Node:sop/fluidsource] in the source geometry network, use the parameters on the __Noise__ tab to increase or decrease the amount of noise in the sourcing of the smoke/fire. For example, in the __Noise > Turbulence setting__ subtab, increase __Amplitude__ to boost to create sharper blobs in the noise.
+
+== Container resolution ==
+
+The resolution of the fluid container is controlled by the __Division Scale__ parameter on the [Icon:DOP/smokeobject] [Smoke object|Node:dop/smokeobject] node. Increase the division scale for a lower resolution simulation, or decrease it for a higher resolution simulation. Houdini's pyro solver produces smoke/flames with the same general character regardless of resolution, so you can experiment quickly with looks at lower resolutions before moving to higher resolutions. You will not, of course, see details such as shredding and turbulence if they are smaller than the division size.
+
+[Image:images/pyro_dops_nodes.png]
+
+== Main smoke and fire controls ==
+
+* For overall artistic control of flame height, use the __Flame Height__ parameter ([Pyro solver|Node:dop/pyrosolver] > Combustion tab > Flames tab).
+
+* The __Buoyancy lift__ parameter ([Pyro solver|Node:dop/pyrosolver] > Simulation tab) controls the lift applied at each step to the temperature field. Increasing or decreasing this will change the speed at which the temperature field rises.
+
+* Increasing or decreasing the amount of fuel in the simulation will change the size of the flames. On the `source_fuel` node, use the __Scale Source Volume__ to scale the amount of fuel imported into the system from the source volume.
+
+* Turn down temperature dissipation ([Pyro solver|Node:dop/pyrosolver] > Shape tab > Dissipation tab) to make the flames hotter, which by default will also make them rise a bit higher.
+
+* Use __Timescale__ ([Pyro solver|Node:dop/pyrosolver] > Simulation tab) to make the effect develop slower or faster overall (it changes how much advection happens at each time step).
+
+== External forces ==
+
+In addition to the physical properties on the smoke object and pyro solver, can use standard DOP forces such as the [Fan force|Node:dop/fan] and [Drag force|Node:dop/drag] to control the simulation.
+
+The parameters on the __Advanced > External forces__ tab of the pyro solver control how external forces affect the simulation. By default _the pyro solver scales all forces by the values in the density field_. __Scaled forces__ is a list of forces that should be multiplied by the value of the `density` field. The default is `*`, meaning all forces are scaled by `density`. __Absolute forces__ is a list of forces that should be applied to the simulation without scaling by `density`.
+
+NOTE:
+    If external forces do not seem to affect your simulation, it may be because the __Scaled forces__ parameter is `*` and your `density` field is empty, so the forces are being multiplied by `0`. To make all forces apply to all fields, clear __Scaled forces__ and set __Absolute forces__ to `*`.
+
+When you create a pyro effect using the shelf tools, they usually set the __Scaled forces__ field on the created effect to `* ^Gravity` so gravity does not apply to the simulation. While technically unrealistic, it is usually much easier to simulate combustion and smoke effects without gravity.
+
+== Gas bombs ==
+
+* Turn on __Advect fuel__ ([Pyro solver|Node:dop/pyrosolver] > Combustion tab > Fuel tab). The __Fuel speed__ is a scaling factor on how much of the velocity field should move the fuel. You can increase this to get a much faster/bigger explosion.
+
+* Play with the fuel source scaling ([Source volume|Node:dop/sourcevolume] > __Scale source volume__ parameter). Use [keyframing|/anim/basics] to pulse the source, and/or pump a lot of fuel into the system at the start and then cut it off.
+
+== Adding noise only in certain areas ==
+
+You can attach DOP nodes that modify velocity fields, such as [Gas Turbulence|Node:dop/gasturbulence], to the fourth ("Advection") input of the Pyro solver node. Most field-modifying nodes have some way to scale the effect by a mask field.
+
+[Image:/images/dynamics/field_mask1.png]
+
+# Create a geometry object in the shape of the area you want to affect.
+
+    [Image:/images/dynamics/field_mask2.png]
+
+# On the __Model__ shelf tab, use the [Icon:SOP/volume] [Volume tool|Node:sop/isooffset] to convert the object into a fog volume object.
+
+    [Image:/images/dynamics/field_mask3.png]
+
+# In the DOP network, add a [SOP Scalar Field node|Node:dop/sopscalarfield] after the Pyro object.
+
+    * Turn on __Use SOP Dimensions__.
+    
+    * Set the __SOP path__ to the path of the fog volume object (for example `/obj/mask_object`). Make sure __Use Object Transform__ is on.
+    
+    * Set the __Data Name__ to something indicating the purpose of this field, for example `NoiseMask`.
+
+    This attaches the fog volume as field data on the Pyro object with the given name.
+
+# Create a [Gas Turbulence|Node:dop/gasturbulence] node and connect it to the fourth ("Advection") input of the Pyro solver.
+
+    [Image:/images/dynamics/field_mask_network.png]
+
+    * On the __Bindings__ tab, set the __Density Field__ to the name of the mask data, for example `NoiseMask`. The effect of the node is multiplied by the value of this field.
+    
+    * Use the controls on the __Turbulence Settings__ tab to control the amount of turbulence added.
+    
+    [Image:/images/dynamics/field_mask4.png]
+
+== Shaping tips ==
+
+* All force DOPs work on pyro simulations. For example, you can use a [Fan force|Node:dop/fan] to blow smoke around.
+
+* The first basis of an interesting effect is an interesting source (see above).
+
+* The parameters on the [Pyro solver|Node:dop/pyrosolver]'s __Shape__ tab give you extensive control on how your effect develops. See the [help on the Shape tab|/nodes/dop/pyrosolver#shapetab] for information on using these controls.
+
+* *Shredding* is the main method for adding the kind of high-frequency details and licks typical of, say, a campfire. You can use the shredding controls ([Pyro solver|Node:dop/pyrosolver] > Shape tab > Shredding tab) to control the amount of shredding detail. Turning shredding off gives an extremely smooth, laminar flame, possibly similar to a butane torch flame or perhaps a fire in space.
+
+* You should *Turbulence* ([Pyro solver|Node:dop/pyrosolver] > Shape tab > Turbulence tab) to create large-scale swirling/churning motion, for example to add character to a fast-moving simulation, and rely on shredding to create smaller-scale high-frequency details.
+
+* The __Temperature diffusion__ parameter ([Pyro solver|Node:dop/pyrosolver] > Simulation tab) blurs the temperature field. Turning this down will make the temperature field sharper. This will increase the sharpness/frequency of effects such as shredding. Turning it up will make the flames/smoke smoother.
+
+* The __Viscosity__ parameter ([Pyro solver|Node:dop/pyrosolver] > Simulation tab) blurs the velocity field. Turning this up will give a smoother, more laminar flow to the flame/smoke. It will also tend to spread the flame/smoke's motion out slightly (by blurring the default upwards movement).
+
+* Using sharpening ([Pyro solver|Node:dop/pyrosolver] > Shape tab > Sharpness tab) with shredding tends to give too high frequency noise, creating a hash. However, if you've turned down shredding for some reason, you can add sharpening to add back detail.
+
+== Tips for interesting looks ==
+
+* For faster moving effects, increase the amount of energy in the system by increasing temperature (creating more temperature and/or decreasing cooling). You can make the effect rise faster by increasing buoyancy. You can also use the __Time scale__ parameter on the Pyro solver to make the effect appear speeded up.
+
+* Pulse the fuel source on and off.
+
+* Try seeing what happens when you increase one parameter to a very large number, or crank up two parameters that normally "fight" each other (such as shredding and sharpening). Sometimes forcing the solver to cope with "insane" values creates interesting looks.
+
+* Vortex confinement [Pyro solver|Node:dop/pyrosolver] > Shape tab > Confinement tab) tends to tear the velocity field up over time, but doesn't look as good as shredding. Using shredding and vortex confinement at the same time will give a fractal hash. Confinement is off by default, but you can try adding a little confinement, perhaps using the control field ramp to add it at certain sizes.
+
+* Interesting smoke plume looks happen at the boundaries between the "layers" of high and low temperature and/or velocity. Increasing the differences in temperature and velocity between the source and the ambient space (for example, by setting high initial velocity on the source) can create interesting smoke plumes.
+
+== General tips ==
+
+* Try using [takes|/basics/takes] to organize you explorations of pyro looks.
+
+* You can create [pinned parameter editors|/network/parms] for the [Smoke object DOP|Node:dop/smokeobject] and [Pyro solver|Node:dop/pyrosolver].
+
+* The [Smoke object DOP|Node:dop/smokeobject] has visualization options for different fields, and the [Smoke solver|Node:dop/smokesolver] and [Pyro solver|Node:dop/pyrosolver] have visualization options for the shaping effects.
+
+* On the [Smoke object|Node:dop/smokeobject] in the dynamics network, click the __Initial data__ tab. The default for __Velocity sampling__ is "Faces". This gives more accurate collisions, but unless you will be colliding the smoke/fire with another dynamic object, set __Velocity sampling__ to "Centers" for faster and more interesting pyro effects.
+
+* To get the exact temperature range of your effect, import the temperature field into a geometry network using the [DOP Import Fields|Node:sop/dopimportfield] or [DOP I/O|Node:sop/dopio] surface node and turn on __Compute Min/Max__ on the node. This creates primitive attributes on the field containing the minimum and maximum value of the field. You can then view the values of the attributes in the [details pane|/ref/panes/geosheet].
+
+* You will sometimes hear different effects described as more _laminar_ or more _turbulent_. _Laminar_ or _streamline_ flow is when fluid moves smoothly, with velocity vectors in parallel, with little or no disruption. _Turbulent_ flow is when a fluid moves chaotically, with swirls, fluctuations, and disruptions. A mix between laminar and turbulent flow is sometimes called _transitional_ flow.
+
+* By default pyro simulates motion without resistance, so for example smoke that doesn't dissipate away will continue moving forever with its momentum. Add a [Drag force DOP|Node:dop/drag] to the simulation to add resistance.
+
+* Increasing the __Transparent Samples__ when rendering will help if you have a problem with too much noise.
+
+
+

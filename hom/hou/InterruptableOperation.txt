@@ -1,0 +1,114 @@
+= hou.InterruptableOperation =
+#type: homclass
+#cppname: HOM_InterruptableOperation
+#group: general
+
+"""Use this class to turn any Python code block into an interruptable operation."""
+
+@methods
+
+::`__init__(self, operation_name, long_operation_name=None, open_interrupt_dialog=False)`:
+    #cppname: HOM_InterruptableOperation::HOM_InterruptableOperation
+    Construct a new InterruptableOperation.
+    
+    `operation_name`:
+        A description of the interruptable operation that appears in the
+        progress bar of the interrupt dialog.
+    `long_operation_name`:
+        A description of the long, or higher-level, operation.  If it is not
+        `None`, a second progress bar appears on the interrupt dialog with the
+        long operation name in it.
+    `open_interrupt_dialog`:
+        Determines whether the interrupt dialog should appear or not.
+
+    The constructor should only be called from within a `with` statement.  For
+    example:
+    {{{
+    #!python
+    with hou.InterruptableOperation(
+            "Performing Tasks", open_interrupt_dialog=True) as operation:
+        for i in num_tasks:
+            #
+            # PERFORM TASK HERE.
+            #
+
+            # Update operation progress.
+            percent = float(i) / float(num_tasks)
+            operation.updateProgress(percent)
+    }}}
+
+    In Python 2.5, the `with` statement is not enabled by default.  To enable
+    it, you need to add the following line at the beginning of your
+    script/module:
+    {{{
+    #!python
+    from __future__ import with_statement
+    }}}
+
+    You can nest multiple interruptable operations.  This is ideal when you
+    have a long operation consisting of several smaller operations.  For
+    example:
+    {{{
+    #!python
+    # Start the overall, long operation.
+    with hou.InterruptableOperation(
+            "Performing", "Performing Tasks",
+            open_interrupt_dialog=True) as operation:
+        for i in num_tasks:
+            # Update long operation progress.
+            overall_percent = float(i) / float(num_tasks)
+            operation.updateLongProgress(overall_percent)
+
+            # Start the sub-operation.
+            with hou.InterruptableOperation(
+                    "Performing Task %i" % i) as suboperation:
+                for j in num_subtasks:
+                    # Update sub-operation progress.
+                    percent = float(j) / float(num_subtasks)
+                    suboperation.updateProgress(percent)
+
+                    #
+                    # PERFORM SUBTASK HERE.
+                    #
+    }}}
+
+::`updateLongProgress(self, percentage=-1.0, long_op_status=None)`:
+    #cppname: HOM_InterruptableOperation::updateLongProgress
+    Update the progress percentage and status of the long, or high-level,
+    operation.  At the same time, check if the operation was interrupted by the
+    user.
+    
+    `percentage`:
+        A fractional number between 0.0 and 1.0.  A value of 0.0 means that no
+        progress has been made while 1.0 means that the operation is complete.
+        A negative percentage indicates that the progress percentage is not
+        available.
+    `long_op_status`:
+        Text describing the current status of the long operation.  The status
+        will overwrite the text in the 2nd progress bar of the interrupt
+        dialog.  To keep the previous text in the progress bar, set this
+        parameter to `None`.
+
+    Raises [Hom:hou.OperationInterrupted] if the user has chosen to interrupt
+    the operation.
+
+    Raises [Hom:hou.OperationFailed] if the interruptable operation object was
+    constructed outside of a `with` statement.
+
+::`updateProgress(self, percentage=-1.0)`:
+    #cppname: HOM_InterruptableOperation::updateProgress
+    Update the progress percentage of the operation.  At the same time, check
+    if the operation was interrupted by the user.
+    
+    `percentage`:
+        A fractional number between 0.0 and 1.0.  A value of 0.0 means that no
+        progress has been made while 1.0 means that the operation is complete.
+        A negative percentage indicates that the progress percentage is not
+        available.
+
+    Raises [Hom:hou.OperationInterrupted] if the user has chosen to interrupt
+    the operation.
+
+    Raises [Hom:hou.OperationFailed] if the interruptable operation object was
+    constructed outside of a `with` statement.
+

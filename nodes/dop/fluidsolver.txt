@@ -1,0 +1,359 @@
+#type: node
+#context: dop
+#internal: fluidsolver::2.0
+#icon: DOP/fluidsolver
+#version: 2.0
+
+= Fluid Solver =
+
+"""A solver for Sign Distance Field (SDF) liquid simulations."""
+
+Use the [Icon:SHELF/box_fluid] [Liquid Container shelf tool|/shelf/liquidbox] to create a liquid container and fluid solver automatically.
+
+== Setting up == (setup)
+
+If you are setting up a fluid network from scratch, you can use the [Fluid Object node|Node:dop/fluidobject] to create a DOP object with the data required by the Fluid solver already attached. If you already have a DOP object, you can use the the [Fluid Configure Object node|Node:dop/fluidconfigureobject] to add the necessary data to it.
+
+This solver makes use of various field subdata on the object.
+
+* The object should have a scalar field "surface" to track the surface of the fluid in space.
+
+* The object should have a vector field called "vel" to track the velocity of each point in space.
+
+== Tips ==
+
+* If your fluid keeps disappearing, try turning off __Build Outside Markers__. You can also set __Marker Escape Threshold__ to `0` to help keep fluid inside the box.
+
+* Liquid streams smaller than a few voxels may disappear.
+
+* If your source object deforms or collides with a deforming object (using a DOP relationship), by default the solver will use the per-point deformation. To make the solver use per-point deformation, on the __Fields > Sources__ subtab set __Velocity Type__ to "Point Velocity".
+
+@parameters
+
+== Simulation ==
+
+These parameters control how the simulation develops over time.
+
+Timescale:
+    A scaling factor for time inside this solver. `1` is normal speed, greater than `1` makes the fluid sim appear speeded up, less than `1` makes the fluid sim appear to be in slow motion.
+    You can use expression functions such as [Exp:doptime], [Exp:dopframe],[Exp:dopsttot], and [Exp:dopttost] to convert between global times and simulation times.
+
+    NOTE:
+        Changing the __Timescale__ only affects the timestep of the simulation. If adding velocities calculated in SOPs to the simulation for collisions or pumps with the [Source Volume DOP|Node:dop/sourcevolume], scale the incoming velocities by `1 / Timescale` to match the timestep of the simulation.
+
+Confinement Strength:
+	When the container has `vorticles` data attached, this is an overall scale adjustment for the vorticle forces.  Vorticle forces are small pin-wheel like forces that add turbulence to fluids.
+
+
+Speed Limit:
+	If set, each axis of the velocity field will be clamped to
+	this maximum speed.  This is done after the force
+	computation and before the divergence or advection, so it
+	is possible for the speed to end up slightly larger than
+	this value.  
+
+	NOTE:
+		As the clamping is done per-axis, the velocity along the diagonal can be up to `sqrt(3)` higher.
+
+Viscosity:
+	Low values give more "watery", "thin", flowing fluid, while higher values give more "thick", resistant fluid.
+	
+	Internally, viscosity is a force that tries to give neighboring voxels the same velocity.
+
+Use Friction and Bounce:
+	Use the fluid's physical parameters for friction and bounce at collisions. Turn this off for a fluid with zero friction and zero bounce.
+
+== Relationships ==
+
+[Include:old_relationships]
+
+=== Sources ===
+
+Enable Source Relationship:
+	Use DOP objects with a "source" relationship to the solver.
+
+Velocity Merge:
+	How the source object's velocity will affect the container's velocity field. Scale controls the amount to add.
+    
+    None:
+    	The source's velocity will be ignored.
+    
+    Net New Source:
+	    Velocity will be set in those areas where fluid will be added this frame from the source.
+	
+    New Source:
+		Velocity will be set in those areas where the source is present.
+
+Velocity Type:
+    #id: veltype
+    
+    How to measure velocity on the source object. If the source geometry does not deform (change shape) over time, use __Rigid Velocity__. If the source deforms but does not change topology over time, use __Point Velocity__.
+    
+    Rigid Velocity:
+        Treat the source object as non-deforming.
+    
+    Point Velocity:
+        Use point history to allow deforming geometry. This only
+        works if the topology of the source geometry doesn't change.
+    
+    Volume Velocity:
+		Uses the SDF representation of the object to detect
+		deformation.  Does not require a fixed topology over
+		time, but cannot detect tangential velocities.
+
+=== Pumps ===
+
+Enable Pump Relationship:
+	Use DOP objects with a "pump" relationship to the solver.
+
+Velocity Merge:
+    How the source object's velocity will affect the
+    container's velocity field. Scale controls the amount of velocity to add.
+
+Velocity Type:
+	Controls how the pump object's per point velocity is
+	computed.
+    
+	Rigid Velocity:
+		The velocity of the object treating it as a rigid
+		body.  Only the angular velocity and linear velocity
+		will be used, no local deformation will be taken into
+		account.
+	
+	Point Velocity:
+		The velocity of the object attempting to take into
+		account deformation by using point history.  This only
+		works if the topology doesn't change.
+	
+	Volume Velocity:
+		Uses the SDF representation of the object to detect
+		deformation.  Does not require a fixed topology over
+		time, but cannot detect tangential velocities.
+
+=== Collisions ===
+
+Enable Collide Relationship:
+	Use DOP objects with a "collision" relationship to the solver.
+
+Restrict Mask to Bandwidth:
+    Normally the collision mask SDF is only calculated up to a certain distance from the original collision geometry. Turn this off to compute the full range of the mask if you need it for some special effect, such as having things react before they reach the object.
+
+Sticky Fluid:
+	Determine if collision objects should prevent fluid from leaving their surface instead of just preventing the fluid from entering their surface.  This should be left on.
+
+Collide with Non-SDF:
+    Allows the fluid to collide with objects that don't have Geometry/SDF, such as other fluids.
+
+Velocity Type:
+	Controls how the collision object's per point velocity is
+	computed.
+
+	Rigid Velocity:
+		The collision velocity of the object is calculated by
+		treating it as a rigid body.  Only the angular
+		velocity and linear velocity will be used, no local
+		deformation will be taken into account.
+	
+	Point Velocity:
+		The collision velocity of the object tries to take into
+		account deformation by using point history.  This only
+		works if the topology doesn't change.
+	
+	Volume Velocity:
+		Uses the SDF representation of the object to detect
+		deformation.  Does not require a fixed topology over
+		time, but cannot detect tangential velocities.
+
+=== Sink ===
+
+Enable Sink Relationship:
+    Use DOP objects with a "sink" relationship to the solver.
+
+== Advanced ==
+
+You should generally not need to change these parameters.
+
+[Include:smokesolver#minimumsubsteps]
+
+[Include:smokesolver#substeps]
+
+[Include:smokesolver#cflcond]
+
+[Include:smokesolver#quantize]
+
+Frames Before Solve:
+	Specifies the number of frames to wait before a full solve cycle is computed. 
+	On those frames only operations applied to the last solver input (sources) are computed.
+	This enables the sourcing and resizing of data without actually computing a full solve on the maximum grid.
+
+=== Surface ===
+
+Correct Surface:
+	The motion of the collision objects may cause the fluid to interpenetrate the fluid objects. The Correct Surface step will remove any fluid that is penetrating a collision object.
+
+Rebuild SDF:
+	The voxels that border the zero isocontour are used to determine the initial zero isocontour. The rest of the field is then rebuilt from these values directly.
+
+Reinitialize SDF:
+	If the field is already almost a signed distance field, a less drastic error correction can be performed. The reinitialization equation is applied which will converge on a signed distance field without affecting the boundary.
+	
+Reinitialize Rate:
+	The rebuilding and reinitialization of the SDF will only be performed every every N frames where N is the reinitialization rate.  
+
+Reinitialize Iterations:
+	The number of times to apply the reinitialization equation.
+
+Marker Escape Threshold:
+	The distance the marker must be on the wrong side of the surface, as measured in terms of the marker's radius, to qualify as escaped.  Only escaped markers will update the surface value.
+
+=== Markers ===
+
+Build Inside Markers:
+	Construct marker surfels on the inside of the surface. Inside surfels increase volume as they correct the surface by pushing out the boundary.
+
+Build Outside Markers:
+	Construct marker surfels on the outside of the surface. Outside surfels decrease volume as they correct the surface by pushing in the boundary.
+
+Markers Per Voxel:
+	The desired number of markers to maintain inside each voxel.  More
+	markers allows for a better capturing of the surface behaviour, but
+	can require a lot of memory and processing time for large
+	complicated sims.
+
+Minimum Marker Radius:
+	The minimum radius of marker surfels, measured in terms of voxel size.
+
+Maximum Marker Radius:
+	The maximum radius of marker surfels, measured in terms of voxel size.
+
+=== Projection ===
+
+Variational:
+	Contribution to the pressure equation is proportional to the amount of the cell in the liquid.  This attempts to avoid stairstep boundaries on solid boundaries.  
+
+	Note: Uses the Gas Project Non Divergent Variational when this is set, so the ghost fluid and preserve bubble options are no longer available.
+
+Scale by Surface:
+    Scales external forces by an estimate of how much fluid is in each voxel. This allows sub-voxel waves to be evened out under gravity.
+
+Preserve Bubbles:
+	Trapped air will be given a pressure value independent of the boundary pressure conditions. This prevents the bubbles from collapsing in on themselves. If not set, fluid will be free to flow into bubbles from all sides ensuring their
+	swift dissipation.
+
+Ghost Fluid:
+	Pressures are extrapolated into air cells rather than just set
+	to zero.  This causes sub-voxel ripples in the air side to be
+	suppressed.
+
+Limit Velocity Extrapolation:
+	When extrapolating the velocity field into non-fluid
+	cells, the extrapolation is stopped when a certain number
+	of cells has been filled along the border.
+
+Max Cells to Extrapolate:
+	The number of non-fluid cells that should be filled with
+	velocity values on the non-fluid side of the velocity field.
+
+=== Strain ===
+
+Use Strain:
+    Adds a "strain" field to the object to track the amount of deformation the fluid has undergone at each voxel.
+
+Plastic Flow Rate:
+	This is the rate of plastic flow. The current strain is
+	dissipated at this rate per second. A value greater than the
+	timestep per second can lead to overshoot.
+	
+Plastic Flow Threshold:
+	This is the threshold for plastic flow. When the norm of
+	the strain exceeds this threshold, the strain is dissipated
+	according to the plastic flow term. 
+
+Strain Elastic Modulus:
+	Similar to a drag coefficient, the elastic modulus provides the scale factor for how to translate a certain amount of distortion into a restorative force.
+
+=== Advection ===
+
+Advection Type:
+    The algorithm to use for advecting the fields.
+    
+    Single stage:
+        Equivalent to the [Gas Advect DOP|Node:dop/gasadvect], where each point is back traced through the velocity field once to find the new voxel value.
+
+    BFECC and Modified MacCormack:
+        Run a second basic advection stage, resulting in a sharper fluid that doesn't disperse as much.
+
+Clamp Values:
+    The error correction of the BFECC and Modified MacCormack advection types can move voxel values outside the container, leading to strange effects such as negative density values. This parameter lets you choose a method to avoid this problem. The default is "Revert".
+    
+    None:
+        Do not attempt to prevent error correction from moving values outside the container.
+        
+    Clamp:
+        Restrict each voxel to the range of values possible given its eight original values.
+
+    Revert:
+        If the error-corrected voxel is out of range, return it to the single-stage value.
+        
+    Reverting can avoid checker artifacts where the error correction breaks down.
+
+Vel Advection Type:
+    The algorithm to use for advecting the velocity field. Higher types in the list will reduce the apparent viscosity of the field, but may add energy or cause chatter.
+
+Advection CFL:
+    When tracing the particles, this controls how many voxels the particles can move in a single iterations. Higher values give faster tracing and faster advection, but more errors.
+
+=== Collisions ===
+
+Feedback Scale:
+    A scale factor for applying feedback forces to other objects. Setting this to `0` will prevent any feedback.
+
+=== Clear Fields ===
+
+Fields to Clear:
+	Zeros out the specified types of fields after the solve
+    step.  This ensures the .sim files, which store the
+    complete state of the simulation, do not have any
+    information not needed, reducing their size and save time.
+    
+    None:
+		No special clearing of fields is done.
+	
+	Hidden:
+		Fields not needed for the next time step that do 
+		not have guide parameters are cleared.
+	
+	Static:
+		Fields not needed for next time step are cleared.
+		Note that some guides will thus start showing up
+		as zero as the underlying field got cleared.
+
+Additional:
+    A space separated list of extra fields that should be
+    cleared post-solve.
+
+=== Distribution ===
+
+    [Include:standard_distribution]
+
+    Distributed Pressure Solve:
+	The pressure projection may be distributed across machines.  This
+	avoids any loss of fluid and is required for tank-style simulations,
+	but not needed for flowing rivers.  It requires considerably more
+	network bandwidth, so becomes advantageous only with very large simulations.
+
+@inputs
+
+[Include:standard_data_inputs]
+
+@outputs
+
+[Include:standard_data_outputs]
+
+@locals
+
+[Include:standard_data_locals]
+
+[Include:standard_locals]
+
+

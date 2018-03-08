@@ -1,0 +1,158 @@
+#type: node
+#context: dop
+#internal: sopvectorfield
+#icon: dop/sopvectorfield
+
+= SOP Vector Field =
+
+"""Creates a vector field from a SOP Volume Primitive."""
+
+The Vector Field DOP creates a Vector Field data that can be attached
+to simulation objects and manipulated by solvers.  A Vector Field is
+an axis-aligned box divided into individual voxels.  Each voxel is
+giving a 3d vector.  
+
+The meaning of these numbers could vary. They could represent force directions or a color field.  The Vector Field is initialized with data from a SOP network.
+
+NOTE:
+    The field data is imported from SOPs prior to any transformation defined by the Position Data Path.
+
+@parameters
+    Use SOP Dimensions:
+        Overrides the __Divisions__, __Center__, and __Size__ options according
+        the properties of the volume primitive in the specified SOP.
+        This attempts to bring the SOP back at the same size and
+        resolution it was supported.  
+        
+        NOTE:
+            This may not work if the SOP has been transformed, especially if rotated, as the DOP scalar field has to be axis aligned.  Only the first specified volume primitive will be used to calculate the override - the other two axes will be sampled in that space.
+
+    SOP Resize Only:
+        Restricts __Use SOP Dimenstions__ option to only override __Center__ 
+        and __Size__. This is useful for customizing the resolution of the
+        vector field.
+            
+    [Include:standard_gas_divisions]
+
+    Voxel Sampling:
+        The overall box will be divided into the specified number of
+        small boxes, or voxels.  However, the question remains where
+        on these voxels the field's vectors should be stored.
+
+        Center:
+            The vector will be stored at the center of each voxel.  The
+            total number of samples thus matches the number of boxes.
+        Faces:
+            The vector will be split and each component will be stored
+            on one of the voxel's faces.  
+            
+            The x component on the x
+            face, the y component on the y face, and the z component
+            on the z face.  Along that dimension, the number of
+            samples will be one higher to store the start and end
+            voxel's face values.
+        Edges:
+            The vector will be split and each component will be stored
+            on the center of one of the voxel's edges.
+            
+            The dimensions involved will be one
+            larger to account for the boundaries.
+        Corner:
+            The value will be stored on the corners of each voxel.
+            
+            The number of samples will be one higher in each dimension
+            than the division count to contain all the boundary
+            values.
+    Closed Ends:
+        Determines the behavior of boundary values.  
+        
+        If set, the
+        boundary will be enforced with the __External Direction__.
+        Otherwise, the boundary is left free.
+
+        X, Y, Z:
+            When closed ends is set, these select which
+            sides will be closed.
+    Border Type:
+	The behavior when the field is sampled outside of its
+	defined box.
+
+	Constant:
+	    The external direction will be returned.
+	Repeat:
+	    The field will wrap, returning values from the
+	    opposite side of the field.
+	Streak:
+	    The value at the edge of the field closest to the
+	    sample will be returned.
+	Extrapolated:
+	    The value at the edge of the field closest to the sample
+	    will be used.  However, it will then be added to the
+	    dot product of the voxel size with the difference of voxel
+	    indices.  This results in the correct extrapolation of
+	    axis aligned rest fields.  For non-axis aligned rest
+	    fields, the [Gas Rest DOP|Node:dop/gasrest] will set up the ratios properly.
+    External Direction:
+        What value to enforce on the boundary of the vector field.
+    Scale Values:
+	The incoming SOP field will be multiplied by this value.
+    Tolerance:
+        The absolute tolerance to use for lossy compression of the
+        vector field.  This can reduce memory usage by detecting
+        constant areas or using a lower bit-depth representation.  
+        
+        A value of 0 only allows lossless compression.
+    Use 16bit Float:
+	The tiles will be stored using a 16 bit float rather than 32
+	bit float.  This uses half the memory, but at the cost of
+	reduced precision and increased computation.  
+
+	NOTE:
+		All computations are still done in 32 bit floats.
+
+    Sop Path:
+        The SOP to extract the three volume primitives from.  
+        
+        After the
+        primitives are extracted, this field is erased.  To reload the
+        vector data every frame, use __Set Always__.
+    Primitive Numbers:
+        Which primitive in the SOP are the volume primitives to
+        correspond to the x, y, and z values for the vector field.
+    Time:
+        The time to evaluate the SOP at, in seconds.  `$T` is a suitable
+        value to evaluate at the current global time.
+
+    Use Object Transform:
+        Turn on this option to embed the transform from the parent
+        object of the SOP along with the geometry.   
+
+	NOTE:
+	    This does not change the contents of the vector field.
+
+    Re-evaluate SOPs to Interpolate Geometry:
+	Normally when a solver asks for geometry data in a sub-step, the
+	simulation will simply linearly interpolate position data from integral
+	frames. However, this is not exact. Turning this option on re-evaluates
+	the geometry network for each substep. This is more accurate, but can
+	be very expensive.
+    [Include:standard_gas_slice]
+
+    [Include:standard_fluidpositionpath]
+
+@inputs
+    [Include:standard_data_inputs]
+
+@outputs
+    [Include:standard_data_outputs]
+
+@locals
+    [Include:standard_data_locals]
+
+    [Include:standard_locals]
+
+@related
+    - [Node:dop/sopvectorfield]
+    - [Node:dop/vectorfieldvisualization]
+
+

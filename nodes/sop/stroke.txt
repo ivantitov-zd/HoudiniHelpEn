@@ -1,0 +1,111 @@
+#type: node
+#context: sop
+#internal: stroke
+#icon: SOP/stroke
+
+#tags: merge, curve, drawcurve
+
+= Stroke =
+
+"""Low level tool for building interactive assets."""
+
+The Stroke SOP is a low level SOP designed to allow the creation of higher level assets that have interactive drawing of strokes in the viewport.  To facilitate this, it is paired with a state, [Stroke|/nodes/sop_state/stroke], which knows how to populate the parameters of the Stroke SOP from interactive sketching.
+
+Often the Stroke SOP is inside a digital asset.  The top level digital asset, which uses the stroke state, can also expose generic parameters like `prestroke`, `poststroke` and `stroke_*` to change the behavior of the stroke state.
+
+There are two sets of parameters.  The first set are used by the interactive state to control how it generates each stroke.  The second set are all in the __Number of Strokes__ parameter.  They store a record of every stroke created by the interactive tool, along with what the values of the first set of parameters were when the stroke was made.
+
+The Stroke SOP itself, when it cooks, merely converts all of the strokes described by the parameters into polygonal geometry.
+
+Raw samples are recorded, no smoothing is performed.  You can use the [Resample SOP|Node:sop/resample] or other SOPs to de-jitter the resulting lines.
+
+== Recorded attributes ==
+
+Point:
+    `P`:
+	Position of the intersection of the drawn curve with the projection geometry.
+    `stroke_angle`:
+	The angle of the pen while drawing.  Active for stylus input that supports this.  Measured in degrees.
+    `stroke_dir`:
+	The direction from the eye to the drawn stroke point.  This is the direction to project the stroke point along.
+    `stroke_hit`:
+	Whether the stroke point successfully hit the projection geometry.
+    `stroke_orig`:
+	The 3d position on the camera plane where the stroke was drawn.  When you draw in the viewport, you are drawing on the near clipping plane.  These positions thus tend to be rather far from where you expect.
+    `stroke_pressure`:
+	How much, in 0..1, the stylus was being pressed to the screen while drawing.
+    `stroke_prim`:
+	When intersecting with geometry, the primitive number that was hit.  -1 if none hit.
+    `stroke_roll`:
+	How twisted the pen was when the stroke was drawn.  Only supported on very high end styluses.
+    `stroke_tilt`:
+	The angle between the stylus and the screen.
+    `stroke_time`:
+	When, in seconds, the stroke point was drawn.  This is measured from the start of the curve.  This allows you to adjust flow rate depending on how fast the curve was drawn.
+    `stroke_uv`:
+	When intersecting geometry, the parameteric uv coordinates of the intersection.  These can be used with the vex `primuv` function.  These are NOT texture uv coordinates.
+
+Primitive:
+    `Cd`:
+	The color of the stroke at the time it was drawn.
+    `stroke_opacity`:
+	The opacity of the stroke at the time it was drawn.
+    `stroke_projcenter`:
+	The chosen center of projection.
+    `stroke_projdir`:
+	The chosen projection direction.
+    `stroke_projtype`:
+	What form of projection was requested.
+    `stroke_tool`:
+	The value of the tool parameter when the stroke was drawn.
+    `width`:
+	The radius when the stroke was drawn.
+
+
+@parameters
+
+Radius:
+    Used to control the `width` of the resulting curves.
+Tool:
+    Used to control the `stroke_tool` of the resulting curves.
+Color:
+    Used to control the `Cd` of the resulting curves.
+Opacity:
+    Used to control the `stroke_opacity` of the resulting curves.
+Projection:
+    Used to control the `stroke_projtype` of the resulting curves.
+Projection Center:
+    Used to control the `stroke_projcenter` of the resulting curves.
+
+Number of Strokes:
+    The interactive stroke state writes into this multiparm to record the output of each on-screen curve.
+
+    Enable Stroke:
+	This can be used to quickly disable a stroke from being added to the generated geometry.
+
+    Radius:
+	The `width` of the stroke.
+    Tool:
+	The `stroke_tool` of the stroke.
+    Color:
+	The `Cd` of the stroke.
+    Opacity:
+	The `stroke_opacity` of the stroke.
+    Projection:
+	The `stroke_projtype` of the stroke.
+    Projection Center:
+	The `stroke_projcenter` of the stroke.
+    Projection Direction:
+	The `stroke_projdir` of the stroke.
+
+    Raw Data:
+	Stores all the position and attribute data of the individual stroke points in a binary form.
+
+    Meta Data:
+	Stores the values of all parameters whose names start with `stroke_`
+	from the top level node.  These are copied into correspondingly named
+	primitive attributes.
+
+@related
+    - [Node:sop/drawcurve]
+

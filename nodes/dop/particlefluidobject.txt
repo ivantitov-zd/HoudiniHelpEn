@@ -1,0 +1,505 @@
+#type: node
+#context: dop
+#internal: particlefluidobject
+#icon: DOP/particlefluidobject
+
+= Particle Fluid Object =
+
+"""Creates a Particle Fluid Object from SOP Geometry."""
+
+The Particle Fluid Object DOP creates a particle fluid object inside
+the DOP simulation. It creates a new object and attaches the subdata
+required for it to be used by the [SPH Solver|Node:dop/particlefluidsolver] or [FLIP Solver|Node:dop/flipsolver].
+
+NOTE:
+    For FLIP fluids, use the [FLIP Fluid Object node|Node:dop/flipobject] instead.
+
+@parameters
+
+== Properties ==
+
+Particle Separation:
+    #id: particlesep
+    
+    This parameter controls the interaction distance between particles in the created Particle Fluid Object. Decreasing this value will decrease the distance between your particles making it more impressive, but may also slow down your simulation, since it will take longer to simulate. Decreasing particle separation means more particles that weigh less, but add up to the same mass per unit area.
+
+    If the __Input Type__ for this object is set to Surface SOP, then this parameter
+    also controls the number of particles spawned inside of the
+    provided surface. That is, a smaller particle separation results
+    in a greater number of particles and hence a particle-based
+    fluid with higher resolution.
+
+Particle Radius Scale:
+    #id: radiusscale
+    
+    The radius of the particles is determined by scaling the __Particle Separation__ by this parameter.  Setting this value higher will result in more volume in the fluid
+    but less surface detail as it gets smoothed out by the larger particle radius.
+
+    In versions prior to Houdini 12, this value was set internally at 2.
+
+== Creation ==
+
+[Include:standard_objcreation]
+
+== Initial Data ==
+    
+Use this tab to control the initial configuration of the particle
+fluid object.
+
+Input Type:
+    #id: surfacetype
+    
+    Determines how to interpret the SOP geometry specified
+    in __SOP Path__.
+
+    Surface SOP:
+        Use this option to generate particles inside of the
+        specified surface. 
+
+        The
+        initial separation between particles is determined by
+        the Particle Separation parameter, and so the particle
+        separation also determines the number of particles
+        created.
+        
+    Particle Field:
+        Use this option to generate a fluid
+        particle at each point in the specified geometry. 
+
+        This can
+        be used to specify a custom initial distribution for the
+        fluid particles or to resume an existing particle fluid
+        simulation.  It can also be used to combine multiple fluids
+        with different initial conditions.  
+
+        When this option is
+        selected, the particle separation is completely
+        independent of the initial particle distribution. This
+        means that changing the particle separation may
+        substantially alter the results of a simulation.  
+
+        However,
+        if the __Initialize Fluid Attributes__ toggle is disabled,
+        then the Particle Fluid Object does not create or change
+        any attributes on the imported fluid geometry, and expects
+        those attributes to exist already.
+
+    File:
+        Use this option to initialize a fluid simulation directly
+        from a .bgeo file.  
+
+        This can be used to easily reinitialize
+        a simulation from saved geometry data.  See the
+        __Fluid Geometry File__ parameter below.
+        
+    Fetch Data:
+        Use this option to generate particles inside of the specified
+        DOP object geometry
+
+        The initial separation between particles is determined by
+        the Particle Separation parameter, and so the particle
+        separation also determines the number of particles
+        created.
+
+Initial Configuration:
+    #id: inittype
+    
+    This determines how the initial configuration of fluid particles
+    if __Input Type__ is set to __Surface SOP__.
+
+    Grid:
+        Particles are generated on an axis-aligned grid inside of
+        the surface.
+    Tetrahedral:
+        Particles are generated in a more tightly-packed tetrahedral arrangement inside of the surface.  
+
+        This can be useful is the
+        fluid needs to settle quickly inside of a container without
+        losing too much of its initial height.
+        
+SOP Path:
+    #id: soppath
+    The geometry controlling the initial locations of fluid
+    particles. How this is used depends on __Input Type__.
+    
+Fluid Geometry File:
+    #id: fluid_geometry_file
+    
+    The file to load fluid geometry from when __Input Type__
+    is set to __File__.
+    
+    This field
+    expects a file containing particle fluid geometry; that is,
+    geometry extracted from the __Geometry__ field of a particle
+    fluid object.
+
+    When running a long simulation, it is useful to save
+    .bgeo files containing particle fluid geometry at each
+    frame.  The simulation can then be restarted from any
+    frame by specifying one of these files in this field.
+
+Source Object:
+    #id: srcobject
+    
+    The object from which to fetch the data.
+
+    You can use group names, object names, object ids, and/or 
+    wildcard characters to match an object, and the negation 
+    character (^) to eliminate objects from consideration. If
+    multiple objects match, Houdini uses the one with the lowest 
+    object ID as the source object.
+
+Source Data Name:
+    #id: srcdataname
+    
+    Data matching the Source Data Name will be extracted from the 
+    source object and provided as the source geometry to control
+    the initial locations of fluid particles.
+
+Use Object Transform:
+    #id: usetransform
+    
+    If this toggle is enabled, the transform of the object
+    containing the SOP geometry
+    applied to the geometry. This is useful if the initial
+    location of the geometry is defined by an object transform.
+    
+Jitter Seed:
+    #id: jitterseed
+    
+    When __Input Type__ is set to __Surface SOP__, a random jitter
+    may be applied to the particles created.  
+
+    This has the effect
+    of making the initial fluid configuration less symmetrical.
+    This parameter is a seed used in the random jitter application.
+    
+Jitter Scale:
+    #id: jitterscale
+    
+    The magnitude of random jitter to apply to each particle.
+
+Initialize Fluid Attributes:
+    #id: initfluidattribs
+    
+    This parameter is only meaningful if __Input Type__ is set
+    to __Particle Field__. In this case, when this parameter is
+    enabled, the DOP will overwrite any existing attributes used
+    by the [Particle Fluid Solver DOP|Node:dop/particlefluidsolver] (mass, velocity, density, etc.)
+    with new values when it initializes the fluid particles.
+    
+    Leave this parameter disabled if you wish to initialize a
+    particle fluid object from the particle geometry of an
+    existing particle fluid simulation.  This is the case
+    when you are attempting to restart an old simulation, or
+    combine two or more particle fluid objects in to the same
+    object.
+
+Initialize Velocity:
+    #id: initvel
+    
+    When sourcing from a grid of particles, they may already have a
+    velocity. This option lets you override these velocities with your
+    own constant velocity with the __Initial velocity__ parameter below.
+
+Initial Velocity:
+    #id: velocity
+    
+    The initial velocity of the fluid particles created by this DOP.
+
+Initialize Force and Mass:
+    #id: initforcemass
+    
+    If enabled, add force and mass attributes to __Plain__ particle types.
+    These attributes are always added to __SPH__ and __Grain__ particles.
+    
+Particle Type:
+    #id: particletype
+    
+    Plain:
+        The fewest number of attributes.  Useful for POPs or FLIP fluids.
+    
+    SPH:
+        Pressure and other attributes required by SPH fluids.
+    
+    Grains:
+        Adds attributes to instance a 'grain' to each point so the points
+        can have their own unique colleciton of spheres.  Used by the  gas
+        particle forces DOP.
+
+Add Viscosity Attribute:
+    #id: addviscosity
+
+    A viscosity attribute is added, but not written to.  It's
+    default value is 1 to allow any new particles added to the
+    sim to respect the global viscosity value.
+
+    Note the particle viscosity is usually treated as a
+    multiplier, so 1 means to use the global viscosity value.
+
+== Guides == (guides)
+
+Use this tab to quickly visualize the particle fluid object.
+
+Show Guide Geometry:
+    #id: showguide
+    
+    Enables or disables particle visualization.
+    
+Visualization:
+    #id: visprim
+    
+    Selects between __Spheres__, __Sprites__, __Grain__, or
+    __Particles__ visualization of particles.
+
+    Sphere visualization stamps a scaled sphere at each point.  Sprite
+    will stamp a billboard image that looks like a sphere.  Grain
+    stamps arbitrary geometry on the points.
+
+Color:
+    #id: viscolor
+    
+    Controls the color of the visualization geometry.
+
+Scale:
+    #id: visscale
+    
+    This controls the size of the spheres in the guide geometry.  
+
+Sprite Image:
+    #id: spriteimage
+    
+    The sprite image to display when __Visualization__ is set to
+    __Sprites__.
+
+Visualization Type:
+    #id: guidevistype
+    
+    Instead of a constant color, one of the particle attributes could
+    be visualized.
+
+    None:
+        The color is used for all particles.
+
+    Speed:
+        The length of the attribute is used.  In the case of velocity,
+        this corresponds to the speed.
+
+    Direction:
+        The attribute is normalized to a unit sphere and then scaled to
+        fit into the RGB cube, resulting in a spectrum of colors
+        depending on which way the particle is moving.
+
+    Value:
+        The attribute's raw value is used as the color channels.
+
+Visualization Mode:
+    #id: guidevismode
+    
+    If the attribute is a scalar attribute, or has been turned into a
+    scalar attribute by the Speed visualization type, it can be remapped
+    into a color spectrum.
+
+Visualization Attrib:
+    #id: guideattrib
+    
+    Which point attribute to visualize as color.
+
+Visualization Scale:
+    #id: guidevisscale
+    
+    Before mapping the visualization range, the attribute is multiplied
+    by this scale.
+
+Detect Range:
+    #id: guidedetectrange
+    
+    The minimum and maximum values of the attribute are computed and
+    used for the range.  This allows for automatic bounding of the
+    range.  The detail attribute `vis_range` will be set to the
+    computed range.
+
+Visualization Range:
+    #id: guiderange
+    
+    This range will be remapped into the 0..1 interval for setting the
+    color or mapping by the Visualization Mode.  Using a balanced
+    interval, such as -1..1, is useful for detecting zero crossings of
+    an attribute along with the Two-Tone visualization mode.
+
+== Physical == (physical_tab)
+
+Use this tab to control general DOPs physical parameters for
+the particle fluid object.
+
+Bounce:
+    #id: bounce
+    
+    The elasticity of the object. 
+
+    If two objects of bounce 1.0 collide, they will rebound without losing energy. If two objects of bounce 0.0 collide, they will come to a standstill.
+    
+Friction:
+    #id: friction
+    
+    The coefficient of friction of the object. A value of 0 means the object is frictionless. This governs how much the tangential velocity is affected by collisions and resting contacts.
+    
+Dynamic Friction Scale:
+    #id: dynamicfriction
+    
+    An object sliding may have a lower friction coefficient than an object at rest. This is the scale factor that relates the two. It is not a friction coefficient, but a scale between zero and one. 
+
+    A value of one means that dynamic friction is equal to static friction. A scale of zero means that as soon as static friction is overcome the object acts without friction.
+
+Density:
+    #id: density
+    
+    The physical density of the particle fluid. 
+
+    This quantity is
+    used by the [Particle Fluid Solver DOP|Node:dop/particlefluidsolver] to determine how to apply pressure forces to particles in the fluid. When the density of
+    particles exceeds their rest density, they are pushed apart.
+    Similarly, they are pulled together when their density is less
+    than the fluid rest density.
+    
+Viscosity:
+    This parameter is used by the Particle Fluid Solver to control
+    the thickness and resistance to flow of the particle fluid. A
+    fluid with higher viscosity tends to flow more slowly and appear
+    thicker than one with low viscosity.  
+
+    For this force to be applied by the particle fluid solvers, the __Enable Viscosity Force__ toggle must be enabled.
+    
+Surface Tension:
+    Controls the magnitude of surface tension forces applied to
+    particles in the fluid by the [Particle Fluid Solver DOP|Node:dop/particlefluidsolver]. Surface
+    tension forces attempt to pull surface particles more tightly in
+    to the fluid, resulting in a more rounded fluid shape.  
+
+    For this force to be applied by the [Particle Fluid Solver|Node:dop/particlefluidsolver], the __Enable Surface Tension Force__ toggle must be enabled in the __Internal Forces__ tab of the Particle Fluid Solver.
+
+    This only applies to SPH fluids.
+
+== Collisions == (collisions_tab)
+
+Volume Offset:
+    Controls how far away from collision geometry particle collisions
+    occur.  If __Volume Offset__ is set to 0, collisions occur directly
+    at the boundary of the collision object.  If it is set to 1.0, then
+    collisions occur one particle radius away from the collision geometry.
+
+Use Point Velocity for Collisions:
+    The local velocity of an affector object is a combination of
+    the angular and linear velocity. However, if the object is
+    deforming and points match frame to frame, the local point
+    velocity can be used as well to estimate the deformation effect.
+    
+Use Volume Velocity for Collisions:
+    If an affector object doesn't have a stable point count, but
+    does have a volume representation, the change in the volume
+    representation can be used as an estimate of deformation
+    velocity. 
+
+== Stored Attributes == (stored_tab)
+        
+Use this tab to select additional attributes to compute and store during the simulation.
+
+Density Field Gradient:
+    Stores the gradient of the fluid density field at each particle
+    position.  This may be useful for identifying particles close to
+    the surface of the fluid, as the magnitude of this vector is
+    larger for particles close to the fluid surface than it is for
+    particles far from the surface.
+
+Pressure Force:
+    Stores the last pressure force vector computed for each particle.
+
+Neighbor Velocity:
+    For each particle, this stores the average velocity of all neighbors
+    of the particle.  By comparing a particle's velocity with its neighbor
+    velocity, areas of particularly turbulent flow in the fluid may be
+    identified.
+
+== Coordinate System == (coords_tab)
+    
+Use this tab to generate a simple coordinate system to be carried along
+with the fluid. This coordinate system can later be transferred on to
+the fluid surface. The coordinate system is designed to reinitialize
+itself over time, and so at all times it stores two different coordinate
+system as well as a blend attribute to blend between the two.
+The blend value is stored in the detail attribute "coordinate_transition_state",
+while the two coordinate systems are stored in the point attributes
+"coordinate1" and "coordinate2".  For each point, if we define
+the blend value as __s__ and the coordinates as __c1__ and __c2__, then
+a blended coordinate value for that point could be given by
+__s * c1 + (1 - s) * c2__.
+
+Create Coordinate System:
+    Enables or disables the coordinate system on this object.
+
+Coordinate Transition Period:
+    Since any coordinate system on a set of freely moving fluid particles
+    is expected to gradually become incoherent, the coordinate system is
+    designed to periodically reinitialize itself.  This specifies the
+    transition period.
+
+Coordinate Transition Length:
+    During each transition period, the coordinate system remains constant
+    for some period of time, and then transitions in to a reinitialized
+    coordinate system over a specified transition length.  Use this
+    parameter to control that transition length.
+
+Coordinate Scale:
+    By default, all fluid coordinates are in the range `[0,1]` and are defined with respect to the initial bounding box of the fluid.
+    
+    Use this parameter to scale the range of each axis from `[0,1]` to `[0,<<s>>]` where <<s>> can be specified.
+
+Override Bounding Box:
+    By default, all particle coordinates are determined with respect to
+    the initial bounding box of the fluid.  This bounding box is
+    repeated spatially to accommodate particles that flow out of this
+    bounding box.  
+
+    Use this parameter to define coordinates with respect
+    to a different bounding box.
+
+Minimum Bound:
+    The minimum boundaries of the user-defined coordinate bounding box.
+
+Maximum Bound:
+    The maximum boundaries of the user-defined coordinate bounding box.
+
+== Grains == (grains_tab)
+    
+Use this tab to select the grain geometry be instanced at each particle
+location. 
+
+Custom Grain:
+    Enables or disables use of a custom defined grain SOP.
+    
+Grain SOP Path:
+    When __Custom Grain__ is enabled, the custom grain SOP path is 
+    defined here. 
+    Custom grains must be a set of rigidly-connected spheres.
+    
+Grain Shape:
+    This options lists a number of default grain shapes.
+    
+Grain Radius:
+    Controls the size of the grains.
+    
+Sphere Radius:
+    Controls the size of the spheres that comprise the grain.
+
+@locals
+
+[Include:standard_locals]
+
+@related
+
+- [Simulating liquids|/fluid/liquids]
+- [Node:dop/particlefluidconfigureobject]
+- [Node:dop/particlefluidsolver]
+- [Node:sop/particlefluidsurface]
+- [How to make splashing water|/fluid/splashingwater]
+

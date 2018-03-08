@@ -1,0 +1,585 @@
+#type: node
+#context: dop
+#internal: rbdpackedobject
+#icon: DOP/rbdpackedobject
+
+= RBD Packed Object =
+
+""" Creates a single DOP object from SOP Geometry that represents a number of RBD Objects."""
+
+The RBD Packed Object DOP creates a single DOP Object inside the DOP simulation. It takes the geometry from the given SOP Path and uses each [packed primitive|/model/packed] in the geometry to represent a single RBD object. Each packed primitive contains the collision geometry for an RBD object, and attributes on the primitive's point are used to store information such as orientation, mass, and velocity.
+
+The resulting DOP Object represents large numbers of objects in a more efficient manner than the [RBD Fractured Object DOP|Node:dop/rbdfracturedobject] or the [RBD Point Object DOP|Node:dop/rbdpointobject]. This object representation is currently only understood by the [Bullet Solver|Node:dop/bulletrbdsolver].
+
+NOTE:
+        In Houdini 13, RBD Packed Objects can't interact with other solvers such as cloth and fluids.
+
+== Point Attributes ==
+
+The [Bullet Solver|Node:dop/bulletrbdsolver] uses several point attributes to
+store the properties of each piece of a packed object.
+
+table>>
+    tr>>
+        th>> Name
+        th>> Type
+        th>> Description
+    tr>>
+        td>> `active`
+        td>> Integer
+        td>>
+            Specifies whether the object is able to react to other objects in the simulation. The default active state is set by the __Initial Object Type__ parameter.
+    tr>>
+        td>> `animated`
+        td>> Integer
+        td>>
+            Specifies whether the object's transform should be updated from its SOP geometry at each timestep. This attribute is only used if the `active` attribute is set to 0. The default value is set by the __Initial Object Type__ parameter.
+    tr>>
+        td>> `bounce`
+        td>> Float
+        td>>
+            The elasticity of the object. If two objects of bounce 1.0 collide, they will rebound without losing energy. If two objects of bounce 0.0 collide, they will come to a standstill. The default value is set by the __Bounce__ parameter.
+    tr>>
+        td>> `bullet_add_impact`
+        td>> Integer
+        td>>
+            When enabled, any impacts that occur during the simulation will be recorded in the __Impacts__ or __Feedback__ data. Enabling this option may cause the simulation time and memory usage to increase.
+    tr>>
+        td>> `bullet_angular_sleep_threshold`
+        td>> Float
+        td>>
+            The sleeping threshold for the object's angular velocity. If the object's angular speed is below this threshold for a period of time, the object may be treated as non-moving.
+    tr>>
+        td>> `bullet_ignore`
+        td>> Integer
+        td>>
+            Specifies whether the object should be completely ignored by the Bullet solver. Unlike setting the `active` attribute to zero, other objects in the simulation will not be able to collide against this object.
+    tr>>
+        td>> `bullet_linear_sleep_threshold`
+        td>> Float
+        td>>
+            The sleeping threshold for the object's linear velocity. If the object's linear speed is below this threshold for a period of time, the object may be treated as non-moving.
+    tr>>
+        td>> `bullet_want_deactivate`
+        td>> Integer
+        td>>
+            Disables simulation of a non-moving object until the object moves again. The linear and angular speed thresholds are used to determine whether the object is non-moving. If the __Display Geometry__ checkbox is turned off, you will see the color of the Guide Geometry change from the __Color__ to the __Deactivated Color__.
+    tr>>
+        td>> `computecom`
+        td>> Integer
+        td>>
+            Specifies whether the center of mass of the object should be computed automatically from the object's collision shape. The default value is set by the __Compute Center of Mass__ parameter.
+    tr>>
+        td>> `computemass`
+        td>> Integer
+        td>>
+            Specifies whether the mass of the object should be computed automatically from the object's collision shape and density. The default value is set by the __Compute Mass__ parameter.
+    tr>>
+        td>> `creationtime`
+        td>> Float
+        td>>
+            Stores the simulation time at which the object was created.
+    tr>>
+        td>> `dead`
+        td>> Integer
+        td>>
+            Specifies whether the object should be deleted during the next solve. The [POP Kill|Node:dop/popkill] node can be used to generate this attribute.
+    tr>>
+        td>> `deforming`
+        td>> Integer
+        td>>
+            Specifies whether the object's collision shape should be rebuilt from its SOP geometry at each timestep. The default value is set by the __Initial Object Type__ parameter.
+    tr>>
+        td>> `density`
+        td>> Float
+        td>>
+            The mass of an object is its volume times its density. The default value is set by the __Density__ parameter.
+    tr>>
+        td>> `friction`
+        td>> Float
+        td>>
+            The coefficient of friction of the object. A value of 0 means the object is frictionless. The default value is set by the __Friction__ parameter.
+    tr>>
+        td>> `inertialtensorstiffness`
+        td>> Float
+        td>>
+            A scale factor that is applied to the inertial tensor of the object. A higher stiffness will make the object less likely to spin. The default value is set by the __Rotational Stiffness__ parameter.
+    tr>>
+        td>> `inheritvelocity`
+        td>> Integer
+        td>>
+            If non-zero, the `v` and `w` point attribute values from the source SOP geometry will override the object's initial velocity.
+    tr>>
+        td>> `mass`
+        td>> Float
+        td>>
+            The mass of the object. If `computemass` is non-zero, this value will be computed automatically by the solver. Otherwise, the default value will be set by the __Mass__ parameter.
+    tr>>
+        td>> `name`
+        td>> String
+        td>>
+            A unique name for the object. This value is used by [Constraint Networks|Node:dop/constraintnetwork] to identify constraints that should be attached to this object.
+    tr>>
+        td>> `orient`
+        td>> Quaternion
+        td>>
+            The orientation of the object.
+    tr>>
+        td>> `P`
+        td>> Vector
+        td>>
+            The current position of the object's center of mass.
+    tr>>
+        td>> `pivot`
+        td>> Vector
+        td>>
+            The pivot point that the orientation is applied to. If `computecom` is non-zero, this will be computed from the object's collision shape. Otherwise, the value is set from the __Center of Mass__ parameter.
+    tr>>
+        td>> `v`
+        td>> Vector
+        td>>
+            The linear velocity of the object. The initial velocity is set by the __Velocity__ parameter.
+    tr>>
+        td>> `w`
+        td>> Vector
+        td>>
+            The angular velocity of the object, in radians per second. The initial angular velocity is set by the __Angular Velocity__ parameter.
+
+=== Collision Shape Attributes ===
+
+The following attributes can be used to customize the collision shape for each object.
+
+table>>
+    tr>>
+        th>> Name
+        th>> Type
+        th>> Description
+    tr>>
+        td>> `bullet_adjust_geometry`
+        td>> Integer
+        td>>
+            Shrinks the collision geometry to prevent the __Collision Padding__ from increasing the effective size of the object.
+            This can improve the simulation's performance by preventing initially closely-packed collision shapes from interpenetrating, and also removes the gap between objects caused by the __Collision Padding__.
+    tr>>
+        td>> `bullet_autofit`
+        td>> Integer
+        td>>
+            Specifies whether to use the bounds of the object's geometry to compute the collision shape when __Geometry Representation__ is __Box__, __Capsule__, __Cylinder__, __Sphere__, or __Plane__.
+    tr>>
+        td>> `bullet_collision_margin`
+        td>> Float
+        td>>
+            A padding distance between shapes, which is used by the Bullet engine to improve the reliability and performance of the collision detection. You may need to scale this value depending on the scale of your scene. This padding increases the size of the collision shape, so it is recommended to enable __Shrink Collision Geometry__ to prevent the collision shape from growing.
+            This option is not supported for the __Concave__ or __Plane__ geometry representations.
+    tr>>
+        td>> `bullet_georep`
+        td>> String
+        td>>
+            The collision shape used to represent the object. Possible values are `convexhull`, `concave`, `box`, `capsule`, `cylinder`, `compound`, `sphere`, and `plane`.
+    tr>>
+        td>> `bullet_groupconnected`
+        td>> Integer
+        td>>
+            When __Geometry Representation__ is __Convex Hull__, specifies whether the solver should create a compound shape that contains a separate convex hull collision shape for each set of connected primitives in the geometry.
+    tr>>
+        td>> `bullet_length`
+        td>> Float
+        td>>
+            The length of the __Capsule__ or __Cylinder__ collision shape in the Y direction. If __AutoFit__ is enabled, this value will be computed automatically from the object's geometry.
+    tr>>
+        td>> `bullet_primR`
+        td>> Vector
+        td>>
+            The orientation of the __Box__, __Capsule__, __Cylinder__, or __Plane__ collision shape in the Bullet world. If __AutoFit__ is enabled, this value will be computed automatically from the object's geometry.
+    tr>>
+        td>> `bullet_primS`
+        td>> Vector
+        td>>
+            The size of the __Box__ collision shape. If __AutoFit__ is enabled, this value will be computed automatically from the object's geometry.
+    tr>>
+        td>> `bullet_primT`
+        td>> Vector
+        td>>
+            The position of the __Box__, __Sphere__, __Capsule__, __Cylinder__, or __Plane__ collision shape in the Bullet world. If __AutoFit__ is enabled, this value will be computed automatically from the object's geometry.
+    tr>>
+        td>> `bullet_radius`
+        td>> Float
+        td>>
+            The radius of the __Sphere__, __Capsule__, or __Cylinder__ collision shape. If __AutoFit__ is enabled, this value will be computed automatically from the object's geometry.
+    tr>>
+        td>> `bullet_shrink_amount`
+        td>> Float
+        td>>
+            Specifies the amount of resizing done by __Shrink Collision Geometry__.
+
+=== Collision Attributes ===
+
+The attributes listed below can be used to ignore collisions against other
+objects in the simulation.
+
+table>>
+    tr>>
+        th>> Name
+        th>> Type
+        th>> Description
+    tr>>
+        td>> `activationignore`
+        td>> String
+        td>>
+            If the object is inactive and has a positive
+            `min_activation_impulse` value, it will not be activated by
+            collisions with any objects that match this pattern. The pattern
+            uses the same syntax as the `collisionignore` attribute.
+    tr>>
+        td>> `activationxformgroup`
+        td>> String
+        td>>
+            For an agent, specifies which of its rigid bodies should be activated when using the `min_activation_impulse` attribute.
+            The default behavior is to activate all of the agent's rigid bodies.
+            This attribute is expected to contain the name of a [transform group|Node:sop/agenttransformgroup] that specifies which joints' rigid bodies should be activated.
+    tr>>
+        td>> `collisiongroup`
+        td>> String
+        td>>
+            Specifies the name of a collision group that this object belongs
+            to. This can be used by the `collisionignore` attribute to ignore
+            collisions against specific groups of objects.
+    tr>>
+        td>> `collisionignore`
+        td>> String
+        td>>
+            The object will not collide against any objects that match this
+            pattern. This pattern can use the name of DOP objects, the ID of
+            DOP objects, DOP groups, or the `collisiongroup` point attribute of
+            a packed primitive in an [RBD Packed
+            Object|Node:dop/rbdpackedobject].  The [POP Collision
+            Ignore|Node:dop/popcollisionignore] node can be used to generate
+            this attribute.
+
+            * `*` will disable all collisions, and an empty string will enable all collisions.
+
+            * `* ^object1` will cause the object to only collide against the DOP object whose name is `object1`.
+
+            * `wall*` will disable collisions against packed primitives whose `collisiongroup` attribute begins with `wall` (or DOP objects whose name begins with `wall`).
+
+            * `object1/wall*` will disable collisions against packed primitives from the DOP object `object1` whose `collisiongroup` attribute begins with `wall`.
+    tr>>
+        td>> `min_activation_impulse`
+        td>> Float
+        td>>
+            The minimum impulse from a collision that will cause the object to switch from inactive to active. The activation occurs at the instant that the collision occurs.
+            The `activationignore` attribute can be used to prevent the object from being activated by collisions with particular objects.
+
+=== Speed Limit Attributes ===
+
+The attributes listed below can be used to clamp the linear or angular speed of specific objects.
+The clamping is performed during each substep after forces and constraints have been applied (but before positions are updated), so this enforces a hard limit on the object's speed.
+If the attribute value is negative, no clamping is performed.
+For animated or deforming static objects, the speed limit affects the velocities used when resolving collisions.
+The [POP Speed Limit|Node:dop/popspeedlimit] node can be used to generate these attributes.
+
+table>>
+    tr>>
+        th>> Name
+        th>> Type
+        th>> Description
+    tr>>
+        td>> `speedmin`
+        td>> Float
+        td>>
+            The slowest speed (in units/second) that an object can move. This does not affect stationary objects.
+    tr>>
+        td>> `speedmax`
+        td>> Float
+        td>>
+            The fastest speed (in units/second) that an object can move.
+    tr>>
+        td>> `spinmin`
+        td>> Float
+        td>>
+            The slowest speed (in radians/second) that an object can rotate. This does not affect non-spinning objects.
+    tr>>
+        td>> `spinmax`
+        td>> Float
+        td>>
+            The fastest speed (in radians/second) that an object can rotate.
+
+The attributes listed below can be used to limit the _change_ in the object's linear or angular velocity when solving constraints and collisions.
+This does not affect changes to the object's velocity due to external forces, and is enforced each frame after constraints have been solved and positions have been updated.
+This can be useful to tame collisions that produce very high linear or angular velocities.
+If the value is negative, no clamping is performed.
+
+:note:
+    For best results, it is recommended to clamp both linear and angular acceleration simultaneously.
+
+    Setting the max acceleration to a very low value can introduce jitter for situations such as objects resting on the ground plane.
+    With such values, the contact constraints cannot change the object's velocity by enough to counter the acceleration due to gravity.
+
+table>>
+    tr>>
+        th>> Name
+        th>> Type
+        th>> Description
+    tr>>
+        td>> `accelmax`
+        td>> Float
+        td>>
+            Limits the change in the object's speed that is caused by enforcing constraints.
+    tr>>
+        td>> `angaccelmax`
+        td>> Float
+        td>>
+            Limits the change in the object's angular speed that is caused by enforcing constraints.
+
+=== Force Attributes ===(forceattributes)
+
+The attributes listed below can be used to apply forces to specific objects. Nodes such as [POP Force|Node:dop/popforce] and [POP Drag|Node:dop/popdrag] can be used to generate these forces.
+
+table>>
+    tr>>
+        th>> Name
+        th>> Type
+        th>> Description
+    tr>>
+        td>> `airresist`
+        td>> Float
+        td>>
+            Specifies how important it is to match the target velocity (`targetv`).
+    tr>>
+        td>> `drag`
+        td>> Float
+        td>>
+            When an object is dragged by the `targetv` and `airresist` attributes, this attribute is used to further scale the drag amount.
+    tr>>
+        td>> `dragexp`
+        td>> Float
+        td>>
+            Higher drag exponents cause objects that are far from `targetv` or `targetw` to recover faster than those that are already close to the target velocity.
+    tr>>
+        td>> `force`
+        td>> Vector
+        td>>
+            Specifies a force that will be applied to the center of mass of the object.
+    tr>>
+        td>> `spinresist`
+        td>> Float
+        td>>
+            Specifies how important it is to match the target angular velocity (`targetw`).
+    tr>>
+        td>> `targetv`
+        td>> Vector
+        td>>
+            Specifies a target velocity for the object. This is used in combination with the `airresist` attribute to compute a force that will move the object towards the desired velocity.
+    tr>>
+        td>> `targetw`
+        td>> Vector
+        td>>
+            Specifies a target angular velocity for the object. This is used in combination with the `spinresist` attribute to compute a torque that will move the object towards the desired angular velocity.
+    tr>>
+        td>> `torque`
+        td>> Vector
+        td>>
+            Specifies a torque that will be applied to the object.
+
+=== Agent Attributes ===(agentattributes)
+
+For agent primitives, a rigid body is created for each transform in its rig that has at least one shape attached to it in the agent's collision layer.
+Array attributes are used for properties that can vary for each of an agent's rigid bodies, and the attributes are named with the `_agent` suffix.
+The arrays are indexed using the transform index from the agent's rig.
+
+The following array attributes are required:
+
+* `bullet_autofit_valid_agent`
+* `bullet_length_agent`
+* `bullet_primR_agent`
+* `bullet_primS_agent`
+* `bullet_primT_agent`
+* `bullet_radius_agent`
+* `bullet_sleeping_agent`
+* `deactivation_time_agent`
+* `mass_agent`
+* `orient_agent`
+* `pivot_agent`
+* `trans_agent`
+* `v_agent`
+* `w_agent`
+
+The following array attributes are optional and can be used instead of the regular point attributes if varying values are needed.
+* `active_agent`
+* `activationignore_agent`
+* `activationxformgroup_agent`
+* `bounce_agent`
+* `density_agent`
+* `force_agent`
+* `friction_agent`
+* `inertialtensorstiffness_agent`
+* `min_activation_impulse_agent`
+* `torque_agent`
+
+The attributes listed below can also be used for agent primitives.
+
+table>>
+    tr>>
+        th>> Name
+        th>> Type
+        th>> Description
+    tr>>
+        td>> `bullet_updateagentxform`
+        td>> Integer
+        td>>
+            Specifies whether the solver should update the agent's overall transform (e.g. the `P` and `orient` point attributes) based on the root rigid body's motion.
+            This option is useful for a full ragdoll so that the agent's point follows its motion, but may cause issues for a partial ragdoll where the agent's overall transform is already being updated elsewhere (e.g. by the [crowd solver|Node:dop/crowdsolver]).
+
+=== Reserved Solver Attributes ===
+
+Below is a list of attributes that are maintained internally by the solver. You should not modify these attributes yourself.
+
+table>>
+    tr>>
+        th>> Name
+        th>> Class
+        th>> Type
+        th>> Description
+    tr>>
+        td>> `bullet_autofit_valid`
+        td>> Point
+        td>> Integer
+        td>>
+            When __AutoFit__ is enabled, this value stores whether the solver has already computed collision shape attributes such as `bullet_length` and `bullet_primT`.
+    tr>>
+        td>> `bullet_sleeping`
+        td>> Point
+        td>> Integer
+        td>>
+            Tracks whether the object has been put to sleep by the solver.
+            This occurs after the object and any nearby / constrained objects have been below the __Linear Threshold__ and __Angular Threshold__ for a period of time.
+            
+            NOTE:
+                When manually waking an object, the `deactivation_time` attribute should also be set to zero so that the object isn't immediately put back to sleep.
+    tr>>
+        td>> `deactivation_time`
+        td>> Point
+        td>> Float
+        td>>
+            The amount of time that the object's speed has been below the __Linear Threshold__ or __Angular Threshold__. The solver uses this value to disable simulation of objects that have been inactive for a period of time.
+    tr>>
+        td>> `found_overlap`
+        td>> Point
+        td>> Integer
+        td>>
+            When the solver sees an object for the first time, it checks whether that object is initially overlapping with any other objects in the simulation and prevents any such pairs of objects from being forced apart. This value is used by the solver to determine whether it has performed this process for the object on a previous frame.
+    tr>>
+        td>> `id`
+        td>> Point
+        td>> Integer
+        td>>
+            A unique identifier for the object. This value is used by the solver to identify objects that have been added to or removed from the simulation.
+    tr>>
+        td>> `nextid`
+        td>> Detail
+        td>> Integer
+        td>>
+            Stores the `id` that the solver will assign to the next new object that is added.
+
+@parameters
+    Creation Frame Specifies Simulation Frame:
+        Determines if the creation frame refers to global Houdini frames (`$F`) or to simulation specific frames (`$SF`).  The latter is affected by the offset time and scale time at the DOP network level.
+    Creation Frame:
+        The frame number on which the object will be created. The object is created only when the current frame number is equal to this parameter value. This means the DOP Network must evaluate a timestep at the specified frame, or the object will not be created. 
+
+	For example, if this value is set to 3.5, the __Timestep__ parameter of the DOP Network must be changed to `1/(2*$FPS)` to ensure the DOP Network has a timestep at frame `3.5`.
+    Initial Object Type:
+        Specifies the initial state of the objects. The `active`, `animated`, and `deforming` point attributes can be used to vary these values on a per object basis.
+        For animated and deforming objects, the `name` point attribute is used to find the matching packed primitive from the __SOP Path__.
+
+        Create Active Objects:
+            The objects will be simulated and react to other objects in the simulation.
+        Create Static Objects:
+            The objects will not move or react to other objects in the simulation.
+        Create Animated Static Objects:
+            The objects' transforms will be updated on each timestep from the __SOP Path__, but the objects will not react to other objects in the simulation.
+        Create Deforming Static Objects:
+            The objects' collision shapes will be rebuilt on each timestep from the __SOP Path__, but the objects will not react to other objects in the simulation.
+        Create Deforming Active Objects:
+            The objects will be simulated and react to other objects in the simulation, and their collision shapes will also be rebuilt on each timestep from the __SOP Path__.
+    Geometry Source:
+        Specifies the source of the objects' geometry.
+
+        SOP:
+            Use the SOP specified by the __SOP Path__ parameter.
+        First Context Geometry:
+            Use the SOP connected to the DOP network's first input.
+        Second Context Geometry:
+            Use the SOP connected to the DOP network's second input.
+        Third Context Geometry:
+            Use the SOP connected to the DOP network's third input.
+        Fourth Context Geometry:
+            Use the SOP connected to the DOP network's fourth input.
+    SOP Path:
+        The path to a SOP (or an Object, in which case the display SOP is used) which will be the geometry for this object.
+    Overwrite Attributes from SOP:
+        When enabled, specifies a list of point attributes that will be updated on each frame from the __SOP Path__. The `name` point attribute is used to find the matching packed primitive from the SOP geometry.
+    Use Object Transform:
+        The transform of the object containing the chosen SOP is applied to the geometry. This is useful if the initial location of the geometry is defined by an object transform. 
+    Display Geometry:
+        Controls if the geometry is displayed in the viewport.  Does not reset the simulation when it is changed.
+
+        Simulation Geometry:
+            The objects' geometry is displayed in the viewport.
+
+        Render Geometry:
+            The geometry specified by the __Render SOP Path__ parameter is transformed to match the simulation geometry and is displayed in the viewport.
+            This is useful for visualizing the results of the simulation when using lower resolution shapes for the simulation geometry.
+
+    Render SOP Path:
+        Specifies the SOP geometry to use when __Display Geometry__ is set to __Render Geometry__.
+
+    == Initial State ==
+
+        Position:
+            Initial position in world space of the object.
+        Rotation:
+            Initial orientation of the object. This is in RX/RY/RZ format.
+        Velocity:
+            Initial velocity of the object.
+        Angular Velocity:
+            Initial angular velocity of the object. This is the axis of rotation times the rate of rotation. Speed of rotation is measured in degrees per second, so a value of 360 will cause
+            the object to rotate once per second.
+        Inherit Velocity from Point Velocity:
+            If enabled, the `v` and `w` point attributes of the source geometry will override the object's initial velocity.
+
+    [Include:standard_bulletdata_parm]    
+
+    == Physical ==
+
+        Compute Center of Mass:
+            Specifies that the object's center of mass should be computed automatically from its collision shape on the next frame it is solved.
+        Inherit Pivot from Point Position:
+            Sets the center of mass to the packed primitive's initial point position.
+        Pivot:
+            Specifies the object's center of mass.
+        Compute Mass:
+            Determines if the mass will be calculated automatically from the object's volumetric representation and glued sub-objects.
+        Density:
+            The mass of an object is its volume times its density.
+        Mass:
+            The absolute mass of the object.
+        Rotational Stiffness:
+            When an object receives a glancing blow, it will often acquire a spin. The amount of spin acquired depends on the shape and mass distribution of the object, known as the
+            _inertial tensor_. 
+
+	    The __Rotational Stiffness__ is a scale factor applied to this. A higher stiffness will make the object less liable to spinning, a lower value will make it more ready to spin.
+        [Include:standard_physparms]
+
+@outputs
+    First:
+        The RBD object created by this node is sent through the single output.
+@locals
+    [Include:standard_locals]
+
+
+@related
+    - [Node:dop/constraintnetwork]
+    - [Node:dop/rbdfracturedobject]
+    - [Node:sop/pack]
+

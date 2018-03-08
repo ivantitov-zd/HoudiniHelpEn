@@ -1,0 +1,195 @@
+#type:     node
+#context:  sop
+#internal: edgetransport
+#icon:     SOP/edgetransport
+
+= Edge Transport =
+
+"""Copies and optionally modifies attribute values along edges networks and curves."""
+
+== Overview ==
+
+This node calculates attribute values as it "moves" along curves, or along edges in polygonal geometry.
+
+The simplest form of "transport" is to copy an attribute value from the starting points to the end points. Alternatively, you can use a function to compute the attribute value at each point in the graph. For example, you can use a sum function to compute the depth of each leaf, or a maximum function to compute the maximum value of the attribute along each branch.
+
+The node can traverse the selected edges in different ways:
+
+* The node can treat edges with shared points as implicitly forming a directed acyclic graph and move from the root(s) of the graph along the edges to the end points.
+
+    * You must specify the "root" point(s) to start processing at. The __Root choice__ parameter lets you use the first or last point in the geometry, or explicitly specify points to use as roots.
+
+    * Houdini edges do not have an inherent direction. This node treats each edge as proceeding from the root outward. You can reverse the direction of traversal with the __Direction__ parameter.
+
+    * If the graph has multiple roots, the results may change if the geometry is animated, because the edge-network mode uses edge lengths to decide traversal order.
+
+* You can set a "parent" attribute on the points to explicitly set up a graph structure for the edges.
+    
+* The node can p each edge individually. This is useful for hair/fur. In this case, avoid using geometry with shared points. If you are computing a point attribute and the edge's points are shared, the resulting values are not well defined. This means the result may not make sense, and/or the result may change between runs or between versions of Houdini.
+
+[Image:/images/nodes/sop/edgetransport_trees.jpg]
+
+
+== Recipes ==
+
+:task: Compute distance along the curve at each point:
+
+    Set __Direction__ to "Foward", __Operation__ to "Total", __Integrate a constant value__ on, __Scale by edge length__ on, __Edge split method__ to "Copy".
+
+:task: Normalize the computed distance to a 0-1 range along the curve:
+
+    First, use an Edge Transport to compute the distance.
+    Then, use an Attribute Wrangle to set each point's distance value to the current value divided by the value on the last point.
+
+:task: Compute the number of edges along the curve at each point:
+
+    Set __Direction__ to "Foward", __Operation__ to "Total", __Integrate a constant value__ on, __Scale by edge length__ off, __Edge split method__ to "Copy".
+
+
+@parameters
+
+Method:
+    #id: method
+    
+    How to traverse the edges between the points in the __Point group__.
+    
+    Each Curve:
+        Processes each curve individually. The "forward" direction of each curve is from the lowest point number to the highest point number. This mode supports both vertex and point attributes. This mode only supports polygons and curves. This mode works with closed curves.
+        
+    Edge Network:
+        The node forms a graph structure from any edges between the points in the __Point group__. You can set the starting points (roots) using the __Root choice__ parameter. The node works from the root points outward. Edges at the same level are traversed by edge distance. This mode only supports point attributes. You can use this mode with any geometry type with internal edges.
+
+    Parent Attribute:
+        This lets you explicitly set up the graph structure of the points using an attribute. Create an integer attribute named `parent` on the points (you can change the attribute name with the __Parent attribute__ parameter). Set the value of this attribute on each point specifies the point number of that point's _parent_ point. This mode does not require actual edges to exist between the points.
+        
+        [Image:/images/nodes/sop/edgetransport_parent_network.svg]
+        
+        To create a parent attribute from the edge topology (like how "Edge Network" mode works), do the following:
+        
+        # Use an [Enumerate SOP|Node:sop/enumerate] to set the `parent` attribute on each point to that point's number.
+        
+        # Use an Edge Trasport node with __Method__ set to "Edge Network", __Operation__ set to "Transport", and __New root value__ set to "Hold".
+
+Curve Group:
+    #id: primgroup
+
+    When __Method__ is "Each Curve", only transport values along the curves in this primitive group. If this is blank, the node operates on all points.
+
+Point Group:
+    #id: ptgroup
+
+    When __Method__ is "Edge Network" or "Parent Attribute", only transport values between points in this group. If this is blank, the node operates on all points.
+
+Attribute:
+    #id: attribute
+    
+    Transport the values of this attribute. When __Method__ is "Each Curve", this can be a point or vertex attribute. When __Method__ is "Edge Network" or "Parent Attribute", this must be a point attribute.
+
+    If this attribute does not exist, and __Integrate a Constant Value__ is on, the attribute is created. Otherwise, if the attribute does not exist the node does nothing.
+
+Direction:
+    #id: curvedir
+    
+    Forward:
+	    Process from the root points outward to the tip points (or from the start of each curve to the end).
+        
+    Backward:
+	    Process from the tip points inward to the root points (or from the end of each curve to the start).
+
+Parent Attribute:
+    When __Method__ is "Parent Attribute", the node looks in this attribute to set up a directed acyclic graph from the points. The default is `parent`. The node treats points with invalid point numbers and their own point numbers in this attribute as roots. The node ignores any points not reachable from a root.
+
+Root Choice:
+    #id: roottype
+    
+    When __Method__ is "Edge Network", this controls which point(s) to start from.
+    
+    First Point:
+	    Start from the point with the smallest point number. If after all points reachable from this root are processed there are still unprocessed points, the unprocessed point with the smallest point number is made a new root and the process repeats.
+        
+    Last Point:
+	    Like "First Point" but starts from the point with the highest point number.
+        
+    Group:
+        Start from the point(s) in the __Root group__. If a point is reachable from multiple roots, whichever has the shortest path will apply the transport function for that point. Any points unreachable from these roots _are not processed_.
+
+Root Group:
+    #id: rootgroup
+
+    When __Root choice__ is "Group", a group of points to use as roots for the edge network.
+
+Operation:
+    #id: operation
+    
+    How the node sets the attribute values as it moves along the curves/edges.
+    
+    Transport:
+        Copy the value from the previous/parent point. If the point is a root, it uses the __New root value__ parameter to choose the new value.
+
+    Transport from Root:
+	    Copy the value from the root. If the point is a root, it uses the __New root value__ parameter to choose the new value.
+
+    Total:
+        Set the value to the sum of all the values of previous/ancestor points. This operation is useful for measuring the _distance_ from the root to each point, or counting the _number of points_ from the root to each point.
+        
+        To measure distance, turn on __Scale by edge length__. This scales each added value by the distance to the previous point, making the 
+        
+	    When measuring distance or number of points, turn on __Integrate a Constant Value__. This treats each point's current value as `1`.
+
+    Maximum:
+        Set the value to the maximum of this point's value and all previous/ancestor values. If the point is a root, it just uses its current value.
+        
+    Minimum:
+	    Like "Maximum", takes the minimum.
+
+New Root Value:
+    When __Operation__ is "Transport", this controls what values to use for the roots.
+
+    Zero:
+	    Treat the value of root points as `0`.
+        
+    Hold:
+	    Use the root point's current value.
+
+Integrate a Constant Value:
+    #id: ignoreattribute
+
+    When __Operation__ is "Total", treat each point's current value as `1`. This lets you measure distance or number of points along the edges.
+
+Scale by Edge Length:
+    #id: scalebyedge
+
+    When __Operation__ is "Total", scale the value transported along an edge by the edge length. This lets you measure distance along the edges.
+
+Edge Split Method:
+    When processing a graph structure with __Direction__ set to "Forward", a point can have more than one outgoing edge. This controls how to pass the current point's value down to multiple "child" points.
+
+    Copy:
+	    Transport the current value to each child point.
+        
+    Split:
+	    Divide the current value by the number of children and pass the result to each child point.
+
+Edge Merge Method:
+    When processing a graph structure with __Direction__ set to "Reverse", a point can have more than one incoming edge. This controls how to merge the values coming up from multiple "child" points.
+
+    Add:
+	    Use the sum of the child values.
+        
+    Maximum:
+	    Use the highest of the child values.
+        
+    Minimum:
+	    Use the lowest of the child values.
+
+
+@related
+
+- [Nodes:sop/measure]
+- [Nodes:sop/ends]
+
+
+
+
+
+

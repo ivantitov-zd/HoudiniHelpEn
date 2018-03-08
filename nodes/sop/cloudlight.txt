@@ -1,0 +1,147 @@
+= Cloud Light =
+
+#type: node
+#context: sop
+#internal: cloudlight
+#icon: SOP/cloudlight
+#tags: baking, volumes, clouds
+
+"""Fills a volume with a diffuse light."""
+
+The Cloud Light SOP is a tool to compute a light field you can add
+to a volume render.  It can be used to create an approximation of multiple
+scattering in a cloud without the expense (or rendering noise) that 
+such solutions entail.
+
+It is not a realistic operation, but it provides controls to allow an artist
+to quickly converge to a realistic solution.  It may be best to think of
+it as a way to paint light fields efficiently.
+
+There are three stages to the computation of the light field.
+
+Computation of a speed field:
+
+    The input volume needs to be turned into a speed field.  Each voxel will
+    have its speed limit.  Speed can be thought of a sort of inverse density -
+    higher values will result in lower arrival times.
+
+Computation of arrival times:
+
+    The  [Volume Arrival Time SOP|Node:sop/volumearrivaltime] is used to compute how long it takes to reach any particular voxel from one of the seed points.  Voxels that are only reachable through low speeds will thus have higher values as they take longer to get to.
+
+Lighting the arrival times:
+
+    Finally, the arrival time field is converted into a light field.  This
+    usually implies an inversion - high arrival times correspond to dark
+    lights.
+
+    The expensive stage is the arrival time computation, so it is often fast to
+    tweak this stage for a fixed arrival time.
+
+    A good place to start is to adjust the color ramp's black and white points
+    to figure out visually where the contrast range is in your scenario.
+
+It is quite reasonable to layer multiple light fields together by adding them
+together.
+
+[Include:no_vdb]
+
+@parameters
+    Group:
+	Which volumes to compute a light field for.  These are processed
+	independently and will each get their own light field at the end.
+    Resolution Scale:
+	Multiscattered light is a low-frequency effect.  Thus, you do not need
+	a as a high resolution for the light field as you would use for the
+	cloud itself.  Scaling down the resolution by 0.5 will take an eighth
+	the memory and an eighth the time, so is usually a good idea.
+    Output Speed Function:
+	Outputs the speed function with no further processing.  This is very
+	useful to figure out how the propagation parameters work as you can see
+	them directly.
+    Output Arrival Times:
+	Disables the lighting tab and just outputs the arrival times directly.
+    Keep Original:
+	The incoming density fields are passed through.  A [Volume Visualization
+	SOP|Node:sop/volumevisualization] will also be used to set the light field to light volume, letting
+	you see the result in the viewport.
+
+	NOTE:
+                There is no particular reason that the density field you use to compute a light field has to be used for rendering the light field. You may find it profitable to alter the incoming density field for light propagation reasons only.
+
+    == Propagation ==
+
+	Treat Input as Raw Speed:
+	    Disables all processing of the incoming density field, using it
+	    directly as a speed function for the [Volume Arrival Time SOP|Node:sop/volumearrivaltime].
+
+	    You may want to use this if you had used an earlier Volume Cloud
+	    Light SOP with the __Output Speed Function__ enabled, had modified the
+	    speed field a bit, and now want to directly compute the lighting on
+	    it.
+
+	Max Density:
+	    This density value will map to the upper end of the density
+	    contrast range.
+	
+	Forward Bias:
+	    A bias function moving the speed function either to the highest
+	    density or lowest density.
+
+	Density Contrast:
+	    Controls the range of the density to speed conversion.  The lowest
+	    value will go to `1 - constrast/2`, the highest to `contrast/2`.
+
+	Complement Speed:
+	    Complements the speed field: sets it to one minus its computed
+	    value.  Thus the slow areas become fast and the fast become slow.
+
+	Use Phase:
+	    Defines a lobed volume which will revert to zero-density behavior
+	    rather than max-density behavior.
+	
+	Phase Model:
+	    The lobe is defined from the average of the seed points to the
+	    cloud center.  It may be a lobe that starts at the cloud center and
+	    leaves away from the seeds.  Or it can start from the seeds and
+	    head to the center.  And finally, it can start from the seed and
+	    reach its maximum at the cloud center.
+	Cloud Center:
+	    The barycenter of the cloud is computed to find where the lobe
+	    should point.  Alternatively, you can use this to override where
+	    the center is.  This is useful if an animated cloud might cause
+	    unexpected changes in lobe direction.
+
+	Convergence Tolerance:
+	    How accurate the resulting arrival times have to be before the
+	    iteration is stopped.
+	Maximum Iterations:
+	    Even if a solution within the tolerance is not found, the process
+	    will still be stopped if this number of passes has been done.
+
+    == Lighting ==
+
+	Light Color:
+	    The generated light fields will be multiplied by this color.
+	Light Intensity:
+	    The light fields will be multiplied by this scalar value.
+
+	Exponential Falloff:
+	    When converting the arrival time to a light intensity, the arrival
+	    time can be sent through an exponential curve.  This simulates the
+	    fall off of light through an extinguishing medium, but is often too
+	    harsh a curve.
+	Density Scale:
+	    How quickly light is extinguished by the arrival time field.
+	Color Ramp:
+	    The complemented arrival time field is sent through this color ramp
+	    to get the color.  Adjusting the white and black point here is
+	    usually the first step in finding a good lighting for a cloud.
+	Gain:
+	    Controls a gain factor, accentuating or hiding the variation in the
+	    cloud light values.
+
+@related
+    - [Node:sop/volumearrivaltime]
+    - [Node:sop/volumevisualization]
+

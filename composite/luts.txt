@@ -1,0 +1,102 @@
+= Modify color output with look-up tables (LUTs) =
+
+Display look-up tables (LUTs) modify the colors of an image before
+displaying it in the viewer. You apply the look-up table to a viewport,
+and the viewport uses the table to modify the colors of the images the
+viewport displays.
+
+The most common use of look-up tables is to see how images will look in
+different media, such as TV/video and film, that have different color
+capabilities. Using a look-up table designed to mimic a certain display
+medium will give you a much better idea what your current work will look
+like after it's transferred to that medium.
+
+:task:Use a look-up table to modify the colors of the viewer:
+    * Click ((RMB)) the [Icon:IMAGE/lut_off] icon on the compositor control toolbar to open a pop-up menu. You can choose to load a LUT or enable/disable the current LUT.
+
+:task:Apply a look-up table as part of a compositing network:
+    * Use the [Lookup COP|Node:cop2/lookup] to filter an image
+      sequence through a look-up table.
+
+:task:Add a new look-up format to Houdini:
+    * See "The Houdini LUT format and adding new LUT formats" in the 
+      HDK documentation (Getting Data In and Out of Houdini, Lookup Tables: 
+      hdk_io_lut.html).
+
+== How to create a look-up table ==
+
+# In a compositing network, create a chain of color-correction
+  nodes that do the color modification you want. Color correction nodes
+  appear blue when placed by default.
+
+# Press ((RMB)) on the last node in the chain and choose __Save
+  LUT__.
+
+# In the __LUT File__ field, type the name of the LUT file, or
+  click the + icon to use the save dialog.
+
+  Open the arrow pop-up menu at the right end of the field to
+  choose the format to save the LUT in. `.lut` is Houdini's
+  native ASCII look-up table format. `.blut` is the binary form
+  of the `.lut` format, which is smaller but cannot easily be
+  edited after saving.
+
+# Depending on the operators in the color-correction chain, the
+  result LUT may be channel independent (it can operate on
+  single channels without having to look at the others), or
+  channel dependent (it must look at the values of all channels
+  to work). Channel-independent operations produce a
+  1-dimensional look-up table. Channel-dependent operations
+  produce a 3-dimensional "look-up cube".
+
+  If your node chain produced a channel-independent, 1D LUT, you
+  can set the __Length field__. Higher numbers give more
+  accurate color transformations, but large LUT lengths (> 1000)
+  are slower.
+
+  If your node chain produced a channel-dependent, 3D LUT, you
+  can set the __Size__ fields, from 2x2x2 to 256x256x256. Higher
+  numbers give more accurate color transformations, but large
+  cubes are slower.
+
+  For 3D LUTs, you should use the `.blut` format to save space.
+  1D LUTs are typically 1-2 KB, while 3D LUTs can be several
+  megabytes.
+
+# Choose whether the sampling of the LUT should be linear or 
+  logarithmic (log). Log is used with high dynamic range images 
+  (HDR images) for more accurate color correction, but log LUTs
+  are slower to apply than linear LUTs. When dealing with 8b images,
+  linear is preferred.
+  
+# Set the __Range__. This is the brightness range within which
+  the look-up table will apply (0 = black, 1 = white). Pixels
+  outside this range are clamped. Logarithmic LUTs can only have
+  positive values for both the start and end range values.
+
+# You can turn on __Clamp LUT__ to clamp the look-up table's
+  output to a given range. Clamping to 0,1 will exclude any
+  values (black less than 0, white greater than 1) that cannot
+  be displayed on a monitor.
+
+
+== How to set up a LUT ==
+
+The easiest way to set up the LUTs in all the spots you want it is from the __Edit__ > __Color Settings__ > __Color Correction__ tab in Houdini. You can apply the LUT to as many of the contexts as you wish, including gamma. To preserve this between sessions, choose __Save As Default__. 
+
+For just a straight MPlay session loading files, you can use a variety of methods:
+
+# Use the following command.
+    {{{
+        setenv HOUDINI_IMAGE_DISPLAY_LUT /show/job/display.lut
+    }}}
+
+# Use the -d <lutfile> command line option and alias MPlay to `mplay -d <lut>`.
+
+# Open the display options in MPlay (`d`), switch to the __Correction__ tab, enter the LUT in the __Display LUT__, and click __Save as Default__.
+
+Finally, to set the input range of the LUT, change the __From:__ line to your range (ie, 0-13.5).
+
+NOTE:
+
+    The __To:__ range should stay 0-1 for a display LUT. It is only used as a post-scale to compress HDR images into the 0-1 range if not set to 0-1.

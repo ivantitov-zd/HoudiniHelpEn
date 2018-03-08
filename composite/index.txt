@@ -1,0 +1,320 @@
+= Compositing =
+
+"""Houdini's compositing networks let you create and manipulate images such as renders."""
+
+== Overview ==
+
+* If you are working with the Cineon file format, remember to set the
+  options on the __Cineon__ tab of the global compositing preferences.
+
+* Create nodes to [load image data|load] into the compositor.
+
+* Create nodes to [blend or modify the image data|layers].
+
+* Set the [render flag|/nodes/cop2/] of the node you want to provide the
+  final output of your compositing network.
+
+* [Save the composited data as image files|save], or
+  [use the composited data elsewhere in Houdini|export].
+
+== How to configure the compositor ==
+
+There are two kinds of compositing options in Houdini: _global_
+preferences and defaults which affect all compositing you do in Houdini,
+and _project_ settings which affect a particular `.hip` file.
+
+=== Global preferences ===
+
+    Choose __Edit > Preferences > Compositing__ to open the 
+    [compositing preferences|/ref/windows/mainprefs].
+
+    The preferences let you control memory usage, efficiency, interface,
+    and color behavior in the compositor.
+
+=== Project settings ===
+
+    Choose __Edit > Compositing  Settings__ to open the
+    [Composite Project Settings window|/ref/windows/composite].
+
+    The settings in this window control the defaults for various COP
+    options in this scene file. Changing a project setting can affect
+    existing nodes that use that setting.
+
+== Types of compositing operators ==
+
+Most COPs belong to one of six groups. Each group has common parameters
+and a consistent way of behaving.
+
+Generators:
+    Create new images and generally create new planes.
+
+    Generators create new planes. They all have the same parameters for
+    specifying the image and sequence information. Generators define the
+    following information:
+    
+    * Image information
+    
+    * Sequence information
+    
+    If a generator has an input, it can either add a plane to the sequence
+    ("inline generation") or affect an existing plane using a simple
+    operation ("quick composite").
+    
+    Planes are generated "inline" when a generator adds a plane to an
+    existing sequence. A generated plane can have its own data type and
+    composition, it is not restricted to the input types.
+    
+    A generator performing a "quick composite" generates the plane and uses
+    a simple operation to combine the input plane (I) with the generated
+    plane (G). The simple operations are Add, Subtract, Multiply, Minimum
+    (Min), Maximum (Max), and Average. This is useful for creating masks or
+    slates, or adding noise to images.
+    
+    These techniques have the following advantages:
+    
+    * The frame range, resolution, interlace options and extend conditions
+      are inherited from the input. This makes matching the resolution and
+      frame range of another sequence much easier; if these are changed in
+      the input, they automatically update.
+    
+    * The number of nodes needed is reduced; no merge or composite node is
+      needed. This also boosts performance and memory efficiency.
+    
+    Inline Generation or Quick Composite mode overrides most of the
+    operator's Image and Sequence parameters. Use the "Add Plane" parameter
+    on the __Image__ tab to specify the plane to create or modify, and the
+    operations to perform. If the plane specified does not exist, or the
+    operation is set to Rename or Replace, the generator creates a new
+    plane.
+    
+Scoped filters:
+    Filter operations which may be applied to only specified planes,
+    channels or frames. Certain operations cannot be scoped, such as a
+    Scale or Crop COP (which changes the resolution).
+    
+    This family of operators allows an operation to be applied to selected
+    planes and frames. By default, all planes and frames are selected.
+    
+    Planes and channels that are not scoped are passed through as if the
+    node was bypassed.
+    
+    You specify scoping with a space-separated list of planes. You can
+    specify specific channels with a dot followed by the channel name. YOu
+    can also use wildcards. For example:
+    
+    `C A` :
+        Color and Alpha are scoped.
+    `*` :
+        All Planes are scoped.
+    `C.r` :
+        The red channel of color is scoped.
+    Scoped filters also have options for scoping frames:
+    
+    All:
+        All frames are scoped.
+        
+    Inside Range:
+        All the frames within the frame range specified are scoped, with
+        optional drop-off regions at each end of the range.
+        
+    Outside Range:
+        All the frames outside the frame range specified are scoped, with
+        optional drop-off regions at each end of the range.
+        
+    Even/Odd Frames:
+        Only the even or odd frames are scoped.
+        
+    Custom:
+        All of the frames in the custom list are scoped.
+    
+Masked filters:
+    Affect portions of an image through the use of a mask. This mask is
+    another image which is similar to an alpha matte. Masked filters are
+    a type of scoped filter.
+    
+    Many operators let you apply them per-pixel using a _mask_ image. The
+    mask can be any plane or channel within the input sequence, or any plane
+    or channel in the sequence of the mask input.
+    
+    The mask acts as a stencil - wherever the mask is 1 (white), the
+    operation is performed. Wherever the mask is 0, the input pixel is not
+    affected. In between, the input pixel is linearly blended with the
+    output pixel. The mask can be inverted so that all pixels outside the
+    mask are affected instead.
+    
+    Use the Alpha plane as a mask as a very efficient way of masking color
+    correction operations to the actual image without affecting outside
+    black levels.
+    
+Pixel filters:
+    Highly optimized operations that can be combined into a single
+    operation if they are grouped together in a chain. Pixel filters are
+    a type of masked filter.
+    
+    Houdini "collapses" multiple consecutive pixel filters in a network
+    chain into a single cooking operation.
+    
+    Pixel filter node tiles have a _light blue background_ to distinguish
+    them from other types of nodes.
+    
+    * Reduces quantization and cutoff errors by doing quantization once, at
+      the end of the pixel filter chain, rather than at every node.
+    
+    * Uses less memory. Only 1 image is cooked, rather than making a copy
+      for each pixel filter.
+    
+    * Calculates in floating point, preventing clipping and quantization
+      error of fixed formats (8- and 16-bit integer). Can handle pixel
+      values well above white and below black during the pixel chain without
+      being clamped, even if the image's native data format would clamp it.
+      The values are clamped at the end of the chain.
+    
+    * Reduces network and quantization overhead, resulting in faster
+      cooking.
+    
+    If you use a mask, it must be the same for all pixel filters in that
+    chain. Pixel filters with different masks will not collapse together.
+    Houdini will log a warning to notify you that quantization is occurring
+    at that node (to get rid of this warning, set the Quantize parameter to
+    "At This Node").
+    
+    If a pixel filter chain branches into two pixel filter outputs, each
+    output pixel filter will cook the chain independently of the other.
+    
+    At any point in the chain, you can tell a pixel filter node to quantize
+    using the Quantize parameter. This will terminate the chain at that
+    point and start collapsing COPs again at the next Pixel Filter COP.
+    Setting the display flag on a pixel filter COP has the same effect.
+    
+Timing modifiers:
+    Move frames to different frame numbers, modify the frame range, or
+    shift the sequence in time. Timing modifiers don't generally cook
+    image information, and so are very efficient in both memory and
+    cooking performance.
+    
+    Timing Modifiers perform a variety of editing operations and allow you
+    to cut, splice, shift and sequence frames easily.
+    
+    The following are timing modifier COPs:
+    
+    * [Trim|Node:cop2/trim]
+    * [Extend|Node:cop2/extend]
+    * [Shuffle|Node:cop2/shuffle]
+    * [Time Warp|Node:cop2/warp]
+    * [Shift|Node:cop2/shift]
+    * [Reverse|Node:cop2/reverse]
+    * [Time Scale|Node:cop2/timescale]
+    
+    Most Timing Modifiers do not need to cook images, so they are very quick
+    and memory efficient. Some Timing COPs allow you to blend frames
+    together; in this case, new images are produced and this efficiency
+    advantage is lost.
+    
+    Timing modifier node tiles have a _beige background_ when they are
+    passing through data without cooking.
+    
+    Timing Modifiers are best viewed in the [Timeline view
+    mode|/ref/views/imgview#ref_imgview_timeline] . Most timing COPs have
+    handles in the timeline view.
+    
+Compositing/blending operators:
+    Take two image inputs and composite or blend them together in
+    different ways. All compositing operators can be masked.
+    
+    Compositing operators are the heart of the compositor. They take two or
+    more image inputs and combine them in different ways in the output.
+    
+    Compositing operators have parameters that let you choose the behavior
+    of the operator in cases where the inputs have different frame ranges,
+    resolution, and/or planes. You can transform the foreground elements as
+    part of the operation, and apply [motion blur|blur_sharpen] to animated
+    transforms.
+    
+    See [how to blend and layer images|layers] .
+
+    All compositing operations can be masked using the
+    [mask input|/nodes/cop2].
+    
+Plane operators:
+    Create, swap, or merge [planes|comp_terms#comp_datatypes].
+    
+    You will sometimes need to swap or create new
+    [planes|comp_terms#comp_datatypes]  to store information during
+    compositing.
+    
+    See [working with planes|planes].
+    
+VEX operations:
+    Some COPs are [implemented in VEX|/vex/] .
+
+    You can create custom compositing operators using the VEX
+    language or VOPs. Some of the compositing operators shipped
+    with Houdini may also be defined this way.
+
+    See [how to create a custom COP with VOPs|comp_vops].
+
+<!-- 
+  
+== Node tile colors ==
+
+Houdini automatically color-codes different types of compositor
+nodes when you create them. You can manually  [change the color
+of a node|/ref/panes/network]  after you create it.
+
+*  [Generators|/composite] : green.
+
+*  [Pixel filters|comp_coptypes_pixel] : blue.
+
+*  [Timing modifiers|/composite] : beige. These
+  operations do not affect images, only the timing or the
+  sequence itself. They do not use any cache memory and are
+  extremely quick.
+
+*  [VEX operators|comp_coptypes_vex] : magenta. VEX COPs differ
+  slightly in the way they interpret input planes, so it is
+  useful to know when you are using one.
+  
+-->
+    
+@subtopics
+
+== Basics ==
+
+:: [comp_terms]
+:: [load]
+:: [view]
+:: [common_effects]
+:: [shapes]
+:: [fills]
+:: [noise]
+:: [color_correct]
+:: [export]
+:: [save]
+
+== Layers ==
+
+:: [layers]
+:: [comp_xform]
+:: [masks]
+:: [mattes]
+
+== Camera effects ==
+
+:: [blur_sharpen]
+:: [distort]
+:: [keying]
+
+== Advanced ==
+
+:: [tips]
+:: [performance]
+:: [luts]
+:: [image_guide]
+:: [deepraster]
+:: [planes]
+:: [multi]
+
+== Guru level ==
+
+:: [comp_vops]
+

@@ -1,0 +1,187 @@
+= Instancing and Rendering =
+
+== Overview ==
+
+When you use the shelf tools to set up your particle system, it creates a [POP network node|Node:sop/particle] inside a [geometry object|Node:obj/geo]. This lets you render the particle system directly (since Mantra always renders objects).
+
+By default, Mantra replaces particles with tiny spheres. You can also render particles as points, or replace particles at render time with images (called sprites) or geometry.
+
+== Render particles as points ==
+
+# Select the object containing the particles.
+
+# In the [parameter editor|/network/parms], click the __Render__ tab, then click the __Geometry__ sub-tab.
+
+# Turn on __Render As Points__.
+
+You can still use the particles scale (`pscale`) attribute to control the size of the points in the render.
+
+== Instance geometry on particles (particle replacement) ==
+
+:task:Instance geometry on particles:
+    # Click the [Icon:POP/instance][Instance|Node:pop/instance] button on the __Drive Particles__ tab of the [shelf|/shelf].
+        
+    # Click ((LMB)) the particle system you want to be affected and press ((Enter)) to confirm your selection.
+    
+    # Click ((LMB)) the object you want the particles to be replaced with and press ((Enter)) to confirm your selection.
+    
+        You can see a preview by clicking the [template flag|/nodes/POP/_index] in the [network editor|/ref/panes/network], which will replace each particle with a wire frame of the shape.
+    
+    [Image:/images/shelf/instance.png]
+        
+    For specific parameter help see the [Icon:POP/instance][Instance|Node:pop/instance] node help.
+
+:task:Rotate the instanced geometry to an angular value:
+    # On the [Icon:POP/instance][Instance|Node:pop/instance] node (see above).
+        
+    # Set the __Orientation__ to Fixed axis.
+        
+    # Set the __Angle__ parameter to the angle to rotate to, and the __Axis__ parameter to the axis around which to rotate.
+        
+    # Create a [Icon:POP/rotation][Rotation|Node:pop/rotation] node and [connect|/ref/panes/network] the particle flow to it.
+        
+    # Set the __Angle__ parameter to the angle to rotate to, and the __Axis__ parameter to the axis around which to rotate.
+
+:task:Rotate the instanced geometry using torque:
+    # Click the [Icon:POP/torque][Torque|Node:pop/torque] button on the __Drive Particles__ tab of the shelf.
+        
+    # Click ((LMB)) the particle system you want to be affected and press ((Enter)) to confirm your selection.
+
+        Torque is like sticking a handle on something and rotating it by pushing on the handle.
+
+        [Image:/images/torque.png]
+
+    # Set the __Position__ of the offset point which you will apply the force to, and the __Force__ to the force to apply to the offset point.
+        
+    [Anim:/images/shelf/torque.gif]
+
+    For specific parameter help see the [Icon:POP/torque][Torque|Node:pop/torque] node help.
+
+:task:Make the instanced geometry look at an object:
+    # Create a [Icon:POP/lookat][Look At node|Node:pop/lookat] and [connect|/ref/panes/network] the particle flow to it.
+
+    # Set __Lookat Mode__ to Lookat point.
+
+    # Set the __Reference__ parameter to Referenced object.
+
+    # Set the __Object__ field to the path to the object you want the particles to point towards.
+
+:task:Make the instanced geometry look at a plane:
+    # Create a [Icon:POP/lookat][Look At node|Node:pop/lookat] and [connect|/ref/panes/network] the particle flow to it.
+
+    # Set __Lookat Mode__ to Lookat plane.
+
+    # Set the __Reference__ parameter to World Space or This Object to choose in which space to interpret the direction.
+
+    # Set the __Direction__ parameter to a vector describing the direction in which the particles should look.
+
+== Set the rendered appearance of particles ==
+
+:task:Control the appearance of non-sprite particles:
+    # Use the  [tab menu|/basics/tabmenu]  to create a [Icon:NETWORKS/rop][Render node|Node:pop/render].
+
+    # Use the __Particle type__ parameter to control what raw
+      particles look like in the rendered image.
+
+    # You can use the Render node to control the global size of all particles, or you can use the [Icon:POP/property][Property POP|Node:pop/property] to set each particle's scale (`pscale`) attribute.
+
+:task:Display sprites in the viewport:
+    # In the viewport options menu, choose __Display > Display options__, or press ((D)).
+        
+        [Image:/images/ui/viewport_menus_anno.png]
+
+    # Click the __Particles__ tab.
+
+    # Set __Display particles as__ to Sprites.
+
+:task:Control the appearance of sprites:
+    # Create a [Icon:POP/sprite][Sprite|Node:pop/sprite] node and connect the particle flow to it.
+
+    # At the SHOP level, create a material with a VEX Decal and a Mantra: Sprite Procedural, and connect them to the Output Shaders node.
+    
+    # Assign a __Texture Map__ to the VEX Decal in the parameter editor.      
+    
+    # Go back to the SHOP level and drag your [Icon:SHOP/vopmaterial][Material|/shade/materials] onto your particle system.
+ 
+    NOTE:
+        You can rotate and scale the sprites by turning on the __Rotate__ and __Scale__ checkboxes and editing the values in the [Icon:POP/sprite][Sprite|Node:pop/sprite] node [parameter editor|/ref/panes/parms].
+            
+    [Image:/images/shelf/sprite.png]
+    
+    NOTE:
+        Sprites always face the camera.
+
+    For specific parameter help see the [Icon:POP/sprite][Sprite|Node:pop/sprite] node help.
+
+
+    If __Resolve SHOP Path__ is on, the Sprite SHOP path is resolved relative to this node, and the `spriteshop` attribute is set to the full path of the shop. If it is off, no attempt is made to find the shop, and the exact string entered in the Sprite SHOP parameter is put into the `spriteshop` attribute. This will prevent the sprites from rendering properly in the POP Viewer. The Geometry and Object Viewers will still render the sprites properly if the SHOP paths are specified relative to the object that contains the POP Network.
+
+== Transparent sprites ==
+
+To see particle alpha in the 3D viewport, the particles must be displayed as sprites. By default particles are displayed as points.
+
+# Press ((D)) in the [scene view|/ref/views/3dview] to open the Display Options window.
+
+# Click the __Particles__ tab and set __Display particles as__ Sprites.
+
+# Close the window.
+
+# Append a [Icon:POP/color][Color POP|Node:pop/color] to your [particle system|/particles].
+
+#  On the __Ramp__ sub-tab of the __Color__ tab, set the __Lookup__ parameter to `$LIFE`.
+
+NOTE:
+    You will need to use a shader that will read the Alpha attribute in order to render. For example, VEX Layered Surface.
+
+== Motion blur ==
+
+When calculating motion blur, Mantra by default assumes the geometry of an object is unchanging, and blurs it as a whole. For a particle system obviously the points are moving, so you need to turn on _velocity blur_ to use the velocity (`v`) attribute of the points to blur them individually.
+
+So, to enable motion blur on particles you must enable it on the _object_ as well the _render node_.
+
+:task:Enable velocity blur on an object:
+    # Select the object containing the particles.
+    
+    # In the [parameter editor|/network/parms], click the __Render__ tab, then the __Sampling__ sub-tab.
+    
+    Turn on __Geometry velocity blur__.
+
+:task:Enable motion blur on a render node:
+    # In the main menu open __Render > Edit Render Node__ and choose the render node.
+    
+        If you don't already have a render node, you can create one by choosing __Render > Create Render Node > Mantra__.
+    
+    # In the [parameter editor|/network/parms], click the __Properties__ tab and then the __Sampling__ sub-tab.
+    
+    # Turn on __Allow motion blur__.
+
+== Rendering Attributes for Points and Particles ==
+
+To change the rendering style of particle systems, use a [Icon:POP/render][Render POP|Node:pop/render]. 
+
+NOTE:
+    You must re-simulate the [Icon:SOP/particle][POP network|Node:part/popnet] for any changes in the render POP to take effect.
+    
+You can add attributes to points and particles by creating an [Icon:SOP/attribute][Attribute SOP|Node:sop/attribute] or [Icon:POP/attribute][Attribute POP|Node:pop/attribute] and [connecting|/ref/panes/network] it to the particle system.
+
+The following attributes can be added to points, vertices, entire particle systems, and primitives:
+
+*Points*
+    * particle scale
+    * width
+    * velocity
+    * orientation
+    
+*vertices*
+    * particle scale
+    * width
+    * orientation
+    
+*Particle systems*
+    * particle scale
+    * width
+
+*Primitives*
+    * particle scale
+    * width
+

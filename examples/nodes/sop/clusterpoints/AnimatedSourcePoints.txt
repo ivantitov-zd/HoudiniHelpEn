@@ -1,0 +1,28 @@
+= Animated source points =
+
+If you cluster point source geometry with a changing number of points, the clusters and cluster numbers can change randomly at each frame and you'll get strange results. To prevent this, you must use a couple of tricks to
+create the clusters based on the final number of points, and only create the clusters that are needed.
+
+First, connect the *second input of the Cluster Points node* to specify a set of point positions at which the [Cluster Points node|Node:sop/clusterpoints] should cluster the points. This is called the _rest position_.
+
+For example, the [Impact analysis tool|Node:dop/impactanalysis] creates points from RBD object collisions. The number of points in the resulting geometry increases as more RBD objects collide.
+
+# [Cache the impact points geometry to disk|/io/geo] using a [ROP Output driver|Node:out/geometry] and [File node|Node:sop/file] combination.
+
+    (The example file may not cache to disk for the sake of simplicity.)
+
+# Branch a [Timeshift node|Node:sop/timeshift] from the File node, and connect the output of the Timeshift to the Cluster Points node's second (rest position) input.
+
+    [Image:/images/dynamics/cluster_timeshift_network.png]
+
+# Set the Timeshift node's __Frame__ parameter to the frame you want to cluster at, usually the last frame of the effect. You can use the `$NFRAMES` variable, which always contains the number of the last frame in the scene.
+
+Second, to create the smoke boxes only as they're needed you must turn on
+__Continuous__ on the [Smoke Object node|Node:dop/smokeobject]. This will
+create a new smoke box on each instance point _at every frame_. To work
+around this so the boxes only get created at the frame where the cluster
+center appears, the example file uses a [For Each SOP|Node:sop/foreach]
+to delete every cluster center at every frame except the frame where it
+first appears.
+
+See also [how to make scattered points stick|/nodes/sop/scatter#stick] for how to make scattered point positions and numbers consistent across frames on deforming geometry.

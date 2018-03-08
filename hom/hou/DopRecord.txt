@@ -1,0 +1,105 @@
+= hou.DopRecord =
+#type: homclass
+#cppname: HOM_DopRecord
+#group: dynamics
+
+"""A table of values stored inside a DopData."""
+
+See [Hom:hou.DopData] for a description of DOP data, records, and fields.
+
+@methods
+
+::`field(self)` -> `int`, `bool`, `float`, `str`, [Hom:hou.Vector2], [Hom:hou.Vector3], [Hom:hou.Vector4], [Hom:hou.Quaternion], [Hom:hou.Matrix3], or [Hom:hou.Matrix4]:
+    #cppname: HOM_DopRecord::field
+    #replaces: Exp:dopfield, Exp:dopfields
+    Return the value of a field inside this record, or `None` if no such field
+    exists.
+
+    Note that you can add the suffixes "x", "y", and "z" to a vector field's
+    name to access the individual float values.
+
+    {{{
+    #!pycon
+    # The following code assumes you have created a box from the shelf and used
+    # Rigid Bodies > RBD Object on the shelf to make it a rigid body.
+    >>> record = hou.node("/obj/AutoDopNetwork").simulation().findData("box_object1/Forces/Gravity_gravity1").options()
+    >>> record.fieldNames()
+    ('force', 'handlepos')
+    >>> record.field("force")
+    <hou.Vector3 [0, -9.80665, 0]>
+    >>> record.field("forcey")
+    -9.8066501617431641
+    >>> record.fieldType("force")
+    fieldType.Vector3
+    >>> record.fieldType("forcey")
+    fieldType.Float
+    }}}
+
+    This example function creates a dict out of a record:
+    {{{
+    #!python
+    def recordAsDict(record):
+	return dict((field_name, record.field(field_name))
+	    for field_name in record.fieldNames())
+    }}}
+
+    The following function returns the geometry transform of an object:
+    {{{
+    #!python
+    def dopGeometryTransform(dopnet_node, object_name):
+	subdata = dopnet_node.simulation().findObject(object_name).findSubData("Geometry")
+	return subdata.record("Transform").field("transform")
+    }}}
+
+::`fieldNames(self)` -> tuple of `str`:
+    #cppname: HOM_DopRecord::fieldNames
+    #replaces: Exp:dopallfields, Exp:dopfieldname, Exp:dophasfield, Exp:dopnumfields
+    Return the names of all the fields inside this record.  See
+    [Hom:hou.DopRecord#field] for an example.
+
+::`fieldType(self, field_name)` -> [Hom:hou.fieldType] enum value:
+    #cppname: HOM_DopRecord::fieldType
+    #replaces: Exp:dopfieldtype, Exp:dophasfield
+    Return a [Hom:hou.fieldType] enumerated value that describes the type
+    of data stored in a field.  Returns `hou.fieldType.NoSuchField` if
+    no field exists with that name.
+
+    See [Hom:hou.DopRecord#field] for an example.
+
+::`recordIndex(self)` -> `int`:
+    #cppname: HOM_DopRecord::recordIndex
+    Return the index of this record.  See [Hom:hou.DopData#record] and
+    [Hom:hou.DopData#records] for more information.
+
+::`recordType(self)` -> `str`:
+    #cppname: HOM_DopRecord::recordType
+    Return the name of this record.  See [Hom:hou.DopData#recordTypes] for
+    more information.
+
+::`setField(self, field_name, value)`:
+    #cppname: HOM_DopRecord::setField
+    #replaces: Cmd:dopsolvesetoption
+    Set a field to the specified value.  You would call this method from a
+    script solver DOP.  `value` may be an `int`, `float`, `str`,
+    [Hom:hou.Vector2], [Hom:hou.Vector3], [Hom:hou.Vector4],
+    [Hom:hou.Quaternion], [Hom:hou.Matrix3], or [Hom:hou.Matrix4].
+
+    Unfortunately, this method cannot be used to set a field to a boolean
+    (True or False) value.  If you pass a boolean to this method, it will set
+    the field to the integer 1 or 0.  To properly set it to a boolean value,
+    use [Hom:hou.DopRecord#setFieldBool].
+
+    Raises [Hom:hou.PermissionError] if called from outside a script solver
+    DOP.
+
+::`setFieldBool(self, field_name, value)`:
+    #cppname: HOM_DopRecord::setFieldBool
+    #replaces: Cmd:dopsolvesetoption
+    Set a field to the specified boolean value.  You would call this method
+    from a script solver DOP.
+
+    To set a field to a different type, use [Hom:hou.DopRecord#setField].
+
+    Raises [Hom:hou.PermissionError] if called from outside a script solver
+    DOP.
+

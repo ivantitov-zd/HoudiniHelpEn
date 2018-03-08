@@ -1,0 +1,422 @@
+= Poly Extrude =
+
+#type: node
+#context: sop
+#internal: polyextrude
+#icon: SOP/polyextrude
+#version: 2.0
+#tags: reshape, polygons, edges, model, boxup, core
+
+"""Extrudes polygonal faces and edges."""
+
+== Overview ==
+
+:fig:[Image:/images/model/extrude_simple.jpg]
+    Poly Extrude lets you "pull" faces and edges out to create new columns/sheets of polygons.
+    
+    You can make the extrusion bigger or smaller (inset/outset), and twist it.
+
+:fig:[Image:/images/model/extrude_edges_interior.png]
+    If you extrude interior edges, the node will use the surface normals.
+
+:fig:[Image:/images/model/extrude_edges_boundary.jpg]
+    If you extrude boundary edges, the node will use the surface direction.
+
+:fig:[Image:/images/model/extrude_curve.png]
+    You can set the number of divisions in the extrusion and have the extrusion curve from the source to the destination.
+    
+    You can draw a curve and have the extrusion follow the shape of the curve.
+
+The node creates a copy of the selected components and transforms them according the parameters, then builds a polygonal bridge between them. The original components are called the _back_ of the extrusion (drawn in red), and the copied/transformed components are called the _front_ (drawn in green).
+
+:vimeo: Polyextrude
+    #id: 142466795 
+
+== How to == (howto)
+
+:task: Extrude edges/faces:
+
+    # Select the edges or faces you want to extrude.
+
+    # On the __Model__ shelf, click the [Icon:SOP/polyextrude] Poly Extrude tool.
+
+    # Use the line handle to pull or push the extrusion front. Use the controls in the operation toolbar across the top of the viewpoert to set the inset and number of divisions.
+
+== Follow a curve ==
+
+:vimeo: Polyextrude curve input
+    #id: 142470680 
+
+:task: Make the extrusion follow an external curve:
+    # Draw the curve you want the extrusion to follow.
+
+    # Extrude the edges/faces (see above).
+    
+    # Connect the curve to the Poly Extrude node's second input.
+    
+    # In the Poly Extrude parameters, set __Spine shape__ to "Curve from second input".
+
+== Distance/twist vs. transform ==
+
+:fig:[Image:/images/model/extrude_simple.jpg]
+    By default, the tool only extrudes along the normals, with controls for distance, inset, and twist.
+
+:fig:[Image:/images/model/extrude_transformed.jpg]
+    You can optionally turn on the __Transform extruded front__ to also apply a full move/rotate/scale tranform to the extrusion front.
+
+    This transform is applied _in addition to_ the __Distance__ and __Twist__ controls, so you probably want to set them to `0` if you want to use the transform.
+
+== Multiple extrusions == (multi)
+
+:fig:[Image:/images/model/extrude_multi.png]
+    The node automatically treats adjacent edges/faces as groups.
+
+:fig:[Image:/images/model/extrude_individual.png]
+    You can extrude individual edges/faces instead of treating them as a group.
+
+The node transforms each element in its own space (unless you set __Extrusion mode__ to "Translate Global").
+
+=== Splitting groups === (splitting)
+
+:fig:[Image:/images/model/bridge_split_group.png]
+    If you want to define multiple source loops with edges/faces that happen to be adjacent, they will just look like one thing to the node. You can choose a point/edge __Split group__ that divides adjacent faces/edges into separate groups.
+    
+    In this image, the yellow line is an edge group splitting the selected faces into two sources.
+
+    (If you are extruding edges, you split with a point group. If you are extruding faces, you split with an edge group.)
+
+== Notes ==
+
+* Unlike previous versions of PolyExtrude, this node *does not support local variables or per-primitive/edge expressions*, for performance reasons.
+
+    If you want to vary some parameter per-primitive/edge, store the value in an attribute and use the controls on the __Local Control__ tab, or refer to it in a parameter using `@attribute` syntax.
+
+@parameters
+
+Group:
+    Faces or edges to extrude. This can be the name of a primitive or edge group.
+    
+Divide Into:
+    #id: splittype
+    #contentfrom: polybridge#srcsplittype
+    
+    [Image:/images/model/extrude_individual.png]
+        
+Split Group:
+    #id: splitgroup
+    
+    When __Divide into__ is "Connected components", any adjacent elements are treated as a single group. If there are edges/faces that are adjacent but you want to be sepearte groups, you can split them using this group. See [splitting|#splitting] above.
+    
+    [Image:/images/model/bridge_split_group.png]
+
+Extrusion Mode:
+    Which normals to use to extrude faces/edges.
+
+    Primitive/Edge Normal:
+        Extrude faces along their normals, extrude edges intelligently depending on whether they are interior or boundary edges.
+    
+    Point Normal:
+        Extrude along point normals.
+
+Distance:
+    How far (in Houdini units) to "pull out" the extrusion. You can use a negative number to "push" the extrusion in the opposite direction of the normals.
+
+Inset:
+    #id: inset
+
+    Expands or dilates the extrusion front. This has no effect when extruding edges.
+    
+    [Image:/images/model/extrude_inset.png]
+
+Twist:
+    #id: twist
+    
+    Twists the extrusion front around the extrusion spine.
+    
+    [Image:/images/model/extrude_twist.png]
+
+Divisions:
+    #id: divisions
+
+    The number of rows of polygons in the extrusion.
+    
+Spine shape:
+    #id: spinetype
+    
+    The path the extrusion takes between the back and front.
+    
+    Straight:
+        Straight from the back to the front.
+    
+    Curved:
+        Curve between the back and front orientations.
+    
+    Curve From Second Input:
+        Take the shape of a curve connected to this node's second input.
+
+== Extrusion ==
+
+=== Front transform ===
+
+Transform Extruded Front:
+    #id: xformfront
+    
+    Turn this on to show full transformation (move, rotate, scale) controls for the extrusion front. This transform is applied _in addition to_ the __Distance__ and __Twist__ controls, so you probably want to set them to `0` if you want to use the transform.
+
+Transformation Order:
+    #id: rst
+
+    Order in which to apply local transformation (when __Transform Extruded Front__ is on).
+
+Rotation Order:
+    #id: lxyz
+
+    Order in which to apply local rotations (when __Transform Extruded Front__ is on).
+
+Translate:
+    #id: translate
+    
+    Moves the extrusion front (when __Transform Extruded Front__ is on). The Z component controls the extrusion amount. The X and Y are applied to the front after extrusion.
+    
+    [Image:/images/model/extrude_move.png]
+    
+Rotate:
+    #id: rotate
+
+    Rotates the extrusion front (when __Transform Extruded Front__ is on). You can use this to twist the extrusion, but see also __Twist__ parameter for more information.
+    
+    [Image:/images/model/extrude_rotate.png]
+    
+Scale:
+    #id: scale
+    
+    Scales the extrusion front (when __Transform Extruded Front__ is on).
+    
+    [Image:/images/model/extrude_scale.png]
+    
+Shear:
+    #id: shear
+    
+    Shears the extrusion front (when __Transform Extruded Front__ is on). The numbers represent X shear in XY plane, X shear in the XZ plane, and Y shear in the YZ plane.
+    
+    [Image:/images/model/extrude_shear.png]
+    
+Pivot:
+     #id: pivot
+
+     Local pivot point for moving, rotating, and scaling the extrusion front (when __Transform Extruded Front__ is on). This is local to each front, unless __Extrusion mode__ is  "Global translate".
+
+=== Output Geometry and Groups ===
+
+Output Front:
+    #id: outputfront
+    
+    Generate polygons for the extrusion front. Turn this off if you only want the sides. This has no effect when extruding edges.
+
+Front Group:
+    #id: frontgroup
+    
+    Enter the name to put the polygons of the extrusion front in this group. You can use this group name in later nodes to easily target just the front polygons.
+
+Output Back:
+    #id: outputback
+    
+    Turn this off to delete the original extruded polygons. This has no effect when extruding edges.
+
+Back Group:
+    #id: backgroup
+    
+    Enter the name to put the polygons at the start of the extrusion in this group. You can use this group name in later nodes to easily target just the back polygons.
+
+Output Side:
+    #id: outputsides
+    
+    Generate polygons for the sides of the extrusion. If you turn this off, the node essentially is just a copy and translate of the selected edges/faces.
+
+Side Group:
+    #id: sidegroup
+    
+    Enter the name to put the polygons in the extrusion sides in this group. You can use this group name in later nodes to easily target just the side polygons.
+
+Front Boundary Group:
+    #id: frontseamgrp
+
+    Enter the name to put the edges bordering the front and side of the extrusion in this group. This group is equal to the front group when extruding edges. This group is empty when both __Output Front__ and __Output Side__ are off. This group is highlighted green in the polyextrude state in the viewport.
+
+Back Boundary Group:
+    #id: backseamgrp
+
+    Enter the name to put the edges bordering the back and side of the extrusion in this group. This group is equal to the back group when extruding edges. This group is highlighted red in the polyextrude state in the viewport.
+
+Preserve Groups:
+    #id: preservegroups
+    
+    If the original edges/faces were in any groups, add the corresponding edges/faces in the extrusion front to the same groups.
+
+=== Insetting ===
+
+Limit insetting:
+    #id: limitinset
+    
+    When this is on, the extrusion front cannot be inset beyond a point where the node determines it would create a degenerate, pinched, zero-size, or otherwise undesirable front. If you turn this off, insetting can continue to shrink the front through pinching and then invert so that further insetting actually grows the front. You should generally just leave this on all the time.
+
+Use common limit:
+    #id: commonlimit
+    
+    If you are extruding multiple fronts, as you increase __Inset__, once one front has a zero-size edge, all fronts stop shrinking. Turn this off to allow each front to shrink to zero individually as you increase __Inset__. If __Limit insetting to zero size__ is off, this option is ignored.
+
+=== Normals ===
+
+By default, if the input geometry has normal attributes, the node adds those attributes to the extruded geometry.
+
+Add Vertex Normals:
+    #id: addvertexnormals
+    
+    Add vertex normals. If vertex normals existed on the original selected edges/faces, the node overwrites them.
+
+Cusp Angle:
+    #id: csupangle
+    
+    Vertices across a shared edge will have different normals if the face normals differ by more than this angle.
+
+Cusp All Front Boundary Edges:
+    #id: cuspfront
+    
+    Always cusp boundary edges of the extrusion front, ignoring the __Cusp angle__.
+    
+Cusp All Back Boundary Edges:
+    #id: cuspback
+    
+    Always cusp boundary edges of the extrusion back, ignoring the __Cusp angle__.
+    
+== Spine Control ==
+
+Bridging tab controls several details of how the bridge connecting the back and front behaves.
+
+=== Shape Adjustment ===
+
+Front Magnitude:
+    #id: frontmagnitude
+    
+    How much the orientation of the front affects the direction of the extrusion at that end. Only available when __Spine shape__ is not "Straight".
+
+    [Image:/images/model/extrude_magnitude1.png]
+    [Image:/images/model/extrude_magnitude2.png]
+
+Back Magnitude:
+    #id: backmagnitude
+    
+    How much the orientation of the original edges/faces affects the direction of the extrusion at that end. Only available when __Spine shape__ is not "Straight".
+
+Front Stiffness:
+    #id: frontstiffness
+    
+    How far the extrusion path follows the orientation of the extrusion front. Only available when __Spine shape__ is not "Straight".
+    
+    [Image:/images/model/extrude_stiffness1.png]
+    [Image:/images/model/extrude_stiffness2.png]
+
+Back Stiffness:
+    #id: backstiffness
+
+    How far the path of the extrusion follows the orientation of the original edges/faces. Only available when __Spine shape__ is not "Straight".
+
+Interpolation:
+    #id: morphmethod
+
+    A technical parameter of the node's internal algorithm. "Rotating frame" tends to be better for twisting bridges, but in practice there's no good basis for choosing one or the other. You can try both and see if they make a difference for your bridge.        
+
+[Include:polybridge#spacing]
+
+=== External Spine === (external_spine)
+
+Available when __Spine shape__ is "Curve from second input" and the node's second input is connected.
+
+Reverse Direction:
+    #id: reversespinedirection
+
+    Reverse the direction of the spine curve.
+
+Axial Roatation:
+    #id: axialrotation
+
+    Rotate the spine curve around the line through its end points. 
+
+Front Blend:
+    #id: srcdirblend
+
+    How much to blend the direction at the end of the curve with the orientation of the extrusion front. 
+
+Back Blend:
+    #id: dstdirblend
+
+    How much to blend the direction at the start of the curve with the orientation of the original edges/faces.
+
+=== Thickness ===
+
+These parameters let you scale the width of the bridge along its length, creating pinches and/bulges in the bridge.
+
+* [Include:polybridge#thicknessscale]
+* [Include:polybridge#thicknessattrib]
+* [Include:polybridge#thicknessramp]
+
+=== Twist ===
+
+* [Include:polybridge#twistscale]
+* [Include:polybridge#twistattrib]
+* [Include:polybridge#twistramp]
+
+== Local Control ==
+
+=== Local Attributes ===
+
+Distance scale:
+    #id: localzscaleattrib
+    
+    Multiply the extrusion distance by the value of this attribute.
+
+Inset scale:
+    Multiply the inset amount by the value of this attribute.
+
+Twist scale:
+    #id: localtwistscaleattrib
+    
+    Multiply the twist amount by the value of this attribute.
+
+Divisions scale:
+    #id: localdivscaleattrib
+    
+    Multiply the number of divisions by the value of this attribute.
+
+=== Local Frames ===
+
+You can use these attributes to control the local transform space and extrusion amount of each individual component.
+
+If you're extruding faces, these should be primitive attributes, and the values are averaged from all faces in an extrusion front. If you're extruding edges, they should be point attributes, and the value of each edge is the average of the values on its two endpoints.
+
+X Direction:
+    #id: localxattrib
+    
+    Use this vector attribute as an edge/face's local X axis. The node makes this orthagonal to the local Z axis if it's not already. If the vector is `0,0,0` the node ignores it. The node automatically normalizes the vector.
+
+Z Direction:
+    #id: localzattrib
+
+    Use this vector attribute as an edge/face's local Z axis. This overrides the computed normal. If the vector is `0,0,0` the node ignores it. The node automatically normalizes the vector.
+
+Center:
+    #id: localctrattrib
+    
+    Use this vector attribute as the edge/face's center. This overrides the computed centroid.
+
+Z Scale: 
+    
+    
+    Scale the extrusion amount by the value of this attribute.
+
+@related
+
+:: [Node:sop/polybridge]
+:: [Node:sop/polybevel]
+:: [Node:sop/extrude]
+

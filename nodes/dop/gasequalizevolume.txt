@@ -1,0 +1,97 @@
+#type: node
+#context: dop
+#internal: gasequalizevolume
+#icon: DOP/gas
+
+= Gas Equalize Volume =
+
+"""A microsolver that equalizes the volume of two fields."""
+
+The Gas Equalize Volume DOP is a microsolver used in building larger fluid
+simulations. The [Fluid Solver|Node:dop/fluidsolver] and [Smoke Solver|Node:dop/smokesolver] DOPs that allow
+microsolvers to be added before or after the main solver step to extend
+or tweak the simulation. Alternatively, advanced users may attempt
+to build an entire new solver out of microsolvers.
+
+The Gas Equalize Volume DOP adds a constant to an SDF so that its total
+volume will match a reference field.   This can be used to
+preserve total liquid volume or to get two disparate volumes to match.
+
+Alternatively, it can add a constant to a divergence field to correct
+the fluid.  This mode is more useful for FLIP fluids where the surface
+field isn't read by the solver.
+
+NOTE: 
+    If you do not have a goal field, you must set the __Scale Goal Volume__ to 0 as the default goal field of 0 will be interpreted as a 50% opacity fog by the SDF conversion.
+
+@parameters
+    Two Dimensional:
+	If two dimensional, areas will be computed rather than volumes
+	to ensure the units remain independent of voxel resolution.
+    Scale Goal Volume:
+	The computed goal volume will be multiplied by this value.
+	This is useful if you want to artificially increase the liquid
+	volume compared to the reference.  This should be an SDF.
+    Add Goal Volume:
+	This constant will be added to the computed and scaled goal
+	volume to form the final volume the SDF will be
+	equalized with.  If scale goal volume is 0, this merely
+	becomes the total goal volume.
+    Max Change:
+	The maximum amount the surface can move in a frame, measured in voxels.
+    Blend Amount:
+	The rate to change the volume to match the goal volume.
+    Method:
+	Toggles whether Gas Equalize volume uses the divergence of the fluid 
+	(for FLIP fluids) or modifies the surface field of the fluid to keep 
+	volume constant (for Level Set fluids).
+    Delta Step:
+	To estimate how much the volume changes for a given change in SDF
+	value, this sized step (in voxels) is performed to estimate the
+	effective surface area. 
+    Integral Decay rate:
+	When correcting by adjusting the divergence field, the correction
+	may be insufficient.  The history of the errors is kept to dynamically
+	control the correction rate.  This decay rate controls how quickly
+	the history is lost.  A value of 0 means no memory is kept.  A value of
+	0.5 means after 1/24th of a second, half of the memory is lost.
+	A value of 1 never decays the recorded errors, which likely 
+	will result in overshooting and oscillations.
+    Integral Coefficient:
+	The accumulated error is scaled by this coefficient when
+	added back to the divergence field.  Larger values will have the
+	accumulated error having a greater effect on the choice of 
+	correction values.
+    Fields:
+	These parameters control what name will be used for the input
+	fields and the internal fields.
+
+	Surface Field:
+	    The field to offset so that its volume matches the goal, if 
+            Use Surface Field is checked.
+	Goal Field:
+	    The target field whose volume will be matched.
+	Surface Volume:
+	    A constant field that is computed that stores the total
+	    volume of the surface.
+	Surface Delta Field:
+	    A constant field to store the size of the delta offset field.
+	Goal Volume:
+	    A constant field that is computed that stores the total
+	    volume of the goal.
+	Rolling Integral:
+	    A constant field which stores the sum of the error in volume.
+	Divergence:
+            The divergence field Gas Equalize Volume will tweak to keep volume
+            constant.
+
+@outputs
+    [Include:standard_data_outputs]
+
+@locals
+    [Include:standard_data_locals]
+
+    [Include:standard_locals]
+
+
+

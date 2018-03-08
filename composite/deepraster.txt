@@ -1,0 +1,197 @@
+= Deep raster effects =
+
+You can use the extra information in deep raster images, such as Depth,
+Normals, and various mattes, in more advanced compositing operations.
+See [rendering deep raster images|] .
+
+== Merge deep raster information in separate files ==
+
+    The renderer can store the extra information in a single deep-raster
+    file format (`.pic`), or in multiple "shallow" files. You may need
+    to merge color planes together with the deep raster information, for
+    certain operations (like [Z Composite|Node:cop2/zcomp], which
+    requires `Zdepth` to be present in the input).
+
+    For deep rasters that have been saved over several files, you will
+    need to merge the deep raster planes and the color planes into a
+    single sequence. See  [how to import an image as a plane of another
+    image|planes] .
+
+== Adjust render passes ==
+
+    * In your surface shaders, you can export float (or vector3)
+      variables such as diffuse, specular and ambient. You must write
+      the appropriate values to them; they are not automatically filled
+      in.
+
+    * With scalar (matte) information, you can use the mattes as masks
+      for color correction operations, or other filters like blur, to
+      adjust portions of the image.
+
+    * With vector3 (color) information, you can subtract the pass color
+      from the image color (C), manipulate it, and then add it back into
+      the composite. You can also use vector3 mattes as masks, just as
+      scalars, but the mask will be applied as a 3 channel mask (Mask.R,
+      Mask.G, Mask.B) and affect the different color channels
+      differently.
+
+    * You can do similar operations on shadow passes, allowing you to
+      darken, blur or add noise to shadows.
+
+== Z-depth compositing ==
+
+    Z depth compositing is useful for compositing volumes or particles.
+    For example, compositing falling snow around foreground elements.
+
+    steps>>
+        # To do Z depth compositing, each COP needs either a depth
+          (`Pz`) or point (`P`) plane.
+
+        # Use the [Z Composite operator|Node:cop2/zcomp] to composite
+          the images, instead of a traditional " [over|layers] ".
+          In addition to transparency, Z Composite looks at the Z depth
+          of each point to see if it should be in front of or behind the
+          other image.
+
+    NOTE:
+        The depth information is also updated with the new Z positions,
+        so you can do multiple Z composites in series correctly.
+
+
+    TIP:
+        If you have many Z composites to perform and some have
+        transparency, put all the Z composites dealing with transparent
+        images at the end of the Z composite chain, if possible. This
+        will minimize problems with Z compositing and transparency
+        (since only 1 Z value can be stored, and transparency requires
+        one for each transparent surface, plus the final opaque
+        surface).
+
+== Relighting ==
+
+    _Relighting_ involves simulating the effect of adding extra lights
+    to the rendered image. Houdini uses the depth and angle information
+    encoded in the deep raster to calculate the interaction of the new
+    lights with the surfaces in the image.
+
+    steps>>
+        # To do 3D lighting, you must have Point and Normal planes in
+          your image.
+
+        # Use the [Lighting operator|Node:cop2/light] to position a
+          single directional or non-directional light in the scene, or
+          do volume lighting with the parameters on the Lighting node's
+          __Atmospheric__ tab.
+
+
+    TIP:
+        You can generate a normal map from a point map with the
+        [Lighting operator|Node:cop2/light], but the results are not as
+        smooth as when you render out a real Normal plane.
+
+
+    NOTE:
+        To add multiple lights, input the image to multiple Lighting
+        nodes and turn off the __Add to original color__ parameter in
+        each. Then  [use an Add or Screen operation|/composite/layers]  to
+        combine the output of the nodes.
+
+
+== Depth of field ==
+
+    You can use the depth information encoded in the deep raster to
+    adjust the apparent depth of field in the image, but de-focusing
+    parts of the image outside the focus range.
+
+    steps>>
+        # To adjust the depth of field, the image must have a Z-depth or
+          Point plane.
+
+        # Create a [Depth of Field node|Node:cop2/dof] and a
+          [Defocus|Node:cop2/defocus] (recommended) or
+          [Blur|Node:cop2/blur] node.
+
+          The Depth of Field operator works by generating a mask plane
+          (`M`) from the depth information in the image, which you then
+          use as a  [mask|/composite/masks]  for the [Defocus|Node:cop2/defocus] node.
+
+        # Connect the image into the Depth of Field node and the
+          [Defocus|Node:cop2/defocus] node. Connect the image into the
+          [Defocus|Node:cop2/defocus] node as well. Finally, connect the Depth of
+          Field node into the  [mask input|/composite/masks]  of the
+          [Defocus|Node:cop2/defocus] node.
+
+        # Append a [Defocus COP|Node:cop2/defocus]; set the __Per Pixel Defocus__ parameter. Adjust the size to get the desired amount of blur.
+
+          [Image:/images/depth_of_field_image.jpg]
+
+
+    TIP:
+        See  [how to preview different planes|/nodes/cop2]  in the node
+        tile's thumbnail.
+
+== Fog ==
+
+    Use the [Fog operator|Node:cop2/fog] to add various atmospheric
+    effects to your network, such as normal fog, layered fog, and heat
+    waves. The image must have a Z-depth plane or Point plane.
+
+    * For normal fog, you can specify the color of the fog and its
+      density.
+
+    * For layered fog, you can specify the above plus the height that it
+      starts/ends at, plus a drop-off region to make the transition
+      smooth.
+
+    * You can add 3D noise to the fog to make it more varied (though
+      this takes quite a bit longer, as it does ray marching through the
+      noise).
+
+    * You can add an image to the Fog node's second input, which varies
+      the fog color based on the second image's color.
+
+    [Image:/images/normal_fog.jpg]
+
+    [Image:/images/noisy_layer_fog.jpg]
+
+== Apply an environment map ==
+
+    Use the [Environment operator|Node:cop2/env] to apply an [environment
+    map|/render/envmaps] to an image. The image must have a Point plane and a Normal
+    plane.
+
+    The Environment operator supports Spherical, Cube-Strip and
+    Cube-Cross maps. You can rotate map around the image, and blend it
+    with the original image colors
+
+== World space pixel culling ==
+
+    Use the [Geo Key operator|Node:cop2/geokey] to partition, or cut
+    out, areas of the image based upon their 3D position or normal
+    direction.
+
+    For images with a Point plane, use clipping planes and distance from
+    a point to isolate or remove elements.
+
+    Use a static direction vector to isolate all normals pointing in
+    that direction. Use a point to isolate all normals pointing towards
+    that point.
+
+    To get a smooth transition, you can use a drop-off area or angle.
+
+    Point:
+        All points removed close to a given point.
+
+        [Image:/images/geo_clip_point.jpg]
+
+    Angle:
+        All points kept facing a certain direction (up).
+
+        [Image:/images/geo_clip_angle.jpg]
+
+    Plane:
+        All points removed in front of a plane.
+
+        [Image:/images/geo_clip_plane.jpg]
+
+

@@ -1,0 +1,173 @@
+= Scripting Houdini from web pages =
+
+"""HTML pages viewed in the embedded browser can use a special JavaScript object to interact with Houdini."""
+
+"""
+The Houdini embedded web browser provides a bridge for executing Python and HOM code from JavaScript.
+"""
+
+NOTE:
+    The method for calling Python from Javascript code changed in Houdini 16 due to Houdini switching to the Qt5 UI library. Scripts written to use the `window.Python` object will need to be rewritten to initialize the bridge and use the asynchronous callback style for expressions.
+
+
+== Overview ==
+
+When you view a page in the embedded browser, the JavaScript on that page can use the `window.Python` JavaScript object to execute Python code and interact with Houdini. *This only works in the embedded browser*.
+
+This lets you set up HTML interfaces that can read information from and change the Houdini scene.
+
+For example:
+
+{{{
+#!js
+// Javascript
+
+if (window.Python) {
+    // Run a Python statement that saves the current scene
+    Python.runStatements("__import__('hou').hipFile.save()");
+}
+
+if (window.Python) {
+    // Run a Python expression and get the result as a string
+    var nodePath = Python.runStringExpression("__import('hou')__.node('/obj/geo1').path()");
+}
+}}}
+
+
+== Initializing ==
+
+Before running Python code from JavaScript some initialization is required in
+the web page.
+
+# Load the `qwebchannel.js` file in your web page, for example:
+
+    {{{
+    #!html
+    <head>
+        <script language="javascript" src="/path/to/qwebchannel.js"></script>
+    </head>
+    }}}
+
+    You can get a copy of `qwebchannel.js` from `$HFS/houdini/python2.7libs/bookish/static/js` and install it in your web server.
+
+# When the page is loaded, create the web channel communication object in JavaScript:
+
+    {{{
+    #!javascript
+    window.onload = function() {
+        if (!qt || !qt.webChannelTransport) {
+            // The web channel transport does not exist so we must not
+            // be running in the embedded browser.
+            return;
+        }
+
+        new QWebChannel(qt.webChannelTransport, function(channel) {
+            // Assign the Python bridge to the window object 
+            // to make it globally available.
+            window.Python = channel.objects.Python;
+
+            // (Optional) Make Python calls during page load here...
+            window.Python.runStatements("print 'Hello World.'");
+        });
+    }
+    }}}
+
+
+== How to ==
+
+Unlike the Qt4 version, calls to the Javascript bridge in Qt5 are _asynchronous_: they return immediately instead of waiting until the Python code runs. To get the result of a Python expression, you need to register a callback function.
+
+Run Python statements:
+
+    {{{
+    #!javascript
+    if (window.Python) {
+        window.Python.runStatements("__import__('hou').setFrame(5)");
+    }
+    }}}
+    
+    The Javascript call will return immediately and Python will do the work asynchronously. You can register a callback to do something when the Python finishes:
+    
+    {{{
+    #!javascript
+    window.Python.runStatements(
+        "__import__('hou').setFrame(5)",
+        function() {
+            alert("Frame is set!");
+        }
+    );
+    }}}
+
+Run a Python expression that returns a string:
+    To get the result of the expression, you must pass a callback function. The bridge will call the function with the result when the Python code is finished.
+
+    {{{
+    #!javascript
+    if (window.Python) {
+        window.Python.runStringExpression(
+            "__import__('hou').node('/obj/geo1').path()",
+            function(result) {
+                alert("Path=" + result);
+            }
+        )
+    }
+    }}}
+
+Run a Python expression that returns an integer:
+
+    {{{
+    #!javascript
+    if (window.Python) {
+        window.Python.runIntExpression(
+            "__import__('hou').intFrame()",
+            function(result) {
+                alert("Integer Frame=" + result);
+            }
+        )
+    }
+    }}}
+
+Run a Python expression that returns a floating point number:
+
+    {{{
+    #!javascript
+    if (window.Python) {
+        window.Python.runFloatExpression(
+            "__import__('hou').time()",
+            function(result) {
+                alert("Time=" + result);
+            }
+        )
+    }
+    }}}
+
+
+== Tips and tricks ==
+
+* See the Python language definition for the difference between executing statements and evaluating and expression. The main differences are that with statements, you can have more than one statement, they can include control flow (for example, `if`, `for`), and they don't return a value.
+
+* `hou` is not automatically available in the executed Python code. You need to import it as part of the code.
+
+* There is essentially *no error handling*. If an exception occurs on the Python side, the Javascript functions simply return the empty string or zero (depending on the method).
+
+
+== Running Python code from JavaScript in the old Qt4 browser (deprecated) ==
+
+This section is for informational purposes only.
+
+* In a Qt4 build, you don't need to initialize the Javascript bridge.  The Qt4 embedded browser automatically creates the `window.Python` object.
+
+* In the Qt4 bridge, calls return _synchronously_, instead of using callbacks.
+
+`window.Python.runStatements(String)` -> `null`:
+    Executes the given string as one or more Python statements. You can separate statements with newlines or the `;` character.
+    
+`window.Python.runStringExpression(String)` -> `String`:
+    Evaluates the given string as a Python expression and returns the result as a JavaScript string.
+
+`window.Python.runIntExpression(string)` -> `Number`:
+    Evaluates the given string as a Python expression and returns the result as a whole number (JavaScript has no distinction between ints and floats).
+
+`window.Python.runFloatExpression(string)` -> `Number`:
+    Evaluates the given string as a Python expression and returns the result as a possibly fractional number (JavaScript has no distinction between ints and floats).
+

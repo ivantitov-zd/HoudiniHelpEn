@@ -1,0 +1,296 @@
+= Metaball =
+
+#type: node
+#context: sop
+#internal: metaball
+#icon: SOP/metaball
+#tags: create, metaball
+
+"""Creates metaballs and meta-superquadric surfaces."""
+
+This node creates metaballs and metasurfaces. If you
+click and drag the mouse on the Construction Plane, it generates a
+metaball whose X radius is specified by your drag. Metasurfaces are
+generalized metaballs meaning that they aren't necessarily ellipsoidal.
+
+== Introduction ==
+
+Metaballs provide a method for creating an organic-looking surface. The
+metaballs are blobs ("fields") of "density" floating in space. Houdini
+skins a surface around areas where the density is greater than some
+threshold.
+
+When two metaballs overlap, Houdini adds their field effects together.
+Because the density of the force field can be increased by the proximity
+of other metaball force fields, metaballs have the unique property that
+they change their shape to adapt and fuse with surrounding metaballs.
+This makes them very effective for modeling organic surfaces.
+
+You can specify negative Weights to create "pusher" metaballs. This lets
+you create holes in the surface by effectively subtracting density.
+
+The field is controlled by a _kernel function_ and a _weight_. The
+kernel function controls the gradient of the density value of a metaball
+field from 1 (at the center) to 0 (at its outside edge). The weight
+scales the density to shift the location of the surface closer or
+further away from the center. You can currently specify the shape of the
+field as an ellipsoid or a _super-quadric_.
+
+[Include:/shelf/metaball#includeme]
+
+== How to ==
+
+:task:Make metaballs interact with each other:
+    * Merge the nodes together with a [Merge
+      operator|Node:sop/merge].
+
+:task:Create a large number of metaballs easily:
+    * Create a single metaball and copy it onto the points of
+      another piece of geometry with the [Copy
+      operator|Node:sop/copy].
+
+      Copying metaballs onto the points of a  [particle system|/particles]
+      is a good way to achieve various volumetric visual effects.
+
+:task:Speed up the display of metaballs:
+    # In the viewport options menu, choose __Display > Display options__, or press ((D)).
+        
+        [Image:/images/ui/viewport_menus_anno.png]
+
+    # Click the __Viewport__ tab and lower the __Level of detail__
+      setting to get faster but rougher representations of geometry
+      in the viewer, including metaballs.
+
+:task:Convert metaballs to other geometry types:
+    * Use the [convert tool|/shelf/convert].
+
+== Super-quadratic field shapes ==
+
+Instead of the regular ellipsoid field shape, you can increase or
+decrease the XY and Z exponent parameters to create "star-ish"
+(exponent > 1) or "square-ish" (exponent < 1).
+
+A metaball is known as a super-quadratic if either exponent is not
+equal to one.
+        
+== How metaballs work ==
+
+Each metaball has a "sphere of influence". When you
+[merge|Node:sop/merge] two metaballs and they extend
+into each other's sphere of influence, they react in a way similar to
+drops of water: the surface tension works to form a smooth bridge
+between them. This is useful for making organic "blobby" shapes which
+meld into each other.
+
+Metaballs can be thought of as spherical force fields whose surface is
+an implicit function defined at any point where the density of the force
+field equals a certain threshold. Because the density of the force field
+can be increased by the proximity of other metaball force fields,
+metaballs have the unique property that they change their shape to adapt
+and fuse with surrounding metaballs. This makes them very effective for
+modeling organic surfaces. For example, below we have a metaball. The
+surface of the metaball exists whenever the density of the metaball's
+field reaches a certain threshold:
+
+[Image:/nodes/images/MetaballFields.jpg]
+
+When two or more metaball force fields are combined, as in the
+illustration below, the resulting density of the force fields is added,
+and the surface extends to include that area where the force fields
+intersect and create density values with a value of one. For more
+information on Metaballs, see the _Geometry Types_ section.
+
+[Image:/nodes/images/MetaballFieldsa.jpg]
+
+You can see a metaball's sphere of influence by turning on __Display primitive hulls__ in the [Display options toolbar|/basics/ui].
+
+This node is ideal for creating organic models, liquid effects and
+other blobby surfaces.
+
+
+== Tips ==
+
+Level of detail:
+    You can change the level of detail of the metaball and NURBS display
+    by adjusting the Level of Detail parameter in display options.
+
+Better metaball shading:
+    Accurate metaball normals will be computed if the _normal_ attribute
+    exists when conversion to polygons is done. Thus, to get improved
+    shading on polygonized metaballs, it's a good idea to add the normal
+    attribute (i.e. use a [Facet SOP|Node:sop/facet]) before converting
+    the metaballs.
+
+Using metaballs to prune L-system copying:
+
+    This is
+    typically done by copying metaballs to every point of the
+    deforming a polygonal/mesh input source with a [Copy
+    SOP|Node:sop/copy]. When doing this, it is a good idea to pass
+    any deforming geometry through a [Facet SOP|Node:sop/facet] and
+    _Consolidate Points_ to minimize the number of points you need
+    to copy to. If converting from spline surfaces, you may want to
+    refine your surfaces first to get a smooth distribution of
+    metaballs.
+
+    If you are using metaballs to create a deforming attractor
+    for the [Particle SOP|Node:sop/particle], you may want to
+    use a [Group SOP|Node:sop/group] to define a bounding area,
+    and copy the metaballs only to the points included in that
+    group. This makes it much easier to control and animate the
+    attractor area.
+        
+== Meta Expressions ==
+
+Metaball expressions are user-specified attributes that determine how metaballs are to be merged. To use Meta Expressions, merge all your metaballs with groups. You can reference metaballs as groups or primitive numbers. Then, use an [Attribute Create SOP|Node:sop/attribcreate] to build a string detail called `metaExpression`.
+
+NOTE:
+    The attribute must be called `metaExpression`.
+
+Then, in a string field, type your expression to control how the metaballs merge together. These expressions can be built using a combination of quoted group names, unquoted primitive numbers, and the operations `min`, `max`, and `sum`. An example of a valid expression is
+
+    {{{
+    sum(max("group1", "group2"), max("group3", "group4"), 0, 1)
+    }}}
+
+where group1, group2, group3 and group4 are the names of groups, and 0 and 1 are the primitive numbers of metaballs. The `min`, `max`, and `sum` operations can take an arbitrary number of arguments and support nested expressions such as `sum(max(...), ...)`. Arguments to `min`, `max`, or `sum` are separated by commas. Providing a quoted group name is equivalent to simply adding each metaball primitive from that group to the current argument list. For example, if group1 contains metaballs with primitive numbers 0, 1 and 2, then the expression
+{{{
+max("group1")
+}}}
+
+is equivalent to
+
+{{{
+max(0, 1, 2)
+}}}
+
+Duplicate argument names are also supported by this expression. For example, if a metaball with primitive number 0 is defined, then specifying the expression `sum(0, 0)` is equivalent to merging two distinct metaballs at the same location as metaball 0.
+
+Sum |
+    [Image:/images/metaball1.png]
+Max |
+    [Image:/images/metaball2.png]
+Min |
+    [Image:/images/metaball3.png]
+
+This expression can be set by creating a detail/string attribute with the desired expression on any geometry containing metaballs. This functionality is also partially exposed via the [Icon:SOP/metagroups][MetaGroups SOP|Node:sop/metagroups]. This SOP allows users to easily generate expressions of the form
+
+{{{
+max(sum(...), sum(...), ..., sum(...))
+}}}
+    
+by establishing a set of [Metaball groupings|Node:sop/metagroups]. Each of these groupings consists of a list of group names, separated by spaces. For example, if two metaball groupings are defined by the SOP, one as 'group1 group2', and the other as 'group3 group4', then the SOP generates a Metaball expression equivalent to
+
+{{{
+max(sum("group1", "group2"), sum("group3", "group4"))
+}}}
+
+TIP:
+    You can increase the __Level of Detail__ on the Viewport tab of the [Display Options|/ref/windows/displayopts_3d] to increase the accuracy at the cost of viewport performance and memory consumption.
+
+== Advanced ==
+
+When generating blobby primitives in RIB, the string parameters were hard-coded to an empty list.  SOHO will now search for a detail attribute named `RiBlobby_Strings` (case sensitive).  This value of this string will be parsed using the syntax described in the Python function `shlex.split()`.  The resulting list of strings will be output in the `RiBlobby()` call.
+
+@parameters
+
+Mode:
+
+    How to interpret the parameters used to specify the metaball.
+
+    Field Radius:
+        Treat __Radius__ as a scale on the density field.  The threshold
+        surface is then a function of this __Radius__, __Weight__ and
+        __Kernel Function__.
+    Threshold Radius:
+        Treat __Radius__ as specifying the radius of the 1.0 threshold
+        surface for this isolated metaball, and compute the corresponding
+        scale on the density field given this __Radius__, __Weight__ and
+        __Kernel Function__.  Changing the __Weight__ in this mode will
+        not change the isolated threshold surface of this metaball.
+
+Radius:
+    #id: radx /rady /radz
+
+    X radius of a metaball that is placed if you click on the
+    Construction Plane without dragging. If you click and drag, the
+    size of the metaball is over-ridden by the amount of drag.
+    Entering non-equal values in the xyz fields results in
+    ellipsoidal shapes.
+
+    The X radius is defined by the distance dragged from the center,
+    while the Y and Z radii vary proportionally with the X / Y and X
+    / Z ratios in the parameter dialog.
+
+Center:
+    #id: tx /ty /tz
+
+    Center of the metaball. This value is updated whenever you click
+    (and drag) to create a metaball. A new metaball will be
+    positioned here if you type ((Enter)).
+    
+Weight:
+    #id: metaweight
+
+    How much "pull" the metaball has on surrounding metaballs,
+    causing them to merge together.
+    
+Kernel Function:
+
+    [Image:/images/metaball_blinn.png] |
+        Blinn |
+            Always puts a sphere at the blob center, even if the
+            weight is less than 1.0. The fastest and most stable of
+            all the models.
+    
+    [Image:/images/metaball_wyvill.png] |
+        Wyvill |
+            The Wyvill and Elendt models are very similar. Only the
+            weight distribution function is different.
+    
+    [Image:/images/metaball_elendt.png] |
+        Elendt |
+            The slowest method, but a good compromise between the
+            Blinn and Wyvill methods in terms of weight
+            distribution.
+    
+    [Image:/images/metaball_links.png] |
+        Links |
+            -----
+    
+    [Image:/images/metaball_renderman.png] |
+        RenderMan |
+            Used by Pixar's RenderMan (and possibly other RIB
+            renderers). Defined as
+            
+            {{{
+            Density = 1 - 3*R^2 + 3*R^4 - R^6
+            }}}
+    
+    [Image:/images/metaball_hart.png] |
+        Hart |
+            A kernel function suggested by mathematician John Hart.
+    
+XY Exponent:
+    #id: expxy
+
+    Determines inflation/contraction in the x and y axes.
+
+    For metaballs, the exponent determines the inflation towards
+    "squarishness" or contraction towards "starishness" as described
+    below:
+
+    > 1 = metaballs that appear more like a star. < 1 = metaballs that
+    appear more squarish. 1 = metaballs that appear spherical.
+
+Z Exponent:
+    #id: expz
+
+    Determines inflation/contraction in the z axis.
+
+@related
+
+- [Node:sop/bulge]
+- [Node:sop/magnet]
+
+

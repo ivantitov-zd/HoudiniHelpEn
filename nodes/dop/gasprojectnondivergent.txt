@@ -1,0 +1,109 @@
+#type: node
+#context: dop
+#internal: gasprojectnondivergent
+#icon: DOP/gas
+
+= Gas Project Non Divergent =
+
+"""A microsolver that removes the divergent components of a velocity
+field."""
+
+The Gas Project Non Divergent DOP is a microsolver used in building
+larger fluid simulations. The [Fluid Solver|Node:dop/fluidsolver] and [Smoke Solver|Node:dop/smokesolver] DOPs that
+allow microsolvers to be added before or after the main solver step to
+extend or tweak the simulation. Alternatively, enterprising people may
+attempt to build an entire new solver out of microsolvers.
+
+The Gas Project Non Divergent DOP removes any divergent portions of a
+velocity field. These are parts of the velocity field that represent
+expansion or contraction. This is done by computing a pressure field
+that counteracts any compression or rarefication and applying that
+pressure field instantaneously.
+
+NOTE:
+    The [Curl Noise POP|Node:pop/curlnoise] is often used with this node in FLIP fluid simulations, because it plays very predictably with any fluid simulations that contain the Gas Project Non Divergent DOP.
+
+
+@parameters
+    Velocity Field:
+        The velocity field to make divergence free. This must be a
+        vector field.
+
+	Two different algorithms are used depending on the type of the
+	velocity field.  If the velocity field has Face Sampling, a
+	PCG iteration is used to project.  If it has Center Sampling,
+	a relaxation algoirthm is used to project.
+    Surface Field:
+        An SDF that specifies which voxels are to be considered in the
+        divergence calculations. Voxels are either inside (less than 0)
+        or outside. Incompressibility is only enforced on the interior
+        voxels.
+    Collision Field:
+        Velocity values on collision boundaries are considered fixed.
+    Goal Divergence Field:
+        While the ostensible purpose of this micro solver is to remove
+        divergence, one may want instead to make a field match a
+        certain divergence pattern.  
+
+	The goal divergence field is a
+        scalar field which will be matched.  If not specified, a zero
+        field is used, thereby having the equivalent of no-divergence.
+        The field is scaled by the surface area of the voxels so can
+        be specified independently of the resolution of the actual gas
+        geometry.
+
+        Note that the Gas Advection micro solver relies on the field
+        being non-divergent - divergent fields may be inconsistent and
+        not exhibit the proper rarefication/compression of scalar
+        fields.  One can add in the rarefication/compression step by
+        using a Gas Velocity Stretch micro solver on the density field
+        using the modified velocity field as a reference.
+    Pressure Field:
+        The pressure required to make the velocity field divergence
+        free is output into this field.
+    Component Index:
+        An index field which tracks which component number each voxel
+        belongs to.  The fluid is broken into multiple connected
+        components which can be identified with this field.
+    Preserve Bubbles:
+        Trapped air will be given a pressure value independent of the
+        boundary pressure conditions. 
+
+	This prevents the bubbles from
+        collapsing in on themselves. If not set, fluid will be free to
+        flow into bubbles from all sides ensuring their swift
+        dissipation.
+    Ghost Fluid:
+        Pressures are extrapolated into air cells rather than just set
+        to zero.  This causes sub-voxel ripples in the air side to be
+        suppressed.
+    Variational:
+        Contribution to the pressure equation is proportional to the
+        amount of the cell in the liquid.  This attempts to avoid
+        stairstep boundaries on solid boundaries.
+    Preconditioner:
+        Controls which preconditioner is used for the conjugate
+        gradient operation.  Should be left on Modified Incomplete
+        Cholesky as it is the fastest to converge.
+    Iterations:
+	When the velocity field is center sampled, this specifies the
+	number of iterations used to project it.  The number of
+	iterations also controls the maximum distance any change in
+	the velocity field can have, so should be about the width of
+	the volume in voxels.  Lower iterations will be faster but the
+	field will not be as nice.
+
+    [Include:standard_solver_parms]
+
+@inputs
+    [Include:standard_data_inputs]
+
+@outputs
+    [Include:standard_data_outputs]
+
+@locals
+    [Include:standard_data_locals]
+
+    [Include:standard_locals]
+
+

@@ -1,0 +1,148 @@
+#type: node
+#context: shop
+#internal: vm_geo_ptinstance
+#icon: SHOP/vm_geo_ptinstance
+
+= Point Instance Procedural =
+
+"""The underlying procedural when using Fast Point Instancing with the 
+instance render parameters."""
+
+The Point Instance Procedural takes a set of objects and distributes them over 
+a given number of points at render time. Each point can assign a material to 
+the object it instances, independent of the object itself. The main benefit is 
+that at render time, unlike the [Copy SOP|Node:sop/copy], the only memory 
+overhead is from the small set of source objects. So instancing a single 
+object 1000 times doesn't cost much more memory-wise than having a single copy 
+of that object.
+
+It is useful for several scenarios, particularly where a small set of 
+geometries, each with a different material variation, will be distributed over 
+large number of points. For example, forests and vegetation, crowds, 
+constructing cities, asteroid fields, rocks and rubble, swarm of flies, birds, 
+bats, etc.
+
+
+@parameters
+
+== Main ==
+
+Point Object:
+    The object that contains the points to instantiate from.
+
+Instance Object:
+    The object to instantiate on each point on the point object. This can be 
+    overridden, on a per-point basis, by the `instance` attribute on the point 
+    object. 
+    In addition, it's possible to do a delayed load of geometries, using the
+    `instancefile` attributes. This is a string attribute that should contain
+    an absolute path of any geometry file that can be loaded by Houdini.
+    If motion blur is required, the companion attribute, `instanceblurfile`
+    can be used. In that case, the `instancefile` attribute would be applied
+    to shutter open, and this second attribute to shutter close.
+    If the geometry file uses the `v` attribute for velocity blur, it is 
+    very likely that some clipping will occur at render time, due to the
+    object's bounding box not including the velocity values. In this case
+    a float attribute, `instancefile_maxv`, can be added to the point object. 
+    This attribute specifies the absolute maximum velocity value of all
+    the velocity vector components, and inflates the object's bounding box 
+    accordingly.
+
+Instance Transform:
+    Typically, the transform on the instanced object is combined with the 
+    object it's being instanced by. This option allows you to turn off this 
+    behavior.
+
+Point Motion Blur:
+    Specifies the motion blur behavior when rendering. Each point will have 
+    an instance of geometry. The transform of this instance is determined by 
+    the point's position. Transformation motion blur on the instance is 
+    determined by the motion of the point. The motion of the points is 
+    controlled by this parameter.
+
+    No Motion Blur:
+        Do not perform motion blur.
+    
+    Compute sub-frame geometry (deformation):
+        Compute the point's position by evaluating the geometry at sub-frame 
+        intervals. This can be problematic if the point count is changing 
+        frame to frame.
+    
+    Use point velocity attribute:
+        The point's vector attribute `v` is used to extrapolate the motion of 
+        the point. 
+        If using the delayed load attributes, velocity blur will be 
+        automatically assumed on the delay load geometry, if the 
+        `instanaceblurfile` attribute is not given. In that case it is the
+        responsibility of the user to tell the procedural the maximum length
+        of the velocity vectors through the `instancefile_maxv` float 
+        attribute. Otherwise clipping artifacts may occur.
+
+Render Geometry as Bounding Boxes Only:
+    Don't render the actual geometries, only their bounding boxes. This is 
+    useful for scene debugging and rendering quick tests.
+
+CVEX Operator:
+    An optional path to a CVEX SHOP node. The point instancing will run this
+    CVEX shader on each instance before rendering it. This allows you to
+    set the transform for each instance procedurally.
+    
+    The point instancing CVEX shader has a single output, a transform 
+    (`xform`) matrix. 
+    
+    The point instancing CVEX shader can use the following globals. 
+    
+    Name ||
+        VEX Type ||
+            Description ||
+    `P` |
+        vector |
+            World position of the point being instanced on
+    `id` |
+        integer |
+            ID of the point being instanced on. If the 'id' attribute already
+            exists on the source object, it will be used. Otherwise the points
+            will be numbered in sequence.
+    `t` |
+        float |
+            Shutter time (0-1)
+    `obj_xform` |
+        matrix |
+            Instance object's transform
+    `cam_xform` |
+        matrix |
+            Camera's transform
+    `inst_bbox_min` and `inst_bbox_max` |
+        vector |
+            The minimum and maximum corners of the bounding box of the 
+            instance geometry
+    `inst_xform` |
+        matrix |
+            The transform of the instance geometry
+    
+    You can use dditional attributes of the points being instanced on. The
+    available attributes are controlled by the __CVEX Attribute Mask__ 
+    parameter.
+
+CVEX Attribute Mask:
+    A glob to indicate which point and detail attributes should be copied into 
+    the CVEX context, if needed.
+
+== IFD Bounds ==
+
+Bounding Box:
+    The bounding box controls let you specify a bounding box for the 
+    referenced geometry. Only when this bounding box is "on screen" will 
+    mantra load the referenced geometry. You can set __Bounding Box__ to 
+    __No bounding box required__, in which case mantra will always load the 
+    references geometry regardless. You can also specify the bounding box by 
+    referencing the SOP's bounding box in the __SOP Bounds__ parameter.
+
+SOP Bounds:
+    The geometry whose bounding box you want to reference.
+
+Min Bounds:
+    The minimum bounding box dimensions, when setting explicit bounds.
+
+Max Bounds:
+    The maximum bounding box dimensions, when setting explicit bounds. 

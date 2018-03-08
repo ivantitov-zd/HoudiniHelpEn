@@ -1,0 +1,120 @@
+#type: node
+#context: dop
+#internal: terrainobject
+#icon: DOP/terrainobject
+
+= Terrain Object =
+
+"""Creates a Terrain Object from SOP Geometry."""
+
+The Terrain Object DOP creates a static object inside the DOP simulation. This
+node is just like the [Static Object DOP|Node:dop/staticobject] except that it
+manipulates the source geometry to generate a useful volume representation
+from thin geometry (such as a grid, or a grid modified with a [VEX Mountain
+SOP|Node:sop/mountain]) which would not otherwise be able to generate a
+useful volume representation. 
+
+Volume representation provides better
+interactions with other solvers in the simulation. To see the volume
+representation created by this DOP (and ensure it provides a good match to the
+source geometry), it is a good idea to turn on the __Show Collision Guide
+Geometry__ parameter. A bad volume may be corrected by modifying the __Base Normal__
+parameter.
+
+The position and velocity of this object is extracted from the animated
+transformation parameters of the source object. Thus a terrain object is not
+necessarily stationary. It can move through the simulation, and even deform,
+but is not affected by other objects in the simulation.
+
+[Include:/shelf/terrainobject#includeme]
+
+@parameters
+    Creation Frame Specifies Simulation Frame:
+        Determines if the creation frame refers to global Houdini
+        frames (`$F`) or to simulation specific frames (`$SF`).  
+        
+        The latter is affected by the offset time and scale time at the
+        DOP network level.
+    Creation Frame:
+        The frame number on which the object will be created. The
+        object is created only when the current frame number is equal to
+        this parameter value. This means the DOP Network must evaluate a
+        timestep at the specified frame, or the object will not be
+        created. 
+        
+        For example, if this value is set to 3.5, the
+        __Timestep__ parameter of the DOP Network must be changed to
+        `1/(2*$FPS)` to ensure the DOP Network has a timestep at frame
+        3.5.
+    Object Name:
+        The name for the created object.  This is the name that shows up
+        in the details view and is used to reference this particular
+        object externally.  
+        
+        NOTE:
+            While it is possible to have many objects with the same name, this complicates writing references, so it is recommended to use something like `$OBJID` in the name.
+
+    SOP Path:
+        #channels: /soppath
+        The path to a SOP (or an Object, in which case the display SOP
+        is used) which will be the geometry for this object. 
+        
+        This parameter can also be a list of Object or SOP paths, and can
+        include wild card specifications or operator groups or bundles.
+        If multiple Objects or SOPs match this string, a separate
+        simulation object will be created for each matching SOP.
+
+    OBJ Path:
+        #channels: /objpath
+        The path to the object that is used to control the motion of the
+        terrain object. The animated world space transformation of this object
+        is used to position this object, and calculate its velocity.
+
+    Base Normal:
+        #channels: /basenormalx /basenormaly /basenormalz
+        Defines the normal to the plane onto which the source surface is
+        projected to generate the volume. This parameter is useful if the
+        primary orientation of the source geometry is not along the Y axis.
+        
+        When manipulating this parameter, you should turn on the __Show
+        Collision Guide Geometry__ parameter to see the volume representation
+        that is being created.
+
+    Use Deforming Geometry:
+        #channels: /animategeo
+        Causes the geometry for the object to be pulled from the chosen
+        SOP at each timestep. If the SOP contains animated geometry, the
+        terrain object's geometry will also animate.
+
+    Create Active Object:
+        #channels: /active
+        Sets the initial active state of the object. An inactive object
+        does not react to other objects in the simulation. If a terrain object
+        is made active, it should be connected to a [Static Solver|Node:dop/staticsolver]. This solver
+        causes the terrain object to behave as if it were inactive.
+
+    Display Geometry:
+        Controls if the geometry is displayed in the viewport.  Does
+        not reset the simulation when it is changed.
+
+    Display Extrusion:
+	    The terrain geometry is extruded along the base normal to create the final closed volume.  Displaying this extruded surface can help identify what the correct base normal is.
+
+    == Physical ==
+        [Include:standard_physparms]
+
+    [Include:standard_rbdvolume_parms]
+
+@outputs
+    First:
+        The terrain object created by this node is sent through the single
+        output.
+@locals
+    [Include:standard_locals]
+
+
+@related
+    - [Node:dop/groundplane]
+    - [Node:dop/staticsolver]
+    - [Node:dop/staticobject]
+

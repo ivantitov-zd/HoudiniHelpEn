@@ -1,0 +1,111 @@
+= Cloth and wire simulations =
+
+== Overview ==
+
+The cloth solver simulates deforming surfaces. Cloth simulations are useful for use it to simulate fabric, rubber, bending metal, and other materials. You can turn any piece of SOP geometry into a cloth object,
+no triangulation is required.
+
+Wire simulations are useful for simulating anything long and flexible, for example grass, fur, or even scaffolding. When wire objects are used with constraints, they can be used to simulate things such as ropes swinging, bungee jumping cords springing, or a tail of a kite.
+
+The tools on the __Cloth__ and __Wires__ shelf tabs let you create and manipulate cloth and wire objects.
+
+== How to ==
+
+
+:task:Deform geometry based on a dynamic wire:
+    You can use a curve being controlled by a wire simulation to drive the deformation of a model. For example, you can model a snake and control it with a dynamics wire.
+    
+    Deforming geometry based on a dynamics wire is basically the same problem as [deforming geometry based on a curve|/character/facialrigging]. Create a control curve to represent the object you want to deform, and make it a simulated wire using the shelf tools. Add any constraints and forces you want to the simulated wire. 
+    
+    Then, create the [Icon:SOP/wirecapture][Wire Capture surface node|Node:sop/wirecapture] to capture the geometry you want to deform to the wire geometry. In the Wire Capture node's parameters, click the __Capture__ tab and set the __Min/Max weight__ to 1 and 1. Connect the original curve to the Wire Deform node's second (rest) input and the DOP Import node (automatically created by the shelf tools to import the simulated wire's motion back onto the curve geometry) to the Wire Deform node's third (deformed) input.
+
+:task:Create a field of wires:
+    One way to create a field of curves at the SOP level is:
+
+    # Use the [Icon:SOP/grid] [Grid|Node:sop/grid] tool on *Create* shelf tab to create a plane and size it to the scale you want for your field.
+    
+    #  [Icon:VIEW/display_points] [Turn on the display of points|/basics/view] in the viewer using the toolbar on the right side of the viewer.
+    
+    # You can just use the points of the grid as the locations for the curves if you want ordered rows and columns of curves, or you can scatter an arbitrary number of points across the grid.
+    
+      - If you want ordered rows and columns of curves, use the __Rows__ and __Columns__ parameters on the Grid node to set them up.
+    
+      - To scatter points across the grid, use the [Icon:SOP/scatter][Scatter|/shelf/scatter] tool on the *Model* shelf tab with the grid object selected, and set the __Number of points__ parameter to the number of curves you want in your field.
+    
+    # Draw a curve starting at the bottom (that is, at the point you want to touch the field plane).
+    
+    # Use the [Icon:SOP/copy] [Copy to points|/nodes/sop/copy] tool on the *Modify* shelf tab to copy the curve onto the points.
+    
+      [Image:/images/wire_field.png]
+    
+    # Use the [Icon:DOP/wireobject] [Wire Object|/shelf/wireobject] tool on the *Wires* shelf tab to turn the curve field into simulated wires.
+
+:task:Create a toppling scaffold:
+    # Build your scaffolding using [Icon:SOP/curve][curves|Node:sop/curve] or [Icon:SOP/line][lines|Node:sop/line].
+
+    # Convert your curves or lines to wire objects using the [Icon:DOP/wireobject][Wire Object|/shelf/wireobject] tool on the Wires tab of the shelf.
+    
+    # Use either a [Icon:SHELF/wirepinconstraint][Wire Pin Constraint|/shelf/wirepinconstraint] or a [Icon:SHELF/wirespringconstraint][Wire Spring Constraint|/shelf/wirespringconstraint] to constrain the points of the pieces of scaffolding together.
+    
+    # If you used a wire pin constraint, [keyframe|/anim/basics] when the constraint should break by changing the __Activation__ to 0.
+    
+        If you used a wire spring constraint, you can either [keyframe|/anim/basics] when the constraint should break by changing the __Activation__ to 0 or set a __Maximum Force__ or __Maximum Length__ on the __Spring__ tab of the parameter editor. Once the spring reaches the maximum force or length the constraint will break.
+    
+        Using a [Icon:SHELF/wirespringconstraint][Wire Spring Constraint|/shelf/wirespringconstraint] will allow you to set a __Maximum Force__ or __Maximum Length__ on the __Spring__ tab in the parameter editor to indicate when the constraint should break. However, the [Icon:SHELF/wirepinconstraint][Wire Pin Constraint|/shelf/wirepinconstraint] does not have these parameters.
+            
+    # Create a [Icon:DOP/rbdobject][Rigid Body Object|/shelf/rbdobject] that will bump into the scaffolding.
+    
+    # Apply [Icon:DOP/gravity][Gravity|/shelf/gravityforce] to the objects in your scene to make them look as if they are falling naturally.
+    
+    [Image:/images/dynamics/wire_scaffolding.png]
+
+== Colliding with cloth and wires ==
+
+Currently RBD objects cannot collide with cloth and wires. Turn your object into a stiff cloth object to have it collide with other cloth objects.
+
+== Useful cloth object parameters ==
+
+Stretch stiffness:
+    The resistance to stretching. Higher numbers mean the cloth is harder to stretch.
+
+Shear:
+    Resistance to shearing (forces along the plane of the cloth; if you stretched a square into a parallelogram that force would be shearing). This affects creasing where cloth is draped over a corner, as in a tablecloth on a table.
+ 
+Bend stiffness:
+    Increase this to make the cloth smoother/more resistant to wrinkles.
+
+== Useful Wire Object parameters ==
+
+- Click the __Physical__ tab to set the physical properties of the wire. The density and width affect the overall mass of the wire. The width also affects collisions. You can also set these (as well as per-point mass) through attributes on the source geometry.
+
+- The __Linear spring constant__ is the wire's resistance to stretching. Decrease this value to make the wire more stretchy.
+
+- The __Angular spring constant__ is the wire's resistance to bending. Decrease this value to make the wire looser, or increase it to make the wire more stiff.
+
+- To get a completely loose wire (like a rope or string), set __Angular spring constant__ to 0. However, when __Angular spring constant__ is 0, you must add an __Angular damping constant__ (such as `0.001`). If both __Angular spring constant__ and __Angular damping constant__ are `0`, the wire can go crazy.
+
+== Wire Object attributes ==
+
+See the [Icon:DOP/wireobject][Wire Object|Node:dop/wireobject] help for a list of [attributes|/model/attributes] used by wires.
+
+The wire solver uses the values of the attributes if they are present on the wire geometry, otherwise it uses the defaults defined by the parameters of the [Icon:DOP/wireobject][Wire Object|Node:dop/wireobject] node.
+
+Springs internal to the wire object resist any change in shape from the rest shape specified by __SOP Path__. The simulation will incorporate animation of the rest shape if __Use Deforming Geometry__ is enabled. If the __Initial Pose__ is different from __SOP Path__, the solvers considers the wire to be starting deformed.
+
+The wire solver automatically keeps the point position and the `v` (velocity) point attribute, `angvel` (angular velocity) attribute, and `orient` (orientation quaternion) attribute up to date.
+
+The wire solver averages the point attributes at either end of a line segment along the length of the segment. So, for attributes like width and mass, if the values at either end of a segment are different, the solver treats the segment like a tapered cylinder.
+
+[Image:/images/wire_attributes.png]
+
+== Cloth Tips ==
+
+* Simulate with simple proxy geometry that roughly approximates the shape of the animated geometry. It is generally not a good idea to let the cloth collide against high-resolution geometry because the cloth solver does collision detection against all the polygons in the animated geometry.
+
+* Increasing the damping of the cloth object more than 1% of the stiffness is usually a bad idea. The best way to calm down a simulation is to add a drag force.
+
+* If your animation moves fast, try simulating at a higher number of substeps.
+
+* Collision detection when two separate cloth objects collide, or when a cloth object collides with itself, is quite slow, and you should restructure your simulation to _avoid it whenever possible_.
+
+* It is very important that the _initial position_ of a cloth object must not have _any collisions_. If a cloth object starts with collisions, the solver cannot fix them.

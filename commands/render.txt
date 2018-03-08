@@ -1,0 +1,123 @@
+#type: hscript
+
+= render =
+
+"""Cause an output driver (ROP node) to render."""
+
+:usage: `render [-V] [-f <<start>> <<end>>] [-i <<inc>>] [-o <<filename>>] [-d <<format>>] [-R <<Xres>> <<Yres>>] [-r <<Xscale>> <<Yscale>>] [-q <<quality>>] [-s] [-I] [-b] [-l] [-k] [-p [-c] [-F]] <<output_name>> [<<output_name...>>]`
+
+This command renders an output driver and optionally any of its inputs.
+Inputs are recursively processed, unless -s is specified, so that all
+descendants are rendered in the proper order before the output node is
+rendered.
+
+The render command can be used with the -p option to show which frames
+would be rendered instead of rendering. An ordered list is printed out,
+showing the first frame(s) that would be rendered to the last, along
+with the ROPs rendering them. The output format is:
+
+{{{
+#!hscript
+order ROPname frame [frames...]
+}}}
+The 'order' is a number which can be used to sequence the renders
+properly. Entries with the same order can be rendered at the same time
+(in parallel).
+
+The ROPname is the name of the ROP to be rendered. If -F is specified,
+the full path to the ROP will be printed.
+
+The 'frame' entry can be printed multiple times, each representing a
+frame. If -c is specified, and more than one frame is rendered, the
+frame list will be condensed to a sequence representation, if possible
+(in the form "( start end step )").
+
+Upon success, this command will set the 'status' variable to 0. Otherwise,
+'status' is set to a non-zero value.
+
+@options
+    `-V`:
+        (Verbose) Print a message when each frame starts rendering.
+    `-f`:
+        Override the frame range to render. This range will be trimmed
+        to the ROP's frame range (if set). If 'Use Frame Range' is off,
+        this range will be used.
+    `-i`:
+        Override the frame increment to render. The ROP's frame
+        increment is ignored.
+    `-o`:
+        Override the file(s) or device to render to. The ROP's output
+        field is ignored.
+    `-d`:
+        Override the device name or image format to render to for ROPs
+        that support this feature. If rendering to a flipbook, see the
+        -k option.
+    `-k`:
+        Render to a flipbook for ROPs that support this feature. This
+        flag can be used instead of explicitly specifying the device to
+        use with the -d option.
+    `-R`:
+	Specifiy an exact resolution in X and Y.  This will override the `-r`
+	option.
+    `-r`:
+        Scale the output resolution in X and Y. Good for producing
+        faster renders or proxy images.
+    `-q`:
+        Sets the image quality for renderers. Values between 0 (low
+        quality) and 2 (normal quality) are used. This can be used to
+        speed up rendering.
+    `-s`:
+        Only render this ROP; do not render input ROPs. This option is
+        only valid when rendering ROPs in a dependency network.
+    `-I`:
+        Render ROPs frame by frame instead of ROP by ROP. If a sequence
+        is rendered, all ROPs will render the first frame, then the
+        second, etc. If -I is not specified, each ROP will render its
+        entire sequence before proceeding to the next ROP. This option
+        is only valid when rendering ROPs in a dependency network.
+    `-b`:
+        Ignore bypass flags; Render any bypassed ROPs.
+    `-l`:
+        Ignore lock flags; Render any locked ROPs and their children.
+    `-p`:
+        Print out what frames would be rendered. Does not render
+        anything. The output has the following format:
+
+        {{{
+        #!hscript
+        <<id>> [ <<dependencies>> ] <<node>> <<frames>>.
+        }}}
+        Where...
+
+        * <<id>> is a unique id for the line.
+
+        * <<dependencies>> is a list of lines (identified by their id)
+          that must be rendered before this line.
+
+        * <<node>> is the name of the node to be rendered. Can be the
+          full path to the node with the -F flag.
+
+        * <<frames>> is the list of frames to be rendered. This list can
+          depend on the -c and -I flags.
+
+    `-c`:
+        Condense frame lists into a sequence description ("( start end
+        step )") if possible. Only valid with the -p flag.
+    `-C`:
+        Consolidate frame lists from work items that are the same ROP and have
+        the same dependencies into one work item, where possible. This is an
+        optimization step for workstation renders. Farm renders should not use
+	this, as they need the extra parallism gained from separate work items.
+	Only valid with the -p flag; actual renders are always consolidated.
+    `-F`:
+        Print the full path to the ROP when printing a render list. Only
+        valid with the -p flag.
+    `-a`:
+        Outputs Alfred style progress when used in conjunction with the `-V` option.
+        For example:
+        {{{
+        #!hscript
+        render -Va mantra1
+        render -V -a dop1
+        }}}
+

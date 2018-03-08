@@ -1,0 +1,98 @@
+#context: dop
+#internal: gassubstep
+#icon: DOP/gas
+
+= Gas SubStep =
+
+"""A microsolver that substeps input microsolvers."""
+
+The Gas SubStep DOP is a microsolver used in building larger fluid simulations. The [Fluid Solver|Node:dop/fluidsolver] and [Smoke Solver|Node:dop/smokesolver] DOPs that allow
+microsolvers to be added before or after the main solver step to extend or tweak the simulation. Alternatively, enterprising people may attempt to build an entire new solver out of microsolvers.
+
+The Gas SubStep DOP will execute each solver wired into it in turn, from left input to right input.  It will also substep, ie, repeatedly execute the input solvers with successive substeps until the full
+timestep is performed.  The parameters allow one to control how this substepping is performed, include computing it from the state of the geometry.
+
+The distribution options allow multiple slices to synchronize their substepping.  This is required if the different slices are going to exchange data during a substep.  If they attempted to run a different
+number of timesteps, due to perhaps seeing different velocity fields, they would desynchronize.
+
+@parameters
+    Primary Solver:
+        #channels: /primarysolver
+
+        Specifies which sub-solver to use when other solvers make
+        queries about the objects to which this solver is applied. This
+        includes information such as what collision method to use, the
+        mass of the object, or physical properties like friction. 
+
+	This
+        value should be set to point to the sub-solver that best
+        represents how other objects in the scene should react to these
+        objects.
+
+    Velocity Field:
+	The vector field to use for computing the substep size.  The
+	maximum direction along each axis is compared with the voxel
+	size to determine how many voxels per second the velocity
+	field is moving.  This can then be used to compute what step
+	size is needed to prevent more than CFL voxels from being
+	moved in a single substep.
+
+    Geometry:
+	The geometry to use for computing substep of particle
+	simulations.  The pscale attribute of the particle is used to
+	determine the effective size and is compared against the v
+	velocity attribute.  The substep size is to prevent the
+	particle from moving more than CFL of its lengths in a
+	substep.
+
+    Min Substeps:
+	Lower bound on the substep size, at least this number of
+	substeps will be performed.  This is useful when strong forces
+	or sources will require substepping that doesn't show up in
+	the velocity field.
+
+    Max Substeps:
+	The maximum number of substeps.  No more than this number will
+	be performed.
+
+    CFL Condition:
+	Controls the automatic computation of substepping.  The idea
+	is that if one steps more than a single voxel, one risks
+	losing the intermediate data.  A CFL condition of 1 means that
+	the timestep will be reduced so that a particle moving at the
+	maximum velocity of the velocity field will move only 1 voxel
+	in a timestep.  A CFL of 2 will allow it to move 2 voxels in a
+	timestep.
+
+    Evaluate CFL Once Per Solve:
+	Only evaluate the __CFL Condition__ once at the beginning of the
+	timestep.  Enabling this option avoids testing the velocity for each substep;
+	however, then the solver can not detect significant velocity changes within the frame.
+
+    Quantize to Max Substeps:
+	Alway use substeps that divide up the frame by __Max Substeps__.  For example,
+	if __Max Substeps__ is set to 4, but the __CFL Condition__ only requires 3 substeps,
+	the solver will take frame steps of 0.25, 0.5, and 0.25.  This option can be useful for
+	re-using input geometry that has been cached to file at increments of 1/__Max Substeps__.
+
+    [Include:standard_distribution]
+
+    Create Substep Data:
+	Pre-create substep information for all affector objects.  Some old
+	solvers required this information to operate properly.  
+	
+	NOTE:
+	    These objects are always deleted after solving a frame, so they are never visible to Houdini.
+
+    [Include:standard_solver_parms]
+@inputs
+    [Include:standard_data_inputs]
+
+@outputs
+    [Include:standard_data_outputs]
+
+@locals
+    [Include:standard_data_locals]
+
+    [Include:standard_locals]
+

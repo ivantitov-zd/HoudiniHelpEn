@@ -1,0 +1,295 @@
+= Geometry attributes =
+
+"""Describes how Houdini represents geometry using details, primitives, points, vertices, and attributes."""
+
+== Attributes ==
+
+_Attributes_ are named values stored on vertices, points, primitives, and objects. Point color, position, [UV coordinates|/shade/textures] , spline weight (`W`), and normal, for example, are stored as point attributes.
+
+* Houdini sets some point attributes that you can use in expressions. For example, you could set the per-point color based on the vertical position (`PY`) of the point.
+
+* Certain attributes you can set manually and if they're present they will be used by Houdini. For example, the dynamics solvers and rendering engines will often use certain attributes on the geometry if they exist.
+
+* You can also set your own custom attributes to be used by your node expressions, scripts, exporters, and so on.
+
+The surface nodes in the Attributes group of the tab menu set different types of attributes. You can also set or create arbitrary attributes using the [Attribute SOP|Node:sop/attribute].
+
+To see the attributes on the geometry in a node, press ((RMB)) on the node's tile in the network editor and choose __Spreadsheet__ to open the [geometry spreadsheet|/ref/panes/geosheet] for the node.
+
+[Particles|/particles]  also have attributes, and attributes are very important when geometry and particle systems interact. For example, particles [emitted|/particles/emit] from geometry inherit (by default) the attributes of the point from which they are emitted, and you can create interesting effects by transferring attributes between surfaces and particles using the [Attribute Transfer POP|Node:pop/attribtransfer].
+
+
+== Geometry components ==
+
+You can create/set attributes using the generic [Attribute Create|Node:sop/attribcreate] surface node, or the [Vertex|Node:sop/vertex], [Point|Node:sop/point], [Primitive|Node:sop/primitive] nodes. You can attach attributes to vertices, points, primitives (e.g. polygon faces), or the entire piece of geometry (called the "detail" level).
+
+[Image:images/geo_detail.png]
+
+NOTE:
+    When you merge two or more branches in a geometry network, if a detail attribute with the same name exists in multiple branches, Houdini uses the value in the first branch. If the attribute is a string array, Houdini merges the arrays.
+
+
+== Attribute precedence ==
+
+When two components in the same geometry have an attribute with the same name, the attribute on the "lower level" of geometry is used, so:
+
+* *Vertex* attributes override
+
+    * *Point* attributes override
+
+        * *Primitive* attributes override
+
+            * *Detail* (whole geometry) attributes
+
+
+== Applying nodes to components based on attribute values ==
+
+Most surface nodes have a __Group__ field that lets you enter a named group or a pattern to select which components the node should apply to. This field recognizes special syntax that lets you select components by the value of an attribute. For example, in a [Point node|Node:sop/point]'s __Group__ field, `@foo>5` selects all points whose `foo` attribute is greater than `5`.
+
+See the section on [manually specifying groups|groups#manual] for more information.
+
+
+== Intrinsic attributes == (intrinsic)
+
+_Intrinsic attributes_ are _computed values_ derived from the geometry that you can access as if they were attributes. For example:
+
+:box: Examples of intrinsic attributes
+    Detail |
+        `intrinsic:pointcount` |
+            Number of points in the geometry
+
+    Detail/primitive |
+        `intrinsic:bounds` |
+            Bounding box of the geometry
+
+    Primitive |
+        `intrinsic:measuredarea` |
+            Surface area of the geometry.
+
+    Primitive |
+        `intrinsic:memoryusage` |
+            Amount of memory used by the primitive.
+
+:task: See what intrinsic attributes are available:
+
+    * The command line utility `ginfo -I` prints a list of all known intrinsic attributes.
+    
+    * You can show intrinsic attributes in the [geometry spreadsheet|/ref/panes/geosheet]. By default they are not shown.
+
+        If you are viewing geometry at a component level that has intrinsic attributes, you can use the __Intrinsics__ menu to show all intrinsics or choose which intrinsics to show in the spreadsheet.
+    
+    * The [Inspect tool|/basics/inspection] can show which intrinsic attributes are available on the inspected geometry.
+    
+:task: Use intrinsic attributes:
+    * In HScript expressions and VEX, use the attribute functions to read intrinsic attributes in expressions and VEX, for example:
+
+        {{{
+        #!expr
+        prim("../volume1", 0, "intrinsic:bounds", 0)
+        }}}
+    
+        (You can't use the `@` attribute shortcut to read an intrinsic in VEX wrangle snippets. However, you can use [Vex:primintrinsic] and [Vex:detailintrinisc] to read the intrinsic directly instead of using the `intrinsic:` prefix magic.)
+
+    * In Python, you can access intrinsic attributes using [Hom:hou.Geometry#intrinsicNames], [.intrinsicValue()|Hom:hou.Geometry#intrinsicValue], and [.intrinsicValueDict()|Hom:hou.Geometry#intrinsicValueDict].
+
+    * In the [group syntax|groups#manual], you can group based on intrinsic values. For example, `@intrinsic:indexorder<100`
+
+TIP:
+    Despite the name, some "intrinsic" attributes can actually be written to, causing Houdini or Mantra to change some internal setting. For example, you can set the `intrinsic:unexpandedfilename` intrinsic attribute on a packed primitive.
+
+
+== Higher and lower precision storage ==
+
+You can choose the numeric precision of attributes you create with the [Attribute Create node|Node:sop/attribcreate], and/or convert attributes to higher precision types (at the cost of more memory) or lower precision types (to save memory) using the [Attrib Cast surface node|Node:sop/attribcast].
+
+See [the help for Attrib Cast|Node:sop/attribcast] for information on the available storage types and limitations.
+
+
+@attributes Common attributes
+
+The following attributes are commonly set by Houdini and/or used by Houdini if set by the user.
+
+== Geometry ==
+
+`P`:
+    #type: vec3
+    #on: point
+    #default: (0,0,0)
+    
+    Point position. The viewport uses this to lay out the points of the model in 3D space.
+
+`N`:
+    #type: vec3
+    
+    Surface or curve normal direction. Houdini will compute the normal if this attribute does not exist.
+
+`v`:
+    #type: vec3
+    
+    Velocity (used for rendering blur).
+
+`uv`:
+    #type: vec3
+    #on: point, vertex
+    
+    UV coordinates for this point/vertex.
+
+`lod`:
+    #type: float
+    #on: detail, prim
+    
+    Level of detail.
+
+`rest`:
+    #type: vec3
+    #on: point
+    
+    Rest position of this point.
+
+
+== Shading ==
+
+`shop_materialpath`:
+    #type: string
+    #on: detail, prim
+    
+    The path to a material to use to shade the surface when rendering. Overrides the object's material is present on primitives.
+
+`shop_oglpath`:
+    #type: string
+    
+    The path to an OpenGL shader to use to shade the surface in the viewport.
+
+`rishade`:
+    #type: string
+    #on: detail, prim
+    
+    Detail/primitive. The name of a RenderMan shader.
+
+
+== Shader overrides ==
+
+Most shaders will use the override attributes to change how elements with the attributes are shaded.
+
+`Cd`:
+    #type: vec3
+    
+    Diffuse color override. The viewport uses this to color OpenGL geometry.
+
+`Alpha`:
+    #type: float
+    
+    Alpha transparency override. The viewport uses this to set the alpha of OpenGL geometry.
+
+`Cs`:
+    #type: vec3
+    
+    Specular color override.
+
+`Cr`:
+    #type: vec3
+    
+    Reflect color override.
+
+`Ct`:
+    #type: vec3
+    
+    Transmit color override.
+
+`Ce`:
+    #type: vec3
+    
+    Emission color override.
+
+`rough`:
+    #type: float
+
+    Roughness override.
+
+`fresnel`:
+    #type: float
+    
+    Fresnel coefficient override.
+
+`shadow`:
+    #type: float
+    
+    Shadow intensity override.
+
+`sbias`:
+    #type: float
+    
+    Shadow bias override.
+
+
+== Point and line display ==
+
+The viewport uses the `pscale` attribute to scale sprites and points. The __Disc scale__ display options lets you further scale discs.
+
+`spriteshop`:
+    #type: string
+    #on: point
+    
+    Path to a material node for shading sprites.
+
+`spritescale`:
+    #type: vec3
+    #default: (1, 1, 1)
+    #on: point
+    
+    Additional sprite scaling.
+
+`spriterot`:
+    #type: float
+    #default: 0
+    #on: point
+    
+    Sprite rotation (around camera angle) in degrees.
+
+`width`:
+    #type: float
+    #on: point
+    
+    Line width (in world space units), for drawing open curves. If this attribute does not exist, the curve is drawn as a thin line instead of as a ribbon with thickness.
+
+
+== Viewport ==
+
+`gl_wireframe`:
+    #type: int
+    #default: 0
+    #on: detail
+    
+    If this detail attribute is 1, the geometry always appears as wireframe in the viewport.
+
+    If this detail attribute is -1, the geometry always appears as shaded in the viewport.
+
+`gl_lit`:
+    #type: int
+    #default: 0
+    #on: detail
+    
+    If this detail attribute is not 0, the geometry always appears without lighting.
+
+`gl_showallpoints`:
+    #type: int
+    #default: 0
+    #on: detail
+
+    If this detail attribute is not 0, all points will be rendered as sprites, even if they are connected to geometry.  Normally only unconnected points are rendered.
+
+`vm_cuspangle`:
+    #type: float
+    #default: 60
+    #on: detail
+
+    Controls the cusp angle used for generating normals when the geometry doesn't have any.  180 will produce entirely smooth point normals.
+
+
+@related
+
+:: [/dopparticles/attributes]
+:: [/crowds/attributes]
+
+
+

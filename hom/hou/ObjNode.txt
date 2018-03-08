@@ -1,0 +1,605 @@
+= hou.ObjNode =
+
+#type: homclass
+#cppname: HOM_ObjNode
+#superclass: hou.Node
+#group: obj
+
+"""An instance of an object node in the Houdini scene."""
+
+Each object has a "transformation" (or "transform") encapsulating its position (or "translation"), rotation, and scale. For a subnet object, the subnet's transform is applied to the objects inside the subnet. An object can have additional transforms from parent objects on top of the transform defined by its parameters, as well as a normally hidden [pretransform|/basics/objects#pretransform] that defines the object's "rest" or "zero" position (normally all zeros). An object's final position/rotation/scale in world space is defined by `(object's transform) * (pretransform) * (parent transform)`.
+
+TIP:
+    You can set an object's position/rotation/scale to certain world space values regardless of parent/pre-transform values with the [Hom:hou.ObjNode#setWorldTransform] method.
+
+NOTE:
+    Houdini does not support shear parameters on objects. If you try to set an object's parameters to a transform containing shear, Houdini will automatically remove the shear.
+
+@methods
+
+== Transforms ==
+
+::`origin(self)` -> [Hom:hou.Vector3]:
+    #cppname: HOM_ObjNode::origin
+    #replaces: Exp:origin
+    Return the object's origin position, in world space.
+
+    `obj.origin()` is equivalent to
+    `obj.Vector3(0, 0, 0) * obj.worldTransform()`.
+
+    {{{
+    #!python
+    # To compute the world space vector from obj1's origin to obj2's origin, you
+    # can write:
+    obj2.origin() - obj1.origin()
+
+    # To compute the distance, in world space, between the origins of two
+    # objects, simply take the length of this vector:
+    (obj2.origin() - obj1.origin()).length()
+
+    # If there are no rotations or scales, the vtorigin() hscript expression
+    # function will return the same result as obj2.origin() - obj1.origin().
+    # If there are rotations or scales, though, it won't.  A Python equivalent
+    # of vtorigin() is defined by:
+    def vtorigin(obj1, obj2):
+        return (obj2.worldTransform() * obj1.worldTransform().inverted()).extractTranslates()
+    }}}
+
+    See also the [Hom:hou.ObjNode#worldTransform] and
+    [Hom:hou.ObjNode#getTransformToNode] methods.
+
+::`localTransform(self)` -> [Hom:hou.Matrix4]:
+    #cppname: HOM_ObjNode::localTransform
+    Return the matrix that transforms this object's geometry into space of its
+    input.
+
+    The local transform matrix contains the cumulative transforms of:
+    - The node's pre-transform
+    - The transform defined by the node's transform parameters
+    - The transform adjustment by the node's lookat and path parameters
+
+    The local transform matrix, independent of the node's pre-transform, can be
+    obtained as follows:
+    {{{
+    #!python
+    def localTransformIgnorePreTransform(self):
+    return (self.localTransform() * self.preTransform().inverted())
+    }}}
+
+    See also [Hom:hou.ObjNode#localTransformAtTime] and
+    [Hom:hou.ObjNode#worldTransform].
+
+::`localTransformAtTime(self, time)` -> [Hom:hou.Matrix4]:
+    #cppname: HOM_ObjNode::localTransformAtTime
+    Return, for the specified time, the matrix that transforms this object's
+    geometry into the space of its input.
+
+    If the object's local transform is animated, this method provides a way
+    to get the transformation at a specific time.
+
+    See [Hom:hou.ObjNode#localTransform] for more information.
+
+::`worldTransform(self)` -> [Hom:hou.Matrix4]:
+    #cppname: HOM_ObjNode::worldTransform
+    #replaces: Exp:optransform
+    Return the matrix that transforms this object's geometry into world space.
+
+    The world transform matrix contains the cumulative transforms of:
+    - The node's pre-transform
+    - The transform defined by the node's parameters
+    - The transforms of parent nodes or containing networks
+
+    This method can approximately be implemented as follows:
+    {{{
+    def worldTransform(self):
+    return (self.localTransform() * self.parentAndSubnetTransform())
+    }}}
+
+    See also [Hom:hou.ObjNode#setWorldTransform] and
+    [Hom:hou.ObjNode#worldTransformAtTime].
+
+::`worldTransformAtTime(self, time)` -> [Hom:hou.Matrix4]:
+    #cppname: HOM_ObjNode::worldTransformAtTime
+    Return, for the specified time, the matrix that transforms this object's
+    geometry into world space.
+
+    If the object's world transform is animated, this method provides a way
+    to get the transformation at a specific time.
+
+    See [Hom:hou.ObjNode#worldTransform] for more information.
+
+::`setWorldTransform(self, matrix, fail_on_locked_parms=False)`:
+    #cppname: HOM_ObjNode::setWorldTransform
+    Adjust this object's parameters to achieve the desired world transformation.
+
+    This method will adjust the translate, rotate, and scale values of this
+    object to achieve the desired final world transform.  It accounts
+    for the transforms of containing networks, parent transforms, and
+    pre-transforms.
+
+    If `fail_on_locked_parms` is `True`, and any of the translate, rotate, or
+    scale parameters of the object are locked, this method raises
+    [Hom:hou.OperationFailed].  If it is `False` and any of those parameters
+    are locked, this method will change their values but leave them locked.
+
+    Suppose:
+    - `W` is the desired new world transform,
+    - `W'` is the existing world transform,
+    - `L` is the desired transform defined by the node's parameters,
+    - `L'` is the existing parm transform,
+    - `P` is the object's pre-transform,
+    - `O` is the parent transform combined with the containing subnet's,
+      transform
+
+    Then, since `W = L * P * O` we have `P = W * O^ * R^`.  So, this method
+    could be implemented as follows:
+    {{{
+    #!python
+    def setWorldTransform(self):
+    self.setParmTransform(
+        matrix * self.parentAndSubnetTransform().inverted() * self.preTransform().inverted(),
+        fail_on_locked_parms)
+    }}}
+
+    Alternately, we can derive L from W' and L' as follows:
+    - `W' = L' * P * O`
+    - so `P * O = L^' * W'`
+    - and `(P * O)^ = W^' * L'`
+    and
+    - `W = L * P * O`
+    - so `L = W * (P * O)^`
+    - giving `L = W * W'^ * L'`
+
+    Thus, this method could also be implemented using the current world and
+    parm transforms as follows:
+    {{{
+    #!python
+    def setWorldTransform(self):
+    self.setParmTransform(
+        matrix * self.worldTransform().inverted() * self.parmTransform(),
+        fail_on_locked_parms)
+    }}}
+
+    Note that, because parm transforms cannot contain shears, it is possible
+    that the resulting world transform will not match the desired transform.
+    If `r` is a function that removes shears from a transform then the new
+    world transform will actually be `L * P * O = r(W * O^ * P^) * P * O`.
+
+    See also [Hom:hou.ObjNode#worldTransform] and
+    [Hom:hou.ObjNode#setParmTransform].
+
+::`parmTransform(self)` -> [Hom:hou.Matrix4]:
+    #cppname: HOM_ObjNode::parmTransform
+    Return the transform defined by the parameters on this node.
+
+    This method can approximately be implemented as follows:
+    {{{
+    #!python
+    def parmTransform(self):
+    pivot_transform = hou.hmath.buildTranslate(self.evalParmTuple("p"))
+    return (
+        pivot_transform.inverted() *
+        hou.hmath.buildTransform({
+            "translate": self.evalParmTuple("t"),
+            "rotate": self.evalParmTuple("r"),
+            "scale": [self.evalParm("scale") * s
+            for s in self.evalParmTuple("s")],
+            "shear": (0.0, 0.0, 0.0)},
+        transform_order=self.parm("xOrd").evalAsString(),
+        rotate_order=self.parm("rOrd").evalAsString()) *
+        pivot_transform)
+    }}}
+
+    See the class documentation for the relation between this transform
+    and the world space transform.  See also [Hom:hou.ObjNode#worldTransform].
+
+    NOTE:
+    For Python Objects, the python code sets the parm transform as well and
+    won't necessarily have any visible parameters. To get the local transform
+    of an object (ie. the transform without any parenting), use
+    [Hom:hou.ObjNode#localTransform].
+
+::`setParmTransform(self, matrix, fail_on_locked_parms=False)`:
+    #cppname: HOM_ObjNode::setParmTransform
+    Sets the transform controlled by this object's parameters.
+
+    This method will adjust the translate, rotate, and scale values of this
+    object to achieve the desired parameter, or local, transform.  It will
+    account for the existing pivot position, transformation order, and
+    rotation order, and will leave them unchanged.
+
+    Note that object nodes do not currently have shears parameters, so any
+    shears in the matrix will be discarded.
+
+    If `fail_on_locked_parms` is `True`, and any of the translate, rotate, or
+    scale parameters of the object are locked, this method will raise
+    hou.OperationFailed.  If it is `False` and any of those parameters are
+    locked, this method will change their values but leave them locked.
+
+    See also [Hom:hou.ObjNode#parmTransform] and
+    [Hom:hou.ObjNode#setWorldTransform].
+
+    This method can be approximately implemented as follows, ignoring locked
+    parameters:
+    {{{
+    #!python
+    def setParmTransform(self, matrix):
+    parm_values = matrix.explode(
+        transform_order=self.parm('xOrd').evalAsString(),
+        rotate_order=self.parm('rOrd').evalAsString(),
+        pivot=hou.Vector3(self.evalParmTuple('p')))
+
+    for parm_name, key in ('t', 'translate'), ('r', 'rotate'), ('s', 'scale'):
+        self.parmTuple(parm_name).set(parm_values[key])
+    }}}
+
+    See also [Hom:hou.Matrix4#explode].
+
+::`parentAndSubnetTransform(self)` -> [Hom:hou.Matrix4]:
+    #cppname: HOM_ObjNode::parentAndSubnetTransform
+    Return the input node's world space transform (if there is an input
+    connected), combined with the world space transform of the containing
+    subnet object (if there is one).  See the class documentation for more
+    information.
+
+    This method can approximately be implemented as follows:
+    {{{
+    #!python
+    def parentAndSubnetTransform(self):
+    if len(self.inputConnectors()[0]) != 0:
+        return self.inputs()[0].worldTransform()
+
+    containing_subnet = self.parent()
+    if containing_subnet.type().category() == hou.objNodeTypeCategory():
+        return containing_subnet.worldTransform()
+
+    return hou.hmath.identityMatrix()
+    }}}
+
+== Pre-transform ==
+
+::`preTransform(self)` -> [Hom:hou.Matrix4]:
+    #cppname: HOM_ObjNode::preTransform
+    #replaces: Cmd:objpretransform, Exp:objpretransform
+    Return this object's pretransform.
+
+    The pre-transform allows you to apply a transform after the parameter
+    transform but before input and containing object transforms.  See the
+    class documentation for more details.
+
+    Unlike the parameter transform, the pretransform is not stored using
+    any parameters on the node.  Instead, Houdini stores the pretransform
+    as a matrix.  Because it is directly as a matrix, the pretransform may
+    contain shears.
+
+::`setPreTransform(self, matrix)`:
+    #cppname: HOM_ObjNode::setPreTransform
+    #replaces: Cmd:objpretransform, Cmd:objresetpretransform
+    Set this object's pretransform.  See [Hom:hou.ObjNode#preTransform] for
+    more information.
+
+::`moveParmRotateIntoPreTransform(self)`:
+    #cppname: HOM_ObjNode::moveParmRotateIntoPreTransform
+    #replaces: Cmd:objcleantransform
+    Set this object's rotate values to zero and adjust the pre-transform so
+    that the object's world transform does not change.
+
+    Suppose:
+    - `W` is the world transform,
+    - `L` is the parameter transform without any rotate component,
+    - `L'` is the existing parm transform,
+    - `P` is the desired new pre-transform,
+    - `P'` is the current pre-transform,
+    - `O` is the parent transform combined with the containing subnet's,
+      transform
+
+    Then,
+    - `W = L * P * O` and `W = L' * P' * O`
+    - `L * P = L' * P'`
+    - `P = L^ * L' * P'`
+    So, this method is implemented approximately as follows:
+    {{{
+    #!python
+    def moveParmRotateIntoPreTransform(self):
+    old_parm_transform = self.parmTransform()
+    self.parmTuple("r").set((0.0, 0.0, 0.0))
+    self.setPreTransform(
+        self.parmTransform() * old_parm_transform * self.preTransform())
+    }}}
+
+    See also [Hom:hou.ObjNode#preTransform] and the class documentation.
+
+::`moveParmScaleIntoPreTransform(self)`:
+    #cppname: HOM_ObjNode::moveParmScaleIntoPreTransform
+    #replaces: Cmd:objcleantransform
+    Set this object's scale values to one and adjust the pre-transform so
+    that the world transform does not change.
+
+    See [Hom:hou.ObjNode#moveParmRotateIntoPreTransform] for more information.
+
+::`moveParmTranslateIntoPreTransform(self)`:
+    #cppname: HOM_ObjNode::moveParmTranslateIntoPreTransform
+    #replaces: Cmd:objcleantransform
+    Set this object's translate values to zero and adjust the pre-transform so
+    that the world transform does not change.
+
+    See [Hom:hou.ObjNode#moveParmRotateIntoPreTransform] for more information.
+
+::`moveParmTransformIntoPreTransform(self)`:
+    #cppname: HOM_ObjNode::moveParmTransformIntoPreTransform
+    #replaces: Cmd:objcleantransform
+    Set this object's parm transform to the identity and adjust the
+    pre-transform so that the world transform does not change.
+
+    This method is implemented approximately as follows:
+    {{{
+    #!python
+    def moveParmTransformIntoPreTransform(self):
+    self.setPreTransform(self.parmTransform() * self.preTransform())
+    self.setParmTransform(hou.hmath.identityTransform())
+    }}}
+
+    See also [Hom:hou.ObjNode#moveParmRotateIntoPreTransform],
+    [Hom:hou.ObjNode#moveParmScaleIntoPreTransform], and
+    [Hom:hou.ObjNode#moveParmTranslateIntoPreTransform].  Also see
+    [Hom:hou.ObjNode#movePreTransformIntoParmTransform].
+
+::`movePreTransformIntoParmTransform(self)`:
+    #cppname: HOM_ObjNode::movePreTransformIntoParmTransform
+    #replaces: Cmd:objextractpretransform
+    Set this object's pre-transform to the identity and adjust the parm
+    transform so that the world transform does not change.
+
+    This method is implemented approximately as follows:
+    {{{
+    #!python
+    def movePreTransformIntoParmTransform(self):
+    self.setParmTransform(self.parmTransform() * self.preTransform())
+    self.setPreTransform(hou.hmath.identityTransform())
+    }}}
+
+    See also [Hom:hou.ObjNode#movePreTransformIntoParmTransform].
+
+== Transforming relative to other nodes ==
+
+::`getTransformToNode(self, obj_node)` -> [Hom:hou.Matrix4]:
+    #cppname: HOM_ObjNode::getTransformToNode
+    #replaces: Exp:vorigin, Exp:vrorigin, Exp:vtorigin
+
+    Return a matrix that transforms this node to line up with the
+    other node.
+
+    The following invariant is true: `node1.worldTransform() *
+    node1.getTransformToNode(node2) == node2.worldTransform()`.
+
+    This method can be implemented as follows:
+    {{{
+    #!python
+    def getTransformToNode(self, obj_node):
+    self.worldTransform().inverted() * obj_node.worldTransform()
+    }}}
+
+    To align node1 (an ObjNode object) with node2 (another ObjNode object),
+    you don't need to use `getTransformToNode()`. You can simply write:
+    `node1.setWorldTransform(node2.worldTransform())`.
+
+    See also [Hom:hou.ObjNode#origin()], [Hom:hou.ObjNode#worldTransform()],
+    and [Hom:hou.ObjNode#setWorldTransform()].
+
+::`getTransformFromPointToPoint(self, pos3, other_node, other_pos3)` -> [Hom:hou.Matrix4]:
+    #cppname: HOM_ObjNode::getTransformFromPointToPoint
+    #replaces: Exp:originoffset
+    Return the transform matrix that rotates the point pos3 (in this
+    object node's transform space) to the point other_pos3 (in another
+    object node's transform space).
+
+    {{{
+    #!python
+    obj1.getTransformFromPointToPoint(pos1, obj2, pos2)
+    }}}
+
+    ...is equivalent to...
+
+    {{{
+    #!python
+    (obj1.worldTransform().inverted() *
+        hou.hmath.buildTranslate(-pos1) *
+        hou.hmath.buildTranslate(pos2) *
+        obj2.worldTransform())
+    }}}
+
+    See also the [Hom:hou.ObjNode#getTransformToNode] and
+    [Hom:hou.ObjNode#worldTransform] methods, and the functions in the
+    [Hom:hou.hmath] module.
+
+::`buildLookatRotation(self, to_node, up_vector=None)` -> [Hom:hou.Matrix4]:
+    #cppname: HOM_ObjNode::buildLookatRotation
+    #replaces: Exp:mlookat, Exp:mobjlookat
+    Return a matrix that will rotate this object to look at the specified
+    object.
+
+    The returned [Hom:hou.Matrix4] object transforms this object from
+    its current position in world space so that its negative z axis points at
+    the origin of the `to_node` object.
+
+    `up_vector` can either be a [Hom:hou.Vector3] object or None.  If it is
+    None, this method uses an up vector of hou.Vector3(0, 1, 0).
+
+    You can extract the rotation values from the return value with
+    [Hom:hou.Matrix4#extractRotates].  You can set an object's transform
+    with [Hom:hou.ObjNode#setWorldTransform].
+
+    {{{
+    #!python
+    # Set the cam1 object's transform so it points at geo1.
+    cam1 = hou.node("/obj/cam1")
+    lookat_obj = hou.node("/obj/geo1")
+    cam1.setWorldTransform(cam1.buildLookatRotation(lookat_obj))
+    }}}
+
+    See also [Hom:hou.ObjNode#setWorldTransform].
+
+::`setInputAndNeverKeepPosition(self, input_index, node_to_become_input, output_index=0)`:
+    #cppname: HOM_ObjNode::setInputAndNeverKeepPosition
+    #replaces: Cmd:opwire
+    #status: ni
+
+== Geometry ==
+
+::`combine(self, nodes)`:
+    #cppname: HOM_ObjNode::combine
+    Combine the geometry from the given list of hou.ObjNode's into this object.
+    After this operation, the old objects will be deleted.
+
+    Raises [Hom:hou.ObjectWasDeleted] if any of the nodes no longer exist in
+    Houdini.  Raises `TypeError` if any of the nodes are not of type
+    hou.ObjNode.  These exceptions are raised prior to performing the combine
+    operation to avoid partial results.
+
+::`displayNode(self)` -> [Hom:hou.Node] or `None`:
+    #cppname: HOM_ObjNode::displayNode
+    If this object contains SOPs or DOPs, return the one that has its display
+    flag on.  Otherwise, return None.
+
+::`renderNode(self)` -> [Hom:hou.Node] or `None`:
+    #cppname: HOM_ObjNode::renderNode
+    If this object contains SOPs or DOPs, return the one that has its render
+    flag on.  Otherwise, return None.
+
+== Flags ==
+
+::`isObjectDisplayed(self)` -> bool:
+    #cppname: HOM_ObjNode::isObjectDisplayed
+    Return whether or not this object is displayed.  This method takes into
+    account both the display flag and the `display` parameter.  If the
+    `display` parameter is enabled, because the `tdisplay` parameter is set,
+    this parameter overrides the flag.
+
+    See also [Hom:hou.ObjNode#isDisplayFlagSet], which returns the current
+    state of the flag.
+
+::`isDisplayFlagSet(self)` -> `bool`:
+    #cppname: HOM_ObjNode::isDisplayFlagSet
+    #replaces: Cmd:opget, Exp:opflag
+    Return whether or not this object's display flag is turned on.  Note that
+    the display flag and the `display` parameter both determine whether the
+    object is actually displayed.
+
+    Use [Hom:hou.ObjNode#isObjectDisplayed] to determine if the object is
+    actually displayed.
+
+::`setDisplayFlag(self, on)`:
+    #cppname: HOM_ObjNode::setDisplayFlag
+    #replaces: Cmd:opset
+    Turn the object's display flag on or off.  See also
+    [Hom:hou.ObjNode#isDisplayFlagSet].
+
+::`isSelectableInViewport(self)` -> bool:
+    #cppname: HOM_ObjNode::isSelectableInViewport
+    #replaces: Cmd:opget, Exp:opflag
+    Return whether or not the selectable flag is set.  When it is not set, it
+    is not possible to select this object or any of its geometry interactively
+    in the viewport.
+
+::`setSelectableInViewport(self, on)`:
+    #cppname: HOM_ObjNode::setSelectableInViewport
+    #replaces: Cmd:opset
+    Set the object's selectable flag.  See
+    [Hom:hou.ObjNode#isSelectableInViewport] for more information.
+
+::`isShowingOrigin(self)` -> bool:
+    #cppname: HOM_ObjNode::isShowingOrigin
+    #replaces: Cmd:opget, Exp:opflag
+    Return whether or not this object displays its local origin gnomon in the
+    viewport.
+
+    Note that you can change this setting by right-clicking on the node.
+
+::`showOrigin(self, on)`:
+    #cppname: HOM_ObjNode::showOrigin
+    #replaces: Cmd:opset
+    Show or hide this object's local origin gnomon in the viewport.  See also
+    [Hom:hou.ObjNode#isShowingOrigin].
+
+::`isUsingXray(self)` -> bool:
+    #cppname: HOM_ObjNode::isUsingXray
+    #replaces: Cmd:opget, Exp:opflag
+    Return whether or not this object displays its geometry in xray mode.
+    Houdini displays xrayed geometry in wireframe and makes it visible even
+    when it is hidden behind another surface.
+
+    Note that you can change this setting by right-clicking on the node.
+
+::`useXray(self, on)`:
+    #cppname: HOM_ObjNode::useXray
+    #replaces: Cmd:opset
+    Turn this object's xray mode on or off.  See also
+    [Hom:hou.ObjNode#isUsingXray].
+
+== Shading ==
+
+::`material(self, operation, parameter)`:
+    #cppname: HOM_ObjNode::material
+    #replaces: Cmd:objmaterial
+    
+    Manages object-local overrides of material parameters. This is basically the scripting equivalent of the __Material Override__ menu in the parameter editor for objects. It allows you to create parameters on an object that override the equivalent values on the object's material.
+    
+    The `operation` argument should be one of the following strings:
+    
+    `"override"`:
+        Create parameters on the object to override _all_ material parameters.
+    
+    `"select"`:
+        Select and create object parameters to override material parameters.
+    
+    `"remove"`:
+        Removes _all_ object parameter overrides.
+    
+    `"rmdefault"`:
+        Removes any unchanged object parameters (that is, that are currently set to their default value).
+    
+    `"sync"`:
+        Synchronize the object parameter overrides with the parameter definitions on the material.
+    
+    `"revert"`:
+        Revert any parameter overrides on the object to their values on the material.
+    
+    `"addlist"`:
+        (Followed by a second argument containing a list of parameter names strings.) Creates object parameters to override the named parameters on the material.
+    
+    {{{
+    #!python
+    
+    myobject = hou.node("/obj/obj1")
+    
+    # Add all material overrides
+    myobject.material("override")
+    
+    # Remove all material overrides
+    myobject.material("remove")
+    
+    # Add specific overrides for "baseColor" and "roughness" parameters
+    myobject.material("addlist", ["baseColor", "roughness"])
+    }}}
+    
+== Python objects ==
+
+::`setCookTransform(self, matrix)`:
+    #cppname: HOM_ObjNode::setCookTransform
+    Set the parameter transform for the Python object that's cooking.  Call
+    this method from objects implemented in Python to set the result of the
+    cook.
+
+    Note that an object implemented in Python controls the parameter transform
+    (i.e. the result of [Hom:hou.ObjNode#parmTransform]).  The world transform
+    (i.e. the result of [Hom:hou.ObjNode#worldTransform]) is still affected by
+    parent node's transforms, pre-transforms, etc.
+
+    This method raises [Hom:hou.OperationFailed] if you call it on an object
+    that is not implemented in Python or if you call it from outside that
+    object's Python cook code.
+
+    See the [Transforms from Disk|/hom/cookbook/xforms_from_disk] example.
+
+
+

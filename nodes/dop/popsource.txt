@@ -1,0 +1,138 @@
+#type: node
+#context: dop
+#internal: popsource
+#icon: POP/source
+
+= POP Source =
+
+"""A POP node that generates particles from geometry."""
+
+POP Source is a node that generates particles from geometry, often a referenced SOP network.
+
+[Include:/shelf/dynamics_popsource#includeme]
+
+@parameters
+
+== Source ==
+
+Emission Type:
+    Where on the source geometry to emit points from.
+
+    All Points:
+	All of the points will emit points simultaneously.
+
+    All Geometry:
+	All of the source object will be added to the particle system.
+	This includes non-points, such as primitives.  This is useful for
+	bringing in constraints or other geometry information.  Note
+	that most POPs just work on points, ignoring any attached geometry.
+
+    Points:
+	The desired number of points will be emitted from random source points.
+
+    Scatter onto Surfaces:
+	The desired number of points will be emitted from random locations on the surfaces of the geometry.
+
+[Include:popCommonParms#geoSourceParms/]
+
+Emission Attribute:
+    When in surface mode, this point attribute will be used to vary the
+    chance of any polygon from emitting polygons.  Higher values will
+    increase the relative chance of that polygon getting an emission.
+
+Relax Iterations:
+    New points will be spread out from each other.  This is done in successive passes, so the more iterations, the more equally spaced the sourced particles will be.  This may result in points matching frame to frame if they get over constrained, however.
+
+Scale Radii By:
+    Point radii will be scaled by this before any relaxing of the points.  Specifying a scale less than 1 will increase "clumpiness" of the resulting points,
+    with a value of zero resulting in no relaxation.  Specifying a scale greater than 1 may speed up convergence of the relaxation, especially when scattering
+    on curves.
+
+    After any scaling, __Max Relax Radius__ will be enforced before any relaxation. 
+
+Max Relax Radius:
+    This must be set appropriately to prevent outlier points in low-density areas causing problems when relaxing points.
+
+    In order to approximately maintain variations in density, points are assigned radii inversely proportional to density (for curves), the square root of
+    density (for surfaces), or the cube root of density (for volumes).  This may cause problems for areas whose densities are near zero, especially in volumes,
+    when painting density on a surface, or when using a density texture with a black background, since the radius approaches infinity.  This parameter
+    specifies the maximum radius within which points will influence other points.
+
+    When this is disabled, there will still be a maximum radius, which is currently chosen as half the diagonal length of the bounding box of the input
+    geometry.
+
+
+Scale Point Count by Area:
+    When in surface mode, the constant and impulse point counts will be
+    scaled by the total area (taking into account any emission attribute)
+    of the geometry.  This lets you paint an emission density and have
+    the number of particles increase as the area of emission increases.
+
+Reference Area:
+    The impulse and constant emission values are often set for an entire object, which is often larger than a unit area.  Therefore, this acts as a scale on their values before applying the area count.
+
+    An object of the size of __Reference Area__ will emit at the specified impulse/constant rate.  A larger object will emit proportionally more particles, and a smaller one less.
+
+Remove Overlapping:
+    Potential new particles are compared against the existing set of particles.
+    If their `pscale` attribute overlaps, the new particle isn't added.
+
+    This can be useful to continuously add new particles to a sand simulation
+    without creating explosions from overlaps.
+
+    Note this only tests against particles that already exsit, so it is
+    important the set of new sourced particles don't overlap within
+    themselves.
+
+== Birth ==
+
+    This operator has two methods for emitting particles. You can use these methods together or separately:
+
+    * *Impulse* creates a certain number of particles each time the node cooks.
+
+    * *Constant* creates a certain number of particles per second.
+
+    [Include:popCommonParms#impulseConstantParms/]
+    
+    Probabilistic Emission:
+        Emit particles by treating the birth rate as a probability.  If enabled, particle emission will be distributed randomly across timesteps when the birth rate is low. If disabled, the emission will occur at regular intervals.  For example, with a __Constant Birth Rate__ of 1 and __Probabilistic Emission__ enabled,  you will see particles emitted at random intervals but an overall rate of approximately 1 per second.  With __Probabilistic Emission__ disabled, particles will be emitted at each one-second interval.
+    
+    [Include:popCommonParms#birthParms/]
+
+
+== Attributes ==
+
+    The parameters on this tab let you control which and how attributes are initialized on
+    the emitted particles. 
+
+    Initial State:
+	If the emission type is __Scatter on Surfaces__, and the source is a SOP
+	Path, the initial state of the particles can be set to sliding, stuck,
+	or stopped.
+
+	Particles can then be released by setting the `i@sliding`, `i@stuck`,
+	or `i@stopped` attributes to 0.
+
+    Inherit Attributes:
+	This specifies which attributes to inherit from the source geometry.
+
+
+    [Include:popCommonParms#veloAttrParms/]
+
+    [Include:popCommonParms#originAttrParms/]
+
+== Stream ==
+    [Include:standard_pop_parms#streamParms/]
+
+@inputs
+
+@outputs
+    [Include:standard_pop_outputs]
+
+@locals
+    [Include:standard_data_locals]
+
+    [Include:standard_locals]
+
+
+

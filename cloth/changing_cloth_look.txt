@@ -1,0 +1,136 @@
+= Changing the look of cloth =
+
+== Stiffness and Damping parameters ==
+
+The parameters on the __Material__ tab control the Cloth Object's internal force model. The look of the cloth material can be changed using the stiffness and damping settings on the __Material__ tab of the Cloth Object. The __Stiffness__ parameters control how vigorously the cloth resists deformation. The __Damping__ parameters control how quickly the cloth loses energy as a result of the rate of deformation.
+
+There are three main types of deformation: stretch, shear, and bend. Together, the Stretch, Shear, and Bend properties define the cloth behavior. Each of these properties has settings that can be controlled independently. Stiffness and Damping are the most important settings for defining cloth behavior. 
+
+[Image:/images/cloth/stretchshear.png]
+
+For example, the following dresses are identical, but with higher and lower __Stiffness__ and __Damping__ parameters. The middle dress (orange) has the default settings.
+
+[Anim:/images/cloth/dresses.gif]
+
+== Example: Stretch deformation ==
+
+Increasing the value in the Stretch column of the__Relative Stiffness__ makes the cloth less likely to stretch during a simulation. Increasing the __Relative Damping Ratio__ value in the same column increases the rate of energy loss due to stretching, forcing the simulation to calm down more quickly.
+
+Normally, the stiffness/damping parameters work uniformly on the [Cloth Object|Node:dop/clothobject] as a whole. However, you can locally control the stiffness, damping and mass density using point attributes. These attributes act as multipliers on the values that are specified on the [Cloth Object|Node:dop/clothobject]. The following are convenient multiplier attributes that affect all types of forces (stretch, shear and weak/strong bend) at the same time:
+
+table>>
+    tr>> 
+        td>> Parameter
+        td>> Type
+        td>> Name
+
+    tr>>
+        td>> Stiffness
+        td>> float
+        td>> stiffness 
+    tr>>
+        td>> Damping Ratio
+        td>> float
+        td>> dampingratio
+    tr>>
+        td>> Mass Density
+        td>> float
+        td>> massdensity
+
+The behavior of the __Stretch__, __Shear__, __Weak Bend__, and __Strong Bend__ models can be multiplier separately using the following attributes:
+
+table>>
+    tr>> 
+        td>> Parameter
+        td>> Type
+        td>> Name
+    tr>>
+        td>> Stretch Stiffness
+        td>> float
+        td>> shellstretchstiffness 
+
+    tr>>
+        td>> Stretch Damping Ratio
+        td>> float
+        td>> shellstretchdampingratio 
+
+    tr>>
+        td>> Shear Stiffness
+        td>> float
+        td>> shellshearstiffness 
+
+    tr>>
+        td>> Shear Damping Ratio
+        td>> float
+        td>> shellsheardampingratio 
+
+    tr>> 
+        td>> Weak Bend Stiffness
+        td>> float 
+        td>> shellweakbendstiffness 
+
+    tr>>
+        td>> Weak Bend Damping Ratio
+        td>> float 
+        td>> shellweakbenddampingratio 
+
+    tr>>
+        td>> Strong Bend Stiffness
+        td>> float 
+        td>> shellstrongbendstiffness 
+
+    tr>>
+        td>> Strong Bend Damping
+        td>> float 
+        td>> shellstrongbenddampingratio 
+
+The __Overall Stiffness__ and __Overall Damping Ratio__ parameters can be animated during the simulation to change the behavior over time. The same is true for the multiplier attributes. Changing the multiplier attributes needs to happen inside the simulation geometry by using a SOP solver in DOPs.
+
+== Weak bend versus strong bend == 
+
+There are two types of bend resistance, which may both be used at the same time. The __Weak Bend__ models the bend resistance of thin cloth materials such as silk. This bend model will always make the cloth recover its original shape. For thicker types of cloth (or non-cloth materials) the __Strong Bend__ can be used. If the stiffness for strong bend is increased enough, then the simulated cloth should recover from any amount of bending. You can blend between the strong and weak bend models to simulate deformable materials from flexible silks to stiff cottons, plastics, metals, and anything in between. The strong bend model is appropriate for creating cloth that is very stiff and is suited for deforming materials such as metal, stiff cottons, plastics, and other deformable materials.
+
+[Image:/images/cloth/weakstrongbend.png]
+
+[Image:/images/cloth/weakstrongbend2.png]
+
+TIP:
+    For strong bend simulations, such as seams or leather, you may want to change the __Float Precision__ parameter on the [Cloth Solver|Node:dop/clothsolver] to __Float 64 bit__.
+
+== Resolution independence ==
+
+It should not matter how detailed the cloth is, the settings for stiffness and damping are normalized to have approximately the same strength. Therefore, you should be able to re-use the same settings for stiffness and damping as you increase the cloth resolution (for example using a [Subdivide SOP|Node:sop/subdivide]).
+
+== Length Units ==
+
+It is strongly recommended that you model the cloth to real size. For example, pants should be roughly 1 meter long. If you do this, then the effects of the stiffness and damping parameters are predictable. This also makes external forces such as gravity look realistically with the default settings. If you want to use length units different than meters, then you should set your length units in the Hip File Options before you create your simulation network. All objects in DOPs that are created after changing this setting will have their defaults automatically adjusted for the new units.
+
+== Simulation geometry ==
+
+A mix of triangles and quads can be used for simulation. In the case of triangles, the weft and warped directions are determined by the UV point/vertex attribute with the name `materialuv` on the cloth. In the case of quad meshes, it is optional to specify UV attributes. If there aren't any UV's specified on quads, the edge directions will be assumed to be the warped and weft directions of the cloth.
+
+[Image:/images/cloth/uv_before.png]
+
+[Image:/images/cloth/uv_after.png]
+
+TIP:
+    A simple grid comprising of quads is a good example to test out the cloth solver's various capabilities.
+
+== Rest Positions ==
+
+The rest positions of the vertices play a critical role in the way cloth behaves. The rest positions are stored on the simulation geometry in the `rest` vertex attribute. The rest position attribute 'rest' can either be a point attribute or a vertex attribute. Using a vertex attribute 'rest' allows you to create multiple cloth panels within a single cloth object.
+The internal cloth forces are computed by comparing the current position (stored in `P`) with the rest positions in `rest`. For example, in the case of stretch, the solver compares the edge lengths based on `P` with the corresponding edge lengths based on `rest`. 
+
+<!--
+    TODO: finish
+-->
+
+In order to fit clothing tightly onto a body, the rest positions can be scaled down a bit from the initial positions. 
+
+== Surface Mass Density ==
+
+This parameter on the [Cloth Mass Properties DOP|Node:dop/clothmassproperties] will effect the weight of the cloth, but not in a way you'll be able to notice visibly if you adjust this in DOPs. It more or less deals with cloth on cloth interactions, such as layering a heavy piece of cloth on a lighter one. 
+
+You can not see the effect because the solver normalizes drag values in relation to the __Surface Mass Density__, so that you can adjust material parameters independently without worrying about how they are all interdependent. If you want to see the effect of the mass, you can go into the [Cloth Drag Properties DOP|Node:dop/dragproperties] and delete the channel references or decrease the drag properties on the __Drag__ tab of the [Cloth Object|Node:dop/clothobject].
+
+Another way to see the effect the __Surface Mass Density__ has on drag is by adding density through an [Attribute Create SOP|Node:sop/attribcreate], since it works independently and does not normalize drag for density.

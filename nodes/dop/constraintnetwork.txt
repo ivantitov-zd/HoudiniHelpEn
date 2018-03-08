@@ -1,0 +1,190 @@
+#type: node
+#context: dop
+#internal: constraintnetwork
+#icon: DOP/constraintnetwork
+
+= Constraint Network =
+
+"""Constrains pairs of RBD objects together according to a polygon network."""
+
+NOTE:
+    This DOP is currently only supported by the [Bullet Solver|Node:dop/bulletrbdsolver]
+    and the [Wire Solver|Node:dop/wiresolver].
+
+The constraint network defines pairs of RBD objects that should be constrained
+together.
+
+With the constraint network, SOP Geometry is specified which defines what
+objects should be constrained. This makes it easy to procedurally generate a
+set of constraint relationships, including constraints of different types. Each
+point in the geometry represents a constraint anchor, according to the `name`
+and `P` attributes. Each two-point polygon represents a constraint, according
+to the constraint data specified by the `constraint_name` attribute.
+
+TIP:
+        Advanced users can use the `constraint_name` and `constraint_type`
+        attributes to dynamically change constraint types with animation or a
+        [SOP Solver|Node:dop/sopsolver].
+
+== Breaking Constraints ==
+
+If a constraint is broken by a solver (such as when sufficient force is applied
+to break a glue bond), the primitive will be placed into a primitive group
+named `broken`. That primitive group can be used in a [SOP Solver|Node:dop/sopsolver]
+to trigger events such as emitting debris when a constraint breaks. Any
+constraints that are in the `broken` primitive group will be ignored by solvers
+on subsequent frames. Currently, only glue constraints will be broken by the
+[Bullet Solver|Node:dop/bulletrbdsolver].
+
+Constraints can also be broken by using a SOP Solver to delete primitives from
+the constraint network's geometry. For linear constraints, the `force` and
+`distance` primitive attributes are updated by the solver to contain the force
+applied to satisfy the constraint and the distance between the anchors,
+respectively. For angular constraints, the `torque` and `angle` primitive
+attributes are updated by the solver to contain the torque applied to satisfy
+the constraint and the angle (in radians) between the anchors. For [glue
+constraints|Node:dop/glueconrel], the `impact` primitive attribute is updated
+by the solver to contain the accumulated impulses for the glue bond. These
+attributes can be used to remove a constraint when certain conditions are met.
+
+== Anchor Types ==
+Each point in the constraint geometry represents an anchor. All constraints are
+made up of two anchors.  Currently there are 4 different types of anchors,
+specified by the `name`, `anchor_type` and `anchor_id` point attributes.
+
+A World Space Anchor is an anchor that is simply placed at a static world space
+position, specified by the `P` attribute on the anchor. If an anchor has an
+empty value for the `name` attribute, then the anchor is treated as a World
+Space Anchor. If the `name` attribute specifies an invalid name, the constraint
+is skipped.
+
+A Relative Offset Anchor is an anchor that is placed at specific position
+relative to a simulated object. This position is fixed to the object's initial
+rotation, so if the object is rotated during the simulation the anchor rotates
+with it. If the `name` attribute specifies a valid object, and the `anchor_id`
+attribute is set to `-1` (or is not defined), then the anchor is treated as a
+Relative Offset Anchor, with the `P` attribute specifying the offset from the
+object's centroid.
+
+A Point Anchor is an anchor whose position is bound to that of a certain point
+on the geometry of a simulated object. When the `name` attribute is valid and
+the `anchor_id` attribute is a valid point index, then the anchor will be
+placed at the specified point. Alternatively, if the `anchor_type` attribute is
+set to `vertex` (the default is `point`) then the anchor will be placed at the
+point referred to by the vertex with the index in `anchor_id`.
+
+NOTE:
+    In cases where the geometry of a simulated object changes over the course
+    of a simulation, anchoring to a point by specifying a point (or vertex)
+    index in the `anchor_id` attribute may not yield correct results. This is
+    because as the geometry changes, point and vertex indices may also change,
+    meaning the Point Anchors could end up referring to different points than
+    at the beginning of the simulation.
+
+    To fix this, add the integer point attribute `anchor_pid` or the integer
+    vertex attribute `anchor_vid` to the simulated object whose geometry may
+    change. If either of these attributes exist, then the `anchor_id` specified
+    on the anchor will match to the first point (or vertex) with the same
+    `anchor_pid` (or `anchor_vid`) value on the simulated geometry. This way as
+    the geometry changes, the attributes will stay the same.
+
+An Agent Anchor is an anchor that is attached to a transform in an agent's rig.
+The transform does not need to be associated with a simulated object (i.e. the agent's collision layer does not need to have a shape attached to the transform).
+When the `anchor_type` is `agent` and the `name` attribute references an agent's transform (e.g. `agent1/head`), the `local_P` and `local_orient` attributes can be used to specify the local transform of the anchor.
+
+== Attributes ==
+
+You can [create attributes|/model/attributes] on the geometry to customize each
+constraint's behavior and type. If a primitive attribute with the same name as
+a constraint property (such as `damping`) is present, the attribute value will
+be multiplied with the value from the constraint sub-data.
+
+[Include:standard_constraintnetworkattribs]
+
+NOTE:
+        For [RBD Packed Objects|Node:dop/rbdpackedobject], the name point attribute from the DOP object’s geometry is used to identify which object to attach the constraint to. Since multiple [RBD Packed Objects|Node:dop/rbdpackedobject] may contain packed primitives with the same names, the identifier can optionally be prefixed by the DOP Object name (e.g. `object2/piece3`) to avoid name conflicts and uniquely identify the object. For all other types of objects, the DOP object name is used as the identifier.
+
+        When switching a setup from using an [RBD Packed Object|Node:dop/rbdpackedobject] to an [RBD Fractured Object|Node:dop/rbdfracturedobject], ensure that the anchor names are not prefixed with the DOP Object name so that the constraint network is compatible with both object representations.
+
+@parameters
+
+== Data Options ==
+
+Geometry Source:
+    Specifies the source of the constraint network geometry.
+
+    SOP:
+        Use the SOP specified by the __SOP Path__ parameter.
+    First Context Geometry:
+        Use the SOP connected to the DOP network's first input.
+    Second Context Geometry:
+        Use the SOP connected to the DOP network's second input.
+    Third Context Geometry:
+        Use the SOP connected to the DOP network's third input.
+    Fourth Context Geometry:
+        Use the SOP connected to the DOP network's fourth input.
+
+SOP Path:
+    The SOP geometry to use to determine the constraints.
+
+Use Object Transform:
+    Turn on this option to embed the transform from the parent object of the
+    SOP along with the geometry.   
+
+Overwrite with SOP:
+    This flag will re-import the network whenever it is set, allowing a
+    completely animated constraint behavior.
+
+== Guide Options ==
+
+    Show Guide Geometry:
+        Turning on this option causes guide geometry to be displayed in
+        the viewport representing this constraint.
+
+    Show Object Link:
+        This parameter controls the display of guide geometry
+        connecting the constraint to the constrained object.
+
+== Relationship ==
+    Attach Internal Constraints to Object:
+        The default behavior is to attach the constraint geometry to a [relationship|Node:dop/applyrel] between the objects, which allows constraints to be anchored to multiple DOP objects.
+        If constraints only need to be between packed primitives in a single DOP object, this option allows the constraint geometry to be attached to the DOP object's `ConstraintGeometry` subdata instead of a relationship.
+        In this mode, constraints can be modified during the timestep with a SOP solver that processes the object's `ConstraintGeometry` subdata (for relationships, any attached solvers are run at the beginning of the timestep before solving any objects).
+    Constrained Objects:
+        Specifies the affected DOP objects in the created relationship.
+    Relationship Name:
+        A unique name that will identify the relationship.
+
+[Include:standard_dataactive_parms]
+
+@inputs
+
+Objects To Be Processed:
+    The objects to apply this relationship to, that will be eligible for
+    being constrained by the object name attribute.
+Constraints To Create:
+    The constraints that can be created using the primitives in the SOP
+    geometry.
+Constraint Solvers:
+    SOP solvers may be attached to update the constraint network
+    dynamically in response to events. Only a single geometry is shared by
+    all the objects, so this solver is executed once per relationship, not
+    per object.
+
+@outputs
+
+[Include:standard_data_outputs]
+
+@locals
+
+[Include:standard_locals]
+
+@related
+
+- [Node:dop/conetwistconrel]
+- [Node:sop/connectadjacentpieces]
+- [Node:dop/constraintnetworkrelationship]
+- [Node:dop/glueconrel]
+- [Node:dop/hardconrel]
+- [Node:dop/sliderconrel]
+- [Node:dop/springconrel]

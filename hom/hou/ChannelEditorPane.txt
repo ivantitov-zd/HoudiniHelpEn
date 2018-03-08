@@ -1,0 +1,156 @@
+= hou.ChannelEditorPane =
+#type: homclass
+#cppname: HOM_ChannelEditorPane
+#superclass: hou.Pane
+#group: channels
+
+@methods
+
+::`channelList(self)` -> [Hom:hou.ChannelList]:
+    #cppname: HOM_ChannelEditorPane::channelList
+    #status: ni
+
+::`dopesheet(self)` -> [Hom:hou.ChannelDopesheet]:
+    #cppname: HOM_ChannelEditorPane::dopesheet
+    #status: ni
+    
+::`graph(self)` -> [Hom:hou.ChannelGraph]:
+    #cppname: HOM_ChannelEditorPane::graph
+    Return the channel graph for this pane.
+
+::`channelListSplitFraction(self)` -> `double`:
+    #cppname: HOM_ChannelEditorPane::channelListSplitFraction
+    Return the width of the embedded channel list as fraction (0-1 value) of
+    the pane's width.
+
+::`setChannelListSplitFraction(self, value)`:
+    #cppname: HOM_ChannelEditorPane::setChannelListSplitFraction
+    Set the width of the embedded channel list as fraction (0-1 value) of the
+    pane's width.
+
+::`displayFilter(self)` -> `string`:
+    #cppname: HOM_ChannelEditorPane::displayFilter
+    Return the filter pattern for which channels are displayed.
+
+::`setDisplayFilter(self, filter)`:
+    #cppname: HOM_ChannelEditorPane::setDisplayFilter
+    Set the filter pattern for which channels are displayed.
+    The channel name is used to match against the pattern.
+    
+::`editorMode(self)` -> `hou.channelEditorMode` enum value:
+    #cppname: HOM_ChannelEditorPane::editorMode
+    Return the animation editor mode.
+
+::`setEditorMode(self, mode)`:
+
+    #cppname: HOM_ChannelEditorPane::setEditorMode
+    Set the animation editor mode.
+    
+::`templateFilter(self)` -> `string`:
+    #cppname: HOM_ChannelEditorPane::templateFilter
+    Return the filter pattern for which channels are templated.
+
+::`setTemplateFilter(self, filter)`:
+    #cppname: HOM_ChannelEditorPane::setTemplateFilter
+    Set the filter pattern for which channels are templated.
+    The channel name is used to match against the pattern.
+
+::`colorsCallback(self)` -> `string`:
+    #cppname: HOM_ChannelEditorPane::colorsCallback
+    Return the active channel colors callback name.
+
+::`setColorsCallback(self, callback_name)` -> `bool`:
+    #cppname: HOM_ChannelEditorPane::setColorsCallback
+    
+    Set the active channel colors callback name.
+    If the callback name is invalid, the active callback will be reset to default.
+    Return True if the callback was successfully changed.
+    Return False if the callback name was invalid.
+
+::`registerColorsCallback(self, callback_name, callback_object )` -> `bool`:
+    #cppname: HOM_ChannelEditorPane::registerColorsCallback
+    
+    Registers a callback to generate custom channel colors based on the node and parameter names.
+    
+    `callback_name`:
+        A name for the custom color scheme.
+        You can use this to remove the callback with the `unregisterColorsCallback` method.
+    
+    `callback_object`:
+        A Python object with a `getChannelColor` method. For example:
+        
+        {{{
+        #!python
+        
+        class MyChannelColors(object):
+            def getChannelColor(self, node_path, channel_name):
+                return 0, 0, 0
+        }}}
+        
+        The `node` argument is the path to the node (for example, `/obj/table`).
+        The `parm` argument is the internal name of the channel (for example, `tx`).
+        The method must return a 3-tuple representing normalized (`0-1`, not `0-255`) red, green, and blue values.
+        If the method returns `(0, 0, 0)` Houdini uses the default channel color.
+    
+    You should register the callback in a session-independent startup script.
+    When you register the callback, Houdini will call it once with empty string arguments to make sure it returns a triple. Your `getChannelColor()` method needs to handle this case.
+
+    The following example object uses the custom color tint of a node to color its channels:
+    
+    {{{
+    #!python
+    
+    import hou
+    
+    class NodeColors:
+        '''
+        Use hue variants of a node's color for parameter names 
+        ending in x, y or z.
+        '''
+
+        def getChannelColor(self, node_path, channel_name):
+            # Handle the empty string case
+            if not node_path:
+                return 0, 0, 0
+            
+            # Get a Node object from the path
+            n = hou.node(node_path)
+            # Get the node's color as a hou.Color object
+            color = n.color()
+            # Get the color's HSV values as a triple
+            hue, sat, val = n.color().hsv()
+            
+            # If the color is gray, use the default
+            if not sat:
+                return 0, 0, 0
+        
+            # Hue-shift the node color for X, Y, and Z channels:
+            if channel_name.endswith("x"):
+                color.setHSV(hue - 50, sat * 2, val * 1.2)
+            elif channel_name.endswith("y"):
+                color.setHSV(hue, sat * 2, val * 1.2)
+            elif channel_name.endswith("z"):
+                color.setHSV(hue + 50, sat * 2, val * 1.2)
+            
+            # Return the color as normalized (r, g, b)
+            return color.rgb()
+    }}}
+
+::`unregisterColorsCallback(self, callback_name)` -> `bool`:
+    #cppname: HOM_ChannelEditorPane::unregisterColorsCallback
+    
+    Unregister a callback by name.
+    It also resets the active callback if the callback to remove was the active one.
+    Return True if the callback was successfully removed.
+    Return False if the callback name was invalid.
+
+::`colorsCallbacks(self)` -> `tuple` of `string`:
+    #cppname: HOM_ChannelEditorPane::colorsCallbacks
+    Return the list of registered channel colors callback.
+
+@replaces
+    
+- [Cmd:chanlist]
+- [Cmd:animeditor]
+
+

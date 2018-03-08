@@ -1,0 +1,128 @@
+= hou.HDAModule =
+#type: homclass
+#cppname: HOM_HDAModule
+#group: assets
+
+"""User-defined Python module containing functions, classes, and constants
+that are stored with and accessed from a digital asset."""
+
+In Python, a module lets you organize functions, classes, and constants into a
+common namespace.  For example, `os` is a module and `os.getcwd` is a function
+inside that module, and you access the contents of a module by looking up
+Python attributes on it.
+
+An HDAModule is a Python module that is associated with a particular digital
+asset type.  It lets you store a library of Python code in one location
+in your asset, and you can invoke that code from parameters, event handlers,
+and callbacks inside that asset.
+
+The module's source code is stored in the __Python Module__ section of the
+__Scripts__ tab in the __Type Properties__ dialog.  For example, suppose the
+digit asset is an object named `gear` and the Python Module section contains
+the following:
+
+{{{
+#!python
+def position():
+    return (hou.frame() * 1.2, 0.0, 3.2)
+
+def onButtonPress():
+    print "you pressed the button"
+
+def onLoaded():
+    print "onLoaded section running"
+}}}
+
+Unlike regular Python modules, which you access by name, you access a digital
+asset's Python module by calling [Hom:hou.NodeType#hdaModule] on its node type.
+For example, suppose you created an object-level digital asset named gear and
+put the above code in its Python Module section.  You could then access the
+contents of the Python module as follows:
+
+{{{
+#!pycon
+>>> node_type = hou.nodeType(hou.objNodeTypeCategory(), "gear")
+>>> node_type.hdaModule().position()
+(1.2, 0.0, 3.2)
+>>> node_type.hdaModule().onButtonPress()
+you pressed the button
+}}}
+
+One use for the Python module is drive parameter expressions on nodes inside
+the digital asset.  For example, suppose `/obj/gear1` is an instance of the
+digital asset and `/obj/gear1/geo1` is a node inside the asset.  You could put
+the following inside `geo1`'s `tx` parameter expression:
+
+{{{
+#!python
+hou.node("..").type().hdaModule().position()[0]
+}}}
+
+For convenience, you can also access the module from a node instance of the
+digital asset using [Hom:hou.Node#hdaModule].  So, you could simplify the
+above expression to:
+
+{{{
+#!python
+hou.node("..").hdaModule().position()[0]
+}}}
+
+And since you don't need to use the `hou.` prefix inside expressions, you
+could further simplify it to:
+
+{{{
+#!python
+node("..").hdaModule().position()[0]
+}}}
+
+The following example shows how you might run code in the module from the
+Callback Script field of a button parameter:
+{{{
+#!python
+hou.pwd().hdaModule().onButtonPress()
+}}}
+
+In an event handler script, such as On Loaded, you can use the `kwargs` dict
+to access the node type:
+{{{
+#!python
+kwargs["type"].hdaModule().onLoaded()
+}}}
+
+Note that Houdini creates a local `kwargs` dict that's accessible from
+the Python Module, too.  It contains one entry with the key `"type"`, to give
+you access to the [Hom:hou.NodeType] defined by the digital asset.
+
+If you find that a digital asset has too much Python code to store in one
+module, it's possible to create submodules.  For example, if you want to
+create a submodule named `bar`, put its source code in a new digital asset
+section (say, `"bar_PythonModule"`).  Then, from the Python Module section, you
+can write the following:
+
+{{{
+#!python
+import toolutils
+bar = toolutils.createModuleFromSection("bar", kwargs["type"], "bar_PythonModule")
+}}}
+
+`bar` now appears as a submodule of the main module.  If, for example, the
+`bar_PythonModule` section contains:
+
+{{{
+#!python
+def foo():
+    return 3.2
+}}}
+
+then you could write the following from a parameter on the digital asset node:
+
+{{{
+#!python
+pwd().hdaModule().bar.foo()
+}}}
+
+Note that the Python Module code is stored in a section of the digital asset
+named `"PythonModule"`.  For example, you can get a string containing that
+source code using
+`node_type.definition().sections()["PythonModule"].contents()`.
+

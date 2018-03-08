@@ -1,0 +1,354 @@
+= hou.Volume =
+#type: homclass
+#cppname: HOM_Volume
+#superclass: hou.Prim
+#group: geo
+
+"""A Volume is a kind geometry primitive (Prim object) storing a three
+dimensional array of voxels."""
+
+@methods
+
+::`resolution(self)` -> [Hom:hou.Vector3]:
+    #cppname: HOM_Volume::resolution
+    Return the x, y, and z dimensions of the volume.  For example, a resolution
+    of (10, 20, 30) means the volume is 10 voxels in x by 20 voxels in y by
+    30 voxels in z.
+
+::`sample(self, position)` -> `float`:
+    #cppname: HOM_Volume::sample
+    Given a sequence of three floats containing a 3D position, return the value
+    of the volume at that position.  If the position is not in the middle of
+    a voxel, Houdini will interpolate using values from surrounding voxels.
+
+    See also [Hom:hou.Volume#voxel] and [Hom:hou.Volume#posToIndex].
+
+::`gradient(self, position)` -> [Hom:hou.Vector3]:
+    #cppname: HOM_Volume::gradient
+    Given a sequence of three floats containing a 3D position, return a
+    vector which points in the direction of the greatest rate of increase
+    of the volume's value.
+
+    See [Wikipedia's gradient page|Wp:Gradient] for
+    more information.
+
+::`voxel(self, index)` -> `float`:
+    #cppname: HOM_Volume::voxel
+    Given a sequence of three integers containing a voxel index, return the
+    value of the corresponding voxel.
+
+    {{{
+    #!pycon
+    >>> volume_sop = hou.node("/obj").createNode("geo").createNode("volume")
+    >>> volume_sop.parm("initialval1").set(0.3)
+    >>> volume = volume_sop.geometry().prims()[0]
+    >>> volume.resolution()
+    (10, 10, 10)
+    >>> volume.voxel((0, 0, 0))
+    0.3
+    }}}
+
+::`setVoxel(self, index, value)`:
+    #cppname: HOM_Volume::setVoxel
+    Set the value of a voxel.  You would typically call this method from the
+    code of a Python-defined SOP.
+
+    index:
+	A sequence of three integers containing a voxel index.  Raises
+	[Hom:hou.OperationFailed] if any of the values in index are out
+	of range.
+
+    value:
+	A float containing the voxel's new value.
+
+    Raises [Hom:hou.GeometryPermissionError] if this geometry is not modifiable.
+
+::`allVoxels(self)` -> tuple of float:
+    #cppname: HOM_Volume::allVoxels
+    Return a tuple of floats containing the values of all voxels.  It is faster
+    to call this method to retrieve all the voxels than it is to loop through
+    the voxel array in Python.
+
+    You can, for example, use Python's Numpy library to perform operations on
+    the voxel data and then store the result back into the volume from a Python
+    SOP using [Hom:hou.Volume#setAllVoxels].  Note that Numpy allows you to
+    reshape the flat tuple of floats to behave like a 3D matrix of floats.
+
+    This method can be approximately implemented as follows (though this Python
+    implementation is much slower):
+    {{{
+    #!python
+    def allVoxels(self):
+	result = []
+	xres, yres, zres = self.resolution()
+	for z in range(zres):
+	    for y in range(yres):
+		for x in range(xres):
+		    result.append(self.voxel((x, y, z)))
+	return tuple(result)
+    }}}
+
+    See also [Hom:hou.Volume#allVoxelsAsString],
+    [Hom:hou.Geometry#pointFloatAttribValues], and
+    [Hom:hou.Geometry#primFloatAttribValues].
+
+::`allVoxelsAsString(self)` -> str:
+    #cppname: HOM_Volume::allVoxelsAsString
+    Return a binary string representation of the floats containing all the
+    values of all voxels.  This method is faster than
+    [Hom:hou.Volume#allVoxels], and you can use the `array` module to convert
+    the string into a Python sequence.
+
+    This method provides a faster implementation of the following:
+    {{{
+    #!python
+    import array
+    def allVoxelsAsString(self):
+	return array.array("f", self.allVoxels()).tostring()
+    }}}
+
+    You can convert the return value from this method to an array using the
+    following method:
+    {{{
+    #!python
+    import array
+    def allVoxelsAsArray(volume):
+	a = array.array("f")
+	a.fromstring(volume.allVoxelsAsString())
+	return a
+    }}}
+
+    See [Hom:hou.Volume#allVoxels] for more information.
+
+::`setAllVoxels(self, values)`:
+    #cppname: HOM_Volume::setAllVoxels
+    Set the value of all voxels in this volume.  You would typically call this
+    method from the code of a Python-defined SOP.
+
+    Raises [Hom:hou.OperationFailed] if the sequence of values is not exactly
+    the same as `self.resolution()[0] * self.resolution()[1] *
+    self.resolution()[2]`.
+
+    Raises [Hom:hou.GeometryPermissionError] if this geometry is not modifiable.
+
+    See also [Hom:hou.Volume#allVoxels].
+
+::`setAllVoxelsFromString(self, values)`:
+    #cppname: HOM_Volume::setAllVoxelsFromString
+    Set the value of all voxels in this volume from a string representation of
+    a sequence of single precision float values.  This method is faster than
+    [Hom:hou.Volume#setAllVoxels].
+
+    Note that this method can accept more types that just a string: it can
+    receive any Python object that supports the buffer interface.  In
+    particular, arrays from the `array` and `numpy` Python modules are
+    supported, so there is no need to first construct strings from those
+    arrays.
+
+    Raises [Hom:hou.OperationFailed] if the length of the string is not exactly
+    the same as `self.resolution()[0] * self.resolution()[1] *
+    self.resolution()[2] * 4`.
+
+    See [Hom:hou.Volume#setAllVoxels] and [Hom:hou.Volume#allVoxelsAsString]
+    for more information.
+
+    The following example function accepts an `array.array("f")` and sets
+    the voxels to its contents:
+    {{{
+    #!python
+    def setAllVoxelsFromArray(volume, arr):
+	assert(arr.typecode == "f")
+	volume.setAllVoxelsFromString(arr)
+    }}}
+
+::`voxelSlice(plane, index)` -> `tuple` of `float`:
+    #cppname: HOM_Volume::voxelSlice
+    Return a tuple of floats containing the values of all voxels in a
+    particular slice.  It is faster to call this method to retrieve a slice
+    than it is to loop through the voxel array in Python.
+
+    plane:
+	The plane corresponding to this slice.  This value must be either "xy",
+	"xz", or "yz".
+    index:
+	The index of this slice in the array.  For example, if the plane is
+	"xy", this index is the z value and the result will contain all values
+	in the voxel with this particular z value.
+
+    This method can be approximately implemented as follows (though this Python
+    implementation is much slower):
+    {{{
+    #!python
+    def voxelSlice(self, plane, index):
+	result = []
+
+	start = [0] * 3
+	stop = list(self.resolution())
+
+	slice_axis = {"xy": 2, "xz": 1, "yz": 0}[plane]
+	start[slice_axis] = index
+	stop[slice_axis] = index + 1
+
+	for z in range(start[2], stop[2]):
+	    for y in range(start[1], stop[1]):
+		for x in range(start[0], stop[0]):
+		    result.append(self.voxel((x, y, z)))
+	return tuple(result)
+    }}}
+
+    See also [Hom:hou.Volume#voxelSliceAsString] and [Hom:hou.Volume#allVoxels].
+
+::`voxelSliceAsString(plane, index)` -> `str`:
+    #cppname: HOM_Volume::voxelSliceAsString
+    Return a binary string representation of the floats containing all the
+    values of voxels in a particular slice.
+    
+    See [Hom:hou.Volume#voxelSlice] and [Hom:hou.Volume#allVoxelsAsString] for
+    more information.
+
+::`setVoxelSlice(self, values, plane, index)`:
+    #cppname: HOM_Volume::setVoxelSlice
+    Set the value of the voxels in a particular slice of this volume.  You
+    would typically call this method from the code of a Python-defined SOP.
+
+    values:
+	A sequence of floats containing the new values for the slice.
+    plane:
+	The plane corresponding to this slice.  This value must be either "xy",
+	"xz", or "yz".
+    index:
+	The index of this slice in the array.  For example, if the plane is
+	"xy", this index is the z value and the result will contain all values
+	in the voxel with this particular z value.
+
+    Raises [Hom:hou.OperationFailed] if the sequence of values is not equal to
+    the number of voxels in the slice.
+
+    Raises [Hom:hou.GeometryPermissionError] if this geometry is not modifiable.
+
+    See also [Hom:hou.Volume#voxelSlice].  See
+    [Hom:hou.Volume#setVoxelSliceFromString] for an example.
+
+::`setVoxelSliceFromString(self, values, plane, index)`:
+    #cppname: HOM_Volume::setVoxelSlice
+    Set the value of the voxels in a particular slice of this volume.  You
+    would typically call this method from the code of a Python-defined SOP.
+
+    values:
+	A binary string representing of a sequence of floats containing the new
+	values for the slice.
+
+	Note that this method can accept more types that just a string: it can
+	receive any Python object that supports the buffer interface.  In
+	particular, arrays from the `array` and `numpy` Python modules are
+	supported, so there is no need to first construct strings from those
+	arrays.
+    plane:
+	The plane corresponding to this slice.  This value must be either "xy",
+	"xz", or "yz".
+    index:
+	The index of this slice in the array.
+
+    See [Hom:hou.Volume#setVoxelSlice] for more information.
+
+    The following example builds a volume from an compositing network sequence:
+    {{{
+    #!python
+    def buildVolumeFromCopSequence(
+	    cop_node, geo, voxel_depth, plane="C", component="r"):
+	zres = int(cop_node.sequenceFrameLength())
+	volume_bbox = hou.BoundingBox(*(
+	    0, 0, 0,
+	    cop_node.xRes(), cop_node.yRes(), zres) * voxel_depth)
+	volume = geo.createVolume(
+	    cop_node.xRes(), cop_node.yRes(), zres, volume_bbox)
+
+	for z in range(zres):
+	    pixels = cop_node.allPixelsAsString(
+		plane, component,
+		time=hou.frameToTime(z + cop_node.sequenceStartFrame()))
+	    volume.setVoxelSliceFromString(pixels, "xy", z)
+    }}}
+
+::`posToIndex(self, position)` -> `tuple` of `int`:
+    #cppname: HOM_Volume::posToIndex
+    Given a sequence of three floats containing a 3D position, return a tuple
+    of three ints containing the corresponding index into the voxel array.
+
+    Note that the returned index will be invalid if the position is outside
+    the volume.  Use [Hom:hou.Volume#isValidIndex] to determine if the index is
+    valid.
+
+::`indexToPos(self, index)` -> [Hom:hou.Vector3]:
+    #cppname: HOM_Volume::indexToPos
+    Given a sequence of three ints containing an index into the voxel array,
+    return the corresponding 3D position of the middle of that voxel.
+
+::`isValidIndex(self, index)` -> `bool`:
+    #cppname: HOM_Volume::isValidIndex
+    Return whether or not a sequence of three ints containing an index into the
+    voxel array is valid, ie, within the bounds of the array.
+
+    This method can approximately be implemented as follows:
+    {{{
+    #!python
+    def isValidIndex(self, index):
+	for i, maximum in zip(index, self.resolution()):
+	    if i < 0 or i >= maximum:
+		return False
+	return True
+    }}}
+
+::`isSDF(self)` -> `bool`:
+    #cppname: HOM_Volume::isSDF
+    Return whether or not the volume is flagged as a signed distance field.
+    Such volumes have a special border condition where out of bound reads will
+    add the distance to the bounding box to the streaked boundary condition.
+    They are also best to be semantically treated as signed distance fields.
+
+::`isHeightField(self)` -> `bool`:
+    #cppname: HOM_Volume::isHeightField
+    Return whether or not the volume is flagged as a heightfield.
+    Such volumes are two dimensional and have the heightfield visualization
+    set.
+
+::`volumeAverage(self)` -> `float`:
+    #cppname: HOM_Volume::volumeAverage
+    Return the average value of all voxels.
+
+::`volumeMin(self)` -> `float`:
+    #cppname: HOM_Volume::volumeMin
+    Return the minimum value of all voxels.
+
+::`volumeMax(self)` -> `float`:
+    #cppname: HOM_Volume::volumeMax
+    Return the maximum value of all voxels.
+
+::`transform(self)` -> [Hom:hou.Matrix3]:
+    #cppname: HOM_Volume::transform
+    Return a 3x3 matrix containing the scale and rotation transformations
+    for this volume.
+
+    Note that the position information for the volume can be obtained by
+    calling `volume.vertex(0).point().position()`.
+
+    The following function returns a 4x4 transformation matrix for the volume
+    that includes the translation:
+    {{{
+    #!python
+    def fullTransform(volume):
+	return (hou.Matrix4(volume.transform()) *
+	    hou.hmath.buildTranslate(volume.vertex(0).point().position()))
+    }}}
+
+    NOTE:
+        You need to get the node transform to get to worldspace.
+
+::`setTransform(self, matrix4)`:
+    #cppname: HOM_Volume::setTransform
+    Given a 4x4 matrix, set the position, rotation, and scale of this volume.
+
+    Note that if you want to just set the translate portion of a volume to a
+    [Hom:hou.Vector3], you could just call
+    `volume.vertex(0).point().setPosition(position)`.
+

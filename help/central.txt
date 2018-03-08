@@ -1,0 +1,229 @@
+= Running a |> central help server =
+
+== Overview ==
+
+A studio can set up a central help server to serve help to multiple users of Houdini, instead of each instance of Houdini starting up its own help server on each machine. This is useful for sharing site-specific documentation between users.
+
+See also [wiki markup reference|format], [how to document your assets|nodes], and [how to make example files|createexamples].
+
+WARNING:
+    The default server setup imports the `hou` package, meaning it uses a batch license when run outside of Houdini. See [how to not use a batch license|#nolicense] below for a work-around.
+
+
+== Command line ==
+
+# Open a Houdini shell.
+
+    :platform:Windows
+        Click __Start > All programs > Side Effects Software > Houdini X.X.XXX > Utilities > Command line tools__.
+
+    :platform:Mac
+        In the Finder, open __Applications > Houdini > HoudiniX.X.X > Utilities > Houdini Terminal__.
+    
+    :platform:Linux
+        In a `bash` shell, `cd` to the Houdini install directory and `source houdini_setup`.
+
+# In the Houdini shell, type:
+    
+    {{{
+    hhelp serve --bgindex
+    }}}
+    
+    ...to start the help server with background indexing.
+
+# Open a browser and go to
+
+    {{{
+    http://localhost:8080/
+    }}}
+
+=== `hhelp serve` ===
+
+`--host=0.0.0.0`:
+    The IP address for the server.
+    
+    * If your computer has multiple network controllers, you can specify which address you want the server to listen at.
+    
+    * Use `0.0.0.0` (the default) to make the server available to other computers.
+    
+    * Use `localhost` or `127.0.0.1` to make the server only available on your computer.
+
+`--port=8080`:
+    The port number for the server. Default is `8080`.
+
+`--debug`:
+    Run the server with debugging information on.
+
+`--bgindex`:
+    Re-index changed documents in the background while the server is running.
+
+`--config=<<path>>`:
+    (Optional) a file to read [configuration options|#config] from.
+
+`--logfile=<<path>>`:
+    (Optional) a file to write server log to.
+
+`--loglevel=<<DEBUG|INFO|WARNING|ERROR>>`:
+    (Optional) log messages at or above this level of severity.
+
+=== `hhelp index` ===
+
+This command lets you manually update the search index (if you're not running a server with the `--bgindex` option). By default the command will only update changed files, unless you pass the `--clean` option.
+
+`--clean`:
+    Re-index all documents from scratch, whether they've changed or not.
+
+`--usages`:
+    Generate information about what nodes are used by example files.
+
+`--config=<<path>>`:
+    (Optional) a file to read [configuration options|#config] from.
+
+`--logfile=<<path>>`:
+    (Optional) a file to write server log to.
+
+`--loglevel=<<DEBUG|INFO|WARNING|ERROR>>`:
+    (Optional) log messages at or above this level of severity.
+
+
+== In Python ==
+
+If you have Houdini's Python libraries in your `PYTHONPATH`, you can get the Houdini WSGI app for use in an application server (for example, Apache with ModWSGI):
+
+{{{
+#!python
+from houdinihelp.server import get_houdini_app
+
+wsgi_app = get_houdini_app(
+    config_file=None,       # Path string to a config file
+    use_houdini_path=True,  # See below
+    log_file=None,          # If not None, overrides default log file path
+    log_level=None          # If not None, overrides default log level    
+)
+}}}
+
+To start the built-in server instead:
+
+{{{
+#!python
+from houdinihelp.server import start_server
+
+start_server(
+    host="0.0.0.0",         # Network interface to listen to
+    port=48626,             # Port to listen to
+    debug=False,            # Whether to start the server in debug mode
+    bgindex=None ,          # Whether to do background indexing
+    config_file=None,       # String path to a config file
+    use_houdini_path=True,  # See below
+)
+}}}
+
+* If `config_file` is `None` and `use_houdini_path` is `True`, the code will use `hou` to search the Houdini path for a `config/Help/bookish.cfg` configuration file (see [configuration|#config] below). This will use a batch license if `hou` hasn't already been imported. If you're specifying a configuration file in the arguments you don't need worry about this.
+
+* The `bgindex` keyword argument can be `True`, `False`, or `None`. `None` means use the value from the configuration, whereas passing `True` or `False` will override the configuration.
+
+
+== Serving Houdini docs from your server ==
+
+You can serve the WSGI application on your server. For example, you can serve the app through ModWSGI on Apache, or by reverse-proxying an instance of uWSGI running the app.
+
+    To get the Houdini help app function:
+    
+    {{{
+    from houdinihelp.server import get_houdini_app
+    
+    wsgi_app = get_houdini_app()
+    }}}
+
+
+== Configuration == (config)
+
+* You can specify a configuration file in the `hhelp` command line utility using the `--config` option, or in code using the `config_file` parameter of `houdinihelp.server.get_houdini_app` or `houdinihelp.server.start_server`.
+
+* If you don't specify a configuration file and `HOUDINIPATH/config/Help/bookish.cfg` exists, the server will load it (unless you pass `use_houdini_path=False`).
+
+* The help server is based on Flask. Flask's configuration files are actually Python.
+
+For example, to add a directory of files at `$HOME/myfiles`, put the following in the configuration file:
+
+{{{
+#!python
+EXTRA_DOCUMENTS = ["$HOME/myfiles/"]
+}}}
+
+
+See below for some useful configuration keys.
+
+=== Useful configuration keys ===
+
+`DOCUMENTS = [...]`:
+    The default list of document sources includes `help` directories from the Houdini path, as well as special sources that allow reading help from inside assets and shelf tools. You can replace this with a list of directory paths to serve _only_ your directories. For example:
+    
+    {{{
+    #!python
+    DOCUMENTS = ["/my/dir"]
+    }}}
+    
+    It's possible to extend this list in your configuration file instead of replacing it, but in that case it's easier to use `EXTRA_DOCUMENTS` (see below).
+
+`EXTRA_DOCUMENTS = []`:
+    A list of "extra" document sources to be added on to the defaults in `DOCUMENTS`. This is useful when you want the defaults but also want to serve from some additional directories
+    
+    (Note that the default list includes the `HOUDINIPATH/help`, so you can extend the Houdini path to achieve the same thing.)
+    
+    {{{
+    #!python
+    EXTRA_DOCUMENTS = ["/my/dir"]
+    }}}
+
+`ENABLE_BACKGROUND_INDEXING = False`:
+    Whether to run a thread to re-index changed content in the background. Overridden by the `--bgindex` option on the command line.
+
+`BACKGROUND_INDEXING_INTERVAL = 60`:
+    The number of seconds between re-indexes when background indexing is on.
+
+`EXTRA_SHORTCUTS = []`:
+    See [search shortcuts|search#shortcuts].
+
+`CACHE_DIR = "<<$HOUDINI_USER_PREF_DIR>>/config/Help"`:
+    Where the server caches `.json` files generated from wiki source files.
+    
+`INDEX_DIR = "<<$HFS>>/houdini/config/Help/index"`:
+    Directory containing the search index.
+
+
+== Configuring a central server to not use a batch license ==
+
+The default server uses `hou` for certain functionality:
+
+* Looking for a configuration file on the Houdini path.
+* Adding `HOUDINIPATH/help`, nodes, and shelf tools to the list of document sources.
+* Indexing example files.
+
+To prevent the server from using a batch license, you need to:
+
+* Create a configuration file for the server.
+
+* In the configuration file replace the default list of document sources, and change the default `PAGES_CLASS` configuration key.
+
+* Specify the configuration file when you start the server (see above).
+
+For example, make a `nolicense.cfg` file with the following:
+
+{{{
+#!python
+# The directories you want to serve from
+DOCUMENTS = ["$HFS/houdini/help", "/my/documents"]
+
+# Specify a page manager that doesn't use hou
+PAGES_CLASS = "houdinihelp.hpages.HoudiniPagesWithoutHou"
+}}}
+
+Using this configuration file will disable functionality that relies on `hou`:
+
+* You will not be able to read read help from the __Help__ tab of nodes and shelf tools.
+
+* Help links and references to `opdef:` will not work.
+
+* Indexing example files.
+

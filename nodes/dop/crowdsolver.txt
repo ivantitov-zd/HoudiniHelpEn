@@ -1,0 +1,281 @@
+#type: node
+#context: dop
+#internal: crowdsolver
+#version: 3.0
+#icon: CROWDS/crowdsolver
+
+= Crowd Solver =
+
+"""Updates agents according to their steer forces and animation clips."""
+
+@parameters
+
+== Particle Motion ==
+
+=== Velocity ===
+
+Controls how the agent's velocity may be manipulated by the solver.
+
+Max Force:
+    Specifies the maximum force that may be applied to the agent.
+    This parameter can be overridden by a `maxforce` point attribute.
+
+Drag:
+    Specifies the strength of a [drag|Node:dop/popdrag] that is applied to the agent's velocity.
+
+Constrain by Max Turn Rate:
+    If enabled, the __Max Turn Rate__ and __Min Speed__ parameters will be used to limit how quickly the agent's velocity may change direction.
+    This can prevent agents from sliding sideways or backwards when a strong force is applied.
+
+Project Forces:
+    If enabled, forces will be projected into the plane defined by the agent's `up` vector.
+    This can be used to prevent 3D forces from causing agents to move vertically.
+
+=== Orientation Update ===
+
+Controls how the agent's orientation is updated based on its `v` and `up` vectors.
+
+Min Speed:
+    Specifies the agent's minimum speed before its orientation may change. This can prevent agents from spinning around while at a low speed.
+
+Max Turn Rate:
+    #id: maxturnrate
+    Specifies how quickly the agent may change its orientation (in degrees per second) by rotating about its up axis.
+    This parameter can be overridden by a `maxturnrate` point attribute.
+
+Constrain Turn Acceleration:
+    #id: constrainturnaccel
+    When enabled, the agent's turning will follow a damped angular spring where its acceleration varies based on the angle from the target direction and the current turn rate.
+    This prevents sharp changes to the agent's orientation or turn rate, while still allowing the agent to adjust quickly to large changes in its target direction.
+    The __Max Turn Rate__ and __Max Acceleration__ parameters provide upper limits for the angular velocity and acceleration, respectively.
+
+Turn Stiffness:
+    #id: turnstiffness
+    Controls how quickly the agent accelerates based on the angle from its target direction.
+
+Turn Damping:
+    #id: turndamping
+    Specifies the damping for the angular spring. Larger values will avoid oscillation.
+
+Max Acceleration:
+    #id: turnaccelmax
+    Specifies the maximum angular acceleration of the agent when turning.
+
+Max Tilt Rate:
+    #id: maxtiltrate
+    Specifies how quickly the agent's up vector can rotate (in degrees per second).
+    This parameter can be overridden by a `maxtiltrate` point attribute.
+
+Constrain Tilt Acceleration:
+    #id: constraintiltaccel
+    When enabled, the agent's tilting will follow a damped angular spring where its acceleration varies based on the angle from the target up vector and the current tilt rate.
+    This can produce significantly smoother motion when, for example, adjusting the agent's up vector to follow the terrain normal.
+
+Tilt Stiffness:
+    #id: tiltstiffness
+    Controls how quickly the agent accelerates based on the angle from its target up vector.
+
+Tilt Damping:
+    #id: tiltdamping
+    Specifies the damping for the angular spring. Larger values will avoid oscillation.
+
+Max Acceleration:
+    #id: tiltaccelmax
+    Specifies the maximum angular acceleration of the agent when tilting.
+
+Adjust Up Vector:
+    Specifies how the solver should adjust the agent's up vector during the simulation.
+
+    Unchanged:
+        The solver will not modify the agent's `up` point attribute.
+
+    Set Perpendicular to Velocity:
+        Updates the up vector to remain perpendicular to the velocity vector.
+        This may be useful for situations such as birds flying around in space.
+
+    Set to Terrain Normal:
+        Updates the up vector to match the terrain normal. This requires that __Enable Terrain Projection__ is enabled.
+        This may be useful for situations such as insects crawling on walls.
+
+Reference Direction:
+    The agent's axis which will be aligned to follow the velocity vector. For example, setting this to 1,0,0 will align the agent's X-axis with its velocity.
+
+Reference Up:
+    The original up vector of the agent. This parameter is used along with the __Reference Direction__ when updating the agent's orientation.
+
+
+=== Locomotion Constraint ===
+
+Provides advanced controls for how agents with a locomotive animation clip follow the motion specified by the clip's locomotion channel.
+
+Strength:
+    Specifies how strong of an influence the locomotion channel's target velocity has on the particle's velocity (equivalent to the __Air Resistance__ of a [drag force|Node:dop/popdrag]).
+
+Sim Influence:
+    Reduces the effect of other forces in the crowd simulation on locomotive agents.
+
+=== Particle Update ===
+
+Update Particles:
+    Specifies whether the embedded POP solver is enabled. This should be disabled when using this solver as a microsolver.
+
+[Include:/nodes/dop/popsolver#doage]
+
+[Include:/nodes/dop/popsolver#doreapparticles]
+
+== Avoidance ==
+
+Enable Avoidance Force:
+    Enables a force that causes the agents to avoid each other based on their anticipated time to collision.
+
+[Include:standard_pop_parms#guideParms/]
+
+Agent Group:
+    Specifies a subgroup of agents that are affected by the avoidance force.
+
+Weight:
+    Specifies the [weight|/crowds/weights] of the avoidance force. Higher values will cause the avoidance force to take precedence over other forces.
+
+Particle Scale Multiplier:
+    The solver uses `pscale` as the size of each agent/particle when calculating potential collisions. You can use this parameter to scale the value of `pscale` in the calculation, letting you allow agents/particles to be more or less tightly packed.
+
+Force Scale:
+    Scaling factor for the strength of the avoidance force.
+
+Anticipation Time:
+    How far into the future an agent will look for possible collisions (this uses current velocity to project the possible distance). The maximum distance for which an agent considers another agent as a neighbor is the minimum of the agent's current speed multiplied by the Anticipation Time, and the Neighbor Distance. 
+
+Neighbor Distance:
+    Maximum distance an agent searches for other nearby agents.
+
+Max Neighbors:
+    Maximum number of nearest neighbors to an agent to consider when computing the agent avoidance force.
+
+== Look At ==
+
+Controls how agents' heads are adjusted to look at targets created by [Node:dop/agentlookat] nodes.
+
+Enable Look At:
+    Enables the head adjustment.
+
+Agent Group:
+    Specifies a subgroup of agents that are affected.
+
+Eye Offset:
+    An offset (in agent space) from the head bone position to the agent's eyes.
+
+[Include:/nodes/sop/agentlookat#limitheadturn]
+
+[Include:/nodes/sop/agentlookat#immediateadjust]
+
+[Include:/nodes/sop/agentlookat#headturnangle]
+
+== Terrain ==
+
+[Include:/nodes/dop/agentterrainadaptation#showguide]
+
+[Include:/nodes/dop/agentterrainadaptation#guidescale]
+
+[Include:/nodes/dop/agentterrainadaptation#lockedscale]
+
+[Include:/nodes/dop/agentterrainadaptation#guidecolor]
+
+[Include:/nodes/dop/agentterrainadaptation#enablefootlocking]
+
+[Include:/nodes/dop/agentterrainadaptation#adjusthips]
+
+[Include:/nodes/dop/agentterrainadaptation#hipoffset]
+
+[Include:/nodes/dop/agentterrainadaptation#hipshiftperframe]
+
+[Include:/nodes/dop/agentterrainadaptation#kneedampingthreshold]
+
+Enable Terrain Projection:
+    #id: enableterrainprojection
+    Projects the agent particles on the given terrain.
+
+Agent Group:
+    Specifies a subgroup of agents to apply terrain projection to.
+
+Source:
+    Specifies the source geometry for the terrain object (SOP path or DOP object).
+
+Mode:
+    Controls the direction of the agent projection.
+
+    Direction Vector:
+        Use the vector specified by the __Direction__ parameter.
+
+    Up Attribute:
+        Use the agent's `up` attribute.
+
+[Include:/nodes/dop/agentterrainprojection#samplingmethod]
+
+[Include:/nodes/dop/agentterrainprojection#projectsamples]
+
+Offset:
+    Additional offset that will shift all agents up or down.
+
+Stick to Deforming Geometry:
+    Enabling this option will record the primitive number and UVW coordinates where the agent was projected onto the terrain.
+    If the terrain geometry is deforming, this allows the solver to move the agent to the corresponding position on the deformed geometry at the start of the next frame.
+
+[Include:/nodes/dop/agentterrainadaptation#enableterrainadaptation]
+
+Agent Group:
+    Specifies a subgroup of agents to apply terrain adaptation to.
+
+[Include:/nodes/dop/agentterrainadaptation#enableleaning]
+
+[Include:/nodes/dop/agentterrainadaptation#leanangle]
+
+[Include:/nodes/dop/agentterrainadaptation#backwardlean]
+
+[Include:/nodes/dop/agentterrainadaptation#forwardlean]
+
+== Attributes ==
+
+Provides options for creating attributes that may be useful when debugging a simulation.
+
+Agent Speed:
+    Creates an `agentspeed` point attribute that contains the agent's current speed.
+
+Agent Angular Speed:
+    Creates an `agentangularspeed` point attribute that contains the agent's current angular speed.
+
+== Substeps ==
+
+Timescale:
+    An overall scale applied to the actual timestep. This parameter can be animated.
+
+Min Substeps:
+    The POP solver will always enforce this minimum number of substeps.
+
+    This should only rarely need to be changed.
+
+Max Substeps:
+    The POP solver will not break the simulation down in to more
+    substeps than this value.
+
+CFL Condition:
+    The CFL condition is a factor used to automatically determine what
+    size substep the scene requires. The idea is to control the distance
+    that a particle can travel in a given substep.
+
+    For example, when this parameter is set to 0.5, the solver will set
+    the length of each substep such that no particle travels more than
+    50% of the size of the smallest particle in a substep.
+
+Quantize to Max Substeps:
+    Always use substeps that divide up the frame by __Max Substeps__.  For example,
+    if __Max Substeps__ is set to 4, but the __CFL Condition__ only requires 3 substeps,
+    the solver will take frame steps of 0.25, 0.5, and 0.25.  This option can be useful for
+    re-using input geometry that has been cached to file at increments of 1/__Max Substeps__.
+
+Frames Before Solve:
+    Delays the actual simulation for a specified number of frames after the object creation.
+    Steps such as terrain adaptation will still occur during these frames.
+
+@related
+- [Node:sop/agentprep]
+- [Node:dop/crowdstate]

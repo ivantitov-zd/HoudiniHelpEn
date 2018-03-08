@@ -1,0 +1,88 @@
+#type: node
+#context: sop
+#internal: pointdeform
+#icon: SOP/pointdeform
+
+#tags: reshape, model, anim
+
+= Point Deform =
+
+"""Deforms geometry on an arbitrary connected point mesh."""
+
+The Point Deform SOP deforms geometry according to a point cloud. The point cloud can have connectivity information. Connected points are used to deduce local transforms, allowing accurate transformation of rotating objects.  This avoids the collapsing that can occur with
+the Lattice SOP's point mode when the transformation mesh rotates.
+
+NOTE:
+    The connectivity between the rest and deformed lattice should be the same.  Changing primitive counts or topology will confuse the system.
+    
+Like the [Bone Deform|Node:sop/deform], [Cloth Deform|Node:sop/clothdeform], and [Lattice|Node:sop/lattice] SOPs, this node captures and deforms geometry. 
+It allows you to animate proxy geometry and transfer that to a high resolution mesh, so each point of the high resolution mesh is captured by corresponding points on the proxy mesh.  Then the difference between the capture frame and the current frame is used to determine how to transform the high resolution mesh.
+
+This is useful if you want to deform by a point cloud and have connectivity information for that point cloud.  It works for cloth or solid like things, but does not work for wire like things (the transforms become unstable).  It does not require the connectivity to be any type, so is not limited to polygons or two manifold surfaces, making it useful for the sort of constraint networks you get out of Bullet or the grain solver.
+
+@parameters
+
+Group:
+    The subset of input points to capture and/or deform.
+
+Mode:
+    Instead of separating the capturing and deformation into separate
+    SOPs, both operations are available with this SOP.  Setting
+    to Capture mode will output the capture weight information, which
+    can then be applied with a successive Point Deform set to Deform mode.
+
+    Alternatively, the Capture and Deform does both operations at once.
+
+    There is no inherent speed advantage to using one SOPs or two SOPs,
+    the choice should be dictated by workflow.
+
+== Capture ==
+
+Radius:
+    The maximum distance (in Houdini units) away from each point to look for points in the deforming point cloud.
+    A simple Elendt metaball weighting is then applied based on the relative distance.
+
+Minimum Points:
+	If fewer points than this are found, the search radius is
+	increased to find at least this number of points.  This will
+	cause discontinuities in final mesh, but is often preferable to
+	having points being orphaned.
+
+Maximum Points:
+	Provides an upper bound to the number of points that any particular
+	point can be weighted by.  Speeds up application and reduces memory
+	use, but will create discontinuities if hit.
+
+== Deform ==
+Rigid Projection:
+	The computed local transform can have shear components.  This projects
+	out those leaving only a rigid transform.
+    Recompute Affected Normals:
+	Recomputes any normals that are affected by polygons that use both
+	transformed and untransformed points. When transforming the full
+	geometry or full connected components, the results should be the same
+	as when this option is off, i.e. the normals will just be transformed
+	and not recomputed. This does nothing if `P` is not being transformed.
+
+Attributes to Transform:
+	Point and Vertex attributes that match this pattern will be
+	transformed.  Their Type Info will be used to determine how
+	they should transform, as points, vectors, and normals
+	all need different operations.
+
+	If `P` matches this string, then primitive transforms will
+	also be rotated.
+
+	NOTE:
+	    `P` is always deformed, regardless of this setting.
+
+Delete Capture Attributes:
+	After capturing the weighting attributes are often no longer needed.
+	This deletes them allowing for lighter weight caches.
+        
+@related
+    - [Node:sop/lattice]
+    - [Node:sop/bulge]
+    - [Node:sop/magnet]
+    - [Node:sop/spring]
+

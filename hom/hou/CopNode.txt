@@ -1,0 +1,464 @@
+= hou.CopNode =
+#type: homclass
+#cppname: HOM_CopNode
+#superclass: hou.Node
+#group: image
+
+"""Represents a compositing node."""
+
+@methods
+
+::`planes(self)` -> `tuple of strings`:
+    #cppname: HOM_CopNode::planes
+    Returns a tuple of plane names in the node's image sequence.
+
+    Raises [Hom:hou.OperationFailed] if the node could not be cooked or
+    opened for processing.
+
+::`components(self, plane)` -> `tuple` of `str`:
+    #cppname: HOM_CopNode::components
+    Returns a tuple of component names for the specified plane in
+    the node's image sequence.  The value of the `plane` argument must
+    be a plane name.
+
+    Raises ValueError if `plane` is None or empty.
+    Raises [Hom:hou.OperationFailed] if the node could not be cooked or
+    opened for processing.
+    Raises [Hom:hou.OperationFailed] if the given plane does not exist.
+
+::`xRes(self)`:
+    #cppname: HOM_CopNode::xRes
+    #replaces: Cmd:res
+    Returns the x-resolution of the node's image for the current frame.
+
+    Raises [Hom:hou.OperationFailed] if the node could not be cooked or
+    opened for processing.
+
+::`yRes(self)`:
+    #cppname: HOM_CopNode::yRes
+    #replaces: Cmd:res
+    Returns the y-resolution of the node's image for the current frame.
+
+    Raises [Hom:hou.OperationFailed] if the node could not be cooked or
+    opened for processing.
+
+::`imageBounds(self, plane="C")` -> `tuple` of `int`:
+    #cppname: HOM_CopNode::imageBounds
+    #replaces: Exp: imgbounds
+    Returns the x and y boundaries of the given plane in the form
+    of (xmin, ymin, xmax, ymax).  The value of the `plane` argument
+    is the plane name.  By default, the image bounds of the color plane
+    is returned.
+
+    Note that the image bounds is not the same as the image resolution.
+    For example, the image bounds for a Font COP is the bounding rectangle
+    around the displayed letters while the resolution is the size of the
+    node's image.
+
+    Note that the returned image bounds is for the current frame.
+
+    Raises ValueError if `plane` is None or empty.
+    Raises [Hom:hou.OperationFailed] if the node could not be cooked or
+    opened for processing.
+    Raises [Hom:hou.OperationFailed] if the given plane does not exist.
+
+::`depth(self, plane)` -> [Hom:hou.imageDepth] enum value:
+    #cppname: HOM_CopNode::depth
+    Return the data format used to represent one component of one pixel in
+    the given image plane.
+
+    For example, if the depth of the `"C"` (color) plane is
+    [hou.imageDepth.Int8|Hom:hou.imageDepth], each of the red, green, and blue
+    components is stored as an (unsigned) 8-bit integer, occupying one byte.
+    If, for example, it is instead [hou.imageDepth.Float32|Hom:hou.imageDepth],
+    each of the red, green, and blue components is a 32-bit float and
+    occupies 4 bytes (12 bytes total for all 3 components combined).
+
+::`maskInputIndex(self)` -> `int`:
+    #cppname: HOM_CopNode::maskInputIndex
+    Return the input index of the mask input for this node. Return -1 if this
+    node type does not provide a mask input.
+
+::`allPixels(self, plane="C", component=None, interleaved=True, time=-1.0)` -> `tuple` of `float`:
+    #cppname: HOM_CopNode::allPixels
+    Return a tuple of floats containing all pixel values for a particular image
+    plane.  The pixels in the bottom scanline of the image are first in the
+    result, followed by the second-last scanline, etc.  Floating point values
+    in the color plane ("C"), for example, are typically in the range 0.0 to
+    1.0.
+
+    plane:
+	The name of the image plane to return.  All images have "C" (color)
+	and "A" (alpha) planes.  Deep raster images may contain other planes,
+	such as "Pz" (depth), "N" (normal), etc.
+    component:
+	A particular subcomponent of the plane.  For example, for the "C" plane
+	you could specify one of the "r", "g", or "b" subcomponents.  Specify
+	`None` to indicate all components.
+    interleaved:
+	Whether the different components of the plane are interleaved in the
+	result.  For example, if the plane is "C", the interleaved result would
+	be organized as `rgbrgbrgb...` while the uninterleaved result would
+	be `rrr...ggg...bbb...`.  This parameter has no effect when a
+	particular component is specified.
+    time:
+	The time at which to cook the COP node.  If this value is negative,
+	Houdini uses the current time.
+
+	Note that this argument does not apply if `allPixels` is called from a
+	Python COP that is cooking.  In that case `allPixels` evaluates at the
+	current cooking time.
+
+    This method does not accept a `depth` parameter like `allPixelsAsString`
+    does.  The values are converted to floating point data, regardless of
+    the actual depth of the image plane.
+
+    Raises [Hom:hou.OperationFailed] if the `time` argument is set to a value
+    greater than or equal to 0.0 and `allPixels` is called from a cooking
+    Python COP.
+
+::`allPixelsAsString(self, plane="C", component=None, interleaved=True, time=-1.0, depth=None)` -> `str`:
+    #cppname: HOM_CopNode::allPixelsAsString
+    Return a binary string representation of the floats containing all the
+    values of all voxels.  This method is faster than
+    [Hom:hou.CopNode#allPixels], and you can use the `array` module to convert
+    the string into a Python sequence.  Note that this method returns binary
+    float data, so there are 4 bytes per R, G, and B component, not 1 byte.
+
+    If depth is [hou.imageDepth.Float32|Hom:hou.imageDepth], this method
+    provides a faster implementation of the following:
+    {{{
+    #!python
+    import array
+    def allPixelsAsString(self):
+	return array.array("f", self.allPixels()).tostring()
+    }}}
+
+    If `depth` is `None` and this method is called from the code implementing a
+    Python COP to get an input plane, the depth will be the same as the plane's
+    native depth.  If `depth` is `None` and this method is called from outside
+    a Python COP, the depth will be `hou.imageDepth.Float32`.  Otherwise, if
+    `depth` is a [Hom:hou.imageDepth] enumerated value the result will be
+    converted to the specified depth.
+
+    See [Hom:hou.CopNode#allPixels] for more information.  See also
+    [Hom:hou.Volume#setVoxelSliceFromString].
+
+    Raises [Hom:hou.OperationFailed] if the `time` argument is set to a value
+    greater than or equal to 0.0 and `allPixelsAsString` is called from a
+    cooking Python COP.
+
+::`setPixelsOfCookingPlane(self, values, component=None, interleaved=True, flip_vertically=False)`:
+    #cppname: HOM_CopNode::setPixelsOfCookingPlane
+    Set the pixels of the plane being cooked by the currently-running
+    Python COP.
+
+    values:
+	A sequence of floats, organized with the contents of the bottom
+	scanline first.
+
+	If `component` is `None`, the length of the sequence of floats must be
+	the number of pixels in the image times the number of components.
+	Otherwise, it must be the number of pixels in the image.
+    component:
+	Either the name of one component in the plane being cooked, or
+	`None`.  If a component name is given, `values` will contain only
+	the values for that component.  Otherwise, it will contain the
+	values for all components of all pixels in the plane.
+    interleaved:
+	If `component` is `None` and interleaved is `True`, `values` is
+	contains the first component of the first pixel, followed by the second
+	component of the first pixel, until the last component of the first
+	pixel, then the first component of the second pixel, etc.  If it is
+	`False`, `values` contains all the values of the first component for
+	all pixels, followed by all the values of the second component, etc.
+
+	For example, if the plane is "C" and interleaved is `True`, the
+	values will be organized as `rgbrgbrgb...`.  If it is not interleaved,
+	it will be organized as `rrr...ggg...bbb...`.
+
+	If `component` is not `None`, this parameter is ignored.
+    flip_vertically:
+	The default value for this parameter is `False`, so the first scanline
+	in the `values` array is assumed to be the bottom scanline.  If
+	`flip_vertically` is `True`, the input values are assumed to oriented
+	starting at the top scanline.
+
+    If you call this method from outside the `cook` function in a Python
+    COP, raises [Hom:hou.OperationFailed].
+
+    See also [Hom:hou.CopNode#allPixels] and
+    [Hom:hou.CopNode#setPixelsOfCookingPlaneFromString].  Also see the
+    [HOM cookbook|/hom/cookbook] and the [Python COP|/hom/pythoncop]
+    documentation for examples.
+
+::`setPixelsOfCookingPlaneFromString(self, values, component=None, interleaved=True, depth=None, flip_vertically=False)`:
+    #cppname: HOM_CopNode::setPixelsOfCookingPlaneFromString
+    Set the pixels of the plane being cooked by the currently-running Python
+    COP.  This method is like [Hom:hou.CopNode#setPixelsOfCookingPlane] except
+    `values` contains a binary string representation of the data instead of a
+    sequence of floats.  Consequently, this method is faster.
+
+    The `depth` parameter specifies how to interpret the values in the binary
+    string, and is a [Hom:hou.imageDepth] enumerated value.  If `depth` is None,
+    the depth is assumed to be in the depth of the plane being cooked.  Note
+    that, by specifying `depth` explicitly, you can provide data in any depth,
+    regardless of the actual depth stored by the COP.
+
+    Note that this method can accept more types that just a string: it can
+    receive any Python object that supports the buffer interface.  In
+    particular, arrays from the `array` and `numpy` Python modules are
+    supported, so there is no need to first construct strings from those
+    arrays.
+
+    See [Hom:hou.CopNode#setPixelsOfCookingPlane] and
+    [Hom:hou.CopNode#allPixelsAsString] for more information.
+
+::`saveImage(self, file_name, frame_range=())`:
+    #cppname: HOM_CopNode::saveImage
+    #replaces: Cmd:opsave
+    Saves the node's cooked image sequence to disk.  For multiple images,
+    make sure that the `file_name` argument contains $F so that the
+    sequence is written to multiple files.
+
+    The optional `frame_range` argument can be specified to write
+    only a subset of frames in the image sequence.  `frame_range` must
+    be a 2-tuple or a 3-tuple, where the first element is the start frame,
+    the second element is the end frame and the third element is the
+    frame increment.  If `frame_range` is not given, then every frame in 
+    the image sequence is saved to disk.
+
+    Raises ValueError if the frame increment in `frame_range` is 0.
+    Raises [Hom:hou.InvalidSize] if the size of `frame_range` is not
+    0, 2 or 3.
+    Raises [Hom:hou.OperationFailed] if the node could not be cooked or
+    opened for processing.
+    Raises [Hom:hou.OperationFailed] if the image could not be saved to disk.
+
+::`getPixelByUV(self, plane, u, v, component=None, interpolate=True)` -> `tuple` of `float`:
+    #cppname: HOM_CopNode::getPixelByUV
+    #replaces: Exp:pic, Exp:picni
+    Returns plane values for a single pixel in the node's image.  The
+    plane is defined by the `plane` argument which must be set to the
+    plane's name.  The pixel is defined by (`u`, `v`) coordinates where 
+    `u` and `v` are values between 0.0 and 1.0.  If the optional 
+    `component` argument is specified, then the value for that particular 
+    component is returned.  Otherwise, all of the plane's component 
+    values are returned.  The value of `component` should be the
+    component's name (i.e. "r", "g", "b", etc.).
+
+    If the (`u`, `v`) coordinates do not fall exactly on a pixel, then
+    the return values are calculated by linear blending of the values
+    for the surrounding pixels.  This can be disabled by setting the
+    `interpolate` argument to False, in which case the values of the 
+    pixel located immediately to the bottom-left of (`u`, `v`) are returned.
+
+    Note that the returned values are for the node's image at the
+    current frame.
+
+    Raises ValueError if either `u` or `v` is outside of the 0.0-1.0 range.
+    Raises ValueError if `plane` is None or empty.
+    Raises [Hom:hou.OperationFailed] if the node could not be cooked or
+    opened for processing.
+    Raises [Hom:hou.OperationFailed] if the given plane does not exist.
+    Raises [Hom:hou.OperationFailed] if the given component does not exist
+    in the plane.
+
+::`getPixelHSVByUV(self, u, v, interpolate=True)` -> `tuple` of `float`:
+    #cppname: HOM_CopNode::getPixelHSVByUV
+    #replaces: Exp:pic, Exp:picni
+    Returns a 3-tuple containing the hue, saturation and value for
+    a single pixel in the node's image.  The pixel is defined by 
+    (`u`, `v`) coordinates where `u` and `v` are values between 0.0 and 1.0.  
+
+    If the (`u`, `v`) coordinates do not fall exactly on a pixel, then
+    the return values are calculated by linear blending of the values
+    for the surrounding pixels.  This can be disabled by setting the
+    `interpolate` argument to False, in which case the values of the 
+    pixel located immediately to the bottom-left of (`u`, `v`) are returned.
+
+    Note that the returned hue, saturation and value are for the
+    node's image at the current frame.
+
+    Raises ValueError if either `u` or `v` is outside of the 0.0-1.0 range.
+    Raises [Hom:hou.OperationFailed] if the node could not be cooked or
+    opened for processing.
+
+::`getPixelLuminanceByUV(self, u, v, interpolate=True)` -> `float`:
+    #cppname: HOM_CopNode::getPixelLuminanceByUV
+    #replaces: Exp:pic, Exp:picni
+    Returns the luminance value for a single pixel in the node's image.
+    The pixel is defined by (`u`, `v`) coordinates where `u` and `v` 
+    are values between 0.0 and 1.0.  
+
+    If the (`u`, `v`) coordinates do not fall exactly on a pixel, then
+    the luminance is calculated by linear blending of the luminance values
+    for the surrounding pixels.  This can be disabled by setting the
+    `interpolate` argument to False, in which case the luminance of the 
+    pixel located immediately to the bottom-left of (`u`, `v`) is returned.
+
+    Note that the returned luminance value is for the node's image 
+    at the current frame.
+
+    Raises ValueError if either `u` or `v` is outside of the 0.0-1.0 range.
+    Raises [Hom:hou.OperationFailed] if the node could not be cooked or
+    opened for processing.
+
+::`isSingleImage(self)` -> `bool`:
+    #cppname: HOM_CopNode::isSingleImage
+    #replaces: Exp:seqanim
+    Returns True if the node has a single image.  Returns False if the
+    node has an image sequence.
+
+::`sequenceStartFrame(self)` -> `float`:
+    #cppname: HOM_CopNode::sequenceStartFrame
+    #replaces: Exp:seqstart
+    Returns the start frame in the node's image sequence.
+
+    Raises [Hom:hou.OperationFailed] if the node could not be cooked or
+    opened for processing.
+
+::`sequenceEndFrame(self)` -> `float`:
+    #cppname: HOM_CopNode::sequenceEndFrame
+    #replaces: Exp:seqend
+    Returns the last frame in the node's image sequence.
+
+    Raises [Hom:hou.OperationFailed] if the node could not be cooked or
+    opened for processing.
+
+::`sequenceFrameLength(self)` -> `float`:
+    #cppname: HOM_CopNode::sequenceFrameLength
+    #replaces: Exp:seqlength
+    Returns the frame length of the node's image sequence.
+
+    Raises [Hom:hou.OperationFailed] if the node could not be cooked or
+    opened for processing.
+
+::`setDisplayFlag(self, on)`:
+    #cppname: HOM_CopNode::setDisplayFlag
+    #replaces: Cmd:opset
+    Turns the node's display flag on or off.  When the display flag is
+    on, the node's image will appear in the image viewport.
+    The value of the `on` argument must be True or False.
+
+    Raises [Hom:hou.PermissionError] if the node is unwritable.
+
+::`isDisplayFlagSet(self)` -> `bool`:
+    #cppname: HOM_CopNode::isDisplayFlagSet
+    #replaces: Exp:opflag, Cmd:opget
+    Returns True if the node's display flag is turned on.  Returns False
+    otherwise.
+
+::`setRenderFlag(self, on)`:
+    #cppname: HOM_CopNode::setRenderFlag
+    #replaces: Cmd:opset
+    Turns the node's render flag on or off.  The render flag controls
+    which node in a compositing network will be rendered to [mplay] 
+    or to disk.  The value of the `on` argument must be True or False.
+
+    Raises [Hom:hou.PermissionError] if the node is unwritable.
+
+::`isRenderFlagSet(self)` -> `bool`:
+    #cppname: HOM_CopNode::isRenderFlagSet
+    #replaces: Exp:opflag, Cmd:opget
+    Returns True if the node's render flag is turned on.  Returns False
+    otherwise.
+
+::`setTemplateFlag(self, on)`:
+    #cppname: HOM_CopNode::setTemplateFlag
+    #replaces: Cmd:opset
+    Turns the node's template flag on or off.
+    The value of the `on` argument must be True or False.
+
+    Raises [Hom:hou.PermissionError] if the node is unwritable.
+
+::`isTemplateFlagSet(self)` -> `bool`:
+    #cppname: HOM_CopNode::isTemplateFlagSet
+    #replaces: Exp:opflag, Cmd:opget
+    Returns True if the node's template flag is turned on.  Returns False
+    otherwise.
+
+::`setCompressFlag(self, on)`:
+    #cppname: HOM_CopNode::setCompressFlag
+    #replaces: Cmd:opset
+    Turns the node's compress flag on or off. If the compress flag is True,
+    this node will not show a preview image in the Network View. If the
+    compress flag is False, a preview image will be shown in the Network View.
+    The value of the `on` argument must be True or False.
+
+    Raises [Hom:hou.PermissionError] if the node is unwritable.
+
+::`isCompressFlagSet(self)` -> `bool`:
+    #cppname: HOM_CopNode::isCompressFlagSet
+    #replaces: Exp:opflag, Cmd:opget
+    Returns True if the node's compress flag is turned on.  Returns False
+    otherwise. The compress flag controls whether or not a preview image is
+    shown for this node in the Network View.
+
+::`bypass(self, on)`:
+    #cppname: HOM_CopNode::bypass
+    #replaces: Cmd:opset
+    Turns the node's bypass flag on or off.  When the bypass flag is
+    on, the node will have no effect on the scene. The value of the 
+    `on` argument must be True or False.
+
+    Raises [Hom:hou.PermissionError] if the node is unwritable.
+
+::`isBypassed(self)` -> `bool`:
+    #cppname: HOM_CopNode::isBypassed
+    #replaces: Exp:opflag, Cmd:opget
+    Returns True if the node's bypass flag is turned on.  Returns False
+    otherwise.
+
+::`hasMetaData(self, metadata_name)` -> `bool`:
+    #cppname: HOM_CopNode::hasMetaData
+    
+    Returns True if the metadata with name `metadata_name` exists, False
+    otherwise.    
+
+::`getMetaDataInt(self, metadata_name, index=0)` -> `int`:
+    #cppname: HOM_CopNode::getMetaDataInt
+    
+    Returns numeric metadata as a single integer. In the case of vectors,
+    matrices and arrays, `index` indicates the component to fetch. Floating
+    point metadata will be truncated.
+
+::`getMetaDataFloat(self, metadata_name, index=0)` -> `double`:
+    #cppname: HOM_CopNode::getMetaDataFloat
+    
+    Returns numeric metadata as a single double precision value.
+    In the case of vectors, matrices and arrays, `index` indicates the
+    component to fetch.
+
+::`getMetaDataString(self, metadata_name)` -> `str`:
+    #cppname: HOM_CopNode::getMetaDataString
+    
+   Returns string metadata from `metadata_name`. 
+
+::`getMetaDataIntArray(self, metadata_name)` -> tuple of `int`:
+    #cppname: HOM_CopNode::getMetaDataIntArray
+    
+    Returns numeric metadata as an array of integers. Floating point metadata 
+    values will be truncated.
+
+::`getMetaDataFloatArray(self, metadata_name)` -> tuple of `double`:
+    #cppname: HOM_CopNode::getMetaDataFloatArray
+
+    Returns numeric metadata as an array of double-precision values.
+
+@replaces
+
+- [Exp:pic]
+- [Exp:picni]
+- [Exp:opflag]
+- [Cmd:opget]
+- [Cmd:opsave]
+- [Cmd:opset]
+- [Exp:res]
+- [Exp:seqanim]
+- [Exp:seqend]
+- [Exp:seqlength]
+- [Exp:seqstart]
+- [Exp:copmeta]
+- [Exp:copmetas]
+

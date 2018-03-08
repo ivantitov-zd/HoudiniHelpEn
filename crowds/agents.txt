@@ -1,0 +1,281 @@
+= Agent Primitives =
+
+"""About agents, the moving "actors" that make up a crowd simulation."""
+
+== Overview ==
+
+Agent primitives are a type of [packed primitive|/model/packed], and are typically used to represent a character (agent) in a crowd simulation.
+As with other packed primitive types, agent primitives reference a single point, and so can be treated as a particle in many situations.
+
+== Agent Definition == (agentdefinition)
+
+An agent primitive stores a reference to several pieces of data, which are shared between copies of the agent and are often referred to as the _agent definition_.
+The agent definition consists of: a [rig|/crowds/agents#rig], a [shape library|/crowds/agents#shapelib], a set of [layers|/crowds/agents#layer], a set of [clips|/crowds/agents#clip], and an optional set of [transform groups|#xformgroups].
+An agent's [current layer and transforms|/crowds/agents#uniquedata] determine the geometry produced when the agent is unpacked.
+
+When saving a set of agent primitives to disk, the components of the agent definition are also embedded in the geometry file (similar to a [packed geometry primitive|/model/packed#memory]).
+Each component of the definition can also be saved separately to disk and treated as an _external reference_ by the agent primitive - this can significantly reduce redundant data when, for example, saving out a sequence of frames from a crowd simulation.
+In such cases, only the path to the agent definition component (e.g. the shape library) will be stored in the geometry file (similar to a [packed disk primitive|/model/packed#disk]).
+The [Agent ROP|Node:/out/agent] can be used to write the agent definition of an existing agent primitive to disk, or can create an agent definition from a character rig or FBX file.
+
+== Rig == (rig)
+
+The rig stores the agent's transform hierarchy (a tree of named transforms).
+Each transform either has a single parent, or is a root of the hierarchy.
+
+:tab: File Format
+    Rigs are stored in JSON format.
+    The hierarchy is represented as a map from parents to a list of their children, and the transform names may appear in any order.
+    {{{
+    #!json
+    {
+        "rig_version": 1,
+        "transforms": {
+            "root": ["LUpperArm", "RUpperArm"],
+            "LUpperArm": ["LLowerArm"],
+            "LLowerArm": [],
+            "RUpperArm": ["RLowerArm"],
+            "RLowerArm": [],
+        }
+    }
+    }}}
+
+:tab: VEX Functions
+    The following VEX functions can be used to query information about an agent's rig:
+    * [Vex:agentrigchildren]
+    * [Vex:agentrigfind]
+    * [Vex:agentrigparent]
+    * [Vex:agenttransformcount]
+    * [Vex:agenttransformnames]
+
+:tab: HOM
+    The following HOM classes and methods can be used query information about or create an agent's rig:
+    * [Hom:hou.Agent#rig]
+    * [Hom:hou.AgentDefinition#rig]
+    * [Hom:hou.AgentRig]
+
+== Shape Library == (shapelib)
+
+The shape library provides a collection of geometry (_shapes_) that can be used by the agent.
+Each shape in the library has a unique name, and can be either _static_ or _deforming_.
+A static shape, such as the arm of a robot, does not deform and may only be transformed.
+The geometry of a deforming shape is expected to be in a rest pose and contain [capture attributes|/character/captureregions] describing how the geometry is influenced by the transforms in the rig.
+
+:tab: File Format
+    Each shape is stored as a [packed primitive|/model/packed#memory], where the `name` primitive attribute contains the name of the shape and the shape's geometry is the packed primitive's contents.
+    As such, the shape library is saved to disk as a single geometry file in the standard [geo/bgeo format|/io/formats/geo].
+
+    The `shapelib_includes` string array detail attribute can be used to specify additional shape libraries that should be included when the library is loaded.
+    This attribute is expected to have a tuple size of 2, with each pair containing the condensed path (e.g. a path relative to `$HIP` or `$JOB`) along with the absolute path to the shape library file.
+
+:tab: HOM
+    The following HOM classes and methods can be used query information about or modify an agent's shape library:
+    * [Hom:hou.Agent#shapeLibrary]
+    * [Hom:hou.AgentDefinition#shapeLibrary]
+    * [Hom:hou.AgentShape]
+    * [Hom:hou.AgentShapeLibrary]
+
+== Layers == (layer)
+
+Layers control the agent's geometry: which shapes from the shape library should be used when the agent is unpacked, along with how those shapes should be transformed.
+
+A layer consists of a set of _shape bindings_, which attach a shape from the shape library to a transform in the rig (for example, attaching the shape named "sword_1" to the "RHand" transform).
+Each shape binding can also specify a scale factor for the shape's bounding box.
+
+:tab: File Format
+    Layers are stored in JSON format, with separate lists of static and deforming shape bindings.
+    {{{
+    #!json
+    {
+	"version": 1,
+	"name": "soldier_display",
+        "static": [
+	    {
+	        "transform": "LLowerArm",
+		"shape": "shield",
+		"bounds_scale": 1
+	    },
+	    {
+		"transform": "RLowerArm",
+		"shape": "sword",
+		"bounds_scale": 1
+	    }
+	],
+        "deforming": [
+	    {
+	        "transform": "root",
+		"shape": "skin",
+		"bounds_scale": 1
+	    }
+	]
+    }
+    }}}
+
+:tab: VEX Functions
+    The following VEX functions can be used to query information about or change an agent's layers:
+    * [Vex:agentcollisionlayer]
+    * [Vex:agentcurrentlayer]
+    * [Vex:agentlayerbindings]
+    * [Vex:agentlayers]
+    * [Vex:agentlayershapes]
+    * [Vex:setagentcollisionlayer]
+    * [Vex:setagentcurrentlayer]
+
+:tab: HOM
+    The following HOM classes and methods can be used query information about, create, or change an agent's layers:
+    * [Hom:hou.Agent#collisionLayer]
+    * [Hom:hou.Agent#currentLayer]
+    * [Hom:hou.Agent#layers]
+    * [Hom:hou.Agent#setCollisionLayer]
+    * [Hom:hou.Agent#setCurrentLayer]
+    * [Hom:hou.AgentDefinition#addLayer]
+    * [Hom:hou.AgentDefinition#layers]
+    * [Hom:hou.AgentLayer]
+    * [Hom:hou.AgentShapeBinding]
+
+== Clips == (clip)
+
+Clips provide animation data that can be used to drive an agent's [transforms|#transforms].
+
+:tab: File Format
+    Clips are saved in the standard [.bclip format|/io/formats/channel_formats].
+
+    Channels for an agent's transforms are stored in local space and are named in the format `transform_name:channel`, where `channel` is `t[xyz]`, `r[xyz]`, or `s[xyz]`.
+
+    NOTE:
+        The `[srt]` channels describe the full local transform of each joint, and will not match the objects' `[srt]` channels from the source animation if there were [pre-transforms|/basics/objects#pretransform].
+
+:tab: VEX Functions
+    The following VEX functions can be used to query information about or change an agent's clips:
+    * [Vex:agentaddclip]
+    * [Vex:agentclipcatalog]
+    * [Vex:agentclipchannel]
+    * [Vex:agentcliplength]
+    * [Vex:agentclipsample]
+    * [Vex:agentclipsamplelocal]
+    * [Vex:agentclipsamplerate]
+    * [Vex:agentclipsampleworld]
+
+:tab: HOM
+    The following HOM classes and methods can be used query information about, create, or change an agent's clips:
+    * [Hom:hou.Agent#clipCatalog]
+    * [Hom:hou.AgentDefinition#addClip]
+    * [Hom:hou.AgentDefinition#clips]
+    * [Hom:hou.AgentClip]
+
+== Transform Groups == (xformgroups)
+
+A transform group is a named subset of the transforms in an agent's [rig|#rig].
+Transform groups can be used when applying clips to parts of an agent's skeleton.
+A weight value from 0 to 1 can also be assigned to each member of the group.
+
+:tab: File Format
+    Transform groups are stored in JSON format.
+    {{{
+    #!json
+    {
+	"version": 2,
+	"name": "upper_arms",
+	"members": [
+	    {
+                "name": "LUpperArm",
+                "weight": 1
+            },
+            {
+                "name": "RUpperArm",
+                "weight": 1
+            }
+	]
+    }
+    }}}
+
+:tab: VEX Functions
+    The following VEX functions can be used to query information about an agent's transform groups:
+    * [Vex:agentfindtransformgroup]
+    * [Vex:agenttransformgroupmember]
+    * [Vex:agenttransformgroups]
+    * [Vex:agenttransformgroupweight]
+
+:tab: HOM
+    The following HOM classes and methods can be used query information about or create transform groups:
+    * [Hom:hou.AgentDefinition#addTransformGroup]
+    * [Hom:hou.AgentDefinition#findTransformGroup]
+    * [Hom:hou.AgentDefinition#transformGroups]
+    * [Hom:hou.AgentTransformGroup]
+
+== Per-Agent Data == (uniquedata)
+
+=== Transforms === (transforms)
+
+:tab: Overview
+    Each agent stores a set of _current transforms_ (a 4x4 matrix for each transform in its rig).
+    The transforms may be driven by the agent's animation clips (by setting the current clip [names|Vex:setagentclipnames], [times|Vex:setagentcliptimes], and [weights|Vex:setagentclipweights]), or the transforms can be [controlled manually|Vex:setagentlocaltransform].
+
+    As with other packed primitive types, agents also have an overall transform (controlled by the `P` and `orient` point attributes) that can be used to position the agent.
+
+:tab: VEX Functions
+    The following VEX functions can be used to read or modify an agent's transforms:
+    * [Vex:agentclipnames]
+    * [Vex:agentcliptimes]
+    * [Vex:agentclipweights]
+    * [Vex:agentlocaltransform]
+    * [Vex:agentlocaltransforms]
+    * [Vex:agentworldtransform]
+    * [Vex:agentworldtransforms]
+
+    * [Vex:setagentclipnames]
+    * [Vex:setagentcliptimes]
+    * [Vex:setagentclipweights]
+    * [Vex:setagentlocaltransform]
+    * [Vex:setagentlocaltransforms]
+    * [Vex:setagentworldtransform]
+    * [Vex:setagentworldtransforms]
+
+:tab: HOM
+    The following HOM methods can be used to read or modify an agent's transforms:
+    * [Hom:hou.Agent#clips]
+    * [Hom:hou.Agent#clipTimes]
+    * [Hom:hou.Agent#clipWeights]
+    * [Hom:hou.Agent#localTransform]
+    * [Hom:hou.Agent#worldTransform]
+
+    * [Hom:hou.Agent#setClips]
+    * [Hom:hou.Agent#setClipTimes]
+    * [Hom:hou.Agent#setClipWeights]
+    * [Hom:hou.Agent#setLocalTransform]
+    * [Hom:hou.Agent#setWorldTransform]
+
+=== Layers === (currentlayers)
+
+:tab: Overview
+    Each agent has a _current layer_ from its agent definition, which specifies the geometry to use when the agent is unpacked, displayed in the viewport, or rendered.
+
+    Additionally, an agent may have a _collision layer_, which is the layer to be used when a simple representation of the agent is needed (for example, a ragdoll simulation with the [Node:dop/bulletrbdsolver]).
+    The collision layer, if present, is also used when determining the agent's bounding box.
+
+:tab: VEX Functions
+    The following VEX functions can be used to read or modify an agent's current layers:
+    * [Vex:agentcollisionlayer]
+    * [Vex:agentcurrentlayer]
+    * [Vex:setagentcollisionlayer]
+    * [Vex:setagentcurrentlayer]
+
+:tab: HOM
+    The following HOM methods can be used to read or modify an agent's current layers:
+    * [Hom:hou.Agent#collisionLayer]
+    * [Hom:hou.Agent#currentLayer]
+    * [Hom:hou.Agent#layers]
+    * [Hom:hou.Agent#setCollisionLayer]
+    * [Hom:hou.Agent#setCurrentLayer]
+
+=== Bounding Box === (boundingbox)
+
+If the agent has a [collision layer|/crowds/agents#currentlayers], that layer will be used when computing the agent's bounding box. If no collision layer is set, the agent's current layer will be used instead.
+The bounding box of a layer is computed by combining the bounding boxes of each shape that is referenced by the layer.
+
+For a static shape, the shape's bounding box is expanded by the shape binding's bounds scale, and then transformed according to the joint the shape is bound to.
+For a deforming shape, the shape's bounding box is computed from the positions of the joints referenced by the capture weights, and then expanded by the shape binding's bounds scale.
+
+@related
+
+:: [Adding diversity with layers|diversity#layers]

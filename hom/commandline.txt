@@ -1,0 +1,113 @@
+= Command-Line Scripting =
+
+== Accessing `hou` from a Regular Python Shell ==
+
+By simply importing the `hou` module into a regular Python shell, you can
+easily integrate Houdini into your existing Python-based scripts.  The first
+time you import `hou`, Python will load in all of Houdini's libraries and
+initialize an empty Houdini session.  The `hou` module effectively stores a
+Houdini session, and you can load into that session from a hip file, inspect
+that file from your script, and input and output information to and from nodes
+in that session.
+
+In order to import the `hou` module, you need to tell Python to search in
+`$HFS/houdini/python2.7libs` for Python modules.  One way to accomplish this
+is to append this to the PYTHONPATH environment variable before starting
+Python, and another is to append the path to the `sys.path` from within Python.
+The following Python snippet will import the `hou` module into a standard
+Python shell, assuming that you sourced `houdini_setup` to set `$HFS` and
+paths.
+
+NOTE:
+    If you do not run `source houdini_setup`, you must set the HFS environment
+    variable manually.  Also, on Windows, you must append the value of $HFS/bin
+    to the PATH environment variable.
+
+When you import the `hou` module, the standard Houdini initialization scripts
+123.cmd/123.py and 456.cmd/456.py will not be run. If you want these scripts
+to run, you must explicitly call `hou.__runUserDefinedCode()`.
+
+{{{
+#!python
+#!/usr/bin/python
+def enableHouModule():
+    '''Set up the environment so that "import hou" works.'''
+    import sys, os
+
+    # Importing hou will load in Houdini's libraries and initialize Houdini.
+    # In turn, Houdini will load any HDK extensions written in C++.  These
+    # extensions need to link against Houdini's libraries, so we need to
+    # make sure that the symbols from Houdini's libraries are visible to
+    # other libraries that Houdini loads.  So, we adjust Python's dlopen
+    # flags before importing hou.
+    if hasattr(sys, "setdlopenflags"):
+        old_dlopen_flags = sys.getdlopenflags()
+        import DLFCN
+        sys.setdlopenflags(old_dlopen_flags | DLFCN.RTLD_GLOBAL)
+
+    try:
+        import hou
+    except ImportError:
+        # Add $HFS/houdini/python2.7libs to sys.path so Python can find the
+        # hou module.
+        sys.path.append(os.environ['HFS'] + "/houdini/python%d.%dlibs" % sys.version_info[:2])
+        import hou
+    finally:
+        if hasattr(sys, "setdlopenflags"):
+            sys.setdlopenflags(old_dlopen_flags)
+
+enableHouModule()
+import hou
+
+# Uncomment the following line to run the 123.cmd/py and 456.cmd/py
+# initialization scripts, now that hou is loaded.
+# hou.__runUserDefinedCode()
+}}}
+
+== Licensing ==
+
+When you import the `hou` module, Python will check out a license.  By
+default, it will use a Houdini Batch license, and use a Houdini FX
+license if no batch license could be found.  If you want it to use a
+Houdini license, you can set the HOUDINI_SCRIPT_LICENSE variable
+to `hescape` before importing the hou module.  You can also set this
+variable from within your Python script with
+`os.environ['HOUDINI_SCRIPT_LICENSE'] = 'hescape'`.
+
+By default, the `hou` module will not return the Houdini license until the
+Python interpreter exits.  However, if you have a long running Python
+script and want to quickly acquire and release a license, you can call
+[Hom:hou.releaseLicense] when you are done with the `hou` module.  Subsequent
+calls into the `hou` module will reacquire the license.  Note that Houdini's
+session data and libraries will not be unloaded from memory until Python exits.
+
+The `hou` module, when imported by Python or Houdini, will loop through the
+directories in $HOUDINI_PATH, and for each directory found, append that
+directory plus "/python2.7libs" to sys.path.  For backward compatibility with
+older versions of Houdini, it will also look for the directories in
+$HOUDINI_PATH plus "/scripts/python".  For example, you can put your Python
+modules in the directory `$HOME/houdiniX.Y/python2.7libs` and they will be
+in the Python search path after you import `hou`.
+
+=== `hython` ===
+
+Hython is a Python shell that ships with Houdini that is slightly
+different from the standard Python shell in the following ways:
+- It automatically adds `$HFS/houdini/python2.7libs` to sys.path and
+  imports the hou module when it starts up.
+- You can pass .hip files on the command line and it will load them.
+- It supports tab completion, and you can press tab twice to list possible
+  completions (on Linux and Mac).
+- You can run hscript commands from an interactive shell by prefixing them with
+  `%`.
+- It can receive and handle Houdini openport commands while waiting for console
+  input when you start it with the `-b` option.
+
+By default, hython does not listen in the background for and run commands sent
+to [Cmd:openport] sockets, but you can enable this behaviour with the `-b`
+option.  When listening for openport events, hython uses a different mechanism
+to read command-line input than the standard Python one.  Note that this
+other mechanism may leave the console in a bad state if hython forks into the
+background or exits prematurely, and it can behave strangely when editing lines
+that wrap.    
+

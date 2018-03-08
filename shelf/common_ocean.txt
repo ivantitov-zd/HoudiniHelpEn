@@ -1,0 +1,108 @@
+#type: include
+
+== Changing the look of your ocean == (howto)
+
+        :task: Set the height of the wave:
+                Navigate to the [Ocean Spectrum|Node:sop/oceanspectrum] node and adjust the __Wave Scale__ parameter on the __Wave Amplitude__ tab.
+        
+                This value is multiplied by the __Speed__ parameter on the __Wind__ tab.
+                
+                [Image:/images/shelf/wave_height_low.png]
+                [Image:/images/shelf/wave_height_high.png]
+                
+        :task: Set the direction of the waves:
+                Navigate to the [Ocean Spectrum|Node:sop/oceanspectrum] node and adjust the __Directional Bias__ parameter on the __Wind__ tab.
+        
+                This controls how many frequencies are moving in the same direction as the wind. Increasing this value will cause more frequencies to travel in the same direction, which is useful for creating shoreline effects.
+                
+                You can also try increasing the __Directional Movement__ parameter. This will dampen the waves moving in the opposite direction of the wind, leaving only the ones moving in the same direction.
+                
+                [Image:/images/shelf/wave_direction1.png]
+                [Image:/images/shelf/wave_direction.png]
+        
+        :task: Control the height of the peak:
+                Navigate to the [Ocean Spectrum|Node:sop/oceanspectrum] node and adjust the __Chop__ parameter on the __Wind__ tab.
+                
+                Increasing this parameter creates sharp peaks on waves. However, if this value is too high waves, may invert on themselves.
+                
+                [Image:/images/shelf/wave_peak_low.png]
+                [Image:/images/shelf/wave_peak_high.png]
+                
+        :task: Add more detail to your ocean:
+                Increase the __Resolution Exponent__ parameter on the [Ocean Spectrum|Node:sop/oceanspectrum] node.
+                
+                NOTE:
+                        The __Resolution Exponent__ parameter will not only determine the quality of your ocean, but also the size of the texture maps that you will eventually write out.
+                
+                [Image:/images/shelf/wave_regular.png]
+                [Image:/images/shelf/wave_detailed.png]
+                
+        :task: Create a large ocean:
+            Use the [Large Ocean|/shelf/largeocean] shelf tool.
+        
+== Understanding the network of nodes == (understand)
+
+        There are three important layers to focus on when creating your ocean. First create the ocean, next add whitewater, and finally add specularity for the whitewater. 
+        
+        TIP:
+                Disable all whitewater nodes at the OBJ level while you work on your ocean, then disable the ocean nodes while you work on your whitewater.
+        
+        The first set of nodes control the ocean itself.
+        
+        [Image:/images/shelf/wavetank_nodes_ocean.png]
+        
+        # `fluidtank_initial` controls the first frame of your simulation. This is where you can shape the initial frame of your tank with [Ocean Spectrum|Node:sop/oceanspectrum] and control the outputs with [Ocean Source|Node:sop/oceansource]. This includes the size of your tank, the depth of the water etc.
+        
+        # `AutoDopNetwork` controls the simulation of your tank. This is where you will find the [FLIP Tank|Node:dop/flipobject] and [FLIP Solver|Node:dop/flipsolver].  The FLIP simulation will contain [SourceVolume|Node:dop/sourcevolume] DOPs to sink and source the boundary layer particles, and a [POP Advect By Volumes|Node:dop/popadvectbyvolumes] POP to add ocean velocities to the simulation.
+        
+        # `fluidtank_fluid` is the result of #1 and #2 combined, and is where the results are rendered. After the simulation is done, this node collects the fluid particles, sets up a material, creates some nodes for surfacing to finish the effect.
+        
+        # `fluidtank_interior` is also used for rendering, and for creating the volumetric effect that one of the shaders applies to the interior of the fluid. It controls the volume beneath the surface, such as how cloudy or murky the water will appear.
+        
+        The next set of nodes are to control the whitewater. 
+        
+        NOTE:
+            To add whitewater to your simulation, use the [Icon:SHELF/whitewater][Whitewater|Tool:whitewater] tool on the __Oceans__ shelf.
+        
+        [Image:/images/shelf/wavetank_nodes_whitewater.png]
+        
+        # `whitewater_source` is where the spray and foam is coming from.
+        
+        # `whitewater_sim` is where the whitewater simulated. This is where you can modify the animation.
+        
+        # `import_whitewater` is the result of #1 and #2 combined.
+        
+        NOTE:
+                Do not try to set up a whitewater simulation from scratch. Always use the tools. For more information about using whitewater, see the [Icon:SHELF/whitewater][Whitewater|/shelf/whitewater] help.
+        
+        For more information see [How to animate a wave tank with whitewater|/fluid/whitewater].
+
+== Tips for improving the look of your water == (tips)
+
+        * The defaults for the tank will create a low res simulation, which makes it easy to animate. However, to create a nice looking render, you will need to change some of the defaults. For example, you will need to increase the number of particles in your scene. Decreasing the __Particle Separation__ parameter to about `0.03` will create a simulation with approximately 30 million particles.
+        
+        * Add an environment light to your scene. Water reflects and refracts a lot of the environment around it, so having an environment map in your scene will significantly improve the look.
+                
+                TIP:
+                        In your __Environment Map__ parameter, navigate to the `HFS/houdini/pic/` folder and choose the sky file `DOSCH_SKIESV2_${F2}SN_lowres.rat`.
+
+                [Image:/images/shelf/wavetank_render.png]
+
+
+== Understanding the extended ocean surface nodes == (extended)
+        
+        The [Guided Ocean Layer|/shelf/guidedoceanlayer] and [Ocean Flat Tank|/shelf/oceanflattank] tools also create a network for rendering an "extended" fluid surface that can stretch to the horizon and be rendered with ocean displacement to provide a seamless integration between a FLIP simulation and the surrounding source ocean.
+
+        # The [Particle Fluid Surface|Node:sop/particlefluidsurface] node (called `particlefluidsurface1`) creates the extended FLIP mesh.  The settings on the __Flattening__ tab of this node will flatten the fluid simulation near the edges of the simulation area, and extrude the edges of the polygonal mesh outwards to form an extended flat surface.  This flat area surrounding the simulation is then rendered with ocean displacement.
+
+        # The two [Particle Fluid Mask|Node:sop/particlefluidmask] nodes (called `particlefluidmask1` and `hifrequency_mask`) will create masks on the input ocean spectra that limit the render-time ocean displacement to specified areas of the simulation, usually where there is little velocity, vorticity, or splash height in the fluid.  These nodes also blend in ocean displacement around the edges of the simulation bounding box to match the flattening applied while surfacing.  The `hifrequency_mask` node additionally filters the incoming ocean spectra to remove all but the highest-frequency waves, usually so these can be applied to the simulated FLIP mesh and allow it to better integrate with the surrounding ocean.
+
+        # The `surface_preview` node is a fast preview of the FLIP simulation that then samples the created mask to allow visualization of the ocean contribution using a [viewport visualizer|/basics/visualizers] on the `mask` attribute.  The `oceanevaluate1` node applies ocean displacements to that preview based on the calculated masks.
+
+        # The `split_spectra_masks` node will separate out the static ocean spectra from the time-dependent masks created by the masking nodes.  They are cached to two different sets of files to take advantage of the [Ocean Surface|/gallery/shop/vopmaterial/oceansurface] material's ability to have separate spectra and mask inputs.
+
+== Understanding the narrow band == (narrowband)
+
+    Several of the ocean tanks use the __Narrow Band__ feature in the [FLIP Solver|Node:dop/flipsolver] by default. If the traditional full tank is desired, it can be changed back by selecting __Particle Field__ in the [FLIP Object|Node:dop/flipobject].
+    
+    [Image:/news/16_5/images/narrow_band_flip.jpg]

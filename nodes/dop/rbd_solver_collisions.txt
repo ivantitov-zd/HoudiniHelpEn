@@ -1,0 +1,175 @@
+#type: include
+
+Collision Passes:
+    The stack solver iterates over all objects looking for
+    ballistic collisions. Because resolving one collision may create
+    a collision elsewhere, this cannot be resolved in a single pass
+    with a local solution. 
+    
+    The stack solver will thus repeat the
+    collision resolution until either no collisions are found, or
+    this pass count is reached.
+
+    Even if a collision is not fully resolved with these passes, it
+    will still be cleaned up in the Contact Pass. The main
+    difference is that it will become inelastic.
+
+Contact Passes:
+    The stack solver iterates over all objects, looking for cases
+    where resting contact requires an acceleration to be adjusted.
+    
+    Multiply stacked objects are common, so this often has
+    complicated interrelationships, so requires multiple passes to
+    converge.
+
+SubContact Passes:
+    Resting objects have a higher stability requirement than
+    bouncing objects. Thus, the object is not immediately brought to
+    a standstill, but slowed over multiple iterations to allow the
+    system to stabilize. 
+    
+    This is the number of steps to do this for
+    every contact pass.
+    
+Shock Propagation:
+    These passes are very similar to Contact Passes. 
+    
+    The main
+    difference is that if a book were resting on a table, the table
+    would be assigned infinite mass in this pass. This prevents the
+    table from shifting into the ground, allowing the system to
+    converge faster.
+    
+    As a rule of thumb, set this to the expected maximum number
+    of stacked objects. If you plane to have ten tables stacked
+    on top of one another in a stable configuration, a value of
+    10 can help ensure that the stacking is fully resolved.
+    
+    If your objects come to rest appropriately, but then seem to
+    slowly start to sink through each other, increasing Shock
+    Propagation can be the right answer.
+    
+Resolve Penetrations:
+    These passes are a final attempt to prevent any
+    interpenetration. Like Shock Propagation, it is attempted to
+    process objects from bottom up. 
+    
+    If a book is resting on a table
+    and is penetrating the table, the book will be moved to lie
+    outside of the table. This will be performed even if the book is
+    at rest on the table.
+
+    The penetration recover repeated until there are no more
+    penetrations up to the maximum number provided by this
+    parameter.
+
+    The SubContact Passes is used to slowly feather the objects
+    apart. Rather than immediately moving the book outside of the
+    table, it is done in over the given number of subcontact passes.
+    This is done to attempt to stabilize the process when
+    complicated overlaps occur.
+
+Use Point Velocity for Collisions:
+    Determines if changes in the point positions will be used in
+    collision resolution. Note that this is different from the
+    Inherit Velocity option of RBD State. This flag only governs if
+    velocity attributes are used for collisions, not for setting up
+    the initial velocities.
+
+    When this is set, the object is inspected for any per point
+    velocity attribute. If present, it is assumed to be a local
+    deformation vector and is used to improve collision response.
+
+    If no point velocities are present, the geometry is compared
+    between the two frames to manually calculate the per-point
+    velocity. Note that if your deformation is a function of $F you
+    may not get expected results as that is a step function, use $FF
+    instead.
+
+Use Volume Velocity for Collisions:
+    Determines if changes to the volumetric representation will be
+    used in collision resolution.
+
+    When this is set the volumetric representation is compared
+    between this frame and the previous frame. The difference is
+    used to compute a velocity of the surface's deformation. This
+    allows deforming objects to interact plausibly. 
+    
+    NOTE:
+        This method can handle changing topologies, but cannot
+    discover tangential deformational velocities.
+
+Glue Ignores Resting Objects:
+    When objects are resting on top of one another, they still receive impacts due to the force of gravity.  This option prevents these from being added to the glue impulse, making it easier to prevent things from falling apart under their own gravity.
+
+Add Impact Data:
+    During the RBD solving process, numerous impacts are calculated
+    between the RBD objects. These are normally not recorded in
+    order to save time. 
+    
+    If this is set, however, all such impacts
+    will be recorded by attaching an Impacts/RBDImpacts data to the
+    objects that collide.
+Culling Method:
+    In simulations with a large number of objects, it is helpful to
+    use various space partitioning schemes to reduce the work in
+    finding collisions. This option selects one of these schemes.
+
+    None means that no attempt at spatial subdivision will occur.
+
+    Sphere means the objects will be treated as spheres and trivial
+    intersection detection will be done with these spheres. This is
+    fast, but with long skinny objects could cause false positives.
+
+    OBB means Oriented Bounding Boxes. While this provides a tight
+    bound on long skinny objects, building the spatial partitioning
+    tree is slow and will often exceed the benefits.
+
+Contact Grouping Method:
+    Controls whether and how Houdini groups similar points together
+    when it calculates point collisions.
+
+    If you set this parameter to a value other than "none", Houdini
+    will treat similar points (that is, points within the distance
+    specified in the __Contact grouping tolerance__ below) as a
+    single point for the purpose of calculating collisions.
+
+    This is useful when you have an object such as a cube, where the
+    geometry points (the corners of the cube) are spaced far apart.
+    One corner might impact a ground plane first, then the cube
+    bounces and rotates so the opposite corner hits, which bounces
+    and rotates, causing jitter when the cube hits. 
+    
+    If you set the __Contact Grouping Method__ to "Average", Houdini will calculate the hit based on an average point between the corners, giving a more
+    stable result with less jitter.
+
+    This is similar to the effect of turning on __Edge
+    representation__ in the __Surface__ tab of an [RBD
+    Object|Node:dop/rbdobject] node. If you have sparse geometry
+    with sharp edges, such as a cube, you may want to turn on both
+    these options.
+
+    To see the effect of contact groupings, create a simulation
+    where you drop a cube onto a ground plane. Attach an [RBD
+    Visualization DOP|Node:dop/rbdvisualization] to see the
+    resulting impacts.
+
+
+    None:
+        Calculate collisions for each point independently. Do not
+        attempt to merge similar collision points.
+    Most central point:
+        Group similar points together as the one point that is most
+        in-line with the center of mass of the object. This uses
+        only points from the original geometry and biases collision
+        points to stable points.
+    Average point:
+        Average similar points together to calculate the collision
+        point. 
+        
+        This reflects the geometry of the actual collision
+        better than "Most central point", but may result in a point
+        that does not lie on the original geometry.
+Contact Grouping Tolerance:
+    The distance within which points are grouped together when
+    __Contact grouping method__ is not "none".

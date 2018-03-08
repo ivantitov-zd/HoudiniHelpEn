@@ -1,0 +1,301 @@
+= hou.Desktop =
+#type: homclass
+#cppname: HOM_Desktop
+#group: ui
+
+"""Class representing a Houdini desktop (a pane layout)."""
+
+A desktop contains one or more panes.  Each pane contains one or more pane
+tabs of various types (scene viewer, parameters, network editor, etc.)  The
+main desktop window can be split horizontally or vertically into two panes,
+and each pane can itself be split horizontally or vertically.
+
+Note that a floating panel also contains one or more panes and a floating panel
+may optionally be attached to a desktop.
+
+The methods in this class that return pane tabs, panes, and floating panels
+only return those objects that are attached to (i.e. saved with) the desktop.
+To access all the visible pane tabs, panes, and floating panels, including
+those not attached to any desktop, use the functions in [Hom:hou.ui].
+
+See also [Hom:hou.ui#curDesktop], [Hom:hou#ui.desktops], [Hom:hou.Pane],
+[Hom:hou.PaneTab], and [Hom:hou.FloatingPanel].
+
+@methods
+
+::`name(self)` -> `str`:
+    #cppname: HOM_Desktop::name
+    #replaces: Cmd:desk
+    Return the desktop's name.
+
+    Each desktop has a unique  name. The desktop's name cannot
+    be changed through either the scripting interface or through Houdini.
+
+::`setAsCurrent(self)`:
+    #cppname: HOM_Desktop::setAsCurrent
+    #replaces: Cmd:desk
+    Make this desktop the currently selected one.  See also
+    [Hom:hou.ui#desktops].
+
+    This example changes to the animate desktop:
+    {{{
+    #!python
+    desktops_dict = dict((d.name(), d) for d in hou.ui.desktops())
+    desktops_dict['Animate'].setAsCurrent()
+    }}}
+
+::`panes(self)` -> tuple of [Hom:hou.Pane]:
+    #cppname: HOM_Desktop::panes
+    #replaces: Cmd:pane
+    Return the panes inside this desktop.  Note that the result includes panes
+    in floating panels as long as they are attached to the desktop.
+
+    The following function will return all visible panes, regardless of
+    whether or not they are attached to a desktop:
+    {{{
+    #!python
+    def allPanes():
+	'''Return a tuple of all visible panes, regardless of whether or not
+	   they are attached to a desktop.'''
+	# Loop through all the pane tabs and add each tab's pane to the result
+	# if it's not already there.  Note that the only way to uniquely
+	# identify a pane is using its id.
+	ids_to_panes = {}
+	for pane_tab in hou.ui.paneTabs():
+	    pane = pane_tab.pane()
+	    if pane.id() not in ids_to_panes:
+		ids_to_panes[pane.id()] = pane
+	return ids_to_panes.values()
+    }}}
+
+::`floatingPanels(self)` -> tuple of [Hom:hou.FloatingPanel]:
+    #cppname: HOM_Desktop::floatingPanels
+    Return all the floating panels attached to this desktop.
+
+    Use [Hom:hou.ui#floatingPanels] to get all the visible floating panels,
+    including those not attached to this desktop.
+
+    See also [Hom:hou.Desktop#floatingPaneTabs].
+
+::`paneTabs(self)` -> tuple of [Hom:hou.PaneTab]:
+    #cppname: HOM_Desktop::paneTabs
+    #replaces: Cmd:pane
+    Return the pane tabs that are contained in this desktop or are in floating
+    panels attached to this desktop.
+    
+    This method does not return floating pane tabs that are not attached to
+    this desktop.  Use [Hom:hou.ui#paneTabs] to get all the visible pane tabs,
+    regardless of whether they are attached to this desktop.
+
+::`currentPaneTabs(self)` -> tuple of [Hom:hou.PaneTab]:
+    #cppname: HOM_Desktop::currentPaneTabs
+    #replaces: Cmd:pane
+    Return the pane tabs that are contained in this desktop or are in floating
+    panels attached to this desktop and are currently selected in their
+    containing panes.
+    
+    This method does not return floating pane tabs that are not attached to
+    this desktop.  Use [Hom:hou.ui#currentPaneTabs] to get all the selected pane tabs,
+    regardless of whether they are attached to this desktop.
+
+::`floatingPaneTabs(self)` -> tuple of [Hom:hou.PaneTab]:
+    #cppname: HOM_Desktop::floatingPaneTabs
+    Return all the pane tabs in floating panels that are attached to this
+    desktop.
+
+::`paneTabOfType(self, type, index=0)` -> [Hom:hou.PaneTab] or `None`:
+    #cppname: HOM_Desktop::paneTabOfType
+    Find and return the pane tab with the desired type.  If no such tab
+    exists, return None.  Like [Hom:hou.Desktop#paneTabs], this method
+    searches pane tabs in the desktop or in floating panels attached to the
+    desktop.
+
+    Use [Hom:hou.ui#paneTabOfType] to search all the visible pane tabs,
+    regardless of whether they are attached to this desktop.
+
+    type:
+	A [Hom:hou.paneTabType] enumerated variable.
+
+    index:
+	If there are multiple tabs with the desired type, this parameter
+	determines which one is returned.  Use `index=0` to return the first
+	found tab, `index=1` to return the second found tab, etc.  By default,
+	index is 0.
+
+    This method can be approximately implemented as follows:
+    {{{
+    #!python
+    def paneTabOfType(self, tab_type, index=0):
+	pane_tabs = [t for t in self.paneTabs() if t.type() == tab_type]
+
+	if max(index, 0) > len(pane_tabs):
+	    return None
+	return pane_tabs[max(index, 0)]
+    }}}
+
+::`findPaneTab(self, name)` -> [Hom:hou.PaneTab] or None:
+    #cppname: HOM_Desktop::findPaneTab
+    Return the pane tab with the given name, or `None` if no such tab exists.
+    Like [Hom:hou.Desktop#paneTabs], this method searches pane tabs in the
+    desktop or in floating panels attached to the desktop.
+
+    The name may optionally be prefixed by the desktop name and a period.
+
+    Use [Hom:hou.ui#findPaneTab] to search all the visible pane tabs,
+    regardless of whether they are attached to this desktop.
+
+::`sceneViewers(self)` -> tuple of [Hom:hou.SceneViewer]:
+    #cppname: HOM_Desktop::sceneViewers
+    #replaces: Cmd:viewls
+    #status: ni
+
+::`createFloatingPaneTab(self, pane_tab_type, position=(), size=(), python_panel_interface=None)` -> [Hom:hou.PaneTab]:
+    #cppname: HOM_Desktop::createFloatingPaneTab
+    #replaces: Cmd:pane
+    Create and return a new floating window containing a single pane tab.  Note
+    that this method creates a floating panel with a single pane tab, and the
+    graphical interface to add more tabs or split the pane inside the panel
+    is not exposed.
+
+    pane_tab_type:
+	A [Hom:hou.paneTabType] enumerated variable.
+
+    position:
+        A tuple of two floats specifying the X and Y positions of the new
+        window, respectively.  The window will open near this position,
+        not necessarily exactly at this position.  If this value is an empty
+	tuple, Houdini will choose a default location.
+
+    size:
+	A tuple of two floats specifying the width and height of the new
+	window, respectively.  If this value is an empty tuple, Houdini will
+	choose a default size.
+
+    python_panel_interface:
+	The name of the Python Panel interface to be displayed in the floating
+	pane tab.  Specifying the interface name additionally hides the Python
+	Panel toolbar.  If `python_panel_interface` is None or points to an
+	interface that does not exist then the default Python Panel pane tab is
+	displayed along with the toolbar.
+	
+	This argument is ignored if `pane_tab_type` is not set to
+	[Hom:hou.paneTabType#PythonPanel].
+
+    Also note that the floating panel containing the new pane tab does not
+    contain any panes: calling [Hom:hou.PaneTab#pane] on the pane tab returns
+    None, and calling [Hom:hou.FloatingPanel#panes] on its floating panel
+    returns an empty tuple.  See [Hom:hou.FloatingPanel] for more information
+    on these stripped down floating panels.
+
+    See also [Hom:hou.Desktop#createFloatingPanel].
+
+    The following example function takes a [Hom:hou.Node] and opens a floating
+    parameter pane pinned to that node.
+    {{{
+    #!python
+    def openParmPane(node):
+	'''Open a floating parameter pane for a particular node.'''
+	pane_tab = hou.ui.curDesktop().createFloatingPaneTab(hou.paneTabType.Parm)
+	pane_tab.setCurrentNode(node)
+	pane_tab.setPin(True)
+	return pane_tab
+    }}}
+
+::`createFloatingPanel(self, pane_tab_type, position=(), size=(), python_panel_interface=None)` -> [Hom:hou.FloatingPanel]:
+    #cppname: HOM_Desktop::createFloatingPanel
+    Create a floating panel and return it.  The returned floating panel
+    contains one pane which contains one pane tab of the desired type.
+
+    See [Hom:hou.Desktop#createFloatingPaneTab] for a description of the
+    parameters.  This method differs from createFloatingPaneTab in two ways:
+    First, it returns the floating panel instead of the pane tab.  Second,
+    the floating panel that is created from this method is not locked down,
+    and the user can add more pane tabs and split the panes.
+
+    The following example creates a floating panel with a parameters pane tab
+    and a channel viewer (motion viewer) pane tab:
+    {{{
+    #!python
+    panel = hou.ui.curDesktop().createFloatingPanel(hou.paneTabType.Parm)
+    pane1 = panel.panes()[0]
+    pane2 = pane1.splitVertically()
+    pane2.tabs()[0].setType(hou.paneTabType.ChannelViewer)
+    }}}
+
+::`shelfDock(self)` -> [Hom:hou.ShelfDock]:
+    #cppname: HOM_Desktop::shelfDock
+    Return the shelf dock for the current desktop.
+
+::`displayHelp(self, node_type)`:
+    #cppname: HOM_Desktop::displayHelp
+
+    Loads the help for the specified node type in the last opened help browser
+    pane tab.  Creates a help browser pane tab if no such pane tab already
+    exists.
+
+::`displayHelpPath(self, help_path)`:
+    #cppname: HOM_Desktop::displayHelpPath
+    Loads the help for the specified help path in the last opened help browser
+    pane tab.  Creates a help browser pane tab if no such pane tab already
+    exists.  The path can either be a Houdini help URL (i.e. op:Sop/copy,
+    tool:curve) or a raw help path (i.e.  /nodes/sop/copy, shelf/curve).
+
+::`displayHelpPyPanel(self, interface_name)`:
+    #cppname: HOM_Desktop::displayHelpPyPanel
+    
+    Loads the help for the python panel with the specified name in the last
+    opened help browser pane tab.  Creates a help browser pane tab if no such
+    pane tab already exists.
+
+    Raises HOM_Error if the interface name is invalid.
+
+::`displaySideHelp(self, show=True)` -> [Hom:hou.PaneTab]:
+    #cppname: HOM_Desktop::displaySideHelp
+    Show or hide the side help pane.
+
+    If show is set to True (default) this method displays the help pane and
+    returns a help browser pane tab.  If set to False then this method hides
+    the help browser pane at the side of the desktop and returns None.
+
+::`homePage(self)`:
+    #cppname: HOM_Desktop::homePage
+    #replaces: Cmd:helpbrowser
+    #status: ni
+
+::`setHomePage(self, home_page)`:
+    #cppname: HOM_Desktop::setHomePage
+    #replaces: Cmd:helpbrowser
+    #status: ni
+
+::`paneTabLinkNumbers(self)` -> tuple of numbers / `None`:
+    #cppname: HOM_Desktop::paneLinkNumbers
+    #status: ni
+
+::`panesTabInLinkNumber(self, number)` -> tuple of [Hom:hou.Pane]:
+    #cppname: HOM_Desktop::panesInLinkNumber
+    #status: ni
+
+::`pathBasedPaneTabLinkNumbers(self)` -> tuple of numbers / `None`:
+    #cppname: HOM_Desktop::pathBasedPaneLinkNumbers
+    #replaces: Cmd:panepath
+    #status: ni
+
+::`pathBasedPanesTabInLinkNumber(self, number)` -> tuple of [Hom:hou.Pane]:
+    #cppname: HOM_Desktop::pathBasedPanesInLinkNumber
+    #status: ni
+
+::`setPathForAllPaneTabs(self, path)`:
+    #cppname: HOM_Desktop::setPathForAllPanes
+    #replaces: Cmd:panepath
+    #status: ni
+
+::`paneUnderCursor(self)`:
+    #cppname: HOM_Desktop::paneUnderCursor
+    Return the [Hom:hou.Pane] object located under the mouse cursor.  Return
+    `None` if no pane is located under the mouse cursor.
+
+::`paneTabUnderCursor(self)`:
+    #cppname: HOM_Desktop::paneTabUnderCursor
+    Similar to [Hom:hou.Desktop#paneUnderCursor] but return the
+    [Hom:hou.PaneTab] object instead located under the mouse cursor.  Return
+    `None` if no pane tab is located under the mouse cursor.

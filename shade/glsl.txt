@@ -1,0 +1,467 @@
+= Writing a custom viewport shader in GLSL =
+
+== Overview ==
+
+OpenGL shaders are written using GLSL (the OpenGL Shader Language). Before you can create an OpenGL shader you need to understand GLSL and its related concepts such as vertex shaders and fragment shaders.
+
+It is much easier to use the built-in viewport shader and [tag parameters in your material|opengl] as various OpenGL properties. However, if you want to write your own custom GLSL shader instead, you can use the information below.
+
+See [the OpenGL GLSL documentation|http://opengl.org/documentation/glsl/] for more information on programming in GLSL.
+
+
+== Creating a new GLSL shader node ==
+
+Creating a GLSL shader requires creating a new SHOP type. Currently you cannot create a GLSL shader using VOPs.
+
+TIP:
+    Alternatively you can store the GLSL shader source in a text file and reference the filename on your material using the [ogl_glsl_shader|/props/material#ogl_glsl_shader] property.
+
+# Choose __File > New operator type__.
+
+# Click on __SHOP Type__.
+
+# In the __Network Type__ menu, choose __GLSL Shader__.
+
+# Enter an internal __Name__ for the shader and a human-readable __Label__.
+
+# Click __Accept__. The [type properties window|/ref/windows/optype] for the new shader type appears.
+
+# Click the __Code__ tab. The node starts with some default shader code. You can use this as a starting point for creating your shader.
+
+    The __Code__ tab provides a simple editor for working with GLSL code. The editor has four text boxes: one for the vertex shader, one for an optional geometry shader, one for the fragment shader, and one for compiler output. You can drag the dividers between the three panes to resize them or maximize a single pane.
+    
+# Click __Test compile__ to try compiling the default code. The output of the compiler appears in the third pane.
+
+
+== Applying an OpenGL shader ==
+
+:task: Assign a GLSL shader for the viewport only:
+    Set an object's surface shader to an instance of your GLSL shader, or connect an instance of your GLSL shader to the surface color output inside a material.
+
+:task: Assign both a GLSL shader for the viewport and a shader for the renderer:
+    - You can define both GLSL shader code and VEX or RenderMan code in a GLSL shader type. Houdini will use the GLSL code in the viewport and the VEX/RenderMan code in the render.
+    
+        On the __Code__ tab, click the [Icon:BUTTONS/gear] gear menu and turn on __VEX/RenderMan shader__. This creates another tab where you can write VEX or RenderMan shader code.
+        
+    - You can also connect both an OpenGL shader and VEX surface shader to the surface color output of a material using a [Select shader node|Node:shop/select].
+
+:task: Assign a custom GLSL shader to an existing material:
+    - Add the GLSL Shader parameter using __Edit Rendering Parameters__ in the [Icon:BUTTONS/gear] gear menu on the material's parameter dialog. The parameter is in the SHOP/OGL sub folder.
+
+    - Enter the filename of a program description file (.prog) or a whitespace separated list of shader files. The format of a program file is documented above. The file extension of a shader file defines its shader stage:
+        - `.vert`: vertex shader
+        - `.frag`: fragment shader
+        - `.geom`: geometry shader
+        - `.tcs`: tessellation control shader (GL4.0+)
+        - `.tes`: tessellation evaluation shader (GL4.0+)
+
+
+== Houdini built-in functions ==
+
+=== Fragment shader functions ===
+
+`void HOUassignLitOutput(vec3 point_color,vec3 emit,vec3 amb,vec3 diff,vec3 spec,vec4 wire,float alpha,float selected)`:
+     Composites the lighting components, applies any Houdini shading (such as 
+     ghosting), and assigns the result to the fragment shader out in normal 
+     lighting mode (`glH_MaterialPass` is 0). The normal renderer is a forward
+     renderer (all lighting computed on all shaded pixels).
+
+`void HOUassignMaterialOutput(vec3 point_color,vec3 emit_color,vec3 amb_color,vec3 diff_color,vec3 spec_color,float alpha,float emit_alpha,float shiny,vec4 wire,vec3 nN,float z,float selected)`:
+     Assigns the lighting components to the g-buffer outputs for the high
+     quality lighting mode (`glH_MaterialPass` is 1). The High Quality lighting
+     renderer is a deferred shading renderer (all parameters required for 
+     lighting and shading is stored in multiple buffers, and lights are 
+     processed after all geometry is rendered). 
+
+`void HOUapplyLightMaps(inout vec3 nN, inout vec3 mspec, inout float shiny,bool has_bump_map, bool has_spec_map, vec2 bumpCoords, vec2 specCoords, float bumpScale, int bumpComps, bool bumpBias, bool bumpInvert, vec2 bumpMapSize, bool specularShinyAdjust, vec2 shinyRange)`:
+     Computes the normal (`nN`), material specular color component (`mspec`) and 
+     material shininess (`shiny`) from the specular, bump and normal maps.
+
+`void HOUfastLightingModel(in vec3 P,in vec3 nN,inout vec3 lAmb,inout vec3 lDiff,inout vec3 lSpec,in float sh)`:
+
+     Computes the lighting components `aAmb`, `lDiff`, and `lSpec` (ambient, 
+     diffuse and specular) using the first 3 scene lights (or headlight). This 
+     should only be used when rendering normal lighting (`glH_MaterialPass` is 
+     0).
+
+`void HOUlightingModel(in vec3 P,in vec3 nN,inout vec3 lAmb,inout vec3 lDiff,inout vec3 lSpec,in float sh)`:
+     Computes the lighting components in the same way as `HOUfastLightingModel`
+     but for the first 9 scene lights (or headlight). This should only be used 
+     when rendering normal lighting (`glH_MaterialPass` is 0).
+
+`float HOUwireAlpha(vec3 edgedist, int edgeflag, float cut)`:
+     Given the edge distances and flags for all 3 triangle edges (x,y,z), and 
+     cutoff tolerance for the inner (non-AA) section of the line, compute an 
+     alpha for a pixel within a rendered triangle. This creates outlined 
+     triangles based on `glH_WireThickness`.
+
+`vec4 HOUwireColor(vec3 edgedist, int edgeflag, float selected)`:
+     Similar to `HOUwireAlpha()`, this computes the wire color and AA for 
+     outlining a triangle. The selected parameter allows mixing between the 
+     `glH_SelectionColor` and the `glH_WireColor`.
+
+
+=== Geometry shader functions ===
+
+`vec3 HOUedgeDistance(vec4 v0, vec4 v1, vec4 v2, out int edges))`:
+     Given the three vertices in clip space of a triangle within a tessellated 
+     polygon, compute the edge flags (`edges`) and edge distances (return value)
+     to be used by `HOUwireColor()` or `HOUwireAlpha()` in the fragment shader.
+     The edge distances are in screen pixels. The edge flags are bits in the 
+     integer which indicate if that edge is an interior edge (zero, crosses the
+     polygon) or an exterior edge (one, lies along a polygon edge). The edge bits
+     are 1 (v1-v2), 2 (v0-v2) and 4 (v0-v1).
+     
+`int HOUedges(vec4 v0, vec4 v1, vec4 v2)`:
+     A stripped down version of `HOUedgeDistance()`, this only returns the edge
+     flags for the triangle within a tessellated polygon. 
+
+`bool HOUfrustumCull(vec4 v0, vec4 v1, vec4 v2)`:
+     Returns true if the triangle with vertices v0, v1 and v2 (in clip space)
+     is outside the current viewing frustum. This is a fast check, and some 
+     cases which are actually outside the viewing frustum may return false. In 
+     no cases will a triangle that is within the viewing frustum ever return 
+     true.
+
+`int HOUprimitiveID(out ivec3 vertices)`:
+     Returns the primitive ID for the current triangle, line or point. The 
+     `vertices` parameter returns the vertex indices for accessing vertex 
+     attributes stored within a texture or texture buffer object.
+
+`int HOUprimitiveIDEdges(out ivec3 vertices, out int edgeflags)`:
+     This is a combination of `HOUprimitiveID()` and `HOUedges()`. It returns the 
+     primitive index and vertices' indices as in `HOUprimitiveID()`, and the edge
+     flags as in `HOUedges()`. It is slightly faster than calling both. 
+
+`int HOUvertexID(out ivec3 vertices)`:
+     Returns a bitfield that provides some information about the current 
+     triangle, and sets `vertices` to the local vertex numbers of the polygon
+     (always in the range zero to number of polygon vertices minus one). This is
+     different from the `vertices` parameter in `HOUprimitiveID()`, which returns
+     the vertex offsets within an attribute (zero to number of detail vertices 
+     minus one). The returned bitfield provides the following polygon 
+     tessellation information for the current triangle:
+
+     * 0x01:  first triangle in the polygon
+     * 0x02:  middle triangle in the polygon
+     * 0x04:  last triangle in the polygon
+     * 0x08:  polygon has an odd number of triangles
+     * 0x10:  vertex 1 has not already been used in this polygon
+     * 0x20:  vertex 2 has not already been used in this polygon
+     * 0x40:  vertex 3 has not already been used in this polygon
+
+     This can be used to position primitive and vertex decorations and estimate
+     the centroid of the polygon.
+
+
+=== Houdini auto-uniforms ===
+
+Houdini automatically generates values for the following uniforms (all prefixed
+with `glH_`) which may be used by all shader stages.
+
+`glH_MaterialPass`:
+    An integer that stores the current pass being render. These passes are:
+
+    * 0 - normal lighting pass
+    * 1 - high quality lighting pass
+    * 3 - shadow map pass
+
+    Lighting calculations should only be performed if `glH_MaterialPass` is 0.
+    Basic material properties (diffuse, ambient, specular and emission) only
+    need to be provided for pass #1. Pass #3 only requires alpha and depth.
+    Pass #2 was deprecated with the old H11 viewport.
+
+`glH_ViewMatrix`:
+    The view matrix (not to be confused with OpenGL's `modelview` matrix). The
+    view matrix is only the viewport tumble transform, as the object resides 
+    in `glH_ObjectMatrix`.
+
+`glH_InvViewMatrix`:
+    The inverse of the view matrix (not to be confused with OpenGL's `modelview` matrix).
+
+`glH_ObjectMatrix`:
+    The object transform for the geometry.
+
+`glH_ProjectMatrix`:
+    The transform used to convert camera space coords to clip space
+    coords (which are `[-1,1]` for X,Y, and Z).
+
+`glH_InvProjectMatrix`:
+    The inverse of the projection matrix, used to convert clip coords back into
+    camera space.
+
+`glH_NumSamples`:
+    The number of samples in a multisampled (2x, 4x, 8x AA) buffer. 
+    
+`glH_LightingEnabled`:
+    An integer that is either 1 if lighting is enabled, or zero if not.
+
+`glH_LightMask`:
+    A int32 bitmask of lights that are enabled. The first scene light has 
+    bit 1, the second bit 2 (0x2), the third bit 3 (0x4), etc.
+
+`glH_ScreenSize`:
+    A vec2 containing the current dimension of the viewport being rendered.
+
+`glH_WireOver`:
+    An integer set to one when a wireframe should be drawn over the model, and 
+    zero otherwise.
+
+`glH_WireColor`:
+    The constant color of the wireframe overlay. This can change colors based on
+    selection, template drawing or ghosting.
+
+`glH_WireThickness`:
+    The current wire thickness, based on the display option setting, which may
+    change depending on the selection status.
+
+`glH_ConstColor`:
+    The constant color for drawing modes such as Hidden Line Invisible and Ghost.
+
+`glH_IsOrtho`:
+    An integer set to zero if the view is perspective, or one if orthographic.
+
+`glH_SelectMode`:
+    The current component selection display mode:
+
+    * 0: nothing selected
+    * 1: primitives, some selected
+    * 2: primitives, all selected
+    * 3: points, some selected
+    * 4: points, all selected
+    * 5: vertices: some selected
+    * 6: vertices: all selected
+
+    Point, primitive and vertex group selections are treated as point, primitive
+    and vertex selections, respectively.
+
+
+The follow uniforms are available, but generally only used by the `HOUassign()` family of built-in Houdini functions. If you do not use them (not recommended) you will need to multiply in the factors, apply the ghost color, handle selection highlights, and two-sided lighting for transparency.
+
+`glH_Emission`:
+    A float that is 1.0 if emission is used in this pass, 0.0 if not.
+
+`glH_Specular`:
+    A float that is 1.0 if specular is used in this pass, 0.0 if not.
+
+`glH_Diffuse`:
+    A float that is 1.0 if diffuse is used in this pass, 0.0 if not.
+
+`glH_Ambient`:
+    A float that is 1.0 if ambient is used in this pass, 0.0 if not.
+
+`glH_GhostColor`:
+    A vec4 representing the ghosting color for 'ghost other objects' display
+    mode. It is set regardless of whether the current object is ghosted, though
+    the color will be (0,0,0,0) if the object is not ghosted.
+
+`glH_SelectColor`:
+    The current selection color, which can change depending on the selection
+    type (object, component, closure, secondary). 
+
+`glH_AlphaPass`:
+    An integer that is 1 when a transparency pass is active, 0 otherwise.
+    Transparency passes always light the polygon face that is facing the light.
+    This is used by the `HOUlightingModel()`, `HOUdiffuse()` and `HOUlightDiffSpec()` lighting methods.
+
+
+=== Coding guidelines === (guidelines)
+
+Houdini's viewport renderer has a large number of display settings which users can change. In some cases the viewport renderer renders multiple passes in order to create a certain visual effect. For example, projective textures and shadows both require multiple passes.
+
+To be compatible with Houdini's various rendering modes, GLSL shaders should adhere to the following guidelines:
+
+- Use one of the `HOUassign...()` methods to assign the color output of a fragment
+  shader.
+
+- Do GL lighting with `HOUlightingModel()`, `HOUdiffuse()` or `HOUlightDiffSpec()`.
+  Otherwise, only add light contributions from enabled light sources. 
+  Use the `glH_LightEnabled` or `glH_LightMask` uniform to check which lights 
+  are enabled.
+
+
+=== The multi-pass viewport render ===
+
+When writing a GLSL shader in Houdini it is useful to understand the contexts 
+in which the shader will be executed. The uniform `glH_MaterialPass` can be used to query the pass.
+
+Normal Lighting Pass (0):
+    Ambient, diffuse, specular and emission components can all be calculated
+    with full lighting. This may be done with the Houdini lighting functions or
+    by the shader.
+
+High Quality Lighting Pass (1):
+    The raw ambient, diffuse, specular and emissive components of the material
+    should be defined but no lighting calculations should be applied. If a 
+    shader does not want to participate in HQ lighting, do the lighting 
+    computations and assign it to the emissive component.
+
+Pass value #2 is obsolete.
+
+Shadow Map Pass (3):
+    A shadow map is being created. Only the depth and alpha value are used, so
+    all calculations for color can be avoided.
+
+
+When shading, the `glH_AlphaPass` variable is set to 1 if a transparency pass
+is rendering. You may discard the fragment if your material uses transparency
+and `glH_AlphaPass` is 0, or if your material is opaque and `glH_AlphaPass` is 1.
+
+
+=== Transparency ===
+
+The OpenGL viewport renderer distinguishes between transparent and opaque 
+materials. To properly render transparent objects, shaders must provide a hint 
+to the renderer if the transparency is not derived from the diffuse or opacity
+texture, the `ogl_alpha` or `ogl_alpha_perp` parameters, or the `Alpha` geometry
+attribute. Add the `ogl_alpha_shader` parameter to the material or SHOP to
+ensure the material receives an alpha pass (Edit Rendering Parameters, 
+SHOP / OGL).
+
+
+== OpenGL GL 3.3 Core Principals ==
+
+The viewport pushes many responsibilities to the GPU, in order to improve
+geometry update performance. This makes parts of the shaders a bit more 
+complicated, such as the geometry shader. The geometry shader is required to 
+lookup primitive and vertex attributes (the vertex shader can only lookup vertex
+attributes).
+
+In addition, the GLSL built-ins are deprecated. These include the GL lighting 
+uniforms, transform matrices (`gl_ProjectionMatrix`, `gl_ModelviewMatrix`), and
+the predefined vertex shader inputs and outputs (`glVertex`, `glNormal`, `glColor`, 
+`gl_MultiTexCoord#`, `gl_TexCoord[]`). Instead, all information is passed through
+uniforms, uniform blocks, and named vertex inputs (`P`, `Cd`, `Alpha`, `N`) which 
+correspond to their Houdini attribute names.
+
+Besides the `glH_` Houdini uniforms listed above, the viewport also 
+recognizes uniform blocks. There are a limited number of uniform blocks 
+available in any shader stage (see __Help > About Houdini__ and Show Details, 
+in the OpenGL information for COMBINED_VERT_UNIFORM_BLOCKS and others). 
+
+
+=== Material uniform block ===
+
+The definition of a Houdini material. This may be used in any shader stage.
+
+{{{
+layout(std140) uniform material
+{
+    vec3            ambient_color;
+    vec3            diffuse_color;
+    vec3            emission_color;
+    vec3            specular_color;
+    float           material_alpha;
+    float           material_alpha_parallel;
+    float           shininess;
+    bool            has_diffuse_map;
+    
+    bool            has_bump_map;
+    int             bumpComps;
+    vec2            bumpMapSize;
+    bool            bumpBias;
+    bool            bumpInvert;
+    float           bumpScale;
+    
+    bool            has_spec_map;
+    bool            specularShinyAdjust;
+    vec2            shinyRange;
+    
+    bool            has_env_map;
+    float           envScale;
+    mat3            envRotate;
+};
+
+uniform sampler2D diffuseMap;
+uniform sampler2D bumpMap;
+uniform sampler2D specularMap;
+}}}
+
+
+=== Light uniform block ===
+
+Basic information for scene lights. The trailing digit may be 0-9 for multiple
+lights. Check the glH_LightMask to see if that light should contribute.
+
+{{{
+layout(std140) uniform light0
+{
+    vec3        pos;
+    vec3        dir;
+    vec3        atten;
+    vec3        amb;
+    vec3        spec;
+    vec3        diff;
+    float       coscutoff;
+    bool        point;
+} lightSource0;
+}}}
+
+
+== Program file format ==
+
+Houdini can load custom shaders using a .prog file. The .prog format is a 
+text-based list of directives and files. Here is an example:
+
+{{{
+#name Simple Surface Shader
+
+#version 150
+#input P 0
+#input N 1
+#input Cd 2
+#input Alpha 3
+#output color 0
+
+surface/simple.vert
+surface/simple.frag
+}}}
+
+The `#name` directive gives the shader a descriptive name. This is optional; otherwise the .prog filename will be the shader's name.
+
+The `#version` directive defines the GLSL version this shader uses. This is the same as the GLSL directive, except that `core`, `compatibility`, and `es` modifiers are not allowed. It may be defined multiple times, each time with a different value defining a separate set of files to load. The highest version supported by the implementation will be loaded. At least one `#version` directive must exist, before any shader files are specified.
+
+The `#extension` directive defines a OpenGL extension that must be present in order for the shader set to be accepted. The parameter must be the exact name of the GL extension to use, such as `GL_ARB_sample_shading` or `GL_EXT_framebuffer_object`. Multiple __#extensions__ may be specified for the same shader set, and all of them must be present in order for the set to be loaded. A new `#version` directive will clear the list of required extensions.
+
+The `#input` directive binds generic vertex attributes to specific attribute indices. Only generic vertex attributes can be assigned (no GL-builtins with the gl_ prefix may be bound), and only to valid indices (from 0 to the maximum GL-supported index, usually 15). This provides a similar function to the `GL_ARB_explicit_attribute_location` extension. These are optional, must be specified after a __#version__ directive, and are cleared when a new __#version__ directive is encountered.
+
+There is also a `#hou_attrib_map` directive, which assigns attributes known to Houdini to standard binding locations:
+
+{{{
+P = 0 (vec3)
+Cd = 1 (vec3)
+Alpha = 2 (float)
+N = 3 (vec3)
+uv = 4 (vec2)
+pointScale = 5 (float)
+pointSelection = 6 (int)
+pointID = 7 (int)
+instIndex = 8 (int)
+}}}
+
+All other generic attributes are assigned starting at attribute location 9.
+
+The `#output` directive binds named fragment shader outputs to specific draw buffer indices. This is optional, must appear after a __#version__ directive and is cleared when another __#version__ directive is encountered. This is useful for shaders that output more than one value to different draw buffers/textures.
+
+The `#define` directive passes a defined symbol to the shader. 
+
+The shader files themselves are loaded from the `HOUDINI_GLSL_PATH` (default path value is `HOUDINI_PATH/glsl` ). The files must have specific extensions - `.vert` for vertex shaders, `.geom` for geometry shaders, `.tcs` for tessellation control shaders (GL4.0+), `.tes` for tessellation evaluation shaders (GL4.0+) and `.frag` for fragment shaders.
+
+Finally, a comment can be specified on a line by starting it with `//` . Comments cannot be specified on the same line as a directive or shader filename.
+
+
+== Troubleshooting ==
+
+My Geometry is Invisible:
+    - Some GLSL shaders require vertex attributes to be passed to them (e.g. the tangent space normal mapping shader). Make sure you are passing it the correct data.
+    - The vertex position is not being calculated properly. 
+
+My Geometry is drawn with red stripes:
+    - Make sure that your GLSL shader compiles. The red stripes indicate that the shader could not be linked properly.
+    
+    - Right click the shader node and choose __Type properties__. Click the __Code__ tab. Click __Test compile__ to try compiling your shader code and check for errors.
+    
+    
+My Geometry is Not Receiving Shadows:
+    Some shaders emit light and don't reflect light (e.g. the decal shader). Such a shader will, by design, not receive shadows.
+

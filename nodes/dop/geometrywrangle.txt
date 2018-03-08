@@ -1,0 +1,184 @@
+= Geometry Wrangle =
+
+#type: node
+#context: dop
+#internal: geoemtrywrangle
+#icon: DOP/geoemtrywrangle
+#tags: volumes
+
+"""Runs a VEX snippet to modify attribute values."""
+
+== Overview ==
+
+This is a very powerful, low-level node that lets experts who are
+familiar with VEX tweak attributes using code.
+
+This node corresponds to the [Geometry VOP DOP|Node:dop/geometryvop],
+but uses a textual VEX snippet instead of a VOP network.
+
+WARNING:
+    This node requires that you understand the [vex language|/vex].
+    It is very easy to write incorrect code using this node.
+
+This node _runs the snippet on the detail or every point/primitive/vertex_
+(depending on the __Run Over__ parameter) in the input geometry.
+The snippet can edit the input geometry by changing attributes.
+It can access information from other geometry using attributes and VEX functions.
+
+* Press ((MMB)) on the node to see any error output from the snippet.
+
+* You can use the VEX function `ch` to evaluate parameters.
+  The path is relative to this node (`ch("parm")` will evaluate the parameter `parm` on this node).
+  This evaluation will be done at the current time.
+
+* Unlike the [Attrib Create SOP|Node:sop/attribcreate], this does not use local variables.
+  Further, all backtick expressions and `$F` variables will be evaluated at frame 1,
+  not the current time.
+  Use `@Frame`, `@Time`, or `@TimeInc` instead.
+
+== Context ==
+
+This node runs the snippet in the *CVEX context*.
+
+[Include:/nodes/sop/wrangle_syntax]
+
+@parameters
+
+== Code ==
+Group:
+	A subset of points in the input geometry to run the program on.
+	Leave this blank to affect all points in the input.
+	The type of group must match the __Run Over__ parameter.
+
+Run Over:
+	What class  of geometry attributes to modify.
+	No attributes will be bound, except read-only detail attributes, when set to __Numbers__.
+
+Number Count:
+	#id: vex_numcount
+
+	Iteration count when __Run Over__ is set to __Numbers__.
+	`@elemnum` will be the iteration number from 0 (inclusive), to this number (exclusive),
+	and `@numelem` will be this number.
+	No attributes will be bound when in this mode, except read-only detail attributes.
+
+Thread Job Size:
+	#id: vex_threadjobsize
+
+	Maximum number of iterations run at a time in any thread when __Run Over__ is set to __Numbers__. If this is greater than or equal to __Number Count__, the VEX code will run single-threaded. If each iteration will take a very large amount of time, set this to 1. However, there is quite often a significant advantage to making this value larger, especially if each iteration will take a small amount of time, and if any work can avoid being duplicated by running multiple iterations at a time.
+
+[Include:/nodes/sop/pointwrangle#snippet]
+
+Attributes to Create:
+	Only create attributes if their names match this pattern.
+	The default pattern allows any attribute to be created.
+	
+	You can restrict the created attributes by replacing the `*` with a list of allowed names.
+
+	Bound attributes, such as `vtxnum`, cannot be created and will be ignored.
+Enforce Prototypes:
+	Automatic binding with the `@` syntax can be convenient, but if your
+	system becomes more complex there is the risk that a typo in an `@` binding
+	will silently just bind a non-existent attribute.
+
+	This option forces all `@` bindings to be explicitly declared as
+	prototypes before use.
+
+
+[Include:standard_gas_timestep]
+
+== Data Bindings ==
+Geometry:
+	The list of the geometry on the object to process.
+
+Evaluation Node Path:
+	VEX functions like `ch()` usually evaluate with respect to this node.
+	Providing a path here can override where the path search starts
+	from.  This is useful for embedding in a digital asset where you
+	would like the top level digital asset to be the search root.
+    
+Timescale:
+        An overall scale applied to the actual timestep.
+
+Export Parameters:
+	When a VEX parameter is exported, the bound attribute will be
+	created if it doesn't exist.  This pattern can be used to override
+	the export option on the VEX shader to avoid writing to or creating
+	certain attributes.  The pattern matches the VEX parameter, not
+	the bound attribute.  The attribute will still be bound for
+	reading.
+
+Autobind by Name:
+	Will use the name of the attribute to determine which
+	attribute binds with which parameter.  
+
+	Integer attributes will bind to integer parameters.  Float
+	attributes will bind to float, vector, point, matrix, or matrix4
+	depending on their tuple size.  String attributes will bind to
+	strings.
+
+Attribute Name, VEX Parameter:
+	Manually specifies the bindings of each attribute.  
+
+Field Name, VEX Parameter:
+	Optionally binds Scalar, Vector, Matrix, or Index fields from this
+	object to the CVEX function.  They will be sampled at the current `P`
+	location of each element.
+
+	You can then access these with the @ syntax referring to the given Parameter.
+
+Autobind Groups by Name:
+	Automatically bind any groups to the integer parameter prefixed with `group_`.
+
+Group Name, VEX Parameter:
+	Manually specifies the bindings of each group.
+
+Update Normals If Displaced:
+	If points are being run over, and the `P` attribute is written to,
+	but the `N` attribute is not written to, any incoming normals will
+	become out of date.  When this option is set, vertex and point
+	normals will be updated when this occurs.
+
+== Inputs ==
+
+Input 1, 2, 3, 4:
+	These control the four virtual inputs accessible inside of VOPs.
+
+	They can be accessed with the OpInput1-4 wires from the VOP, or with
+	the `@OpInput1-4` string parameters when using VEXpressions.
+
+	They can also be accessed numerically as 0-3 with VEX functions
+	that take an input number.
+
+	None:
+	    No geometry is wired to this input.
+	SOP:
+	    The SOP geometry will be cooked prior to running the VEX and
+	    the result wired to this input.
+	DOP Data:
+	    Data in the current simulation to reference.  Specified as
+	    an object/data, for example, `pyro1/vel` to refer to the velocity
+	    field of the `pyro1` object (which will show up as three volume
+	    primitives).
+	Myself:
+	    Referring to the geometry currently being processed is
+	    special as you have to ensure a copy is made so the VEX
+	    functions can refer to its original form.  This handles
+	    that for you.
+	Nth Context Geometry:
+	    These refer to the SOPs wired into the parent DOP Network itself.
+	Myself (No Reads from Outputs):
+	    Refers the currently processed geometry.  Does not make a copy
+	    so it is up to the user to ensure no reads are made from
+	    any attributes that are bound.
+
+SOP Path:
+	Path to a SOP to wire in.
+DOP Data:
+	Name of a piece of DOP data on THIS object to wire in.
+
+@related
+
+- [Node:dop/geometryvop]
+- [Node:dop/gasfieldvop]
+- [Node:dop/gasfieldwrangle]

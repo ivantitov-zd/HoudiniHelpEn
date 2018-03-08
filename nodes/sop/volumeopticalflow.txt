@@ -1,0 +1,68 @@
+= Volume Optical Flow =
+
+#type: node
+#context: sop
+#internal: volumeopticalflow
+#tags: volumes
+
+"""Translates the motion between two "image" volumes into displacement vectors."""
+
+This node takes a "source" volume and a "goal" volume. This node outputs a vector field representing the displacement of each voxel in the "source" volume to the corresponding voxel in the "goal" volume. This works best if goal volume is a slight variation on the source volume, such as if they are created from the pixel data of adjacent frames of a video.
+
+[Image:/images/nodes/sop/optical_flow.jpg]
+
+You can create cool effects where you convert 2D video pixel data into volume data, find the displacement vectors between the previous frame and the current frame, and use those vectors to drive motion such as a simulation. For example, a dancer sweeping her arm in the video could scatter a field of particles.
+
+* If there are multiple volume primitives in the inputs, the node will match them up by `name`, then by index (for example, if each input has two volumes, the node will match the first in the source with the first volume in goal, then the second volume in the source with the second volume in the goal, and so on).
+
+* This node outputs three scalar fields for each pair of volumes. The names of the fields are the name of the source volume with a `.x`, `.y`, or `.z` suffix.
+
+[Include:no_vdb]
+
+
+@parameters
+
+Source Group:
+	A list of volume primitives to use from the first input. If this is blank, the node uses all volumes in the input. Note that you should end up with the same number of volumes from each input.
+
+Goal Group:
+	A list of volume primitives to use from the second input. If this is blank, the node uses all volumes in the input. Note that you should end up with the same number of volumes from each input.
+
+Tolerance:
+	Controls how much difference there must be between the volumes to output displacement. Turn this up when the source and goal have small-scale noise you don't want to show up in the displacements.
+    
+    (Increasing this drives the output vectors toward zero, so eliminating noise will also decrease the output vector magnitudes.)
+
+Blurring Window Radius:
+	The radius of the window over which to blur the displacement in each iteration. Higher values smooth out motion more.
+
+Use Gaussian Filter:
+	The the slower but more accurate Gaussian calculations instead of the default box filter.
+
+Pyramid Levels:
+    Higher values help track larger displacements, but take longer to compute.
+    
+    (This node finds differents between the source and goal using multiple layers of increasing resolution, forming a pyramid.)
+
+Pyramid Scale:
+	The ratio of the size of each pyramid layer to the next one. Higher values help track larger displacements, but take longer to compute.
+
+Iterations:
+	The number of iterations of refinement to do at each layer in the pyramid. Higher numbers give more precise motion but take longer to compute.
+
+Approximation Window Radius:
+    The size of a "window" around each voxel the node uses to approximate the voxels as polynomials. Higher values may smooth over noise by approximating larger areas, but may take longer to compute.
+
+
+@inputs
+
+Source Image:
+    The "from" volume(s). The node computes displacements from values in this volume to corresponding values in the second input.
+
+Goal Image:
+    The "to" volume(s). The node computes displacements from values in thi first input to corresponding values in this volume.
+
+
+@related
+- [Node:sop/timeshift]
+- [Node:sop/volumetrail]

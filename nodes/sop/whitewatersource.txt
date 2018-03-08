@@ -1,0 +1,423 @@
+#type: node
+#context: sop
+#icon: whitewater
+#internal: whitewatersource
+
+
+= Whitewater Source =
+
+"""Generates emission particles and volumes to be used as sources in a Whitewater simulation."""
+
+The Whitewater Source SOP generates emission particles and surface
+and velocity volumes to be used as input to the 
+[Whitewater Solver|Node:dop/whitewatersolver].
+It calculates emission probabilities by analyzing the input particles and 
+volumes according to several criteria, choosing the maximum probability for
+each candidate particle.  The probability of each particle emitting
+whitewater is stored in its `emit` attribute.  All particles with 
+non-zero emission probability are put in the `emitters` group, and 
+non-emitting particles are deleted.
+
+Input to this SOP will often be the output of a FLIP simulation, including
+particles, a Signed Distance volume named `surface` that represents the
+liquid, and three velocity volumes named `vel.x`, `vel.y`, and `vel.z` 
+containing the velocity values from the input fluid simulation.
+
+Input can also consist of only particles from a Particle Fluid simulation
+or another simulation package, in which case this SOP can generate
+compatible volumes. Conversely, it can take surface and velocity volumes from
+the Liquid Solver or another volume-based liquid simulation and generate
+emission particles.
+
+== Tips == (tips)
+
+* If the source fluid simulation is cached to disk or memory, this SOP allows
+  quick preview and tuning of whitewater emission particles throughout the
+  frame range of the source simulation. Choosing 
+  [Hide Other Objects|/basics/view] in the Scene Viewer can ensure no 
+  simulations solve in the background when scrubbing frames.
+
+* If the input particles have been packed using the [Fluid Compress|Node:sop/fluidcompress]
+  or [Pack Points|Node:sop/packpoints] SOPs and are being read from disk files, ensure that
+  __Delay Load Geometry__ is enabled on the [File|Node:sop/file] or [File Cache|Node:sop/file]
+  SOP used to read them in. With this setup, particles won't actually load from disk until
+  needed for emission, saving load time if using __Distribution__ to divide emission into regions.
+  
+:task:Create swirls of bubbles underneath the surface:
+    Turn on __Reseed Compressed Fluid__ on the [Whitewater Source SOP|Node:sop/whitewatersource]. This will create new particles under the specified particle bandwidth to use as potential whitewater emitters.
+        
+:task:Only emit whitewater at the surface:
+    Turn on __Limit By Depth__ on the [Whitewater Source SOP|Node:sop/whitewatersource]. This will limit whitewater emission to particles with a certain depth range within the surface SDF.  Alternatively, because FLIP compression already culls particles deep below the surface, it can often be effective (and faster) to simply turn off __Reseed Compressed Fluid__.
+    
+:task:Only emit whitewater in a particular region:
+    Change the __Division Type__ to __Specified Box__ on the __Divisions__ tab of the [Whitewater Source SOP|Node:sop/whitewatersource]. This will only load whitewater in the specific slice.
+
+
+
+== Advanced Tips == (advancedtips)
+
+When fine-tuning emission criteria or generating whitewater for very large
+liquid simulations, it is important to understand the multiple stages of this
+node's operation:
+
+* _Culling_ the input particles based on __Min Speed__ and __Distribution__
+  settings.
+
+* _Sampling_ the emission criteria from the input volumes into attributes on
+  the culled points.
+
+* _Mapping_ the sampled attribute values onto their emission values, with
+  the final emission probability being the maximum of all emission values.
+
+* _Visualization_ of the attribute or emission values for any criterion.
+
+* _Grouping_ emitting particles into the `emitters` group and culling
+  any non-emitting particles.
+
+Enabling parameters such as __Keep Curvature Attributes__ allows inspecting the
+sampled attribute values directly in the
+[Geometry Spreadsheet|/ref/panes/geosheet] to determine good ranges for mapping
+to emission probability.
+
+The __Cache__ tab allows caching the candidate emission points to file after the
+_Culling_ and _Sampling_ stages.  At this point there are typically far
+fewer candidate points and the input volumes no longer need to be sampled,
+so fine-tuning only _Mapping_ stage parameters such as __Min Accleration__
+will be much faster.  
+
+@inputs
+    Liquid Simulation:
+        Particles and / or surface and velocity volumes or VDBs from a liquid 
+        simulation.
+
+    Liquid Simulation Volumes:
+        Surface and velocity volumes or VDBS from a liquid simulation.
+
+@parameters
+
+== Emission == (emission)
+
+Particles will only emit whitewater when they have sufficient speed and,
+optionally, are within a specified surface depth range. The maximum value
+from all other criteria is taken, then the particle's emission probability
+is fit to a 0-1 range based on its speed.
+
+Min Speed:
+    The minimum speed at which a particle can emit whitewater.
+
+Max Speed:
+    The maximum speed at which a particle can emit whitewater.
+
+Reseed Compressed Fluid:
+    If the input fluid simulation has been compressed with the 
+    [Fluid Compress SOP|Node:sop/fluidcompress], automatically reseed
+    potential emitter points below its specified particle __Cull Bandwidth__.
+    Disabling this option will speed up emission and avoid creating emitters
+    deep within the liquid, which is sometimes preferable.  The density
+    of the reseeded particles is controlled by the __Particle Separation__
+    parameter on the __Sources__ tab.  
+
+Limit By Depth:
+    Limit whitewater emission to particles with a certain depth range
+    within the surface SDF.
+
+Min Depth:
+    The minimum depth at which a particle can emit whitewater.
+
+Max Depth:
+    The maximum depth at which a particle can emit whitewater.
+
+Output Points Only:
+    Do not include input volumes in the output of this node.
+
+Keep Non-Emitting Points:
+    Do not cull points with zero emission probability.  This is mostly useful
+    for inspecting sampled attribute values.
+
+Remap Speed:
+    Remap the speed curve from a linear mapping to a specific curve.
+
+Speed Ramp:
+    The ramp for remapping speed.
+
+Remap Emission:
+    Apply a global ramp to the emission probability after all other criteria
+    have been applied.
+
+Emission Ramp:
+    The ramp for remapping emission.
+
+Visualize Emission:
+    Visualize the emission probability of each source particle as
+    color.
+
+Emission Color Ramp:
+    The ramp for mapping emission probability to color.
+
+== Curvature == (curvature)
+
+Emit From Curvature:
+    Create emission particles based on the curvature of the surface SDF, which
+    can be an effective criteria for detecting the leading edge of breaking
+    waves.
+
+Keep Curvature Attributes:
+    Retain the `curvature`, `velocityangle`, and `curvatureemit` attributes
+    sampled when __Emit From Curvature__ is enabled.  This option is useful for
+    inspecting the raw curvature values to determine good settings for
+    the mapping parameters below.
+
+Min Curvature:
+    The minimum surface curvature at which to emit whitewater.
+
+Max Curvature:
+    The maximum surface curvature at which to emit whitewater.
+
+Max Velocity Angle:
+    The angle between the velocity of the particle and the surface normal must
+    be lower than this value for whitewater emission. This limit helps ensure
+    that whitewater is only created on the leading edges of waves.
+
+Remap Curvature:
+    Remap the curvature emission probability from a linear mapping to
+    a specific curve.
+
+Visualize:
+    #channels: /vizcurvature
+    Visualize the sampled attribute values or emission probability from
+    curvature.
+
+Curvature Ramp:
+    The ramp for remapping curvature.
+
+== Acceleration == (acceleration)
+
+Emit From Acceleration:
+    Create emission particles based on the magnitude of the acceleration
+    occurring at a particle's position within the velocity volumes.  This
+    value is calculated by comparing the particle velocity to the velocity at
+    that point in the velocity volumes time-shifted by one previous frame.
+    Acceleration is effective at detecting areas when particles are rejoining
+    existing parts of the fluid, resulting in trapped air that causes
+    whitewater.
+
+Keep Acceleration Attributes:
+    Retain the `acceleration` and `accelerationemit` attributes sampled
+    when __Emit From Acceleration__ is enabled.  This option is useful for
+    inspecting the raw acceleration values to determine good settings for
+    the mapping parameters below.
+
+Min Acceleration:
+    The minimum acceleration magnitude at which to emit whitewater.
+
+Max Acceleration:
+    The maximum acceleration magnitude at which to emit whitewater.
+
+Remap Acceleration:
+    Remap the acceleration emission probability from a linear mapping
+    to a specific curve.
+
+Acceleration Ramp:
+    The ramp for remapping acceleration.
+
+Visualize:
+    #channels: /vizaccel
+    Visualize the sampled attribute values or emission probability from
+    acceleration.
+
+== Vorticity == (vorticity)
+
+Emit From Vorticity:
+    Create emission particles based on the the vorticity, or magnitude of
+    rotation, within the velocity volumes.  This criterion can be effective in
+    identifying churning areas of the fluid, which generally occur deeper
+    below the surface.
+
+Keep Vorticity Attributes:
+    Retain the `vorticity` and `vorticityemit` attributes sampled
+    when __Emit From Vorticity__ is enabled.  This option is useful for
+    inspecting the raw vorticity values to determine good settings for
+    the mapping parameters below.
+
+Min Vorticity:
+    The minimum vorticity at which to emit whitewater.
+
+Max Vorticity:
+    The maximum vorticity at which to emit whitewater.
+
+Remap Vorticity:
+    Remap the vorticity emission probability from a linear mapping to
+    a specific curve.
+
+Vorticity Ramp:
+    The ramp for remapping vorticity.
+
+Visualize:
+    #channels: /vizvorticity
+    Visualize the sampled attribute values or emission probability from
+    vorticity.
+
+== Sources == (sources)
+
+This SOP can modify the input sources before generating emission particles or
+generate potential emission points or volumes from the input.
+
+Type:
+    Particles and Volumes:
+        The input contains particles to use as possible emission points and
+        surface and velocity volumes.
+    Particles Only:
+        The input contains only particles from which to generate surface and
+        velocity volumes.
+    Volumes Only:
+        The input contains only surface and velocity volumes.   Candidate
+        emission points will be generated inside the surface volume.
+    Particles and VDBs:
+        The input contains particles to use as possible emission points, 
+        a surface VDB, and a velocity VDB.
+    VDBs Only:
+        The input contains only surface and velocity VDBs.   Candidate
+        emission points will be generated inside the surface VDB.
+
+Volume Division Size:
+    The voxel size for generated volumes.
+
+Volume Limit Size:
+    The maximum size of generated volumes.
+
+Max Extrapolation:
+    The distance outside the surface volume to extrapolate valid
+    depth values.  This value should be greater than the sum of the foam
+    __Depth__ and __Iso Surface__ parameters of the 
+    [Whitewater Solver|Node:dop/whitewatersolver].
+
+Particle Separation:
+    The smallest distance between any two of the generated points 
+    in the initial configuration.
+
+Particles Radius Scale:
+    Scales the __Particle Separation__ value to calculate a radius
+    stored in the `pscale` attribute of generated particles.
+
+Jitter Scale:
+    The amount of jitter to apply to the positional values of the 
+    generated candidate points.  
+
+Jitter Seed:
+    The random seed for the jitter operation.
+
+Rebuild Surface SDF:
+    Rebuild the depth values in the surface SDF, up to the distance specified
+    by __Max Extrapolation__.  This operation can be useful if the input
+    surface volume only has valid depth values for a very narrow bandwidth
+    around the zero iso-surface, but the 
+    [Whitewater Solver|Node:dop/whitewatersolver] needs depth values 
+    farther away from the surface to create a thick foam  layer.
+
+Delete Attributes:
+    Delete all specified attributes on the input geometry.
+
+== Distribution == (distribution)
+
+Division Type:
+    Divide the input points into multiple regions, allowing the resulting source
+    particles to be distributed across multiple machines.  When divisions are
+    active the bounding area of the __Current Region__ will be displayed in this
+    node's guide geometry.
+
+    None:
+        Turn off divisions.
+    Specified Box:
+        Divide the box specified by the __Box Size__ and __Box Center__ into
+        regions according to the __Divisions__ parameter.
+
+        TIP:
+            Press ((Enter)) in the Viewport to display a handle for sizing and
+            positioning this box.
+    Surface Bounding Box:
+        Divide the the bounding box of the input surface field into regions
+        according to the __Divisions__ parameter.
+    Camera:
+        Divide the frustum specified by the __Camera__ and its window parameters into
+        regions according to the __Divisions__ parameter.
+
+Box Size:
+    The size of the domain to be divided into regions.
+
+Box Center:
+    The center of the domain to be divided into regions.
+
+Camera:
+    Restrict emission to the specified camera's frustum.  If the input
+    particles are packed geometry and loaded with Delay Load Geometry, no
+    particles will be loaded from disk outside this region.
+
+Z Near:
+    The distance from the camera to start emitting whitewater.
+
+Z Far:
+    The distance from the camera to stop emitting whitewater.
+
+Use Camera's Window:
+    If set, the camera's window scale, offset, and crop parameters will be
+    used in addition to the following __Window X/Y__ settings.
+
+Window X/Y:
+    The min/max portions of the camera's view for emission.
+    This allows you to add padding to ensure good boundary conditions or focus
+    into a key area of the scene.
+
+Divisions:
+    The number of regions along each axis.
+
+Current Region:
+    Specifies the region to evaluate.  If distributing simulations across
+    machines,  this parameter will often be set to a variable like `$SLICE` that
+    represents the region for the current job.
+
+== Visualization == (visualization)
+
+Show Surface:
+    Show the polygonized surface volume as guide geometry to help visualize
+    the whitewater emission in the context of the source fluid simulation.
+
+Surface Detail:
+    Controls the sample rate of the polygon conversion for the 
+    guide surface volume.
+
+== Cache == (cache)
+
+These parameters allow caching the candidate points after sampling the
+volumes into attribute values, but before mapping to final emission
+probability.
+
+Cache Points Only:
+    Only save points to the cache file.
+
+Load Sampled Points From Disk:
+    Use the cache to load sampled points.
+
+Save to Disk:
+    See the [Geometry ROP|Node:out/geometry] help for this parameter.
+
+Start/End/Inc:
+    See the [Geometry ROP|Node:out/geometry] help for this parameter.
+
+Sampled Output File:
+    See the [Geometry ROP|Node:out/geometry] help for this parameter.
+
+Output File:
+    See the [Geometry ROP|Node:out/geometry] help for this parameter.
+
+Create Intermediate Directories:
+    See the [Geometry ROP|Node:out/geometry] help for this parameter.
+
+Save in Background:
+    See the [Geometry ROP|Node:out/geometry] help for this parameter.
+
+
+@related
+    - [Whitewater Solver|Node:dop/whitewatersolver]
+
+
+

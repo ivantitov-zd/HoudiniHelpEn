@@ -1,0 +1,999 @@
+= L-System =
+
+#type: node
+#context: sop
+#internal: lsystem
+#icon: SOP/lsystem
+#bestbet: lsystem
+#tags: tech, create, curves
+
+"""Creates fractal geometry from the recursive application of simple rules."""
+
+== About L-systems ==
+
+L-systems (_Lindenmayer-systems_, named after Aristid Lindenmayer,
+1925-1989), allow definition of complex shapes through the use of
+iteration. They use a mathematical language in which an initial string
+of characters is matched against rules which are evaluated repeatedly,
+and the results are used to generate geometry. The result of each
+evaluation becomes the basis for the next iteration of geometry, giving
+the illusion of growth.
+
+The [L-system SOP|Node:sop/lsystem] lets you simulate complex organic
+structures such as trees, lightning, snowflakes, flowers, and other
+branching phenomena.
+
+[Include:/shelf/lsystem#includeme]
+
+== Fractal properties ==
+
+There are several factors which combine to organize plant structures
+and contribute to their beauty. These include:
+
+* symmetry
+
+* self-similarity
+
+* developmental algorithms
+
+With L-systems, we are mostly concerned with the latter two.
+Self-similarity implies an underlying fractal structure which is
+provided through strings of L-systems. Benoit Mandelbrot describes
+self-similarity as follows:
+
+"When each piece of a shape is geometrically similar to the whole,
+both the shape and the cascade that generate it are called
+self-similar."
+
+L-systems provide a grammar for describing the growth of
+self-similar structures in time. L-system rules determine the
+underlying structures of growth in a way that is analogous to the
+way that DNA is thought to determine biological growth. This growth
+relies on the principle of self-similarity to provide extremely
+compact descriptions of complex surfaces.
+
+== Rewriting ==
+
+The central concept of L-systems is _rewriting_. This works by
+recursively replacing an initial state (the _initiator_) with
+rewritten geometry (the _generator_), reduced and displaced to have
+the same end points as those of the interval being replaced.
+
+In 1968, Astrid Lindenmayer introduced a string rewriting mechanism
+termed "L-systems". The grammar of L-systems is unique in that the
+method of applying productions is applied in parallel and
+simultaneously replaces all letters in a given "word".
+
+The simplest example of a rewriting grammar is where two "words" or
+strings are used, built from the two letters: `a` and `b`, which may
+occur many times in a string. Each letter is associated with a
+rewriting rule. The rule `a = ab` means that the letter `a` is to be
+replaced by the string `ab`, and the rule `b = a` means that the
+letter `b` is to be replaced by `a`.
+
+If we start the process with the letter `b` (the _premise_), and
+follow it through in time, we see a certain pattern emerges by
+following the rewriting rules:
+
+[Image:/nodes/images/Houdini-03-1-089.jpg]
+
+== Production rule syntax ==
+
+The general form of an L-system rule is:
+
+{{{
+[left_context<] symbol [>right_context] [:condition]=replacement [:probability]
+}}}
+
+Where...
+
+left_context:
+    An optional string that must precede the <<symbol>> for this rule to
+    match.
+symbol:
+    The symbol to replace. For example, if the symbol is `A`,
+    occurrences of `A` in the initial string will be replaced with
+    <<replacement>> (if this rule matches).
+right_context:
+    An optional string that must follow the <<symbol>> for this rule to
+    match.
+condition:
+    An optional expression that must be true for this rule to match.
+replacement:
+    The string that will replace the <<symbol>> (if this rule matches).
+probability:
+    The optional chance (between 0 and 1) that this rule will be executed.
+    For example, using `0.8` means this rule will execute 80% of the time.
+
+TIP:
+    You can use `->` in production rules instead of `=`. The meaning is
+    identical.
+
+== Turtle commands ==
+
+We can combine this string-manipulation system with a graphics
+routine that interprets the strings as commands for a drawing
+"turtle" with a position (XYZ) and heading (angle). By following the
+commands, the turtle traces out a shape as it moves.
+
+Examples of simple turtle commands:
+
+`F` :
+    Move forward a step, drawing a line connecting the previous
+    position to the new position.
+`f` :
+    Move forward without drawing.
+`+` :
+    Rotate right 90 degrees.
+`-` :
+    Rotate left 90 degrees.
+(In the actual L-system node, the angle of the `+` and `-` commands
+is configurable.)
+
+With these simple rules, we can easily come up with a string that
+causes the turtle to draw a shape such as the letter "L". For
+example, assuming the turtle is initially facing upwards, we would
+use the following string to create the letter "L":
+
+[Image:/nodes/images/Houdini-03-1-090.jpg]
+
+== Rewriting turtle command strings ==
+
+By iteratively running a turtle command string through rewrite
+rules, you can generate surprisingly complex geometry. The power of
+self-reference in rewrite rules can create extremely intricate
+figures.
+
+As a very simple example of self-reference, consider an L-system
+with the initial string `A` and the rule `A=F+A`. The rule means
+"Wherever you see 'A', replace it with 'F+A'". Because the
+replacement will contain within it the trigger for the rule, each
+generation will cause the string to grow in a _cascade effect_:
+
+[Image:/nodes/images/Houdini-03-1-092.jpg]
+
+This generates a growing list of repeated "move forward, then turn"
+commands. With a turn angle less than 90 and a sufficient number of
+generations, this L-system will approximate an arc or circle. You
+could use this behavior as the basis for curling a sheet of paper or
+curling a scorpion's tail. Or, you could randomize the turn angle
+and create a squiggly line, which you could use as the basis for a
+bolt of lightning.
+
+(Be sure not to confuse the turtle command string `F+A` with the
+mathematical statement _F plus A_. In the context of L-systems, the
+`+` symbol means "turn", not "add".)
+
+Another example: the following figure is called a _quadratic Koch
+island_. Beginning with these values:
+
+table>>
+    tr>>
+        td>> Initial string (premise)
+        td>>
+            `F-F-F-F`
+    tr>>
+        td>> Rewrite rule
+        td>>
+            `F = F-F+F+FF-F-F+F`
+    tr>>
+        td>> Angle
+        td>>
+            `90`
+...the turtle generates the following for three generations:
+
+[Image:/nodes/images/lsystems/island1.png]
+[Image:/nodes/images/lsystems/island2.png]
+[Image:/nodes/images/lsystems/island3.png]
+
+NOTE:
+    The work required for Houdini to calculate successive
+    generations increases exponentially. If you try the island
+    example in Houdini, make sure the __Generations__ parameter is
+    not greater than `3`.
+
+TIP:
+    You can press ((MMB)) on an L-system node to see the node's
+    current string. This can be very useful in debugging
+    rule substitution.
+
+== Branches ==
+
+The systems described so far generate a single continuous line. To
+describe things like trees, we need a way to create _branches_.
+
+In L-systems, you create branches with the square brackets (`[` and
+`]`). Any turtle commands you put inside square brackets are
+executed separately from the main string by a new turtle.
+
+For example, the turtle commands `F [+F] F [+F] [-F]` is interpreted
+as:
+
+# Go forward.
+
+# Branch off a new turtle and have it turn right and then go
+  forward.
+
+# Go forward.
+
+# Branch off a new turtle and have it turn right and then go
+  forward.
+
+# Branch off a new turtle and have it turn left and then go
+  forward.
+
+This creates the following figure:
+
+[Image:/nodes/images/Houdini-03-1-095.jpg]
+
+Another example: the command string `F [+F] [-F] F [+F] -FF` creates
+the following figure:
+
+[Image:/nodes/images/Houdini-03-1-096.jpg]
+
+== 3D ==
+
+The systems described so far generate flat geometry.
+
+To move the turtle in 3D, you use the `&` (pitch up), `^` (pitch
+down), `\\` (roll clockwise), and `/` (roll counter-clockwise)
+commands.
+
+For example, the initial premise `FFFA` and the rule `A= " [&FFFA]
+//// [&FFFA] //// [&FFFA]`.
+
+[Image:/nodes/images/Houdini-03-1-099.jpg]
+
+This creates the following 3D figure:
+
+[Image:/nodes/images/lsystems/roll1.png]
+[Image:/nodes/images/lsystems/roll2.png]
+[Image:/nodes/images/lsystems/roll3.png]`.
+[Image:/nodes/images/lsystems/roll4.png]
+[Image:/nodes/images/lsystems/roll5.png]
+
+The rule creates three branches at every generation. The pitch up
+commands (`&`) split the branches off from the vertical. The roll
+commands (`/`) make the branches go out in different directions.
+(Note the `A` at the end of each branch that ensures new copies of
+the rule will grow from the ends of the branches.)
+
+The `"` command makes the `F` commands half length in each
+generation, which makes the branches shrink further out.
+
+== Use multiple L-system rules ==
+
+In the previous section we used the rule
+`A= " [&FFFA] //// [&FFFA] //// [&FFFA]`.
+
+Obviously this rule has redundancy. Since L-systems are about
+replacing symbols with strings, we can simply replace the repeated
+strings with a new symbol, and then create a new rule for that
+symbol:
+
+table>>
+    tr>>
+        td>> Rule 1
+        td>>
+            `A= " [B] //// [B] //// [B]`
+    tr>>
+        td>> Rule 2
+        td>>
+            `B= &FFFA`
+
+Because the branches are now defined in one place, if you want to
+change the branch instructions you only need to edit one string.
+
+*Note that the two-rule system will take _twice as many
+generations_ to produce the same result*. This is because each
+generation performs one rule substitution.
+
+So, whereas the single rule `A= " [&FFFA] //// [&FFFA] //// [&FFFA]`
+grows by expanding `A` at each generation, the dual rules of
+`A= " [B] //// [B] //// [B]` and `B= &FFFA` work by alternating
+between replacing `A` with `" [B] //// [B] //// [B]` and replacing
+`B` with `&FFFA`.
+
+== Turtle command reference ==
+
+Normally turtle symbols use the current length/angle/thickness etc. to
+determine their effect. You can provide explicit arguments in brackets
+to override the normal values used by the turtle command.
+
+The following list shows the bracketed arguments. Remember that you can
+simply use the single-character command without the arguments and
+Houdini will simply use the normal values.
+
+`F(l,w,s,d)` :
+    Move forward (creating geometry) distance <<l>> of width <<w>>
+    using <<s>> cross sections of <<d>> divisions each.
+`H(l,w,s,d)` :
+    Move forward half the length (creating geometry) distance <<l>>
+    of width <<w>> using <<s>> cross sections of <<d>> divisions
+    each.
+`G(l,w,s,d)` :
+    Move forward but don't record a vertex distance <<l>> of width
+    <<w>> using <<s>> cross sections of <<d>> divisions each.
+`f(l,w,s,d)` :
+    Move forward (no geometry created) distance <<l>> of width <<w>>
+    using <<s>> cross sections of <<d>> divisions each.
+`h(l,w,s,d)` :
+    Move forward a half length (no geometry created) distance <<l>>
+    of width <<w>> using <<s>> cross sections of <<d>> divisions
+    each.
+`J(s,x,a,b,c) K(s,x,a,b,c) M(s,x,a,b,c)` :
+    Copy geometry from leaf input J, K, or M at the turtle's
+    position after scaling and reorienting the geometry. The
+    geometry is scaled by the s parameter (default Step Size) and
+    stamped with the values <<a>> through <<c>> (default no
+    stamping). Stamping occurs if the given parameter is present and
+    the relevant Leaf parameter is set. The <<x>> parameter is not
+    used and should be set to 0. Note that point vector attributes in the
+    leaf inputs will be affected by the turtle movements. 
+`T(g)` :
+    Apply tropism vector (gravity). This angles the turtle towards
+    the negative Y axis. The amount of change is governed by <<g>>.
+    The default change is to use the Gravity parameter.
+`+(a)` :
+    Turn right <<a>> degrees. Default Angle.
+`-(a)` :
+    Turn left <<a>> degrees (minus sign). Default Angle.
+`&(a)` :
+    Pitch up <<a>> degrees. Default Angle.
+`^(a)` :
+    Pitch down <<a>> degrees. Default Angle.
+`\\(a)` :
+    Roll clockwise <<a>> degrees. Default Angle.
+`/(a)` :
+    Roll counter-clockwise <<a>> degrees. Default Angle.
+`|` :
+    Turn 180 degrees
+`*` :
+    Roll 180 degrees
+`~(a)` :
+    Pitch / Roll / Turn random amount up to <<a>> degrees. Default
+    180.
+`"(s)` :
+    Multiply current length by s. Default Step Size Scale.
+`!(s)` :
+    Multiply current thickness by s. Default Thickness Scale.
+`;(s)` :
+    Multiply current angle by s. Default Angle Scale.
+`_(s)` :
+    Divide current length (underscore) by s. Default Step Size
+    Scale.
+`?(s)` :
+    Divides current width by s. Default Thickness Scale.
+`@(s)` :
+    Divide current angle by s. Default Angle Scale.
+`'(u)` :
+    Increment color index U by <<u>>. Default __UV Increment__'s
+    first parameter.
+`#(v)` :
+    Increment color index V by <<v>>. Default __UV Increment__'s
+    second parameter.
+`%` :
+    Cut off remainder of branch
+`$(x,y,z)` :
+    Rotates the turtle so the up vector is (0,1,0). Points the
+    turtle in the direction of the point `(x,y,z)`. Default behavior
+    is only to orient and not to change the direction.
+`[` :
+    Push turtle state (start a branch)
+`]` :
+    Pop turtle state (end a branch)
+`{` :
+    Start a polygon
+`.` :
+    Make a polygon vertex
+`}` :
+    End a polygon
+`g(i)` :
+    Create a new primitive group to which subsequent geometry is
+    added. The group name is the Group Prefix followed by the number
+    <<i>>. The default if no parameter is given is to create a group
+    with the current group number and then increment the current
+    group number.
+`a(attrib, v1, v2, v3)` :
+    This creates a point attribute of the name attrib. It is then
+    set to the value `v1, v2, v3` for the remainder of the points on
+    this branch, or until another a command resets it. <<v2>> and
+    <<v3>> are optional. If they are not present, an attribute of
+    fewer floats will be created. The created attribute is always of
+    float type and with zero defaults. For example, the rule
+    `a("Cd", 1, 0, 1)` added to the start of the premise will make
+    the L-system a nice pugnacious purple.
+
+== Use modeled geometry in an L-system ==
+
+Houdini lets you create a copy of some geometry at the turtle's location
+using certain commands. You can use this to create leaves and flowers on
+an L-system shrub, for example.
+
+steps>>
+    #  [Connect|/ref/panes/network]  the output of the geometry you want to
+      stamp to one of the L-system node's inputs.
+
+    # Use the corresponding command (`J`, `K`, or `M`) in a turtle
+      command string to insert the geometry.
+
+table>>
+    tr>>
+        th>> Input
+        th>> Turtle command
+    tr>>
+        td>> 1
+        td>> J
+    tr>>
+        td>> 2
+        td>> K
+    tr>>
+        td>> 3
+        td>> M
+
+If you connect a leaf surface to the L-systems input 1 and a flower
+to input 2, you can use the following to create a bush with leaves
+and flowers:
+
+table>>
+    tr>>
+        td>> Premise
+        td>>
+            `A`
+    tr>>
+        td>> Rule 1
+        td>>
+            `A= [&FA [fK]] ///// [&FA [fJ]] /////// [&FA [fJ]]`
+    tr>>
+        td>> Rule 2
+        td>>
+            `F= S/////`
+    tr>>
+        td>> Rule 3
+        td>>
+            `S= F`
+[Image:/nodes/images/Houdini-03-1-104.jpg]
+
+Rule 1 prefaces the `K` and `J` commands with `f` (move forward
+without drawing) to offset the geometry a little bit. Otherwise, the
+leaf would be attached at its center, rather than the edge.
+
+== Symbol variables ==
+
+Each symbol can have up to five user-defined variables associated
+with it. You can reference or assign these variables in expressions.
+Variables in the matched symbol are instanced while variables in the
+replacement are assigned.
+
+For example, the rule `A(i, j)=A(i+1, j-1)` will replace each `A`
+with a new `A` in which the first parameter (`i`) has been
+incremented and the second parameter (`j`) decremented.
+
+Parameters assigned to geometric symbols (for example, `F`, `+`, and
+`!`) are interpreted geometrically. For example, the rule: `F(i, j)
+= F(0.5*i, 2*j)` will again replace each F with a new F containing
+modified parameters. In addition to this, the new F will now be
+drawn at half the length and twice the width.
+
+TIP:
+    The variables in the predecessor can also be referenced by the
+    condition or probability portions of the rule. For example, the
+    rule `A(i):i<5 = A(i+1) A(i+1)` will double each A a maximum of
+    five times (assuming a premise of `A(0)`).
+
+== Control length over time ==
+
+To create an L-system which goes forward <<x>> percent less on each
+iteration, you need to start your Premise with a value, and then in
+a rule multiply that value by the percentage you want to remain.
+
+table>>
+    tr>>
+        td>>Premise
+        td>>`A(1)`
+    tr>>
+        td>>Rule
+        td>>`A(i)= F(i)A(i*0.5)`
+        
+This way <<i>> is scaled before <<A>> is re-evaluated. The important
+part is the premise: you need to start with a value to be able to
+scale it.
+
+== Stamp variables onto input geometry ==
+
+The third argument to the `J`/`K`/`M` commands is passed to the
+connected geometry.
+
+TIP:
+    You can use this trick to get around the limitation of only
+    three geometry inputs on a L-system.
+
+    Create all the different models you want (say, 20 different
+    types of leaves) and connect them to a [Switch
+    node|Node:sop/switch]. Set the switch node's __Select input__
+    parameter to `stamp("/path/to/lsystem", "lsys",0)`.
+
+    Connect the switch node to the J input of an L-system node. Now
+    you can insert any of the 20 leaf types using
+    `J(,,<<leaf_number>>)`.
+
+# Create a [Circle node|Node:sop/circle] and set the number
+  of divisions to `stamp("/path/to/lsystem", "lsys", 3)`.
+
+  Because the default number of divisions is 3 (the second
+  argument in the expression), this creates a triangle.
+
+# Connect the output of the circle node to the J input of an
+  L-system node.
+
+# In the L-system rules, you can use `J(,,<<number>>)` to
+  pass <<number>> to the J geometry. For example, `J(,,4)`
+  produces a square, `J(,,5)` produces a pentagram.
+
+== Create groups within L-systems ==
+
+The `g` command puts all geometry currently being built into a
+group.
+
+The group name is composed of a prefix set on the __Funcs__ tab and
+a number. Default prefix is `lsys`, producing group names like
+"lsys1". You can specify the number as an argument to the `g`
+command.
+
+For example, `g[F]` puts geometry from the `F` into a group (named
+using ). Otherwise, the default index is incremented appropriately.
+
+The current group is associated with the branch, so you can do
+things like `gF [ gFF ] F` to put the first and last `F` into group
+0, and the middle (branched) `FF` into group 1.
+
+To exclude a branch from its parent's group, use `g(-1)`.
+
+== Edge rewriting ==
+
+In _The Algorithmic Beauty of Plants_, many examples use a technique
+called _edge rewriting_ which involve left and right subscripts. A
+typical example is:
+
+table>>
+    tr>>
+        td>>Generations
+        td>>`10`
+    tr>>
+        td>>Angle
+        td>>`90`
+    tr>>
+        td>>Premise
+        td>>`F(l)`
+    tr>>
+        td>>Rule 1
+        td>>`F(l) = F(l)+F(r)+`
+    tr>>
+        td>>Rule 2
+        td>>`F(r)=-F(l)-F(r)`
+        
+However, Houdini doesn't support the `F(l)` and `F(r)` syntax. You
+can modify the rules to use symbol variables instead.
+
+For the F turtle symbol, the first four parameters are <<length>>,
+<<width>>, <<tubesides>>, and <<tubesegs>>. The last parameter is
+user-definable. We can define this last parameter so 0 is left, and
+1 is right:
+
+table>>
+    tr>>
+        td>>Generations
+        td>>`10`
+    tr>>
+        td>>Angle
+        td>>`90`
+    tr>>
+        td>>Premise
+        td>>`F(1,1,3,3,0)`
+    tr>>
+        td>>Rule 1
+        td>>`F(i,j,k,l,m) :m=0 = F(i,j,k,l,0)+F(i,j,k,l,1)+`
+    tr>>
+        td>>Rule 2
+        td>>`F(i,j,k,l,m) :m=1 =-F(i,j,k,l,0)-F(i,j,k,l,1)`
+
+After two generations this produces: `Fl+Fr+-Fl-Fr` There should not
+be any difference between this final string and: `F+F+-F-F`
+
+Another approach is to use two new variables, and use a conditional
+statement on the final step to convert them to F:
+
+table>>
+    tr>>
+        td>>b
+        td>>`ch("generations")`
+    tr>>
+        td>>Premise
+        td>>`l`
+    tr>>
+        td>>Rule 1
+        td>>`l:t<b=l+r+`
+    tr>>
+        td>>Rule 2
+        td>>`r:t<b=-l-r`
+    tr>>
+        td>>Rule 3
+        td>>`l=F`
+    tr>>
+        td>>Rule 4
+        td>>`r=F`
+
+The produces the following output:
+
+table>>
+    tr>>
+        th>>Generation
+        th>>String
+    tr>>
+        td>>0
+        td>>`l`
+    tr>>
+        td>>1
+        td>>`F`
+    tr>>
+        td>>2
+        td>>`F+F+`
+    tr>>
+        td>>3
+        td>>`F+F++-F-F+`
+
+== Limit L-system growth inside a shape ==
+
+The L-system node's meta-test input lets you generate rules that will
+cause the system to stop when it reaches the edges of a defined shape,
+like a topiary hedge.
+
+<!--
+TBD: setup file
+-->
+
+steps>>
+    # Create a metaball or merged metaballs that define the volume in
+      which the L-system can grow.
+
+    # Connect the metaball node's output to the Meta-test input of the
+      L-system node.
+
+    # Use a conditional statement (`:`) with an "in" test. For example:
+
+== Example ==
+
+    table>>
+        tr>>
+            td>> Premise
+            td>>
+                `FA`
+        tr>>
+            td>> Rule 1
+            td>>
+                `A: in(x,y,z) = F [+FA] -FA : 80`
+        tr>>
+            td>> Rule 2
+            td>>
+                `A: ! in(x,y,z) = A%`
+    * This L-system checks to see if the next iteration of growth will
+      be within the Meta-test bounds, and if not it prunes the current
+      branch.
+
+    * Rule 1 executes 80% of the time when the branch is within the
+      meta-test boundary.
+
+    * Rule 2 executes when the branch is _not_ within the meta-test
+      boundary (the `!` negates the `in(x,y,z)` condition). The `%`
+      command ends the branch.
+
+NOTE:
+    If the L-system start point is not inside the metaball envelope, it
+    will stay dormant. Once you have set up your L-system and metaballs,
+    make sure you transform them together so the L-system is not
+    accidentally moved outside the metaball.
+                
+== Arrange geometry instances with L-systems ==
+
+L-systems can be a powerful tool for arranging modeled geometry. By
+using an L-system as the template input to a [Copy SOP|Node:sop/copy],
+you can place a copy of a model at every point of the L-system.
+
+For example, you could use the "arc approximation" L-system from the
+[L-system basics|#basics]  (premise=`A`, rule=`A=F+A`) to arrange
+a series of spheres in an arc or circle. This gives you parametric
+control of the bending and spacing of the arc of spheres.
+
+== Further reading ==
+
+If you have any serious interests in creating L-systems, you should
+obtain the book:
+
+_The Algorithmic Beauty of Plants_ by Przemyslaw Prusinkiewicz and
+Aristid Lindenmayer (1996, Springer-Verlag, New York. Phone
+212.460.1500. ISBN: 0-387-94676-4)
+
+It is the definitive work on the subject. It contains many L-systems
+examples along with ideas and theories about modeling realistic
+plant growth.
+
+== Speed up calculations ==
+
+Modeling something like a whole tree as single large L-System may cause collision resolution calculations to be single threaded. The wire solver will look for pieces of wire objects that can be solved independently and divide the work among the available cores. One large connected L-System means the work cannot be divided into smaller work units.
+
+Try using a [Wire Glue Constraint DOP|Node:dop/wireglueconstraint] to constrain a point on the L-System where the branches join together near the root of the tree (constrain the point to its world space position). This will cause the wire solver to see the separate branches as distinct pieces that can be solved independently. Since the constrained point will not move, any motion on one of the branches will not affect the other branches. If possible, reducing the number of points in the wire object should also speed up the calculations. 
+
+@parameters
+
+    == Geometry ==
+
+        Type:
+            The type of geometry to create as the turtle moves.
+
+
+            TIP:
+                You can create a tube path from a skeleton L-system using
+                a [Polywire SOP|Node:sop/polywire].
+
+
+            Skeleton:
+                Draw polylines.
+            Tube:
+                Draw tubes.
+        Generations:
+            The number of times to repeat the rule-substitution. If you
+            specify a fractional number and __Continuous angles__ and/or
+            __Continuous length__ are on (below), Houdini scales the
+            geometry generated by the last substitution to give smooth
+            growth between generations.
+
+        Start Position:
+            This is the starting point position for the turtle.
+
+        Random Scale:
+            If non-zero, randomly scales all the lengths specified by F
+            and other similar turtle functions.
+
+        Random Seed:
+            The seed to use for the random number generator. By varying
+            this on a L-system using random rules (Ie: random scale, ~,
+            or probabilistic rules) one can generate different instances
+            of the L-system.
+
+        Continuous Angles:
+            If set, the angles rotated by the last generation's turtle
+            operations will be scaled by the amount into the
+            generation.
+
+        Continuous Length:
+            If set, the lengths taken by the last generation's turtle
+            operations will be scaled by the amount into the
+            generation.
+
+        Continuous Width:
+            If set, the widths generated by the last generation's turtle
+            operations will be scaled by the amount into the
+            generation.
+
+        Apply Color:
+            If set, the L-system will output a color attribute on each
+            point. The color value will be found by looking up into the
+            Image File at the current U & V positions. The current U & V
+            is altered with the ' and # turtle operations.
+
+        Image File:
+            This is the image file which is used for the Apply Color
+            operation. The image files used by the pic() expression is
+            under Funcs tab.
+
+        UV Increment:
+            These determine the default U and V increments of the ' and
+            # turtle operations.
+
+        Point Attributes:
+            If the type is Skeleton, this is available. Turning this on
+            will cause the creation of many point attributes to be
+            created to track how each point was generated:
+
+
+            width:
+                The width of the tube that would have been generated.
+            segs:
+                The number of segments that would be made on a tube.
+            div:
+                The number of divisions the tube would be divided into.
+            lage:
+                The vertical increment from the root of the tree. This
+                is affected by the Tube::Vertical Increment parameter.
+                It is similar to arc, but not dependent on edge length.
+            arc:
+                The arc length from the root of the turtles path to this
+                point.
+            up:
+                The up vector of the turtle at this point.
+            gen:
+                The generation that created this point.
+
+    == Tube ==
+
+        Rows:
+            The number of rows to divide tubes into. A value of 3 will
+            cause the tubes to be swept triangles.
+
+        Cols:
+            The number of columns to divide the tubes in. A value of 4
+            means one F will create 4 cross sections.
+
+        Tension:
+            How straight the tubes should sweep to their destination
+            point.
+
+        Branch Blend:
+            How much a new branch should inherit off an old branches
+            direction.
+
+        Thickness:
+            Default width of the tubes.
+
+        Thickness Scale:
+            How much the ! operation will affect the thickness.
+
+        Apply Tube Texture Coordinates:
+            If checked, the tubes will generate uv texture coordinates.
+
+        Vertical Increment:
+            The amount each tube will increment the V texture
+            coordinate.
+
+
+    == Values ==
+
+        Step Size:
+            The default size of a movement, such as F, command.
+
+        Step Size Scale:
+            The number used by the " command.
+
+        Angle:
+            The default angle for an angle, such as /, command. This
+            also becomes the variable a in the expression.
+
+        Angle Scale:
+            The number used by the ; command.
+
+        Variable b:
+            The value of the expression variable b.
+
+        Variable c:
+            The value of the expression variable c.
+
+        Variable d:
+            The value of the expression variable d.
+
+        Gravity:
+            The amount of tropism from the T command. Also becomes the
+            value of the expression variable T.
+
+        Number Of Variables:
+            This multiparm allows the assignment of an arbitrary number
+            of new expression variables.
+
+        Variable Name:
+            The name of the expression variable. This is a single
+            character. Check the Local Variables section to see what
+            variables are already reserved.
+
+        Variable Value:
+            The value of the expression variable.
+
+
+    == Funcs ==
+
+        Pic Image File:
+            The image file to use with the pic() expression function.
+
+        Group Prefix:
+            The prefix used by g command.
+
+        Channel Prefix:
+            The prefix used by the chan() expression function.
+
+        Leaf Param A:
+            This is the name of the stamp parameter to stamp the leaf
+            with. The value of the stamp comes from the J, K, or M
+            operation. It can be read upstream using the stamp()
+            function.
+
+        Leaf Param B:
+            This is the name of the stamp parameter to stamp the leaf
+            with. The value of the stamp comes from the J, K, or M
+            operation. It can be read upstream using the stamp()
+            function.
+
+        Leaf Param C:
+            This is the name of the stamp parameter to stamp the leaf
+            with. The value of the stamp comes from the J, K, or M
+            operation. It can be read upstream using the stamp()
+            function.
+
+
+    == Rules ==
+
+        Read Rules From File:
+            If this is set, the rule fields are ignored. Instead, the
+            Rule File is read and used as the rules.
+
+        Write Rule Parameters to File:
+            This will write all the current rules to the Rule File.
+
+        Rule File:
+            The name of the file to use as a source of rules. This file
+            should have one line per rule. Blank lines and lines that
+            start with '#' will be ignored, so comments may be added to
+            the rule file with '#'.
+
+        Context Ignore:
+            This is a list of symbols. They will be ignored when trying
+            to determine contexts.
+
+	Context Includes Siblings:
+	    By default, the context of each branch only includes the
+	    symbols in that branch.  Any sub-branches or parent
+	    branches will be skipped over.  Given the rule `A>B=F`, `A[B]`
+	    will not resolve as B is in a sub-branch.  `A[Q]B` will
+	    resolve because the `[Q]` is ignored.  If you change the
+	    Context Ignore to have `[]`, this effect is removed and
+	    `A[Q]B` will not resolve but `A[B]` will.  The Context
+	    Includes Siblings flag restores the pre-Houdini 10
+	    behavior of context of sibling branches being included.
+	    For example, `[A]Q[B]` will resolve if this flag is set, but
+	    not resolve if it is not set.
+
+        Premise:
+            The initial state of the L-system. This is the state of the
+            L-system at generation 0.
+
+        Rule #:
+	    A rule to apply to the L-system.  Applying the toggle will disable
+	    the rule, removing it from the generation procedure.
+
+@inputs
+    Leaf J,K & M:
+        This geometry is used by the J, K & M rules
+    Meta Test Input:
+        This geometry is used by the in() function to determine bounding
+        regions (for topiaries)
+@locals
+    a:
+        The value of the __Angle__ parameter.
+    b:
+        The value of the __b__ parameter.
+    c:
+        The value of the __c__ parameter.
+    d:
+        The value of the __d__ parameter.
+    g:
+        The age of the current rule, initially 0.
+    i:
+        The offset into the current L-system string where the rule is
+        being applied.
+    t:
+        The iteration count, initially 0.
+    x, y, z:
+        Current turtle position in space.
+    A:
+        Arclength from the root of the tree to the current point.
+    L:
+        Current length increment at the point.
+    T:
+        The value of the __Gravity__ parameter.
+    U:
+        Color map U value.
+    V:
+        Color map V value.
+    W:
+        Width at the current point.
+
+@related
+    - [Node:sop/polywire]
+

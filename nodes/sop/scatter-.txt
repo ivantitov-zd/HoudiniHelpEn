@@ -1,0 +1,164 @@
+= Scatter =
+
+#type: node
+#context: sop
+#internal: scatter
+#icon: SOP/scatter
+
+#tags: copy, random, points
+#bestbet: scatter
+#index: no
+
+"""Scatters new points randomly across a surface or through a volume."""
+
+== Overview ==
+
+This node distributes new points across the surface in a roughly uniform pattern and attempts to limit clumping and holes.
+
+For volume primitives, this node scatters points through the volume with a density proportional to the field value (with negative values giving zero probability).
+
+You can use the generated points for a variety of purposes.
+They may be used to specify birthing locations for particles,
+template points for [copying|Node:sop/copy],
+or as queues for irradiance computations.
+
+For surfaces, you can base the distribution of points on the surface area of faces (faces with a larger surface area will get more points),
+a user defined attribute, or a blend of area and attribute.
+
+This node scatters the points in UV (surface) space. That means surfaces with pinched sides (like NURBS spheres and cones) will have non-uniform distributions in 3D space.
+
+[Include:/shelf/scatter#includeme]
+
+== Making scattered points stick on deforming geometry == (stick)
+
+Since the Scatter node recomputes at each frame, if the shape of the geometry changes over time, the point positions and point numbers will change randomly from frame to frame.
+
+To prevent this, the Scatter node lets you specify static "rest" geometry to scatter on using the [Icon:SOP/measure][Measure node|Node:sop/measure] and the `area` attribute. You can use this technique to plant guide hairs on deforming meshes for tasks such as sticking curves for facial hair on characters (eyebrows, mustaches, etc). 
+
+:task:Stick scattered points to the original shape:
+    # Insert a [Measure node|Node:sop/measure] between the geometry's rest position and the node(s) deforming the geometry.
+    
+        [Image:/images/nodes/sop/scatter_area_network.png]
+    
+    # On the Measure node set __Type__ to "Area".
+    
+    # On the Scatter node, set __Alternate Attribute__ to `area` and __Attribute Bias__ to `1`.
+
+:task:Stick to the shape of the geometry at some frame:
+    If the deforming geometry is cached to disk, you can branch off a [Time Shift node|Node:sop/timeshift] set to a static frame and follow with the Measure node, then use an [Attribute Copy node|Node:sop/attribcopy] to copy that area attribute to the deforming geometry.
+
+:task:Stick to the shape of the geometry stored in rest attributes:
+    If you have rest attributes on the geometry, you can branch off a Point SOP, use $RESTX $RESTY and $RESTZ in place of $TX $TY and $TZ in the __Position__ parameters to switch the geometry to its rest position, then Measure the rest geometry and use an [Attribute Copy node|Node:sop/attribcopy] to copy the area attribute to the deforming geometry.
+
+<!-- [Anim:/images/nodes/sop/scatter_area.gif] -->
+
+@parameters
+
+Group:
+    #id: group
+
+    Subset of geometry to consider when generating points.
+    
+Keep Original Geometry:
+    #id: keep
+
+    Keep original geometry after scattering points.
+
+Compute Number of Points:
+    Instead of scattering a fixed number of points, calculate the
+    total area and use that as a scale on the points value.
+
+    NOTE:
+        This total area includes the effects of any alternate attribute.
+
+Number of Points:
+    #id: npts
+
+    Number of points to scatter over the input geometry.
+    
+Points per Area:
+    Number of points to scatter for every unit of area in the
+    primitives.
+    
+Use Density for Volumes:
+    Instead of using the surface area of the box that contains the
+    primitive volume as the area, use the total non-zero component
+    of the volume.  This becomes a measure of volume rather than
+    area, but matches expectations if one is measuring the amount
+    of smoke in a primitive volume.
+
+Random Seed:
+    Different scattering patterns will be generated for different seed values.
+    Set this to `$T` if you want every frame to have a different pattern.
+    
+Scatter based on primitive area:
+    #id: area
+
+    Use the surface area of primitives to influence the distribution
+    of points.
+    
+Alternate Attribute:
+    #id: attrib
+
+    An alterative attribute used to influence the distribution of
+    points. This attribute can be either a point, primitive or
+    vertex attribute. Lower attribute values will result in fewer
+    points being generated, while higher values will result in more
+    points being generated.
+
+Blending Algorithm:
+    This parameter uses both the primitive area and alternate attributes.
+
+    Linear Interpolation:
+        `P = lerp(P(area), P(attrib), weight)`. 
+
+        A value of 0 is equivalent to weighting by area. A value of 1 equivalent to weighting by the attribute.
+
+    Multiplication of Probabilities:
+        `P = P(area) * P(attrib)`
+
+        If there is a zero area polygon for example, it's attribute value will be ignored.
+
+Attribute Bias:
+    #id: bias
+
+    When an alternate attribute is specified, this determines how
+    much of an effect the attribute has. A bias of 0 is equivalent
+    to specifying no attribute at all (no effect), while a bias of
+    one uses the attribute values exclusively.
+    
+Compute nearest points:
+    #id: donear
+
+    After the points have been scattered on the surface, it is
+    sometimes useful to determine how far apart the points are
+    scattered (when using the points for irradiance computations for
+    example). The mean distance to the nearest <<N>> points can be
+    pre-computed and stored in a point attribute if this parameter
+    is turned on.
+    
+Points to consider:
+    #id: nearcount
+
+    The distance to the <<N>> the point will be stored in the
+    attribute. For example, if a value of 4 is specified, the
+    attribute will store the distance to the fourth nearest point.
+    
+Store in attribute:
+    #id: nearname
+
+    Name of the attribute to store the coverage distance.
+
+Divide Non-Convex Polygons:
+    #id: convex
+
+    Divide non-convex polygons so that points are correctly distributed for both convex and non-convex polygons. 
+
+    NOTE:
+        If __Keep Original Geometry__ is selected, the geometry kept will be convexed.
+
+@related
+
+- [Node:sop/measure]
+- [Node:pop/source]
+

@@ -1,0 +1,129 @@
+#type: node
+#context: dop
+#internal: sopscalarfield
+#icon: dop/sopscalarfield
+
+= SOP Scalar Field =
+
+"""Creates a scalar field from a SOP Volume."""
+
+The Scalar Field DOP creates a Scalar Field data that can be attached
+to simulation objects and manipulated by solvers.  A Scalar Field is
+an axis-aligned box divided into individual voxels.  Each voxel is
+giving a floating point number.  The meaning of these numbers could
+vary - a signed distance field would store the distance to the surface
+and a density field would store the amount of density at the location.
+The scalar field is initialized using data from a Volume Primitive in
+a SOP.
+
+NOTE:
+    The field data is imported from SOPs prior to any transformation defined by the Position Data Path.
+
+@parameters
+    Use SOP Dimensions:
+        Overrides the __Divisions__, __Center__, and __Size__ options according
+        the properties of the volume primitive in the specified SOP.
+        This attempts to bring the SOP back at the same size and
+        resolution it was supported.  
+       
+        NOTE:
+	    This may not work if the SOP has been transformed, especially if
+	    rotated, since the DOP scalar field has to be axis aligned.
+
+    SOP Resize Only:
+        Restricts __Use SOP Dimenstions__ option to only override __Center__ 
+        and __Size__. This is useful for customizing the resolution of the
+        scalar field.
+
+    [Include:standard_gas_divisions]
+
+    Voxel Sampling:
+        The overall box will be divided into the specified number of
+        small boxes, or voxels.  However, the question remains where
+        on these voxels the field's values should be stored.
+
+        Center:
+            The value will be stored at the center of each voxel.  The
+            total number of samples thus matches the number of boxes.
+        Face X/Y/Z:
+            The value will be stored on the center of the specified
+            face of each voxel.  Along that dimension the number of
+            samples will be one higher to store the start and end
+            voxel's face values.
+        Edge XY/XZ/YZ:    
+            The value will be stored on the center of the specified
+            edge of each voxel.  The dimensions involved will be one
+            larger to account for the boundaries.
+        Corner:
+            The value will be stored on the corners of each voxel.
+            The number of samples will be one higher in each dimension
+            than the division count to contain all the boundary
+            values.
+    Border Type:
+	The behavior when the field is sampled outside of its
+	defined box.
+
+	Constant:
+	    The initial value will be returned.
+	Repeat:
+	    The field will wrap, returning values from the
+	    opposite side of the field.
+	Streak:
+	    The value at the edge of the field closest to the
+	    sample will be returned.
+    Initial Value:
+        When first initialized, the scalar field will be set to this value.
+    Scale Values:
+	The incoming SOP field will be multiplied by this value.
+    Tolerance:
+        The absolute tolerance to use for lossy compression of the
+        scalar field.  This can reduce memory usage by detecting
+        constant areas or using a lower bit-depth representation.  
+        
+        A value of 0 only allows lossless compression.
+    Use 16bit Float:
+	The tiles will be stored using a 16 bit float rather than 32
+	bit float.  This uses half the memory, but at the cost of
+	reduced precision and increased computation.  
+
+	NOTE:
+		All computations are still done in 32 bit floats.
+
+    Sop Path:
+        The SOP to extract a volume primitive from.  After the
+        primitive is extracted, this field is erased.  To reload the
+        volume data every frame, use Set Always.
+    Primitive Number:
+        Which primitive in the SOP is a Volume Primitive to import.
+    Time:
+        The time to evaluate the SOP at, in seconds. $T is a suitable
+        value to evaluate at the current global time.
+
+    Use Object Transform:
+        Turn on this option to embed the transform from the parent
+        object of the SOP along with the geometry.   
+    Re-evaluate SOPs to Interpolate Geometry:
+	Normally when a solver asks for geometry data in a sub-step, the
+	simulation will simply linearly interpolate position data from integral
+	frames. However, this is not exact. Turning this option on re-evaluates
+	the geometry network for each substep. This is more accurate, but can
+	be very expensive.
+    [Include:standard_gas_slice]
+
+    [Include:standard_fluidpositionpath]
+
+@outputs
+    [Include:standard_data_inputs]
+
+@outputs
+    [Include:standard_data_outputs]
+
+@locals
+    [Include:standard_data_locals]
+
+    [Include:standard_locals]
+
+@related
+    - [Node:dop/scalarfield]
+    - [Node:dop/scalarfieldvisualization]
+

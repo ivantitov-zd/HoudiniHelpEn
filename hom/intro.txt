@@ -1,0 +1,292 @@
+﻿= HOM introduction =
+
+== Overview ==
+
+Here's a quick example of how to use HOM to accomplish a simple
+task in Houdini.  Don't worry if you don't understand the details
+of this example -- it will give you a flavor of what scripting
+Houdini is like.
+
+Choose __Windows > Python Shell__ to open an interactive
+Python Shell window.
+
+{{{
+#!pycon
+
+# Print out a tree of all the nodes in the scene:
+>>> def print_tree(node, indent=0):
+...     for child in node.children():
+...         print " " * indent + child.name()
+...         print_tree(child, indent + 3)
+... # Press Enter to finish the definition
+
+>>> print_tree(hou.node('/'))
+obj
+   cam1
+      file1
+      properties
+         standard
+out
+part
+ch
+shop
+img
+   img1
+vex
+}}}
+
+== Getting Started ==
+
+When you open Houdini's Python shell, you'll notice it greets you with
+the `>>>` prompt and waits for you to enter Python expressions or
+statements.  Even if you don't plan on writing large Python scripts, the
+Python shell is invaluable as a handy calculator:
+
+{{{
+#!pycon
+>>> 2 + 2
+4
+>>> 0.03 * 25.1
+0.753
+>>> min(hou.frame(), 7) * 3
+3.0
+}}}
+
+What is hou.frame(), you might ask?  Houdini's Python API is implemented in
+a module named `hou`, short for Houdini.  Just like `os.getcwd` is a function
+in the `os` module, `hou.frame` is a function in the `hou` module, and it
+returns the current frame number.  Note that you don't need to write `import
+hou` to use the hou module, since Houdini automatically imports the hou module
+when it starts up.
+
+Press Ctrl+D to close a floating Python shell window.  See the main menu
+for the shortcut to open the floating Python shell window.
+
+Python shells can be inside panes if you don't want to use a floating
+window.
+
+In the Python shell, ((Home)) and ((Ctrl + A)) will move to the beginning of the
+line, ((End)) and ((Ctrl + E)) will move to the end, and up and down will navigate
+through the history.
+
+You can't use ((Ctrl + C)) to copy from the Python shell, since Ctrl+C will
+send a KeyboardInterrupt exception.  To copy text from a Python shell,
+right-click and select Copy.
+
+== Loading Hip Files ==
+
+Use the [Hom:hou.hipFile] submodule to save/load the current session to/from
+hip files.  Note that [Hom:hou.hipFile#load] will throw a [Hom:hou.LoadWarning]
+exception if there were warnings, even though the file was loaded successfully.
+The following code will print out warnings and continue the rest of the
+script.
+
+{{{
+#!python
+# Print out load warnings, but continue on a successful load.
+try:
+    hou.hipFile.load("myfile.hip")
+except hou.LoadWarning, e:
+    print e
+}}}
+
+== Accessing Nodes ==
+
+Because Houdini is designed around nodes (e.g. SOPs, DOPs, Object nodes, etc.),
+you're likely to manipulate them in scripts.  Here's a brief primer to get
+started.
+
+The [hou.node|Hom:hou.node_] function takes a path to a node and returns a [Hom:hou.Node]
+object, or None if the path is invalid.
+
+{{{
+#!pycon
+# Empty out the current session.
+>>> hou.hipFile.clear()
+
+>>> hou.node('/obj')
+<hou.Node at /obj>
+>>> # hou.node returned a hou.Node object corresponding to the /obj node
+
+>>> n = hou.node('/asdfasdf')
+>>> # The node path was invalid, so n will be the None object.
+>>> print n
+None
+
+>>> g = hou.node('/obj').createNode('geo')
+>>> g
+<hou.ObjNode of type geo at /obj/geo1>
+>>> # g is hou.Node object corresponding to the newly created /obj/geo1 node.
+>>> # Note that g is actually a hou.ObjNode instance, which is a subclass of
+>>> # hou.Node.
+
+>>> # The parm method on hou.Node objects returns a hou.Parm object (or None
+>>> # if the parameter name is invalid).
+>>> tx = g.parm('tx')
+>>> tx
+<hou.Parm tx in /obj/geo1>
+
+>>> # Evaluate the parameter and change its value.
+>>> tx.eval()
+0.0
+>>> tx.set(3.5)
+>>> tx.eval()
+3.5
+
+>>> hou.node('/obj/geo1').parm('tx').eval()
+3.5
+>>> # hou.parm is a shortcut to access a parm directly.
+>>> hou.parm('/obj/geo1/tx').eval()
+3.5
+>>> # hou.evalParm is a shortcut to evaluate a parameter.
+>>> hou.evalParm('/obj/geo1/tx')
+3.5
+>>> # hou.ch is exactly the same as hou.evalParm.
+>>> hou.ch('/obj/geo1/tx')
+3.5
+
+>>> # hou.Parm.name returns the name of the parameter, and hou.Node.parms
+>>> # Returns a tuple of all the Node's parameters.
+>>> [p.name() for p in g.parms()]
+['stdswitcher1', 'stdswitcher2', 'stdswitcher3', 'stdswitcher4', 'keeppos',
+'pre_xform', 'xOrd', 'rOrd', 'tx', 'ty', 'tz', 'rx', 'ry', 'rz', 'sx', 'sy',
+'sz', 'px', 'py', 'pz', 'scale', 'lookatpath', 'lookup', 'pathobjpath',
+'roll', 'pos', 'uparmtype', 'pathorient', 'upx', 'upy', 'upz', 'bank',
+'shop_materialpath', 'shop_materialopts', 'tdisplay', 'display',
+'use_dcolor', 'dcolorr', 'dcolorg', 'dcolorb', 'picking', 'pickscript',
+'caching', 'vport_shadeopen', 'vport_displayassubdiv', 'vm_phantom',
+'vm_renderable', 'folder01', 'folder02', 'folder03', 'folder04',
+'categories', 'reflectmask', 'lightmask', 'geo_velocityblur',
+'vm_shadingquality', 'vm_rayshadingquality', 'vm_rmbackface',
+'shop_geometrypath', 'vm_rendersubd', 'vm_renderpoints', 'vm_metavolume',
+'vm_coving', 'vm_computeN']
+
+>>> # hou.Parm tuples correspond to parameter groupings:
+>>> t = g.parmTuple('t')
+>>> t
+<hou.ParmTuple t in /obj/geo1>
+>>> tuple(t)
+(<hou.Parm tx in /obj/geo1>, <hou.Parm ty in /obj/geo1>, <hou.Parm tz in /obj/geo1>)
+>>> t.eval()
+(3.5, 0.0, 0.0)
+>>> t.set((1.0, 2.0, 3.0))
+>>> t.eval()
+(1.0, 2.0, 3.0)
+
+>>> # Build a simple sop network.
+>>> hou.hipFile.clear()
+>>> geo = hou.node('/obj').createNode('geo')
+>>> box = geo.createNode('box')
+>>> subd = geo.createNode('subdivide')
+>>> subd.parm('iterations').set(3)
+>>> subd.setFirstInput(box)
+>>> subd.moveToGoodPosition() # Move the node tiles to avoid overlaps.
+>>> subd.setDisplayFlag(True)
+>>> subd.setRenderFlag(True)
+>>> subd.setCurrent(True, clear_all_selected=True)
+}}}
+
+== Working with Animated Parameters and Keyframes ==
+
+When you hear the term "animated parameter", you typically think of keyframed
+values and bezier curves and the animation graph editor.  Recall from earlier,
+though, that parameters with expressions are also considered animated
+parameters.  All animated parameters have at least one keyframe, and each
+keyframe has an expression.  Typical parameters with expressions simply have
+one keyframe whose expression is something like `sin($F)` or `cos(time())`,
+while typical animation curves have multiple keyframes whose expressions are
+something like `bezier()`.
+
+So how does a function like `bezier()` evaluate to different values at
+different times?  Clearly there are no parameters passed to bezier that
+vary from time to time, and there are no keyframe or slope values passed
+in.  The answer is that keyframes store more than just an expression.
+A keyframe stores those values, slopes, and accelerations, and certain
+functions, like bezier, access those values for the current keyframe and
+the next one.  For keyframes with expressions like `sin($F)`, those
+extra values are not set and are not used.
+
+Each keyframe has an associated time.  Using that time and the number of
+frames per second, you can derive the keyframe's frame.  You can think of
+the expression as being active _between_ keyframes: Houdini evaluates the
+expression between its keyframe and the _next_ keyframe.  If there is no
+next keyframe, most animation functions (e.g. [bezier|Hom:hou.bezier],
+[cubic|Hom:hou.cubic], etc.) simply evaluate to their keyframe's value.  For
+the times before the first keyframe, the parameter evaluates to the value
+at the first keyframe's time.
+
+[Hom:hou.Parm#keyframes]
+values, slopes, and accelerations
+
+- If you set the in value and the (out) value is not set, it will be
+  set to the same value.  Setting the in value breaks the tie between
+  the values.  If neither of the in or (out) values are set, they
+  are considered tied.
+
+- for example, to set a keyframe with the current value and slope, do not
+  set the value or slope in the keyframe
+- or, to automatically determine the slopes, set a keyframe with the slope not
+  set
+- times and expressions
+- in and out/values
+- tied values
+- asCode()
+- same syntax between Hscript expressions and Python
+
+== Working with Objects and Transformations ==
+
+- worldTransform(), setWorldTransform()
+- matrices, exploding
+- column vectors for transforms (p * T1 * T2), not (T2 * T1 * p)
+- see the object_xform cookbook example
+
+== Where to find error messages ==
+
+- For the shelf/tab menu: in the details section of the popup window.
+- For HDA callbacks: in the console.
+- For `123.py`/`456.py`: in the console.
+- For parameters: ((MMB)) on node.
+- For Python-based nodes: ((MMB)) on node.
+
+== Interpreting Python error messages ==
+
+When Python code generates an unhandled exception, it will display a traceback
+of the call stack where the exception was raised.  By looking at the last
+entry in the traceback, you can find the line of code that raised the
+exception.
+
+For example, if there was spelling error in the implementation of
+`fixFilePrefixes`, you might see the following traceback.
+
+{{{
+#!pycon
+>>> hou.session.fixFilePrefix(hou.node('/'), '/home/luke/project', '$HIP')
+Traceback (most recent call last):
+  File "<console>", line 1, in <module>
+  File "hou.session", line 12, in fixFilePrefix
+NameError: global name 'to_prefix' is not defined
+}}}
+
+The last line of the traceback displays the string representation of the
+exception.  The most common exceptions the hou module is likely to raise
+are [Hom:hou.OperationFailed], [Hom:hou.PermissionError],
+[Hom:hou.LoadWarning], and [Hom:hou.ObjectWasDeleted].  A list of all exception
+types defined in the hou module can be found in the
+[reference documentation|hou].
+
+TIP:
+    The Python source editor, multi-line expression editor, shelf script
+    editor, and HDA script editors show the line number in the bottom-right
+    corner, helping to locate the line that raised an exception.
+
+== Tips ==
+
+- Drag a node from the network editor into the Python shell to paste a
+  hou.node expression.  You may find this easier if the Python shell is
+  inside a pane.
+  
+- Use variables to store hou.Node, hou.Parm, and hou.ParmTuple objects
+  instead of calling hou.node and hou.parm over and over again.
+  
+- Use the output from [Hom:hou.Node#asCode] to help learn the parts of
+  the HOM API that create nodes and set parameters and keyframes.

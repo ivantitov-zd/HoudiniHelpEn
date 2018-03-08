@@ -1,0 +1,246 @@
+= Advanced Viewport Shading =
+
+Houdini's 3D viewport has the ability to produce an interactive version of many
+lighting effects found in offline renderers. In addition, color correction 
+through Lookup Tables (LUTs) and gamma correction can be applied.
+
+== Lighting in the Viewport ==
+
+Many of the light types in Houdini have been modeled with OpenGL shaders. These
+light shaders produce a good approximation to the final rendered result so that
+lighting can be adjusted interactively. By default, most lights are rendered
+as point and spot lights, including area and environment lights. __High Quality
+Light Shading__, found on the [3D Viewer Display Options|/ref/windows/displayopts_3d] __Effects__ tab and on the right toolbar, 
+is used to enable the more complex shaders for these lights.
+
+Area and environment lights require multisampling of the light source, and the
+__Area Samples__ parameter in the [3D Viewer Display Options|/ref/windows/displayopts_3d] controls their rendering quality
+(default 16 samples). Increasing the value improves the quality, but slows 
+down rendering.
+
+__High Quality Light Shading__ also enables an infinite number of lights in the viewport, avoiding the limited number of OpenGL lights (usually 8 or 16). Greater numbers of lights will gradually impact performance.
+
+Ramp-based light attenuation is also available in __High Quality Light Shading__ mode, as is cone light soft edge falloff and projected light textures. 
+
+Finally, screen space ambient occlusion is only available when __High Quality 
+Light Shading__ is turned on. This emulates ambient occlusion by darkening edges and impressions, but it cannot do occlusion from more distant objects. It 
+respects the [Unit Length|/ref/windows/mainprefs#hipfile] of the hip file 
+when determining distances for occlusion shadowing.
+
+Shadows are also supported from all light types. They can be enabled on 
+the __Effects__ tab of the [3D Viewer Display Options|/ref/windows/displayopts_3d], or by using the __Shadows__ toggle button on the 
+right toolbar. While point lights cast hard shadows, environment and area lights
+can cast softer shadows.
+
+The shadow quality can be changed from basic hard-edged shadows for all lights 
+to smoothed, soft area shadows by clicking ((RMB)) the 
+[Icon:VIEW/shadow_quality_high] __Shadows__ icon or using the 
+__Quality__ option in the [3D Viewer Display Options|/ref/windows/displayopts_3d]. Area shadows do not affect point lights, 
+they will always use point shadows. Shadowmaps for lights are cached and only 
+regenerated when the light's casting area changes, or when the geometry 
+producing shadows changes.
+
+TIP:
+   The higher quality shadow options can affect interactivity when adjusting
+   lights or geometry in the scene. It is recommended that you reduce the 
+   shadow quality or turn them off altogether if the scene becomes choppy when
+   modeling or positioning lights.
+ 
+NOTE:
+   High Quality Lighting only runs in perspective views. Normal quality lighting
+   will be used when orthographic projections (Top, Left, Front) are active.
+   Flat shading is also unsupported; smooth shading will always be used.
+ 
+== Materials ==
+
+The default shader used by the viewport has support for basic lighting, 
+multiple textures and light-based textures. The [Mantra Surface Material|/gallery/shop/vopmaterial/mantrasurface] has these 
+properties built in, but they can be added through the __Edit Rendering 
+Parameters__ interface for other shaders. The viewport rendering parameters can be
+found in the SHOP/OGL subfolder.
+
+Bump and normal mapping are supported for adding surface detail. Diffuse, 
+specular and reflection maps are supported for color sampling. An opacity map
+is also supported to provide ease of transparency when multiple diffuse textures
+are used (otherwise, the first diffuse layer can specify opacity).
+
+In terms of shader processing, the final normal is computed from either the
+interpolated vertex normals or the normal map if supplied. A bump map will
+further perturb the normals. 
+
+The normal and viewing direction is then used to compute the specular 
+reflection. A specular map may used to tint the specular highlight, multiplied
+by the constant material specular color. The shininess factor can be encoded 
+in the alpha channel and mapped to a shininess range using the __Specular Map__ 
+parameter set. If a reflection map is used, the specular color is further 
+multiplied by a lookup into the reflection map using the reflection vector.
+
+The diffuse color is a combination of the interpolated vertex color (if any),
+multiplied by the diffuse map (if any), multiplied by the constant material 
+diffuse color.
+
+The opacity is determined by the interpolated vertex alpha (if any), multiplied
+by the constant material alpha, multiped by the opacity map (if any) and 
+finally multiplied by the first diffuse layer's alpha channel (if any, and the
+diffuse texture has an alpha channel). 
+
+Custom GLSL shaders may be used in the viewport as well, though they need to 
+follow a few guidelines to work properly in all cases. See [How to write an
+OpenGL Shader |/shade/opengl]. 
+
+
+== Transparent Objects ==
+
+Houdini draws transparent objects separately in a transparent pass after all
+opaque objects have been drawn when the __Transparency__ display option is on.
+Objects are considered to be transparent if they have the following:
+
+- point or vertex color and alpha
+- a material applied with an alpha value other than 1.0 or 0.0
+- a material applied that references a diffuse RGBA texture with alpha values 
+other than 1.0 or 0.0
+- a material applied with an opacity map
+- a material with a custom GLSL shader that has the ogl_alpha uniform defined
+- sprites
+- volumes
+
+Only those parts of the object which meet the above criteria will be 
+considered transparent, so some primitives within a geometry model may be 
+drawn in the opaque pass if they do not qualify.
+
+If the __Transparency__ option is off, cutouts are used instead. Any pixel with a
+final alpha value of 0.0 will not be drawn, otherwise the pixel will be drawn 
+as if it were opaque.
+
+When the __Transparency__ display option is enabled, the 
+__Transparency__ may be set to __Low Quality__, __Medium Quality__ or __High Quality__. These modes greatly improve the quality of transparent surfaces,  especially overlapping transparent surfaces. However, High Quality Lighting is not applied to transparent objects for performance reasons. If you wish to see the effect of area or environment lighting on transparent surfaces, disable __Transparency__.
+
+__Low Quality__ transparency draws transparent objects front-to-back after all
+opaque objects have been drawn. Intersecting transparent objects will not 
+render correctly, as will some overlapping object cases where the bounding boxes
+overlap.
+
+__Medium Quality__ transparency draws a limited number of layers, sorted
+on a per-pixel level. Shadows are not cast on transparent objects and normal
+quality lighting is performed.
+
+__High Quality__ transparency allows more layers to be drawn, which produces a 
+better result for many overlapping transparent objects. Shadows can also be 
+cast onto transparent objects. 
+
+
+=== Sprites ===
+
+Particle systems can be rendered as sprites if a [Sprite POP|Node:pop/sprite] is present. Sprites are always drawn as transparent objects. A sprite is a small texture that always faces the camera, centered at the particle. Sprites are drawn after all other transparent objects except for volumes when in __Medium Quality__ or __High Quality__ transparency mode.
+
+=== Volumes ===
+
+Volumes can be rendered at a variety of quality levels which improve the look
+of the volume at the expense of performance. Volumes do not cast or receive
+shadows, nor does ambient occlusion affect them. Volumes can be rendered 
+without transparency, producing a solid outline of the volume.
+
+Volumes are limited to using a 128x128x128 8 bit 3D texture by default. For
+larger datasets, this limit can be adjusted on the __Optimization > Textures__
+page of the display options.
+
+Volumes are drawn in the final pass of the beauty render.
+
+== Managing Performance and Graphics Memory ==
+
+Houdini allows for high quality display of many different aspects of the 
+viewport rendering, including lights, shadows and materials. However, it is 
+not advisable to set all of these features to the maximum quality setting
+at the same time, even on high-end graphics hardware. Many of these features
+are designed to improve image quality for specific situations, such as 
+evaluating the contribution of lights or viewing a volume in great detail.
+Pushing everything to high quality can end up reducing viewport interactivity
+to the point where making changes is painfully slow. 
+
+There are several quick ways to return to interactive frame rates if the 
+viewport is sluggish, if these display options are active:
+
+# Turn off __High Quality Lighting__
+# Reduce __Volume Quality__ to __Low__
+# Turn off __Transparency__ 
+# Reduce __Shadow Quality__ to __Point__
+# Reduce __Scene Antiaiasing__ to __None__
+# Disable __Textures__
+# Turn off __HDR Rendering__
+
+NOTE:
+    The following sections go into greater detail on performance and memory use.
+
+=== Viewport Performance ===
+
+Performance in the viewport is affected by two things: what you are displaying 
+(the model), and how you are displaying it (display options). Turning off 
+__Material Shaders__ on the __Effects__ tab of the [3D Viewer Display Options|/ref/windows/displayopts_3d] is a good way to 
+determine if the model is the constraining factor, as this will disable most
+of the advanced viewport effects.
+
+If the model does appear to be the limiting factor, you can try a variety of
+things:
+
+# Turn off the [display flags|/nodes/sop] some objects.
+
+# Display the non-subdivided geometry, if a [Subdivide SOP|Node:sop/subdivide] is used. Turn on the [render flag|/nodes/sop] on the [Subdivide SOP|Node:sop/subdivide], and the [display flag|/nodes/sop] of the SOP before it.
+
+# Turn on some culling options on the __Optimization > Culling__ tab of the [3D Viewer Display Options|/ref/windows/displayopts_3d], such as __Remove Backfaces__ (backface culling) and __Cull by drawing 'x' primitives out of every 'x'__ (polygon reduction).
+
+If the display options are the limiting factor, you can reduce the quality of
+the displayed geometry. This is more common on graphics hardware with fewer
+shaders or earlier generations. All of the following options are found on the 
+__Effects__ tab of the [3D Viewer Display Options|/ref/windows/displayopts_3d].
+
+# __High Quality Light Shading__ is the most performance-intensive quality enhancement available. Disabling this will provide the highest performance increase, especially if many lights are in the scene, and complex lights like area, geometry, environment or portals are used. It is not enabled by default.
+
+# If many volumes are shown, reducing the __Volume Quality__ will improve interactivity. Turning off __Transparency__ may help as well, though at a fairly large quality decrease.
+
+# Transparency causes more passes to be rendered and can result in slower rendering, if transparent objects are present. Volumes, sprites, materials with alpha less than one, and RGBA textured materials will all cause a transparency pass to be rendered. Try lowering the __Transparency Quality__ first, then disable it if needed.
+
+# Shadows can slow down the system, especially if there are many lights in the scene, or if area lights or portals are used and the __Shadow Quality__ is set to __Area__ or above. Try reducing the shadow quality first. You can also disable a light from rendering in the viewport by disabling the __Enable Light in Viewport__ parameter in the [Light object|Node:obj/hlight]. 
+
+# Try using a non-shaded mode such as __Hidden Line Ghost__ or __Wireframe__.
+
+
+=== Viewport Memory Management ==
+
+Graphics hardware has a limited pool of on-board memory (VRAM). Exceeding this
+limit will result in geometry, textures, and framebuffers swapping in and out
+of system memory. This can be observed as a frame rate stutter which may 
+gradually correct itself.
+
+There are several ways which VRAM can be used by Houdini:
+
+# Geometry - models and particle systems.
+# Textures - 2D textures on materials and for shadow maps; cube textures for environment maps on environment and area lights, plus omnidirectional light shadows; 3D textures for volumes.
+# Framebuffers - textures and windows used to display information on the screen.
+
+Geometry can be reduced in several ways, as stated above in Viewport Performance.
+
+Texture usage can be reduced by disabling mipmapping, on the __Effects__ tab, or by 
+changing the settings found on the __Optimization > Textures__ page. Reducing the
+maximum size of a texture, or its default bit depth, can decrease the overall 
+memory use of material textures. Finally, material textures can be reduced by
+disabling __Multi Texturing__ or removed entirely by disabling __Display Textures__ n the __Effects__ tab.
+
+Textures used for shadows can be reclaimed by turning shadows off, or by 
+reducing the shadow __Quality__ to __Point__ if many area lights are used on the __Effects__ tab.
+
+Framebuffer usage can be reduced by lowering __Scene Antialiasing__ or disabling
+__HDR Rendering__. __Scene Antialiasing__ increases the framebuffer size by the 
+antialiasing factor (2x, 4x, 8x) and can be a major source of VRAM use. __HDR
+Rendering__ increases the framebuffer size by 50%. 
+ 
+Framebuffer memory increases as the size of the Houdini window increases. A 
+high resolution display, such as the 2560x1536 resolution found on many 30" 
+monitors, will consume much more VRAM than a smaller resolution. Using multiple
+monitors will double or triple the framebuffer use as well.
+
+NOTE:
+   While many graphics cards can run multiple displays at high resolution, they
+   may not have enough installed VRAM to also display a scene with heavy 
+   geometry, textured and lit with high quality HDR lighting. It is recommended
+   that a graphics card have over 512MB for a single display and at least 1GB 
+   for multiple displays when using these features.

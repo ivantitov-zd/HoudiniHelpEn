@@ -1,0 +1,429 @@
+= Understanding mantra rendering =
+
+== Overview ==
+
+The following information about how Mantra works may be useful for understanding the various parameters and how they affect the renderer, performance, and quality.
+
+== Render engines ==
+
+The [Mantra render node settings|Node:out/ifd] let you choose a _rendering engine_. You should generally leave it at the default ("Raytracing"), but the following explains the settings.
+
+Mantra essentially has two operating modes: _physically based raytracing_ and _micropolygon rendering_.
+
+Micropolygon rendering was a performance compromise that has largely been supplanted by raytracing in modern rendering setups. The micropolygon algorithm was designed for memory efficiency: geometry is diced and shaded once, then discarded when it is no longer needed (though it remains in memory if it is hit by a ray). Now that we have models with very high polygons counts and machines with tons of memory, raytracing/PBR is usually a more efficient method.
+
+*Physically based rendering/raytracing* (PBR) should be your *default choice* for almost any rendering. PBR simulates real-world light, making it easier to understand. With PBR you get shadows, reflections, secondary bounces, and so on "for free" instead of having to use workarounds or write complex shaders. You can also repurpose traditional methods to achieve lighting effects, for example putting [cucoloris|Wp:Cucoloris] or [gobo|Wp:Gobo_(lighting)] geometry in front of a light, or using a very powerful light to "blow out" part of the scene.
+
+Because it's based on random sampling, PBR tends to create images with more noise than the other engines. See [reducing PBR noise|quality#noise] for tips on how to reduce the noise.
+
+The "Physically based render" and "Raytracing" settings produce largely identical results, since most of the logic is in the shaders and is the same in both modes. For background information on the difference between the two modes, see [PBR vs. raytracing|#pbrray].
+
+The "Physically based micropolygon" setting exists in case someone found a need for it, but is not really useful.
+
+The following might be reasons to use the micropolygon rendering engine:
+
+* Scenes involving a lot of fur and/or smoke (using [deep shadow maps|shadows]), or sprites, can render more efficiently with *micropolygon rendering*, provided you are not using ray traced shadows or other ray tracing in the shader. Note that you might want to render fur and volumes as a separate render pass using micropolygon rendering and render the rest of the scene using PBR.
+
+* Scenes that require matching existing footage rendered with micropolygon settings.
+
+== Mantra's rendering pipeline ==
+
+:bubble:
+    #dir: down
+ 
+    === Tile ===
+
+    Mantra divides the image up into tiles and begins rendering each tile individually. Rendering small tiles increases responsiveness in the render view but can decrease overall performance.
+
+    When a render is updating in [MPlay|/mplay] or the [render view|/ref/views/ipr], you can click to tell mantra to start rendering that tile immediately. This lets you preview areas you're interested in faster.
+
+    * [Mantra:vm_bucketsize]
+
+:bubble:
+    #dir: down
+    
+    === Load geometry ===
+
+    Mantra loads the geometry saved in the IFD file into RAM. It will also load on demand any procedural geometry needed by the current bucket. Procedural geometry can come from a `bgeo` file, an Alembic file, a VEX program, or other sources.
+
+    * [Node:shop/vm_geo_file]
+    * [Node:shop/vm_geo_alembic]
+    * [Node:shop/vm_geo_vexvolume]
+            
+
+:bubble:
+    #dir: down
+
+    For displacements and smooth surfaces like nurbs or bezier patches, Mantra will _refine_, cutting the geometry up into smaller and smaller _patches_ until it gets a piece that is small enough to shade.
+
+    The _shading quality_ controls the maximum amount of refinement. Increasing shading quality increases the geometric quality in the image (not the texture resolution).  For micropolygon rendering, even flat polygons are refined to produce grids of shading points for VEX.
+
+    The shading quality property can be set _per-primitive_, so you can increase it for specific objects.  For displacements, it is useful to increase the Z-Importance to allow polygons viewed edge-on to be diced more.
+
+    * [Mantra:vm_shadingquality]
+    * [Mantra:vm_measure]
+    * [Mantra:vm_zimportance]
+
+:bubble:
+    #dir: down
+    
+    === Displacement ===
+
+    If the material on the surface adds _displacement_, mantra runs the displacement shader to deform the current piece of geometry.
+
+    Displacement changes the shape of the geometry, and can push the geometry outside its original bounding box.
+
+    The _displacement bound_ property tells mantra the _maximum_ distance you expect the surface's displacement shader to move the geometry. You should set this value as low as you can while still ensuring that nothing is displaced more than this distance. If you set it too low, displaced geometry will be "clipped" (mantra will print a warning in this case). Setting the displacement bound too large can uses more memory and time.
+
+    If your displacement shader moves the geometry a long way, you can turn on _re-dice displacements_ to increase the quality of the displaced geometry where it stretched the original polygons the most. Redicing re-measures the geometry after an initial trial displacement to see if the displacement significantly changes the geometry's shape.
+
+    [Image:/images/render/displace_bounds.svg]
+
+    * [Mantra:vm_displacebound]
+    * [Mantra:vm_redice]
+
+:bubble:
+    #dir: up down
+        
+    === Renderable check ===
+    
+    After displacement, is the piece of geometry still renderable within the bucket? *If the patch is still renderable*, proceed to _opacity shader_. *If not*, _go back_ and re-refine the displaced geometry.
+
+:bubble:
+    #dir: down
+    
+    === Opacity shading ===
+    
+    If the surface material outputs _opacity_ (`Of`), mantra runs the surface shader (optimized for calculating `Of`) to get the opacity/transparency of the current patch.
+
+    Mantra sends a certain number of rays per pixel from the camera to the surface. For each ray, and at every hit (up to the opacity limit), it runs the surface shader and records the opacity `Of`. For opaque surfaces, it will hit the surface and record full opacity. For transparent surfaces and volumes, the ray will continue through until it reaches full opacity or the opacity limit.  Using the opacity or opacity limit to limit the amount of shading that occurs is called _occlusion culling_.  The recorded opacity information is used for stochastic transparency to determine where full surface shading should occur.
+
+    * Note that refinement and displacement happen _before_ occlusion culling, so they may occur on occluded geometry. However mantra will try to avoid work on geometry that is fully occluded.
+
+    * In this step mantra compiles and runs only the code necessary to compute opacity (`Of`). You should structure your shader program to do as little work as possible in this code path so this step runs faster. _Do not_ make opacity dependent on work that's only relevant to computing the color, such as illuminance loops!
+
+    * [Mantra:vm_samples]
+    * [Mantra:vm_opacitylimit]
+    * [Mantra:vm_transparent]
+
+:col:
+    :bubble:
+        #dir: down
+        
+        === Raytracing/PBR ===
+        
+        Send certain number of rays (_primary samples_) per pixel. Run surface shader (optimized for color, `Cf`) on each ray hit, blend between samples to get pixel color.
+            
+        The main method for increasing image fidelity is to increase the number of pixel samples. More pixel samples gives greater detail and edge resolution but increases render time.
+
+        (For no very good reason, the pixel samples parameter is expressed as two parameters, for example `3` × `3` = 9 pixel samples. About the only time you might vary the two numbers independently is if you are rendering to an anamorphic film format.)
+
+        For surfaces with displacement and/or very high frequency textures, you might increase pixel samples up to a maximum of `9` × `9`. For anything else, a good limit is `5` × `5`.
+
+        Sampling is highly dependent on the rendering algorithms. When rendering "old-style" renders with fixed approximations to light sources and no distributed ray-tracing, sampling is primarily concerned with geometry edge anti-aliasing (or texture filtering). For motion blur or depth of field sampling might have to be increased.
+
+        With PBR and other sophisticated lighting, sampling is now used more to make the illumination functions converge. So sampling is often set much higher. 
+
+        * [Mantra:vm_samples]
+        * [Mantra:vm_jitter]
+        * [Mantra:vm_raybias]
+    
+    :bubble:
+        After shading the samples for the pixel, calculate the _variance_ between the results.
+            
+        If the variance is greater than the allowed _noise level_, resample the pixel, up to _max ray samples_ times.
+
+        You can export "direct samples" and "indirect samples" as extra image planes in the rendered image. These planes encodes the number of times this step was repeated for each pixel. It can help you pinpoint areas of your image causing slowdowns.
+
+        * [Mantra:vm_variance]
+        * [Mantra:vm_maxraysamples]
+
+:col:
+    :bubble:
+        === Micropolygon rendering ===
+        
+        Dice polygons into _micropolygons_ of roughly pixel size. Increasing the _shading quality_ increases the number of micropolygons per pixel (a shading quality of `1` means roughly one micropolygons per pixel; a value of `2` means roughly four micropolygons per pixel).
+            
+        Run the surface shader (optimized for color, `Cf`) on _every vertex_, blend between vertices to get surface color. Very inefficient for high-polygon models that are small/far away.
+
+        * [Mantra:vm_shadingquality]
+
+== PBR shading ==
+
+* PBR (physically based rendering) is a shading process that supports accurate physical simulations of lighting, shadows, and shading.
+
+    * PBR automatically enables: raytraced reflections and refractions, glossy reflections and refractions, and reflected light sources.
+    
+    * PBR is useful for rendering many types of scenes, for example: scenes that requires soft shadows from an [environment map|Node:obj/envlight] or [area lights|Node:obj/hlight], lots of indirect lighting (such as closed rooms with reflective walls), glossy reflections and refractions, and caustics.
+    
+    * For information on how to set up the mantra node to use PBR, see [setting up PBR|pbr].
+
+* PBR is a shading process. It can work with either of Houdini's sampling methods (micropolygon sampling or raytracing). That's why the mantra node lets you choose Micropolygon PBR ("Micropolygon Physically Based Rendering") or Raytracing PBR ("Physically Based Rendering") using the __Rendering engine__ parameter on the __Sampling__ sub-tab of the __Properties__ tab.
+
+* Whereas in traditional shading the shader programs control the number and distribution of secondary rays, in PBR secondary rays are controlled by the surface's _BSDF_ (Bidirectional Scattering Distribution Function).
+
+    * In PBR, the surface shader is responsible for computing the BSDF of the surface. Whereas traditional surface shaders set `Cf` (surface color) and `Of` (surface opacity) color values, surface shaders for PBR set `F` to a `bsdf` value (`bsdf` is a VEX datatype introduced in Houdini 9).
+
+    * A BSDF is a function that takes the incoming light direction and a viewing direction, and returns the magnitude of the reflected light given that "bounce".
+    
+    * Houdini provides several VOPs/functions for creating `bsdf` values, including [Vex:ashikhmin], [Vex:blinn], [Vex:cone], [Vex:isotropic], [Vex:phonglobe], [Vex:diffuse], [Vex:specular], and [Vex:phong] (use `vcc -X surface | grep bsdf` for a full list).
+    
+    * You can add `bsdf` values together and scale them by vectors or floats. Multiplying a BSDF by a color vector makes the surface reflect that color.
+
+        {{{
+        #!vex
+        // Multiply the diffuse (hemispherical) BSDF by the texture color,
+        // multiply a phong BSDF by 0.5, and then add the two BSDFs together
+        F = texture(map) * diffuse() + 0.5 * phong(20);
+        }}}
+        
+        {{{
+        #!vex
+        // Red diffuse surface
+        F = diffuse() * {1.0, 0, 0}
+        }}}
+        
+* For each shading sample...
+
+    * Mantra computes the _direct lighting_ contribution for all lights in the scene.  This involves sending up to one shadow ray toward every light in the scene, as well as one additional ray to account for reflections of light sources.
+    
+    * Mantra takes the eye angle, and a _random direction_ based on the shape of the BSDF (for example, in diffuse BSDF, every secondary ray direction is equally likely, while in a reflective BSDF, the reflection direction is much more likely) and sends an _indirect lighting_ ray. If the indirect lighting ray hits a surface, mantra runs its shader and samples its contribution to the current surface's color.
+        
+        Running the indirect lighting surface's shader will send out secondary rays for that shader, and those rays may hit surfaces, causing their shaders to run, sending out more rays. To prevent this process from continuing forever, mantra uses the _reflect limit_ settings (on the __Shading__ subtab of the __Properties__ tab) to limit the number of bounces mantra will follow.
+    
+    * So, for each shading sample in BSDF, mantra will only generate a few additional rays: direct lighting rays in the direction of light sources, a direct lighting ray for reflections of light sources, and an indirect lighting ray in a direction chosen via the BSDF.
+    
+    * The output of the BSDF for the incoming eye direction and the direct and indirect lighting rays is the final surface color.
+    
+    * Because each sample only traces a few rays, different samples might compute completely different colors. For this reason, in PBR you will typically use 16x16, 32x32, or more samples per-pixel (_pixel samples_ setting). Accumulating that many samples will average out the differences from sampling only a few rays.
+    
+* You can create a single surface shader that works both in the traditional shading pipeline and in PBR. All you have to do is set/connect `Cf`/`Of` as well as `F`. For example, in VEX:
+    
+    {{{
+    #!vex
+    surface simple()
+    {
+       vector nn = nomalize(frontface(N, I));
+       Cf = diffuse(nn);
+       F = diffuse();
+    }
+    }}}
+        #display: numbered
+    
+    The rendering engine will only execute the code needed to compute the appropriate variable(s), so in the traditional shading pipeline, the renderer will run lines 3 and 4 of the above code, while in the PBR pipeline it will only run line 5. This also means that if your shaders aren't set up to compute `F` and you switch to PBR rendering, the shaders will output black, because the traditional shading code isn't run.
+
+== Non-PBR shading ==
+
+* Shaders are programs the renderer runs to allow specification of various aspects of rendering, such as the color of surfaces. Mantra's shaders can be hand-written in the [VEX language|/vex], or created by wiring together [VOP node networks|/nodes/vop], which are automatically converted to VEX by Houdini.
+
+* Mantra runs five types of shaders: Displacement, Surface, Light, Shadow, and Fog.
+
+    * *Displacement shaders* run first. A displacement shader can move the corner of the micropolygon. Displacement shaders work by modifying the global variables `P` (the vertex position) and `N` (the vertex normal, since changing the position usually changes the normal).
+    
+        An important factor for displacement shading is the _displacement bounds_ setting. Since micropolygon rendering only looks at a small part of the scene at a time, if a displacement would move a corner outside the area mantra is looking at, the micropolygon will be clipped, resulting in holes. The displacement bounds setting tells mantra the _maximum_ displacement distance (in Houdini units) you expect in the scene. Mantra uses this number to increase the amount of geometry it keeps in memory, so you should increase it to the maximum displacement in the scene but no higher.
+
+        Displacement shaders can store values on the vertex using _export parameters_, for example it could store the predisplaced position and/or normal, the displacement distance, etc. for use by the surface shader. A surface shader can retrieve the stored values using the [Vex:dimport] VEX function or [Import Displacement Variable VOP|Node:vop/dimport].
+    
+    * *Surface shaders* run after displacement shaders. Surface shaders are responsible for calculating the color of the surface at the sampled point.
+    
+        Surface shaders work by setting the following global variables:
+
+        `Cf`:
+            The surface color.
+        `Of`:
+            The surface opacity.
+        `Af`:
+            The pixel transparency (alpha).
+    
+        Although they sound similar, surface opacity and pixel transparency are different and can be used for different effects. `Of` (surface opacity) affects the visibility of surfaces behind the one being shaded. `Af` (pixel transparency) affects the transparency of the resulting pixel in the rendered image. The output values of the `Cf`, `Of`, and `Af` variables are stored in the sample.
+        
+    * Surface shaders can invoke raytracing using various VEX functions or VOP nodes to send out _secondary rays_. Each of those rays get sampled and shaded and return their values to the invoking shader.
+        
+        For example, A shader might send a _reflection ray_ if the material is reflective (or multiple reflection rays for a blurred reflection). It might send refraction rays if the material is refractive. It might send _occlusion_ or _irradiance_ rays for more realistic lighting.
+        
+        So, in "traditional" (non-PBR) shading, the surface shader (or light shader) determines how many secondary rays to send and the distribution of the rays. This may lead to inefficiencies where a light might compute hundreds of ambient occlusion rays, even for surfaces (such as highly reflective materials) where the light contributes very little to the final color. This situation is more gracefully handled by [PBR shading|#pbr].
+    
+    * Surface shaders can cause *light and shadow shaders* to run if they call an _illuminance loop_. An illuminance loop iterates over each light, calling the light's _light shader_, which sets the `Cl` (light color) variable inside the loop. The code in the loop may then call `shadow(Cl)`, which uses the light's _shadow shader_ to modify the variable. The variable `L` (direction from the surface to the light) is also available inside the loop.
+    
+        Of course, the code in the loop may ignore these values or use them in different ways. For example, here's some pseudo-VEX code that uses the shadow shader to tell whether the surface is in shadow, but colors all unshadowed areas blue and all shadowed areas red.
+    
+        {{{
+        #!vex
+        illuminance(P) {
+            Cx = Cl
+            shadow(Cl)
+            if (Cl == Cx) {
+                Cf = blue
+            } else {
+                Cf = red
+            }
+        }
+        }}}
+    
+    * *Fog shaders* run after surface shading if they are present. Fog shaders can modify the final `Cf` (surface color) and `Of` (surface opacity) of every surface. You can add a fog shader to the scene by creating an [Atmosphere object|Node:obj/fog] at the object level and specifying the shader in the Atmosphere object's parameters. In general, however, rendered volumes are a much more accurate and flexible way to simulate atmospheric effects than using a fog shader.
+    
+    * Variable arguments to the shader will be overridden by any attributes on the shaded geometry with the same name, allowing the shader access to arbitrary attributes. There are also various useful global variables. For example the `P` variable contains the coordinates of the point being shaded, and the `dPds`, `dPdt` global variables contain the delta between the current position (`P`) and the position of the neighboring micropolygon vertex along S and T. You can use these vectors to get the approximate length of micropolygon edges. See [the list of global variables in the shading contexts|/vex/contexts/shading_contexts#globals].
+
+See [how to use materials and shaders|/shade] for information on how to set up shading.
+
+== Sampling and shading volumes ==
+
+* Mantra samples and shades volumes very similarly to micropolygons. Whereas micropolygon rendering refines and dices surfaces into micropolygons (each with a size measured by `dPds` and `dPdt`), micro-volume rendering dices primitive volumes into _micro-volumes_.
+
+    * Mantra dices Microvolumes symmetrically in all dimensions, with the aim of microvolumes with a volume proportional to `<<micropolygon area>> x <<depth>>`.
+    
+    * The height and width of the micro-volumes are controlled by the _shading quality_, just like micropolygons. The Z depth is controlled by the _volume step size_ setting.
+    
+    * The `dPdz` global contains the Z-depth delta for the current microvolume.
+
+* Shading micro-volumes uses the same shading pipeline as shading surfaces. All the standard types of shaders you use on surfaces are used on volumes. Displacement shaders can move the micro-volumes, which can add detail to the volume cheaply.
+
+    * The _way you write_ a surface shader or displacement shader to work with volumes instead of surfaces is different, however.
+    
+    * For surface shaders, you'll generally want to scale the `Of` output to take into account the volume step being shaded (`dPdz`).
+    
+    * For displacement shaders, displacing along the normal displaces along the volume gradient, but what you'll usually want is to perform a 3D displacement that is independent of the normal.
+
+* Geometry attributes are available to the shaders just like with standard surface shaders. In addition, the `density` variable represents the volume density (passed to shaders as a float), and the global variable `N` represents the gradient vector (the direction of greatest change in the density) at the micro-volume being rendered.
+
+    If you use the [Name surface node|Node:sop/name] to name volume primitives, which stores the name of the volume (e.g. `density`, or `vel.x`, or `temperature`, etc.) in the special `name` attribute. You can then create parameters on your shader called `density`, `vel`, `temperature`, etc., and they will automatically bind to the value of the named volume. You can use this, for example, to base the color of a surface shader on the volume's temperature.
+
+* Because volumes are rendered using the same pipeline as surfaces, they get the same features as surfaces. For example, opacity culling, instancing, shadow maps, depth of field, and motion blur. The most important benefit is that semi-transparent micro-volumes are composited just like surfaces, allowing accurate compositing of volumes and surfaces. This is opposed to fog shaders which run as a post-process to surface shading and composites over the surfaces, and so semi-transparent surfaces don't composite the fog properly. 
+
+* Volumes can be generated in various ways:
+
+    * Houdini's volume primitives, using dynamics or the [Isooffset surface node|Node:sop/isooffset].
+
+        You can map multiple Houdini primitives to a single rendered volume primitive. Each Houdini primitive is represented by a separate VEX variable, which allows different resolutions for different "channels" of the volume. For example, you could have a volume with a high-resolution "density" channel and a low-resolution "color" channel.
+    
+    * An `i3d` 3D texture file. Using an i3d file gives you paged memory usage. Each channel in the i3d file is represented by a separate VEX variable.
+
+    * You can choose to render [metaballs|Node:sop/metaball] as volumes (since metaballs define density fields, they map naturally to volumes). Point attributes on the metaball primitive map to VEX variables in the shader.
+
+See [how to use volumetric rendering|volumes] for information on how to set up volumes.
+
+== Filtering ==
+
+* After mantra runs the shaders and gets values for each sample, it sums the contributions of each pixel's samples to get the pixel color. The _pixel filter_ controls how much each sample contributes to the final value. The default gives more weight to samples near the center of the micropolygon. The _filter width_ setting controls the radius within which pixel samples are considered. Increasing the filter width will increase anti-aliasing/blurring. This is controlled by the controlled by the __Pixel filter__ parameter on the __Output__ sub-tab of the __Properties__ tab. The default is a 2x2 Gaussian filter.
+
+* Once the renderer has the summed pixel color, it quantizes the floating point color vector into the specified color format (e.g. 8-bit or 16-bit integer) to get the final value of the pixel in the `C` (color) plane of the final image.
+
+* The renderer sends the pixel values to the output device driver, for example a file format driver like TIFF or JPEG, or the `ip` device, which displays the image in [Mplay|/mplay].
+
+== PBR vs. Raytracing modes == (pbrray)
+
+While the ray-tracing engine (RT) and the PBR rendering engine (PBR) produce very similar results, the engines work slightly differently under the hood.
+
+The primary difference is how they evaluate VEX shaders. Aside from the `Of` (opacity) variable, the raytracing engine only evaluates the `Cf` variable. The PBR engine, on the other hand, ignores all
+computations required to compute `Cf` and `Af`, and only evaluates the `F` (BSDF) variable.
+
+For example, with this simple shader:
+
+{{{
+#!vex
+surface
+clay(vector diff=1; float rough=.1; vector Cd=1)
+{
+    vector	nml;
+
+    nml = frontface(normalize(N), I);
+    Cf  = diffuse(nml, -normalize(I), rough);
+    Cf *= Cd * diff;
+    F = (Cd * diff) * diffuse();
+}
+}}}
+
+The raytracing engine will see the shader as:
+
+{{{
+#!vex
+surface
+clay(vector diff=1; float rough=.1; vector Cd=1)
+{
+    vector	nml;
+
+    nml = frontface(normalize(N), I);
+    Cf  = diffuse(nml, -normalize(I), rough);
+    Cf *= Cd * diff;
+}
+}}}
+
+The PBR engine will see the shader as:
+
+{{{
+#!vex
+surface
+clay(vector diff=1; float rough=.1; vector Cd=1)
+{
+    F = (Cd * diff) * diffuse();
+}
+}}}
+
+The raytracing engine takes the `Cf` variable and stores the result in the pixel sample.  For the PBR engine, all the shading occurs in the `pathtracer` shader.  This is similar to a fog/atmosphere shader, in that the results of the surface shader (for PBR, the `F` variable) are passed as inputs, and used to compute the `Cf` variable.  This allows Mantra to have several different `pathtracers` (photon tracer, light tracer, path tracer, etc.) that all work in the same fashion. They take they `F` variable computed by the surface shader and use it to compute the resulting color.
+
+However, the two rendering engines will often render nearly identical images since both engines often make use of the `pbrlighting()` shader.  This shader takes a BSDF input and computes the resulting color.
+
+This can be seen in the `plastic.vfl` shader that's shipped with Houdini.  The shader looks something like:
+
+{{{
+#!vex
+import pbrlighting;
+surface
+plastic(
+    vector diff=0.8;
+    vector spec=0.2;
+    float rough=0.2;
+    vector Cd=1;
+    ...
+    export vector direct=0;
+    export vector indirect=0;
+    export vector indirect_emission=0;
+    ...
+)
+{
+    float	exponent = 1.0 / rough;
+
+    F = (Cd * diff) * diffuse() + spec * phong(exponent);
+
+    pbrlighting(
+	    "direct", direct,
+	    "indirect", indirect,
+	    "indirect_emission", indirect_emission,
+	    ...
+	    "inF", F);
+
+    Cf = direct + indirect + indirect_emission;
+}
+}}}
+
+In the raytracing engine, this shader computes the BSDF `F`, since it's required by the `pbrlighting()` function.  The color =Cf= is computed by running the `pbrlighting()` function.
+
+For PBR, all the computation required for computing `Cf` is ignored entirely.  This means that the PBR version of the shader sees the surface shader as:
+
+{{{
+#!vex
+import pbrlighting;
+surface
+plastic(
+    vector diff=0.8;
+    vector spec=0.2;
+    float rough=0.2;
+    vector Cd=1;
+    ...
+    export vector direct=0;
+    export vector indirect=0;
+    export vector indirect_emission=0;
+    ...
+)
+{
+    float	exponent = 1.0 / rough;
+
+    F = (Cd * diff) * diffuse() + spec * phong(exponent);
+}
+}}}
+
+The PBR engine then calls the `pathtracer` shader to evaluate `F`.  The default `pathtracer()` function simply calls `pbrlighting()`, which results in very similar shading for the final color.
+
+There are other subtle differences, such as when exactly export variables are evaluated, but the primary difference is how surface shaders are evaluated.
+
+Most shader built using VOPs use the [Compute Lighting VOP|Node:vop/computelighting], which calls `pbrlighting()`.  For example, both the Mantra Surface and the Principled Shader use Compute Lighting so should generate nearly identical results using either engine.

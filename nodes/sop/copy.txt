@@ -1,0 +1,290 @@
+= Copy Stamp =
+
+#type: node
+#context: sop
+#internal: copy
+#icon: SOP/copy
+#tags: copy, model
+
+"""Creates multiple copies of the input geometry, or copies the geometry
+onto the points of the second input."""
+
+The Copy Stamp node has two main functions, with the second function being the
+most useful:
+
+* Create multiple copies of the input geometry. You can apply
+  transformations progressively to each copy. So, for example, you could
+  copy a box model into a line-up of identical boxes descending in
+  size.
+
+* Copy the first input (source) geometry onto the points of the second
+  input (template) geometry. This is very useful for populating scenes
+  with geometry with full control over the placement of the copies.
+
+  For example, you can arrange copies in a spherical shape by copying
+  them onto the points of polygonal sphere. Or you could copy a tree
+  model onto the points of a Grid, then add turbulence to the grid's
+  points to add randomness to the placement of the trees.
+
+  This operator is especially useful for copying geometry onto the
+  points output from a  [particle system|/particles]  (that is, a [POP
+  network SOP|Node:sop/popnet]). Whereas  [particle
+  instancing|/particles/instancing_rendering]  displays the instanced geometry at
+  render time (and is more efficient), using the Copy SOP gives you
+  "real" geometry in the network that you can further manipulate.
+
+See [copying and instancing|/copy] for more information.
+
+[Include:/shelf/copytopoints#includeme]
+
+== Instancing point attributes == (instanceattrs)
+
+When you copy or instance geometry onto points, Houdini looks for specific attributes on the destination points to customize each copy/instance. See [instancing point attributes|/copy/instanceattrs].
+
+== Tips ==
+
+* When making multiple copies (not copying onto points), use the NCY
+  (number of copies) local variable in an expression to make values
+  independent of the number of copies.
+
+  For example, to have the each copy rotated so they go from 0 to
+  360 degrees, set the rotation to `360/$NCY`.
+
+* You can create multiple copies around an axis, then skin them to
+  create complex lathe-like effects, similar to the results of the
+  [Revolve SOP|Node:sop/revolve].
+
+* To alleviate issues when copying to normals, you can add up vectors to template points or do it in POPs with an [Up Vector POP|Node:pop/upvector].
+
+<!--
+Also, while not intuitive, the scaling is ALSO dependent on the "Rotate to template normal" toggle being enabled. If the toggle is off, the copied geometry will not change orientation OR scale.
+-->
+
+@parameters
+
+Source Group:
+    A subset of the source (first input) primitives to copy from.
+    You can create groups with the [Group SOP|Node:sop/group].
+
+Template Group:
+    A subset of the template (second input) points to copy onto.
+    Please note, that only point group specifications are valid for
+    this parameter.
+
+
+== Copy ==
+
+Number of copies:
+    #channels: /ncy
+
+    The number of copies of the original geometry.
+    
+Transform Using Template Point Attributes:
+    Rotates copies to face the template point normals. Also
+    applies translations, rotations and scales according to the
+    trans, rot, and scale point attributes on the template
+    points (if these attributes exist).
+
+Transform Cumulative:
+    Each copy is transformed relative to the previous.
+
+Transform Order:
+    Order transformations occur.
+
+Rotate Order:
+    Order rotations occur.
+
+Translate:
+    #channels: /tx /ty /tz
+
+    Translation along xyz axes.
+
+Rotate:
+    #channels: /rx /ry /rz
+
+    Rotation about xyz axes.
+
+Scale:
+    #channels: /sx /sy /sz
+
+    Non-uniform scaling along xyz axes.
+
+Shear:
+    Amount of shearing. The three values represent X on XY
+    plane, X on XZ plane, and Y on YZ plane respectively.
+Pivot:
+    #channels: /px /py /pz
+
+    The local pivot point of the copy.
+
+Uniform Scale:
+    #channels: /scale
+
+    Uniform scaling.
+
+Preserve Normal Length:
+    Normals to maintain length after transformations.
+
+Create Output Groups:
+    Places each copy into a primitive group.
+
+Preserve Groups:
+    Don't delete the contents of the copy group if it already
+    exists before adding the copied primitives.
+
+Copy Groups:
+    The name of the group to create for each copy.
+
+
+== Stamp ==
+
+<!--
+    Stamping lets you set up values that vary per-copy on the Copy node, and then refer to those variables in the source network using the [Exp:stamp] function. See [copy stamping|/copy/stamping] for more information.
+-->
+
+Stamp Inputs:
+    Stamp proceeding variables for each input copied.
+
+Cache Stamping Geometry:
+    If enabled, keep local copies of the input geometry for each set of stamp parameter values.  If there are a fixed number of input geometries which are repeated multiple times, it can improve efficiency by avoiding the recooking of the input geometry.  If the input geometry changes every time it's stamped, it can cause increased memory usage during cooking.
+
+Pack Geometry Before Copying:
+    Pack the input geometry into an Embedded Packed primitive before copying. This results in the input geometry being shared by each copy rather than being duplicated for each copy.
+
+Pivot Location:
+    Specifies how to initialize the offset for the point referenced by the
+    packed primitive.
+
+Display As:
+    The viewport LOD for the specified packed primitives.
+
+Attribute Stamps:
+    Any point attributes on the template geometry that match this
+    will also be stamped.  They will be stamped as stamps of the
+    same name as the attribute.  Float and integer attributes
+    will stamp their first value as a float.  String attributes
+    will stamp as strings.
+
+Variable/Value n:
+    Token and value of each stamp variable. Changes values of
+    parameters which include param function.
+
+== Attribute ==
+
+The parameters on this tab control how attributes on the
+template points affect the copies.
+
+
+Use Template Point Attributes:
+    #channels: /doattr
+
+    Copy attributes from the template points onto the copies,
+    according to the values in the attribute fields below.
+
+Attribute fields:
+    #channels: /setpt /setprim /setvtx /mulpt /mulprim /mulvtx /addpt /addprim /addvtx /subpt /subprim /subvtx
+
+    (Available when __Copy template point attributes__ is on
+    above.)
+
+    The _columns_ represent _possible ways of combining the
+    attributes_ from template geometry with the attributes from
+    the source geometry.
+
+    Set:
+        Copy the template attributes onto the copies.
+    Mult:
+        Multiply the template attributes by the corresponding
+        source attributes.
+    Add:
+        Add the template attributes to the corresponding source
+        attributes.
+    Sub:
+        Subtract the template attributes from the corresponding
+        source attributes.
+    The _rows_ represent _the different entities you can copy
+    attributes onto_: points, primitives, and vertices.
+
+    At the _intersection_ of each column and row, you can enter
+    a list/pattern of attributes.
+
+    For example:
+
+    * To copy all attribute values from the template points to
+      the primitive attributes of the copies, set the field at
+      __Set/To Prim__ to `*`.
+
+    * To multiply primitive colors by the template's colors, set
+      the field at __Mult/To Prim__ to `Cd`.
+
+    * To add the texture coordinates of the template to the
+      coordinates of the source, set the field at __Add/To
+      Point__ to __uv__.
+
+    Copy Local Variables:
+        All local variables referring to the manipulated attributes are
+        copied.
+
+@inputs
+
+Source:
+    The geometry to copy.
+
+Template:
+    (Optional) Copy the source geometry onto the points of this
+    geometry.
+
+@locals
+
+Copy-specific variables.
+
+CY:
+    The number of the copy currently being generated. Starts at 0.
+NCY:
+    The total number of copies that will be created (the value of
+    the __Number of copies__ parameter).
+PT:
+    The point number of the Template being copied onto. If there is
+    a template group, this will be the index into the group, _not_
+    the actual point number. Use `TPT` to always get the actual
+    point number.
+NPT:
+    The total number of points in the template geometry.
+TPT:
+    The actual point number of the currently processed template
+    point, independent of any template groups. See `PT` above.
+
+Variables for point attributes on the template.
+
+AGE:
+    The seconds a particle in the template has been alive.
+LIFE:
+    The ratio of the age of a particle to its expected life This
+    number is between 0 (when born) and 1 (when about to die).
+ID:
+    The ID of the particle in the input.
+
+Variables for the input geometry/template geometry (if there is a
+template input).
+
+CEX, CEY, CEZ:
+    The centroid of the geometry.
+XMIN, XMAX:
+    The X extents of the bounding box of the geometry.
+YMIN, YMAX:
+    The Y extents of the bounding box of the geometry.
+ZMIN, ZMAX:
+    The Z extents of the bounding box of the geometry.
+SIZEX, SIZEY, SIZEZ:
+    The size of the bounding box.
+BBX, BBY, BBZ:
+    The point's relative position in the bounding box.
+
+== Standard variables ==
+
+[Include:standardvariables]
+
+@related
+    - [Node:sop/copyxform]
+    - [Node:sop/copytopoints]
+

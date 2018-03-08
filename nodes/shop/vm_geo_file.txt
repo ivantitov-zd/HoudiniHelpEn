@@ -1,0 +1,126 @@
+﻿= Mantra: Delayed Load =
+
+#type: node
+#context: shop
+#internal: vm_geo_file
+#icon: SHOP/vm_geo_file
+
+"""Replaces the object with the contents of a file at render time."""
+
+== Rendering Geometry from Disk ==
+
+Geometry from a surface operator is sent down for mantra when an IFD is created. Therefore, Houdini needs to have a copy of the geometry in memory at some point during the IFD generation. Additionally, Houdini needs to write all the data into the IFD stream, and mantra needs read all the data from the IFD stream. In most cases this is fine, since the geometry does not take up much memory and the cost of reading/writing the geometry is not too high.
+
+However, there are cases where this process can be prohibitive. For example, when rendering extremely large geometry files. Forcing Houdini to load and save the geometry at every frame can by costly in both memory and time. This could also become a problem when performing network rendering (the H-option on mantra), as it can impact the memory footprint of the server mantra.
+
+A way to alleviate render time and memory costs is to save the geometry files to disk and instruct mantra to load the geometry from disk. Mantra still has to read the geometry, but instead of having to process the embedded geometry it can load the geometry directly from the disk.
+
+# In the SHOP network, create a `Mantra: Delayed Load` geometry shader.
+
+# Set the __File__ name on the Main tab of the shader to point to the disk geometry file.
+
+# On the IFD Bounds tab of the `Mantra: Delayed Load` geometry shader, set the __Bounding Box__ to No bounding box required.
+
+# On the Geometry sub-tab of the Render tab of the object, point to your shader in the __Procedural Shader__ field.
+
+NOTE:
+    Try to avoid using displacement shaders on delayed load instances. Displacement forces mantra to create separate geometry for each instance, decreasing the benefits of referencing. If you must use displacement, micropolygon rendering is better because the renderer can throw away the displaced geometry when it's done rendering it (see [understanding mantra|/render/understanding]).
+
+=== Improving Efficiency ===
+
+Setting the __Bounding Box__  to __No bounding box required__ will make mantra attempt to read the bounding box from the geometry file on disk. If no bounding box information is found in the geometry file, the entire file is read in. This can be very inefficient in both render speed and memory, if the geometry is fully occluded or off-screen. By default, geometry files in Houdini are written out with this bounding box information included.
+
+There are two other options for the __Bounding Box__ field on the IFD Bounds tab of the `Mantra: Delayed Load` geometry shader.
+
+Explicit Bounds:
+    Allows you to explicitly set bounding box boundaries in the __Min Bounds__ and __Max Bounds__ fields.
+    
+Specified By SOP's Bounding Box:
+    Uses the geometry's bounding box. This option is useful when the bounding box of a sequence of disk files are animated.
+    
+NOTE:
+    Instead of using a file SOP to load the full geometry for the disk files, use proxy geometry instead. This keeps Houdini's memory footprint lower.
+    
+=== Motion Blur ===
+
+This procedural has two modes to render motion blur. The first mode is where explicit motion blur information is specified, regardless of the current motion blur settings. The second mode loads the appropriate set of geometry files to conform to the current motion blur settings.
+
+==== Explicit Motion Blur ====
+When the motion blur mode is explicit, this procedural only supports one segment of motion blur (2 geometry samples) and the camera shutter time is ignored. You can specify either the deformation geometry in the __Blur File__, or by enabling __Use Velocity Motion Blur__.
+
+Using a blur file, the procedural will blur from the original file to the blur file. Given a blur time of t, the blur is computed as:  
+
+`P' = lerp(P, P_blur, t * shutter)`
+
+Similarly, when using velocity blur, the blur is computed as: 
+
+`P' = lerp(P, P + v / FPS, t * shutter)`
+
+==== Using Shutter Information ====
+
+When using the motion blur settings, it's only necessary to specify the geometry file sequence. To do this, the procedural needs a file name with a frame number marker, `%F`. This marker can also take padding values, like `$F`. For example: `/tmp/mymodel.%F4.bgeo`, will attempt to load `/tmp/mymodel.0001.bgeo` at frame 1. Any files that are missing will cause mantra to emit a warning, so it is important to give a sequence of geometries that will cover the entire rendered sequence, including geometry files before and after. 
+
+
+See the [motion blur|/render/cameras] help for more information.
+
+@parameters
+
+=== Main ===
+
+File:
+    The geometry file.
+
+Frame Offset:
+    Specifies a frame offset added to the expanded `%F` sequence when evaluating the __File__ parameter.
+
+Motion Blur Style:
+    Specifies the motion blur behavior when rendering. 
+    
+    None:
+	No motion blur will be rendered by this procedural.
+	
+    Set Explicitly:
+	Explicit motion blur data is given with __Use Velocity Motion Blur__, __Blur File__ and __Shutter__.
+	
+    Use Shutter Information:
+	The procedural takes care of loading the correct geometry files to render motion blur, based on the current motion blur settings.
+
+Use Velocity Motion Blur:
+    If motion blur style is explicit, this option tells the procedural to render the geometry using velocity motion blur, as defined by the `v` attribute on the geometry. In this case the __Blur File__ option will be ignored.
+    
+Blur File:
+    The deformation motion blur geometry file.
+    
+Shutter:
+    This value can be used to diminish or exaggerate the effect of the motion blur. A value of 1.0 corresponds to the entire shutter duration.
+
+Material Archive:
+    Allows you to apply materials in the archive without having the materials defined in the .hip file. These materials can be generated using the
+    [Mantra Archive render driver|Node:out/archive].
+
+Share Geometry:
+    If this checkbox is turned on, the loaded geometry will be shared amongst other instances of this procedural. This is useful when you have one piece of heavy geometry that is instanced many times. Instead of loading the geometry multiple times, mantra will load the geometry once and share the geometry amongst all procedurals. However, this means that mantra needs to hold onto the geometry for the duration of the render. 
+    
+    If this checkbox is turned off, mantra will load the geometry for the procedural on demand, and then free the geometry after the fact. This can have a large impact on the rendering footprint.
+    
+    NOTE:
+	When using explicity motion blur settings, file procedurals with different __Shutter__, __Blur File__, or __Use Velocity Motion Blur__ will not share geometries between themselves.
+	
+	Likewise, for procedurals that use shutter information to load geometries, no sharing will happen between procedurals on objects that have different shutter settings applied to them.
+
+=== IFD Bounds ===
+
+Bounding Box:    
+    The bounding box controls let you specify a bounding box for the referenced geometry. Only when this bounding box is "on screen" will mantra load the referenced geometry. You can set __Bounding box__ to __No bounding box required__, in which case mantra will always load the references geometry regardless. You can also specify the bounding box by referencing the SOP's bounding box in the __SOP Bounds__ parameter.
+       
+SOP Bounds:
+    The geometry whose bounding box you want to reference.
+
+Min Bounds:
+    The minimum bounding box dimensions, when setting explicit bounds.
+
+Max Bounds:
+    The maximum bounding box dimensions, when setting explicit bounds.
+
+NOTE:
+    This procedural requires a bounding box to be specified. When generating motion blurred geometry, the bounds must enclose the blurred geometry as well.

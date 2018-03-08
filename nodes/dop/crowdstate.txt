@@ -1,0 +1,233 @@
+#type: node
+#context: dop
+#internal: crowdstate
+#version: 3.0
+#icon: CROWDS/state
+
+= Crowd State =
+
+"""Defines a Crowd State"""
+
+Crowd State defines the current [agent state|/crowds/states]. By default, the node/state name is used for the clip animation that is played while the agent is in that state. The clip name can be overridden, which allows for sharing of animation clips between states. The node also sets animation parameters for the clips that it uses (retiming of the clips is based on those values).
+
+@parameters
+
+State Name:
+    A name for this crowd state. For example, `walking` or `attacking`. The default (`$OS`) uses the node name as the state name. This value is used, for example, to show the current state in a readout, or let you choose a state from a list).
+
+RBD Ragdoll:
+    Whether agents are simulated ("ragdoll") in this state.
+    
+    Ignore:
+        The Bullet solver will ignore the agents and no RBD objects will collide against them.
+
+    Animated Static:
+        The Bullet solver will treat the agents as animated static objects, meaning the agent will affect rigid bodies (for example, other objects will bounce off the agent), but simulated objects will not affect the agent.
+
+    Active:
+        The Bullet solver will simulate the agents as active RBD objects (ragdolls). You can use the __Partial ragdoll__ controls below to only simulate part of the character and have part of the character follow an animation clip.
+
+
+=== Stiffness === (stiffness_parms)
+
+Enable Stiffness:
+    #id: ragdoll_enablestiffness
+    
+    Stiffness adds a certain resistance to the solver's attempts to move joints from their current orientation to the "target" (animated or simulated) orientation.
+
+Group:
+    #id: ragdoll_stiffnessgroup
+    
+    A [named transform group|/crowds/ragdoll#joint_groups] specifying which joints should become stiff. You can create joint groups in the agent setup network with the [Agent Transform Group SOP|Node:sop/agenttransformgroup].
+
+Stiffness Value:
+    #id: ragdoll_stiffnessvalue
+    
+    If this is "Constant", the stiffness is the same for the duration of the state. You can choose "Ramp" to change the value according to a ramp based on how long the agent has been in the state.
+
+Stiffness:
+    #id: ragdoll_stiffness
+    
+    When __Stiffness value__ is "Constant", how much to resist changes to the current joint rotations. A value between `0.2` (the default) and `0.5` read as "stiff but not too stiff". Values of `1` or more will be very stiff.
+
+Time Range:
+    #id: ragdoll_stiffnessramprange
+    
+    When __Stiffness value__ is "Ramp", the start and end times (in seconds) corresponding to the start and end of the ramp. For example, if you set this to `0.0` and `5.0`, the ramp lets you control the stiffness over the first 5 seconds the agent is in this state. Outside this range, the ramp extends the first and last values.
+
+Stiffness Scale:
+    #id: ragdoll_stiffnessscale
+    
+    When __Stiffness value__ is "Ramp", a scale on the value of the __Stiffness Ramp__.
+
+Stiffness Ramp:
+    #id: ragdoll_stiffnessramp
+    
+    Sets the stiffness at each point during the time the agent is in this state. Houdini can't know how long the agent might be in this state, so you have to set up a __Time Range__ and define the stiffness in just that range. Outside this range, the ramp extends the first and last values.
+
+Constraint Force Mixing:
+    #id: ragdoll_stiffnesscfm
+    
+    [Include:/nodes/dop/conetwistconrel#motor_cfm/]
+
+
+=== Partial Ragdoll === (partial_parms)
+
+Enable Partial Ragdoll:
+    Makes some joints on the agent become simulated (ragdoll), while others follow an animation clip. For example, you can have the lower body animated by a walking clip, but the upper body can be ragdolled and react to hits from simulated objects.
+
+Active Group:
+    #id: ragdoll_activegroup
+    
+    A [named transform group|/crowds/ragdoll#joint_groups] specifying which joints you want to be simulated (ragdoll). (Joins not in this group will follow the animation clip you can set at the bottom of the parameters.) You can create joint groups in the agent setup network with the [Agent Transform Group SOP|Node:sop/agenttransformgroup].
+
+
+=== Motors === (motors_parms)
+
+Enable Motor:
+    Spends a certain amount of effort to make joints follow the animation clip, however the joints are still simulated and simulated forces can modify or overcome the motor effect.
+
+Group:
+    #id: ragdoll_motorgroup
+    
+    A [named transform group|/crowds/ragdoll#joint_groups] specifying which joints should be (partially) animated by the clip. You can create joint groups in the agent setup network with the [Agent Transform Group SOP|Node:sop/agenttransformgroup].
+
+Strength Value:
+    If this is "Constant", the stiffness is the same for the duration of the state. You can choose "Ramp" to change the value according to a ramp based on how long the agent has been in the state.
+
+Motor Strength:
+    How much effort to spend making the joints follow the clip. The default value of 10 is enough to overcome gravity but still allow collisions to overcome the motor. You can play with increasing or decreasing this value to get the effect you want.
+
+Time Range:
+    When __Strength value__ is "Ramp", the start and end times (in seconds) corresponding to the start and end of the ramp. For example, if you set this to `0.0` and `5.0`, the ramp lets you control the motor strength over the first 5 seconds the agent is in this state. Outside this range, the ramp extends the first and last values.
+
+Strength Scale:
+    When __Strength value__ is "Ramp", a scale on the value of the __Strength Ramp__.
+
+Strength Ramp:
+    Sets the motor strength at each point during the time the agent is in this state. Houdini can't know how long the agent might be in this state, so you have to set up a __Time Range__ and define the strength in just that range. Outside this range, the ramp extends the first and last values.
+
+Correction Time:
+    How quickly or slowly (in seconds) it takes the solver to correct deviations from the target joint rotations (such as after a collision). Lower values make the agent "recover" from impacts quickly, while higher values make impacts affect the agent for longer.
+
+Constraint Force Mixing:
+    [Include:/nodes/dop/conetwistconrel#motor_cfm/]
+
+
+== Animation clip controls ==
+
+These controls are available when __Partial ragdoll__ or __Motors__ are on, allowing you to set the animation clip that will control the animated joints.
+
+Clip Name:
+    Name of the animation clip to be played in the state.
+
+Randomize Clips:
+    #id: randomizeclips
+    
+    Randomly select a clip from a custom distribution of clip names and weights.
+
+Random Seed:
+    #id: randomclipseed
+    
+    Seed used when randomly selecting clips.
+
+Clip Groups:
+    #id: numclipgroups
+    
+    The number of groups of clips in the custom distribution.
+
+Clip Names:
+    #id: clippattern
+    
+    A string pattern that specifies one or more clip names.
+    The pattern follows the same syntax as the [match|Vex:match] VEX function.
+    The __Weight__ value for the group is divided evenly between the matching clips.
+
+Weight:
+    #id: clippatternweight
+    
+    Specifies how likely the clips are to be selected.
+
+=== Clip Playback ===
+
+Type:
+    Specifies the type of animation used for the state.
+
+    In-Place:
+        The animation is stationary, and the agent's movement should be entirely driven by its particle.
+
+    Locomotive:
+        The source animation moves in world space, and the agent's movement should be guided by the clip's locomotion data.
+        When baking the animation clip, the __Convert to In-Place Animation__ parameter should be enabled on the [Agent ROP|Node:/out/agent] or [Agent SOP|Node:/sop/agent].
+
+Clip Speed Multiplier:
+    #id: clipspeedmultiplier
+    
+    Specifies a multiplier for how fast the animation clip should be played back.
+
+Locomotion Speed Multiplier:
+    For locomotive clips, specifies a multiplier for how fast the locomotion channel of the animation clip should be played back.
+
+Randomize Clip Speed:
+    Randomly adjusts the __Clip Speed Multiplier__ and __Locomotion Speed Multiplier__ for each agent.
+    The speed multipliers can also be adjusted using VEXpressions.
+
+Variance (%):
+    #id: clipspeedvariance
+    Specifies how much the clip speed can be randomly varied by.
+
+Random Seed:
+    #id: clipspeedseed
+    Seed used when randomly varying clip speeds.
+
+Last Frame Matches First Frame:
+    For locomotive clips that are designed for looping, a common workflow is to have an extra frame at the end of the clip that matches the first frame's pose.
+    The final frame of the clip will be used by the [Crowd Solver|Node:/dop/crowdsolver] to determine the correct locomotive motion when moving from the final pose back to the initial pose.
+    The final frame will be skipped when advancing the clip time to avoid having the same pose for two consecutive frames or having the agent suddenly jump backwards.
+
+Retime Clip to Match Particle Speed:
+    Adjusts the clip's playback speed based on the __Gait Speed__ and the particle's velocity.
+
+Gait Speed:
+    #id: gaitspeed
+    
+    Specifies how fast the agent is moving in the in-place animation. This is used when __Retime Clip to Match Particle Speed__ is enabled.
+
+Allowed Variance (%):
+    Specifies how much the clip is allowed to be retimed by when __Retime Clip to Match Particle Speed__ is enabled.
+
+Limit Particle Speed to Gait Speed Range:
+    Forces the particle speed to fall within the range specified by __Gait Speed__ and __Allowed Variance__.
+
+Set Initial Clip Time:
+    Specifies whether to override the agent's initial clip time using the __Initial Clip Time__ and __Randomness__ parameters.
+
+Initial Clip Time:
+    #id: initialcliptime
+    
+    Adjusts the initial clip time (in seconds) for all agents.
+
+Randomize Clip Time:
+    #id: randomizecliptime
+    
+    Randomly adjusts the initial clip time for each agent.
+
+Random Clip Offset:
+    #id: randomclipoffset
+    
+    Randomly shifts the initial clip time forward for each agent by up to the specified number of seconds.
+
+Random Seed:
+    #id: randomclipoffsetseed
+    
+    Seed used when randomly varying clip times.
+
+Apply Locomotion Orientation:
+    For locomotive clips, specifies whether the agent should also be rotated according to the clip's locomotion data when __Set Initial Clip Time__ is enabled.
+
+
+@related
+- [Node:dop/crowdsolver]
+- [Node:dop/crowdtransition]
+- [Node:dop/crowdtrigger]
+- [Node:dop/crowdtriggerlogic]

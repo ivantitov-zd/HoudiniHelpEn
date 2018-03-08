@@ -1,0 +1,98 @@
+﻿= Import, export, and cache geometry to/from disk =
+
+== Overview ==
+
+Houdini lets you store geometry on disk in `.geo` or `.bgeo` format files. The file extension controls which format Houdini saves. `.geo` is a simple ASCII format, `.bgeo` is a much more compact binary format. Unless you want to use external scripts to process the geometry files for some reason, use `.bgeo` as the extension for geometry files.
+
+(The `.geo` file format is documented [here|/io/formats/geo].)
+
+TIP:
+    The [File surface node|Node:sop/file] can also load geometry data directly from saved simulation state (`.sim`) files. See the help for the [File node|Node:sop/file] for more information.
+
+== Export ==
+
+:task:Save the geometry in a node as a one-shot action:
+    In the [network editor|/ref/panes/network], right-click a surface node and choose __Save geometry__.
+        
+:task:Set up a File node to write geometry each time it cooks:
+    # In the [network editor|/ref/panes/network], add a [File node|Node:sop/file] and connect the geometry network to its input.
+        
+    # In the node's parameters, set __File mode__ to __Write__.
+        
+    # Set the __Geometry file__ to the file on disk to write to.
+        
+        If your geometry is animated, you can [include $F in the filename|/render/expressions] to write out separate files for each frame.
+        
+    Also see the section on caching below.
+        
+:task:Set up writing geometry as part of a render dependency network:
+    The [Geometry render node|Node:out/geometry] "renders" the scene as a geometry file.
+        
+    # Choose __Render > Create render node > Other output nodes > Geometry__.
+
+    # In the Geometry node's parameters, set the __SOP Path__ to the object or geometry node whose geometry you want to save.
+    
+    # Set the __Output name__ to the name of the file to save the geometry into (should end in `.geo` or `.bgeo`).
+    
+        If your geometry is animated, you can [include $F in the filename|/render/expressions]  to write out separate files for each frame.
+    
+    # Click the __Render__ button at the top of the parameter editor to
+      create the geometry files.
+        
+== Import ==
+
+:task:Import geometry into a new object:
+    Choose __File > Import > Geometry__.
+        
+    This creates a new object containing a [File node|Node:sop/file] to load the geometry.
+        
+:task:Import geometry into a geometry network:
+    # In the [network editor|/ref/panes/network], add a [File node|Node:sop/file].
+        
+    # In the node's parameters, set the __Geometry file__ to the file on disk to read.
+        
+        If you saved out animated geometry is animated, you can [include $F in the filename|/render/expressions] to read in separate files for each frame.
+            
+    TIP:
+        Press ` (backquote, above the ((Tab)) key on US keyboards) in the network editor to open a file chooser which lets you choose a geometry file and automatically creates a [File node|Node:sop/file] in the network.
+
+== Caching geometry ==
+
+The [File surface node|Node:sop/file] lets you write out geometry the first time the node cooks, and then use the saved geometry from then on, giving a simple form of on-disk caching. To refresh the cache, delete the files on disk.
+
+# In the [network editor|/ref/panes/network], add a [File node|Node:sop/file] and connect the geometry network to its input.
+
+# In the node's parameters, set __File mode__ to __Automatic__.
+
+# Set the __Geometry file__ to the file on disk to write to.
+
+    If your geometry is animated, you can [include $F in the filename|/render/expressions] to write out separate files for each frame.
+
+# You can add nodes to the File node's output to further process the cached geometry.
+
+== Working with .sim and .simdata ==
+
+* SDFs as volume primitives can live in `.bgeo` files. They show up in the viewport as sort of inverted because the default fog makes the outside areas opaque. However, you can use the [Primitive SOP|Node:sop/primitive] to set their visualization to __Iso Surface__.
+
+* `.sim` stores a bunch of simulation objects and their attached data. `.simdata` only stores the data attached to some simulation object.
+
+* You can create SDFs in `.sim` format and save them as `.simdata`. It is a mostly DOP specific format, but the [File SOP|Node:sop/file] will read `.sim` and `.simdata`.
+
+* The [Isooffset SOP|Node:sop/isooffset] only saves `.simdata` files. The [File DOP|Node:dop/file] saves `.sim` files. The [File Data DOP|Node:dop/filedata] saves `.simdata` files. The checkpoint option on the DOP Network saves `.sim` files. The [Dynamics output driver|Node:out/dop] saves `.sim` files.
+
+* Isooffset reads `.simdata`, not `.sim`. The [File SOP|Node:sop/file] will read `.sim` and `.simdata`.
+
+* There is the [Dynamics ROP|Node:out/dop] to create `.sim`.
+
+* The [File SOP|Node:sop/file] can be used directly to read an SDF from within a `.sim` being referenced by a [DOP Import SOP|Node:sop/dopimport]. If you specify a `.sim`, it unlocks the object mask and data path to read from.
+
+* To turn an SDF into a `.sim`, __Volume Sample__ it in an [Isooffset SOP|Node:sop/isooffset] and use the write mode. This will create a `.simdata`, suitable for use by the RBD Collision cache.
+
+== See also ==
+
+- [Surface nodes|/nodes/sop]
+
+
+
+
+

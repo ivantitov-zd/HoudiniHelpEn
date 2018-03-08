@@ -1,0 +1,176 @@
+#helpid: h.menu.windows.import_fbx
+
+= FBX Import Window =
+
+== Overview ==
+
+FBX (sometimes called "Filmbox") is an interchange file format used to
+move 3D animation data between software packages.
+
+# Choose __File > Import > Filmbox FBX__.
+# Click the [Icon:BUTTONS/chooser_file] chooser button next to the __File__ field and choose the file you want to import.
+# Click __Import__ to replace the current scene, or __Merge__ to merge the imported data into the current scene.
+
+NOTE:
+	To properly export vertex caches from Maya(tm), the "Export Quick Select Set as Geometry Cache File(s)" option needs
+	to be checked.
+	
+== Exporting point animation from Maya ==	
+
+To export animated point data, you will need to create a vertex cache in Maya. A vertex cache is a set of files that defines 
+positions for every vertex of the geometry at every frame over an animation interval.
+
+To do this in Maya, select the object whose points you have animated, make sure the main menu type is set to "Animation", 
+and in the menu, go to "Geometry Cache->Create New Cache". It is also highly recommended to ensure that the cache type
+is set to "Double" before create the cache. To do this, click on the options box next to the "Create New Cache" menu item, 
+and make sure that the "Store points as" option is set to "Double".
+
+Once you have your geometry cache, you can export it to FBX. When doing so, make sure that the "Export Quick Select Set as 
+Geometry Cache File(s)" exporter option is checked, otherwise Maya will ignore all vertex cache information.
+
+
+== Filter options ==
+
+Cameras:
+    Import cameras.
+Joints and Skin:
+    Import joints, bones and skinning information.
+Geometry:
+    Import geometry - meshes, triangulated NURBS, etc.
+Lights:
+    Import lights.
+Animation:
+    Import animation, including vertex cache files.
+Materials:
+    Import materials and textures.
+
+== Animation options ==
+
+Resampling:
+    This menu determines what animation curves are resampled, as well as the frequency of resampling. Please note that animation curves
+    for objects with any kind of pivots will always be resampled.
+    
+    For example, if the curve is to be sampled at every frame, set the sampling frequency parameter to 1. If the curve is to sampled
+    once every two frames, set this parameter to 2, and so on.
+    
+    Resample TCB Curves Only:
+        Only curves exported as TCB (Tension-Continuity-Bias) types will be
+        resampled. This is the default setting since native TCB curves are
+        currently not supported.
+        
+    Resample All Cubic Curves:
+        All cubic curves will be resampled down to linear key interpolation.
+        
+Override FBX Frame Rate:
+	If checked, the frame rate stored in the FBX file will be ignored, and the one provided by the user will be used instead. This
+	is useful if an application that exported the original file did not set the frame rate correctly.
+        
+== Character options ==
+
+Hide Joints Attached to Skin:
+	If checked, imported joints that are attached to skin geometry will be
+	hidden.
+
+Convert Joints To ZYX Rotation Order:
+	If checked, imported joints will get their rotation order converted to
+	ZYX. This option will also cause animation curves to be resampled to
+	ensure correctness of the conversion.
+
+== Material options ==        
+
+Import Materials As:
+	This option determines how materials will be imported. 
+	
+	FBX Shader Nodes:
+		Each material's surface is represented as a special VEX FBX Shader with standard parameters such as diffuse,
+		ambient, emissive, etc. components.
+		
+	VOP Networks:
+		Each material's surface is represented as a VOP shader network constructed from various VOP nodes. While
+		parameters similar to the ones in FBX Shaders are exposed, individual shader components inside the shader
+		can be rearranged and edited as the user desires.
+	
+== Compatibility options ==
+
+Compatibility Mode:
+	Determines how values in FBX nodes are interpreted. Some exporters output information differently from what the FBX
+	standard dictates, and thus workarounds for these issues are often useful. This menu allows the user to choose which
+	set of workarounds, if any, is to be used on import.
+	
+	FBX Standard:
+		FBX data is interpreted in strict accordance with FBX rules and documentation. Files from FBX exporters which
+		output anything other than what FBX standard dictates may look incorrect on input.
+		
+	Compatible with Maya:
+		FBX data is interpreted as coming specifically from the Maya(tm) FBX exporter, and adjustments are made appropriately 
+		in order to make the imported scene look exactly as its original source in Maya(tm).
+
+Single-Precision Vertex Caches:
+    Forces the importer to treat all Maya(tm) vertex cache files
+    as if they were exported with
+    single-precision (float), instead of double precision. This is necessary since FBX SDK incorrectly imports any
+    single-precision vertex cache files.
+
+Triangulate NURBS and Patches:
+    Forces the importer to triangulate NURBS and patch surfaces. If unchecked, patches are converted to NURBS on import.
+    Note that information such as skinning and vertex caches will not be preserved on these objects.
+   
+Import Global Ambient Light:
+    Allows importing the single global ambient scene light.
+    This light exists in addition to any lights defined in the scene;
+    however, some FBX exporters do not set it correctly,
+    in which cases it may be useful not to import it.
+    
+    If objects with geometry caches look extremely distorted,
+    try turning this option on.
+    
+Import Blend Deformers as Blend SOPs:
+	If checked, any objects with Blend deformers on them will be imported
+	as Blend SOPs. Otherwise, blend deformations will be imported as channels.
+	
+	The main advantage of importing blending as SOPs is the resulting flexibility
+	to adjust blend targets' geometry and blend weight values; however, there is a
+	possibility that blending animation will not be exactly the same as that of the
+	original file.
+
+Segment Scale Compensate Already Baked In:
+	Assume that the FBX file has segment scale compensation already baked
+	in. This should be turned off for FBX files exported from versions of
+	Maya older than 2010.
+
+== General options ==
+    
+File Paths:
+    Determines how file paths to textures and the original FBX file are set on import.
+    
+    Keep Absolute:
+        All paths are stored as absolute paths. If any referenced files are moved, paths in the saved scene will need to be
+        changed by hand.
+    	
+    Convert to Relative:
+        The importer will attempt to convert all paths to relative paths. If the FBX file is merged with the current scene, 
+        all paths will be made relative to the current location of the Houdini scene file. If the FBX is replacing an entire scene,
+        all paths will be made relative to the location of the FBX file. Note that this requires the resultant Houdini scene to be saved into
+        the same directory where the original FBX file is located.
+
+Unlock Geometry File SOPs:
+    Leaves all imported File and Capture SOPs unlocked after import. This means that FBX geometry is referenced from the original
+    FBX file on disk, and is not stored in Houdini HIP file. Note that for skinned objects, point weights will not be re-imported
+    when the File SOP re-cooks, and are always stored as a copy in the Override SOP.
+
+Unlock Deformation File CHOPs:
+    Leaves all imported File CHOPs, which are responsible for deformations such as blending and vertex caching, unlocked 
+    after import. This means that deformation data is referenced from the original FBX file on disk, and is not stored in 
+    Houdini HIP file.
+
+Import Null Nodes as Subnets:
+    If checked, all grouping null nodes will be imported as subnets, and their children will be placed inside of each subnet.
+    Note that nodes which represents joints in a skeleton will still be imported as nulls, regardless of this option's value.
+
+Import Directly Into /obj Network:
+    If checked, imports all geometry and objects from the current FBX file directly into /obj network, instead of creating a
+    separate subnet per FBX file.
+
+Convert to Y-up Coordinate System:
+    If checked, the entire FBX scene will be converted to the Y-up coordinate system.  If unchecked, the scene will be imported
+    as-is.

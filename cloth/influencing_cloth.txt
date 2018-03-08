@@ -1,0 +1,37 @@
+= Influencing the cloth simulation =
+
+The cloth simulation can be influenced using external forces, such as air drag forces.
+
+== Air drag ==
+
+To affect how the cloth behaves to the surrounding air, use the __Normal Drag__ and __Tangent Drag__ parameters found on the [Cloth Object|Node:dop/clothobject]. Both parameters require values above 0 to be considered. The velocity of the air that surrounds the cloth is controlled by the __External Velocity Field__ and __External Velocity Offset__ parameters. To create a simple wind effect, you can simply enter a velocity in the __External Velocity Offset__ parameter. The __External Velocity Field__ parameter allows you to make use of the `vel` field that can be found any liquid or smoke objects that affect the cloth. For example, the cloth piece of the flag has a an __External Velocity Offset__ of `-25` in the Z axis.
+
+[Anim:/images/cloth/flag.gif]
+
+TIP:
+    You can decrease the drag to give the cloth a heavier look.
+
+__Normal Drag__ determines how much the relative velocity of the cloth to the air affects the cloth in the direction of the face normal. __Tangent Drag__ determines how much the components of the relative velocity in the tangent plane affects the cloth. Typically __Normal Drag__ should be set to a much higher value than __Tangent Drag__.
+
+NOTE:
+    You should not use the [Wind Force DOP|Node:dop/windforce] or any of the other forces in DOPs because they will generate inferior results compared with the Air Drag model.
+
+== Target state ==
+
+You can use target positions and velocities to mix simulation with target in a natural-looking way. The target positions and velocities are stored in the point attributes `targetP` and `targetv`, respectively.
+If you enable __Import Target Geometry__ on the [Cloth Object|Node:dop/clothobject], then the solver will automatically copy the position `P` and the velocity `v` of a specified geometry node onto `targetP` and `targetv`.
+The __Target Stiffness__ and __Target Damping__ parameters on the cloth object can be used to determine how strongly the target geometry influences the cloth position and velocity. The __Target Stiffness__ parameter on the [Cloth Object|Node:dop/clothobject] determines how strongly the positions in the simulation geometry will move towards the positions in the target geometry. The __Target Damping__ parameter determines how strongly the solver will adapt the velocities in the simulation geometry to the velocities in the target geometry. Both the __Target Stiffness__ and __Target Damping__ result in forces that are taken into account by the cloth integrator.
+If you want to animate target positions and velocities at each frame, then you need to set `targetP` and `targetv` in a SOP solver that runs before the cloth solver.
+
+To get good results with __Target Damping__, it is important that you have good velocities on the target geometry, in the form of a velocity point attribute `v`. For this purpose, the __Cloth Object__ tool will add a correctly configured [Trail SOP|Node:sop/trail] in the Cloth Object's geometry network so that reasonably accurate velocities are guaranteed. However, if your target geometry already has accurate instantaneous velocities, then this [Trail SOP|Node:sop/trail] is not needed.
+
+If you want some parts of the cloth to be affected by the target geometry more than others, you can locally adapt the __Target Stiffness__ and __Target Damping__ using the point attributes `targetstiffness` and `targetdamping`. The solver will multiply the per-object target stiffness and damping values with these multiplier point attributes when it determines the forces.
+
+In addition to target stiffness and damping, which are a soft type of constraint, you can use hard constraints on the cloth simulation geometry, so that some points will exactly follow the trajectories of the target geometry. This can be achieved using the `pintoanimation` point attribute. Setting `pintoanimation` to 1 will make a point follow the target exactly. Setting it to 0 for a point, will make that point ignore the animated position and velocity.
+
+    <!--
+    == External force point attribute ==
+    
+    -->
+
+

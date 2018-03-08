@@ -1,0 +1,74 @@
+#type: node
+#context: sop
+#internal: volumemerge
+#icon: SOP/volumemerge
+
+#tags: volumes, merge
+
+= Volume Merge =
+
+"""Flattens many volumes into one volume."""
+
+The Volume Merge operation flattens the scalar data in a collection of
+volumes into a single base volume.  This is useful for converting many
+overlapping volumes into one large volume for more efficient
+rendering.  For example, you can stamp hundreds of thousands of volumes into a single volume for faster rendering, and flatten hierarchies into a low-res base. You can also create a Frustum volume that ensures only voxels in your camera's field of view are created.
+
+TIP:
+    If you have a lot of overlapping volumes you can turn on the __Clamp Maximum__ option.  This allows the merging to stop early when that maximum is reached. However, in this early-exit, the maximum is before __Post-Add, Post-Mul__.
+
+[Include:no_vdb]
+
+@parameters
+    Source Group:
+        The volume primitives in the first input to be written to.
+    Merge Group:
+        The volume primitives to flatten in from the second input.  
+    Merge Method:
+        Each voxel of the base volume in the source group will be
+        merged with the corresponding voxels of the volumes in the
+	merge group according to this merge method. A
+        refers to the first input's value, B refers to the second
+        input's value. If there is no second input, the first input
+	will be used.
+
+	The copy operation will take the volume with the highest primitive number, when more than two volumes are being merged.
+
+	Copy:
+	    result = B
+        Add:
+            result = A + B
+        Multiply:
+            result = A * B
+        Max:
+            result = max(A, B)
+        Min:
+            result = min(A, B)
+	Average:
+	    result = (A + B) / numvolumes
+
+    Clamp at Volume Boundary:
+	While volume primitives can have boundary conditions, for
+	efficiency it is often best to simply ignore any out of bound
+	volumes.  If clamping isn't done, all of the volumes need to
+	be evaluated for every voxel, which quickly gets prohibitively
+	expensive with many volumes.
+    Dest Pre-Add, Dest Pre-Mul:
+	The `A` in the calculation is set to `A' = A * m + a`, where `m` is the
+	__Dest Pre-Mul__ and `a` the __Dest Pre-Add__.
+    Source Pre-Add, Source Pre-Mul:
+	The `B` in the calculation is set to `B' = B * m + a`, where `m` is the
+	__Source Pre-Mul__ and `a` the __Source Pre-Add__.
+    Post-Add, Post-Mul:
+	The `result` that the destination field is set to is modified
+	by `result' = result * m + a,` where `m` is the __Post-Mul__ and `a`
+	is the __Post-Add__.
+    Clamp Minimum, Maximum:
+	The final result is clamped optionally to these ranges.
+
+@related
+    - [Node:sop/volumevop]
+    - [Node:sop/volumemix]
+    - [Node:sop/isooffset]
+    - [Node:sop/iso]
+

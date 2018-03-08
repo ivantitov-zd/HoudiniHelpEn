@@ -1,0 +1,176 @@
+= Distributing fluid simulations =
+
+== Overview ==
+
+The [Icon:SHELF/distribute_fluid_sim] Distribute tool sets up the networks of a simulated object so that it can be solved in parallel on multiple machines using HQueue.
+
+Particle fluids, cloth, wire, and single grid-based fluid containers are distributed using _slicing_, where the space in which the effect happens is partitioned and each _slice_ is solved on a separate machine. Grid based fluid containers are sliced using a certain number of divisions per side. Particle fluids, cloth, and wire simulations do not have boundaries, so you must [slice them manually|#slicing] (below).
+
+For sliced simulations, the nodes on the network will talk to each other to communicate information across the boundaries between slices.
+
+For clustered fluid simulations, each cluster container solves independently, even if they overlap with other cluster containers. For smoke and pyro simulations this is often acceptable since the output volumes blend together visually.
+
+NOTE:
+    Distributed simulation are not supported on Macs.
+
+== Set up distributing sliced simulations ==
+
+=== Slicing the fluid space === (slicing)
+
+Slicing the space containing a particle fluid allows different machines on the HQueue farm to simulate different parts of the fluid. You can put a particle fluid simulation on the farm without slicing, but it will simply simulate on one machine instead of in parallel.
+
+There are two tools on the __Particle Fluids__ tab for slicing a particle fluid simulation into separate regions for distribution:
+
+* The [Icon:DOP/sliceplane][Slice along line|/shelf/slicealongline] tool. This is the simplest way to slice up space, by creating a specified number of equally spaces slices along a certain direction.
+
+    [Image:/images/shelf/slicealongline.png]
+
+* The [Icon:DOP/slicealongline][Slice|/shelf/slice] tool. The tool lets you slice the space using a hierarchy of intersecting planes, allowing you to divide the space in arbitrarily complex ways.
+
+    [Image:/images/shelf/slice.png]
+
+Each region requires an individual machine on the HQueue client network, so only set up as many regions as you have machines. For example, using the Slice along line tool with __Number of regions__ set to `8` would require 8 machines on the HQueue network.
+
+=== How to ===
+
+# On the __Particle Fluids__, __Cloth__, or __Wire__ shelf tab, click the [Icon:SHELF/distribute_fluid_sim] Distribute tool.
+
+# Select the particle fluid, cloth, or wire object and press ((Enter)).
+
+    This creates a few nodes in various networks for distributing the simulation:
+    
+    * A `distributedsim` HQueue Simulation render node in `/out` to render the simulation out to HQueue.
+    
+        This render node sends the distribution job to the HQueue server.
+    
+    * A `distribute_<<objectname>>` object in `/obj` to load the simulation files created by the HQueue clients back into Houdini.
+    
+    * A `DISTRIBUTE_<<objectname>>_CONTROLS` Null node in the DOP network.
+    
+        This node is mostly a placeholder for values. The render node explicitly sets values on the "control" Null DOP such as the tracker address/port and slice divisions, and then multiple distribution-aware DOPs in the network reference the value on the control Null.
+
+# If you want to change the default path pattern for saved geometry files (`$HIP/geo/dist_${SLICE}_$F.bgeo.gz`), go to the Scene level (`/obj`) and double-click the `distribute_<<objectname>>` object to go inside. Select the `loadslices` File node and change the __File__ parameter. See [using expressions in filenames|/render/expressions] for more information.
+
+    The path should be relative to `$HIP`.
+
+=== How to view a simulation slice without running it on the farm ===
+
+The [Icon:SHELF/distribute_fluid_sim] Distribute tool modifies the network to ready it for distribution. If you try to play back the simulation after these modifications, the network will only calculate a slice of the whole simulation, and several nodes will generate network traffic trying to talk to HQueue peers.
+
+If you want to check the simulation on a single machine, you can use parameters on the "control" Null DOP created by the Distribute tool to temporarily switch the network back to non-distributed operation.
+
+:task:View a slice without distributing the simulation:
+    # On the `DISTRIBUTE_uprespyro_CONTROLS` Null node in the DOP network, turn off the __Distribution__ checkbox.
+        
+    # Set the __Slice__ parameter to the slice you want to view.
+
+=== How to use particle fluid distribution with FLIP ===
+
+==== Fluid tanks ====
+
+Using particle distribution with tanks can sometimes lead to a loss of fluid. Turn on the __Distributed Pressure Solve__ checkbox on the [FLIP Solver|Node:dop/flipsolver] to avoid this issue. This will account for pressure in the tank and result in smoother seams between slices. 
+
+NOTE:
+    This option requires considerably more network bandwidth, and is specifically used for large tank-style simulations. It is not needed for flowing rivers.
+    
+[Image:/images/dynamics/distributedtank.png]
+
+==== Whitewater ==== (ww)
+
+        Whitewater distribution is similar to Pyro clustering in that the different simulation nodes don't have to communicate with one another. The results should generally be the same between distributed and non-distributed, except for the __Preserve Foam__ option, which looks at overall foam particle density to affect particle life.  You may need to adjust the particle density downwards when running distributed.
+        
+        The following is a simple example to illustrate how to set up particle fluid distribution with whitewater.
+        
+        # Create a [Icon:SHELF/flip_tank][FLIP Tank|/shelf/fliptank] from the __Particle Fluids__ shelf.
+        
+        # Click the [Icon:SHELF/whitewater][Whitewater|/shelf/whitewater] shelf tool, select the `fliptank` node in the `AutoDOPNetwork`, and press ((Enter)).
+        
+        # Click [Icon:SHELF/distribute_fluid_sim]Distributed Particle Fluid from the __Particle Fluids__ shelf, select `whitewaterobject1` in the `whitewater sim` network, and press ((Enter)).
+        
+        The shelf tool creates an HQueue simulation ROP to send the distributed sim to the farm, as well as a [Null|Node:dop/null] in the Whitewater DOP Network called `DISTRIBUTE_whitewaterobject1_CONTROLS`. The only relevant parameter is really the __Slice__ parameter. The tracker has to be there, but like clustering, the different simulation nodes don't communicate during simulation. It also creates a set of nodes to save the slices to disk in `whitewater_import`, as well as a [File Merge SOP|Node:sop/filemerge] called `load_slices` to load them back in.
+        
+        The distribution is controlled by spatially dividing the emission of whitewater particles in the `WhitewaterSource` node. On the __Distribution__ tab, the __Division Type__ can be __Surface Bounding Box__ or __Specified Box__. __Surface Bounding Box__ expands to the bounding box of the incoming liquid's surface SDF. __Specified Box__ lets you specify a box size, or press ((Enter)) and manually adjust it in the viewport.
+              
+        The bounding box is then divided up according the Divisions across each axis. The __Current Region__ parameter controls the current emission region being simulated and is tied to the `DISTRIBUTE_whitewaterobject1_CONTROLS` __Slice__ parameter. 
+        
+        NOTE:
+                Setting the __Division Type__ back to __None__ will disable Whitewater Distribution.
+                
+        TIP:
+                To change which slice you're viewing while testing distribution , click __Edit__ > __Aliases and Variables__ and changing the __Slice__ variable.
+
+
+== Set up distributing clustered smoke and pyro simulations ==
+
+=== How to ===
+
+# Create a clustered smoke or pyro simulation from point sources using the Smoke Cluster or Pyro Cluster tools on the __Pyro FX__ shelf tab (see [clustering|/pyro/clustering].
+
+# On the __Container Tools__ shelf tab, click the [Icon:SHELF/distribute_fluid_sim] Distribute tool.
+
+# Select the container you want to distribute and press ((Enter)).
+
+    If you are distributing a clustered simulation with multiple one of the containers created by the smoke/pyro cluster tool, you can just select one of them.
+    
+    (Alternatively you can select the DOP object in the network editor and then press ((Enter)) in the viewport.)
+
+# If the object has multiple containers (for example, it was created using [clustering|/pyro/clustering]), a dialog box appears asking if you want to distribute the simulation using _slices_ or _clustering_.
+
+    (If your simulation is so massive even a single clustered container at a time is too much to run on one machine, you can click __Slicing__ to distribute separate slices of each clustered container.)
+
+# If for some reason you have more than one object importing the results of the simulation, a dialog box will ask you which object should be set up for distribution (see [how the tool modifies the geometry network|#clustering_guts] below).
+
+# The tool will create and select a [HQueue simulation render node|Node:out/hq_sim]. Set the node's __HQueue server__ parameter to the name of the HQueue server machine and port name (for example `hq.company.com:5000`).
+
+    If you are slicing, you can set the __Slice Divisions__ parameter. The default `1, 1, 1` slices the container into 8 smaller boxes for distribution. If you have a complex simulation, you can increase the divisions to get more, smaller slices.
+
+=== Distributed clustering behind the scenes === (clustering_guts)
+
+In the Geometry object that imports the simulated fields you distributed (for example, `import_pyro_build`), the Distribute tool adds a [DOP I/O node|Node:sop/dopio] to write the generated cluster fields to disk using a [ROP Output Driver|Node:out/geometry] on the farm.
+
+When the HIP file is [run on the farm|#run] (below), the HQueue render node does the following:
+
+* Sets the global `$CLUSTER` variable to the cluster number being generated on this machine.
+
+* On the Cluster Points node (pointed to in the HQueue render node's __Cluster Node__ parameter), it sets the  __Cluster Filter__ parameter to the `$CLUSTER` variable, so the source network will only generate source points for that cluster number.
+
+* It cooks the ROP Output Driver (pointed to in the HQueue render node's __Output Driver__ parameter) which causes the simulation to cook and writes out the geometry for the current cluster and frame.
+
+The Distribute tool also creates a [File Merge node|Node:sop/filemerge] in the network to import the cluster fields generated on the farm and reintegrate them on your machine. It sets the display and render flags on this node so when you view the HIP file on your machine it uses the cached geometry files.
+
+NOTE:
+    The filename pattern for the output geometry files is set on the File Merge node and referenced from the ROP Output Driver, so if you want to change it, change it on the File Merge node. The pattern must incorporate the `$CLUSTER` (cluster number being simulated) and `$F` (current frame) variables.
+
+== Turn off the live simulation ==
+
+Once the HQueue network has generated the geometry, you should stop the original simulation network from cooking, since you now have the end-result cached.
+
+Do one of the following:
+
+* Turn off the visibility of any scene-level objects that require the simulation to cook.
+
+* Turn off simulation in Houdini: right click (or pressing and holding on) the [Icon:BUTTONS/resimulate] simulation menu in the bottom right corner of the main window and turn off __Enable simulation__.
+
+* Start a fresh new `.hip` file that simply loads the generated particle fluid geometry files using a [File surface node|Node:sop/file].
+
+== Run the distributed simulation on the farm == (run)
+
+# In the main menu, choose __Render > Edit render node > distributedsim__. In the parameter editor:
+
+    * Set the frame range you want to simulate.
+    
+    * Check the __Slice divisions__ parameter. The product of the three components should equal the number of regions in your particle fluid simulation (for example, `3, 1, 1` for a simulation with 3 regions).
+    
+        This number is set automatically when the Distribute tool creates the render node. However, if you then go back and change the number of slices (for example, by changing the __Number of regions__ parameter on a Slice Along Line node), you need to update this parameter on the render node.
+    
+    * Set the __HQ Server__ to the hostname and port of the HQueue server, for example `render.example.com:5000`.
+    
+# In the parameter editor, click __Render__ to send the job to HQueue.
+
+    The render node sends its information to the HQueue server. The HQueue server sends commands to its client machines to load the `.hip` file and simulate and save a slice of the particle fluid simulation per-frame. The individual client machines save their generated geometry cache files to the shared network directory.
+
+
+
+
+
+

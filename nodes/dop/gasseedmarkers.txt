@@ -1,0 +1,196 @@
+#type: node
+#context: dop
+#internal: gasseedmarkers
+#icon: DOP/gas
+
+= Gas Seed Markers =
+
+"""A microsolver that seeds marker particles around the boundary of a surface."""
+
+The Gas Seed Markers DOP is a microsolver used in building larger fluid
+simulations. The [Fluid Solver|Node:dop/fluidsolver] and [Smoke Solver|Node:dop/smokesolver] DOPs that allow
+microsolvers to be added before or after the main solver step to extend
+or tweak the simulation. Alternatively, enterprising people may attempt
+to build an entire new solver out of microsolvers.
+
+The Gas Seed Markers DOP creates marker particles, or surfels, along
+the boundary of a signed distance field. These can be used to correct a
+fluid solution to help preserve volume and maintain high detail on
+boundaries.
+
+The created surfels have the `Cd` attribute which signifies if they are
+inside or outside surfels. Inside surfels are red, outside are green.
+They also have a `pscale` attribute which provides their distance to the
+surface clamped to between 0.1 and 0.5 of the voxel size.
+
+
+@parameters
+Surfels:
+    The geometry data which will have surfels added to it. Any
+    existing surfels will be taken into account in the ensuing
+    update. Surfels that are too far outside will be deleted and
+    voxels with too few surfels will have additional ones added.
+Surfels Group:
+    An optional point group to specify which surfels to
+    consider when counting existing surfels within a voxel.
+Surface:
+    The signed distance field to seed the marker surfels around.
+    The zero isocontour and an approximately three cell distance on
+    other side of it will be seeded with surfels.
+Collision Field:
+    A signed distance field representing collision geometry. Any
+    inside surfel that is inside this field will be deleted.
+Source Field:
+    A signed distance field representing a fluid source. Any
+    outside surfel that is inside this field will be deleted.
+Source Velocity:
+    A velocity field representing the velocity of a fluid source.
+    Surfels inside of the source volume will have the velocities
+    overwritten by this field.
+Apply Only To New Surfels:
+    Apply the __Source Velocity__ field only to the newly created
+    surfels inside of the source volume.
+Sink Field:
+    A signed distance field representing a fluid sink. Any inside
+    surfel inside this sink will be deleted.
+Boundary Layer Field:
+    A signed distance field representing the surface in the 
+    boundary layer. Surfels above the surface in the boundary 
+    layer will be deleted and voxels with too few surfels will
+    have additional ones added.
+Boundary Velocity Field:
+    A vector field representing the velocity field in the boundary
+    layer. Surfels in the boundary layer will have their velocity
+    overwritten by this velocity field.
+Particle Velocity Attribute:
+    The boundary velocity will be applied to the indicated
+    attribute for all the surfels.
+Slice Index Field:
+    An index field that indicates the slice number that a region of a
+    simulation corresponds to. If an index field voxel does not match 
+    the slice number, a surfel will not be created.
+    
+    NOTE:
+        This index field is only used in the boundary layer. 
+Surfels Per Voxel:
+    The number of surfels per voxel cell. Surfels will be added to
+    cells within the bandwidth until this number is reached.
+Birth Threshold:
+    Surfels will be added to a voxel once the current number drops
+    below the product of this parameter and __Surfels Per Voxel__.
+Death Threshold:
+    Surfels will be deleted from a voxel once the current number rises
+    above the product of this parameter and __Surfels Per Voxel__.
+Surface Oversampling:
+    Oversample surfels by this multiple when within __Oversampling Bandwidth__
+    of the surface.
+Oversampling Bandwidth:
+    Oversample within this number of voxels from the surface or any __Surface__
+    volume boundaries, if __Oversample at Boundaries__ is enabled.
+Oversample At Boundaries:
+    Oversample within __Oversampling Bandwidth__ voxels of the boundaries of
+    the __Surface__ volume.
+Move To Isosurface:
+    Move surfels that are slightly inside or outside the __Surface__ field back
+    to the zero isosurface.
+Build Inside Surfels:
+    Construct marker surfels on the inside of the surface. Inside
+    surfels increase volume as they correct the surface by pushing
+    out the boundary.
+Build Outside Surfels:
+    Construct marker surfels on the outside of the surface. Outside
+    surfels decrease volume as they correct the surface by pushing
+    in the boundary.
+Add Particle System:
+    Create a particle system in the __Surfels__ geometry if one does
+    not exist.
+Kill Outside Bounding Box:
+    Kill any surfels outside the bounding box of the field specified in
+    the __Surface__ parameter.
+Copy Nearest Surfel:
+    Instead of explicitly setting the `Cd` and `pscale` attributes when
+    creating a new surfel, create a copy of the nearest existing surfel,
+    including all other attributes.
+Use Boundary:
+    Activate the boundary layer option to seed particles inside the layer
+    even if there is no surface. Additionally, particles inside the boundary
+    layer but above the boundary volume will be deleted.
+Lower Border:
+    The thickness of the boundary layer into the simulation from the 
+    bottom corner.
+Upper Border:
+    The thickness of the boundary layer into the simulation from the
+    upper corner.
+Volume Size:
+    The size of the current simulation volume. This is used to help determine
+    where the boundary layer is positioned in the simulation.
+Volume Center:
+    The center position of the current simulation volume. This is used to help
+    determine where the boundary layer is positioned in the simulation.
+Interpolate Velocity In Boundary:
+    By default, when new surfels are created in the boundary layer, they will be
+    assigned the default velocity (or sampled from the Boundary Velocity Field). 
+    With this toggle enable, the new boundary surfels will instead interpolate
+    the velocity vector from nearby surfels. This option is useful for maintaining
+    water level of a flat tank by freely allow surfels to flow out of the boundary
+    layer and into the simulation.
+Use Waterline:
+    The waterline option replaces the __Boundary Layer Field__ with a plane, where
+    particles are instead seeded into volume below the waterline plane and inside
+    the boundary layer.
+Waterline:
+    The __Waterline__ level and __Waterline Direction__ define the waterline plane.
+    The volume inside the boundary layer and below the __Waterline__ plane will be
+    seeded with particles. Alternatively particles inside the boundary layer and
+    above the __Waterline__ plane will be deleted.
+Waterline Direction:
+    The __Waterline Direction__ specifies the "up" direction of the __Waterline__ plane.
+Use pscale Attribute:
+    This toggle determines whether the surfel radius used to reseed at the 
+    boundary surface is derived from the `pscale` attribute or the user-provided
+    value below.
+Boundary Surface Offset:
+    When reseeding the boundary layer, the surfels will be offset from the surface
+    based on this radius. The default is 0, meaning the surfels will be placed exactly
+    on the surface.
+Interpolation Attributes:
+    All attributes matching this pattern will be interpolated to newly
+    seeded particles from the surrounding existing particles.  This interpolation
+    is more expensive but yields a smoother particle sampling for attributes like
+    velocity.
+Minimum Radius:
+    Surfel's radius will not be smaller than this.  They will
+    created this distance from the surface.  This is measured in
+    terms of voxel cells.
+Maximum Radius:
+    Surfel's radius will not be larger than this.  Even if they
+    are farther from the surface than this distance, their radius
+    will be clamped to this size.  This is measured in terms of
+    voxel cells.
+Use Bandwidth:
+    Use the bandwidth settings to limit the size of the surface boundary
+    within which surfels can be created.
+Birth Bandwidth:
+    Surfels will be created up to this number of cells from the surface if the current number of surfels in the cell is less than surfels per voxel.
+Death Bandwidth:
+    Surfels will be deleted when they stray this number of cells from the surface boundary.
+Seed:
+    The seed to the random number generator that determines the position of the newly create surfels or which
+    surfel to delete in an overfilled voxel.
+Slice Number:
+    If non-negative, only particles from this slice will be eligible as seeds.  This avoids wastefully seeding particles in external slices that will be eliminated in the next border update.  This only takes effect if the `slice` attribute is present and __Copy Nearest Surfel__ mode is turned on (and an index field is provided for the boundary layer).
+
+    [Include:standard_solver_parms]
+
+@inputs
+    [Include:standard_data_inputs]
+
+@outputs
+    [Include:standard_data_outputs]
+
+@locals
+    [Include:standard_data_locals]
+
+    [Include:standard_locals]
+
+

@@ -1,0 +1,422 @@
+= Hair Shader =
+
+#type: node
+#context: vop
+#internal: hairshader
+#icon: SHELF/hair
+
+"""A powerful, highly flexible, general model for hair/fur shading."""
+
+== Overview ==
+
+This node is a fully featured model of hair/fur shading. It gives you
+control over highlights, glints, and back-lighting, which are the essential visual
+components of real hair. Similar to the [Surface Model|Node:vop/surfacemodel], the Hair Model computes direct lighting (from light sources) and indirect lighting (lighting bouncing off other objects in the scene).
+
+This node is intended to be the starting point for hair/fur shader
+networks. Since the Hair Model itself takes care of lighting and simulates
+most physical properties, simply connecting the Hair Model VOP to the
+output would create an "uber-shader" capable of simulating most hair/fur
+surfaces.
+
+For more information on building a material shader with VOPs, see
+[creating materials|Node:shop/vopmaterial].
+
+== Advantages of the Hair Model == 
+
+* Physically-based hair model
+* Works with PBR, ray-tracing, and micropolygon rendering engines
+* Easy-to-use controls for the size and position of highlights
+* Energy conservation
+
+In non-physically based renders, this node adds support for the following:
+
+* Per-light exports
+* Variance antialiasing support for area lights
+* Variance antialiasing support for raytracing
+
+TIP:
+    Most of the parameters are available as inputs, but are hidden by
+    default. See [working with VOPs|/shade/vops] for information on
+    connecting hidden inputs.
+
+== Three light paths: R, TRT, and TT == (paths)
+
+The hair model takes a physically-based approach to shading hair.  It
+does this by taking into account the different ways that light rays can
+bounce off of an individual strand of hair.
+
+The hair model simulates three light paths: reflected (primary or `R`),
+transmitted-reflected-transmitted (secondary or `TRT`), and
+transmitted-transmitted (transmission or `TT`).  The primary path hits the
+hair and is reflected.  The secondary path enters the hair, reflects off
+the back of the hair, and exits out of the front of the hair.  The
+transmission path enters the hair and exits through the back.  The
+following diagram depicts the paths:
+
+[Image:/nodes/images/hair_model.png]
+
+Each light path produces a distinctive visual feature.  For example,
+primary paths tend to be scattered diffusely, resulting in a uniform
+color.  You can think of the primary component as being similar to a diffuse component.  In fact, you must have __Diffuse Contribution__ enabled on your light sources to get contribution from the primary light paths.
+
+The secondary component is more directional in nature than the primary
+component, resulting in highlights.  You can think of the secondary component as a specular highlight.
+
+The transmission component controls how much light passes through a hair strand.  This makes it useful for controlling the look of hair/fur in situations where the hair/fur is back-lit.
+
+== Reflectivity ==
+
+For a discussion of reflectivity, see the [Surface Model|/nodes/vop/surfacemodel].
+
+== Reflection and transmission sizes == (sizes)
+
+The size parameters control the angular spread of a reflection or
+transmission lobe. Low values produce a concentrated lobe that
+reflects/transmits light over a narrow cone of angles, whereas high values
+produce a lobe that reflects/transmits light over a wide cone of angles.
+For example, if you want to produce a diffuse look, use a large size. For
+a sharp highlight, use a small size.
+
+== Reflection and transmission shifts == (shifts)
+
+The shift parameters control the general direction of a reflection or
+transmission lobe. Values range from `-1` (towards the hair's root) to
+`1` (towards the hair's tip). A value of `0` results in a direction
+perpendicular to the hair. The __Reflection Shift__ parameter on the __Secondary Reflection__ tab is typically most useful for controlling the position of a secondary reflection.
+
+== Exporting image planes == (exports)
+
+This node exports a large number of variables you can use to create extra
+image planes when rendering to the OpenEXR format. It is often useful for
+compositing and special effects to have the primary and secondary reflections
+output by the shader as separate images.
+
+For example, you can export the shader's direct/indirect/combined
+diffuse/reflect/refract output, samples, and so on. You can export the
+total output for each variable, or separate per-light exports.
+
+See the [Extra image planes|Node:out/ifd#vm_numaux] parameter of the
+[mantra render node|Node:out/ifd] for more information.
+
+== Hair Model VOP vs. the other hair VOPs ==
+
+The Hair Model VOP combines the effects of the other three hair VOPs: [Physically Based Hair (Primary Reflection)|Node:vop/pbrhair_r], [Physically Based Hair (Secondary Reflection)|Node:vop/pbrhair_trt], and [Physically Based Hair (Transmission)|Node:vop/pbrhair_tt].  This is analogous to the way the [Surface Model|Node:vop/surfacemodel] combines the effects of the [Physical Based Diffuse|Node:vop/pbrdiffuse] and [Physically Based Specular|Node:vop/pbrspecular] VOPs.
+
+The Hair Model VOP handles higher level functionality such as:
+* Deep raster exports
+* Conservation of energy
+* Opacity
+
+The other Physically Based Hair VOPs simply create BSDFs. You could use them separately, but usually you would want to combine them. The Hair Model VOP uses these BSDFs to get the overall hair effect.
+
+== FAQ ==
+
+Can I use this shader to render hair up close?:
+    Not too close.  This shader looks best when the width of individual hair/fur strands is less than a pixel.  If you want to render hair at a microscopic level try using the [Surface Model VOP|Node:vop/surfacemodel].
+
+Why do my hairs look flat?:
+    Houdini renders hair as flat geometry facing the camera.  This works fine as long as the camera is far enough away from the hair.  If this is not the problem, try creating a sharp highlight using the __Secondary Reflection__.
+
+What do the glint controls do?:
+    The glint controls create sharp highlights in the hair's BSDF that look like bunny ears.  See the image above in [Three light paths: R, TRT, and TT|/nodes/vop/hairmodel#paths] for a depiction.
+
+How can I make hair that looks less greasy?:
+    Try reducing the hair width and increasing the hair density.  Sometimes when the hair strands are too wide, they take on an oily appearance.
+
+How can I reduce aliasing and noise in my animations?:
+    First, determine what is causing the aliasing/noise. For example, it could be the shadow map or specular reflection. Render using [Extra image planes|Node:out/ifd#vm_numaux] to see which channels contain aliasing/noise.  If you're using shadow maps, try increasing the resolution and pixel samples.  Increase the pixel samples on your output driver as well.  Adding some motion blur can help smooth the animation.
+
+Should I use shadow maps or raytraced shadows?:
+    Either method will work.  Try testing each to see which renders more quickly in your scene. If you are rendering a static scene, shadow maps will be faster.
+
+How does the Hair Model tie in with the Fur tools?:
+	The fur tool's shader is built around the Hair Model VOP.  If you use the [Add Fur|/shelf/addfur] tool and click on the created fur object, the __Material__ parameter on the __Basic__ tab will point to the Textured Hair material.  If you dive into this shader, you will see the Hair Model VOP near the end of the VOP network.  
+	
+	The Textured Hair material provides additional texturing options that ultimately feed into the Hair Model VOP.  For example, it lets you specify a texture map for the roots of the hair and another for the tips of the hair.
+
+@parameters
+
+Conserve Energy:
+    #id: conserveenergy
+
+    Ensures that the surface reflects no more light than it receives.
+    This is important in physically based rendering and raytracing to
+    ensure the illumination in the scene does not increase as the
+    number of raytracing bounces increases. For example, a surface
+    that reflects twice as much light as it receives (by turning off
+    __Conserve Energy__ and setting the __Reflection Intensity__ to 2)
+    would produce a unnaturally bright render as you increase the
+    __Reflect Limit__.
+    
+    This setting conserves energy by scaling the BSDF by the inverse
+    of its reflectivity when the node detects the reflectivity is
+    greater than 1. This reduces all components of the surface model
+    by the same factor, linearly darkening the surface.
+    
+    You can calculate the total reflectivity of a surface by summing
+    the __Reflection Intensity__ of the primary and secondary reflections
+    with the __Transmission Intensity__.  For predictable results, you
+    should try to conserve energy manually by limiting the intensity or
+    reflectivity parameters.
+
+Enable Fake Rounding:
+    #id: rounding_enable
+
+    Enables an inexpensive tweak to make curves appear rounded across their
+    width like tubes.  This trick depends only on the curve s coordinate
+    and is independent of lighting - so specular highlights will not move
+    across the width of the curve when lighting changes.
+
+Max Ray Distance:
+    #id: maxdist
+
+    For reflections and refractions in non-PBR
+    renders, treat rays that travel farther than this distance (in
+    Houdini world space units) without intersecting any geometry as
+    missed rays.
+
+== Primary Reflection ==
+
+This tab controls primary reflection, the overall color of the surface. The default values reflect 40% of the incoming light.
+
+Enable Primary Reflection:
+    #id: r_enable
+
+    Enables primary reflection.
+
+Reflection Intensity:
+    #id: r_int
+
+    The proportion of incoming light reflected back as the primary
+    component, from `0` (no reflection) to `1` (all incoming light is
+    reflected).
+
+Reflection Color:
+    #id: r_clr
+
+    The color reflected by the object (the reflectivity
+    of red, green, and blue color components).
+
+Reflection Size:
+    #id: r_size
+
+    Controls the angular spread of the reflection component.  See
+    [Reflection and Transmission Sizes|/nodes/vop/hairmodel#sizes] above for details.
+
+Reflection Shift:
+    #id: r_shift
+
+    Controls the angular shift of the reflection component.  See
+    [Reflection and Transmission Shifts|/nodes/vop/hairmodel#shifts] above for details.
+
+== Secondary Reflection ==
+
+This tab contains parameters for secondary reflections (similar to a
+specular reflection). When turned on, the surface will reflect light
+proportional to the __Reflection Intensity__. With secondary reflections,
+light is reflected in a more concentrated manner, and in a particular
+direction. This makes the effect more sensitive to changes in light and
+viewing direction.
+
+In addition to the usual intensity, color, size, and shift controls,
+the __Secondary Reflection__ tab introduces extra controls for adding glints. These glints, or bright spots, are really caustics formed by internally reflected light.  They appear in pairs at critical angles, perpendicular to the hair.  The glints are symmetrical about the incident light angle.
+
+Enable Secondary Reflection:
+    #id: trt_enable
+
+    Enables a highlight, which can also be thought of as a secondary,
+    or specular, reflection.
+
+Reflect Lights:
+    #id: trt_refl_lights
+
+    Light sources (including environment lights) will be reflected.  Light
+    source reflections are commonly known as Specular Highlights.
+
+Reflect Objects:
+    #id: trt_refl_objs
+
+    Reflect other objects in the scene, using raytracing.
+
+Reflection Intensity:
+    #id: trt_int
+
+    The proportion of light that is reflected in the secondary reflection,
+    from `0` (no light reflected) to `1` (all light is reflected.
+    The default is `0.2` (20%).
+
+Reflection Quality:
+    #id: trt_qual
+
+    The sampling quality for raytraced secondary reflections. Larger
+    values will cause more raytracing samples to be sent for the
+    reflection, increasing quality but also shading time.
+
+Reflection Color:
+    #id: trt_clr
+
+    The tint of the secondary reflection (the reflectivity for
+    the red, blue, and green color components). For example, setting the
+    reflection color to `1, 0, 0` will reflect only red light.
+
+Reflection Size:
+    #id: trt_size
+
+    Controls the angular spread of the secondary reflection.  See
+    [Reflection and Transmission Sizes|/nodes/vop/hairmodel#sizes] above for details.
+
+Reflection Shift:
+    #id: trt_shift
+
+    Controls the angular shift of the secondary reflection.  See
+    [Reflection and Transmission Shifts|/nodes/vop/hairmodel#shifts] above for details.
+
+Glint Intensity:
+    #id: g_int
+
+    The relative size of the glints compared to the reflection.  Higher
+    values result in brighter glints.
+
+Glint Size:
+    #id: g_size
+
+    Controls the angular spread of the glint components.  See
+    [Reflection and Transmission Sizes|/nodes/vop/hairmodel#sizes] above for details.
+
+Glint Shift:
+    #id: g_shift
+
+    Controls the angular separation of the two glints.  Values near `0`
+    result in two overlapping glints, and larger values result in two
+    distinct glints.
+
+== Transmission ==
+
+This tab contains parameters for transmission (light passing through
+the hair). When turned on, the surface will transmit light proportional
+to the __Transmission Intensity__.
+
+Enable Transmission:
+    #id: tt_enable
+
+    Turns on simulation of light passing through the hair.
+
+Transmit Lights:
+    #id: tt_trans_lights
+
+    Light sources (including environment lights) will be transmitted.
+
+Transmit Objects:
+    #id: tt_trans_objs
+
+    Transmit other objects in the scene, using raytracing.
+
+Transmission Intensity:
+    #id: tt_int
+
+    The proportion of light transmitted through the surface, from `0`
+   (no light transmitted) to `1` (all incoming light is transmitted).
+
+Transmission Quality:
+    #id: tt_qual
+
+    Sampling quality for raytraced transmission. Larger values send
+    more raytracing samples.
+
+Transmission Color:
+    #id: tt_clr
+
+    A tint for the transmitted light, the transmission amount
+    for different color components. For example, setting the
+    transmission color to `1, 0, 0` will cause the surface to transmit
+    only red light.
+
+Transmission Size:
+    #id: tt_size
+
+    Controls the angular spread of the transmission component.  See
+    [Reflection and Transmission Sizes|/nodes/vop/hairmodel#sizes] above for details.
+
+Transmission Shift:
+    #id: tt_shift
+
+    Controls the angular shift of the transmission component.  See
+    [Reflection and Transmission Shifts|/nodes/vop/hairmodel#shifts] above for details.
+
+== Opacity ==
+
+The parameters on this tab control the rendered opacity of the
+surface.
+
+Opacity Scale:
+    #id: opac_int
+
+    Scales the value of the __Opacity Color__ parameter. This is useful
+    as a single number to manipulate rather than having to change all three components of the __Opacity Color__ parameter together.
+    
+Opacity Color:
+    #id: opac_clr
+    
+    The opacity for each color component.
+
+Enable Fake Caustics:
+    #id: fake_enable
+
+    Transmissive objects produce semi-transparent shadows that attempt
+    to approximate the amount of light that would be transmitted if
+    real caustics were rendered.  If you are rendering real caustics
+    using an [Indirect Light|Node:obj/indirectlight], turn this
+    parameter off.
+
+Min Shadow Intensity:
+    #id: fake_min
+
+    The minimum shadow intensity to use for fake caustics. Increase
+    this to darken the lightest part of the shadow.
+
+Max Shadow Intensity:
+    #id: fake_max
+
+    The maximum shadow intensity to use for fake caustics. Decrease
+    this to lighten the darkest part of the shadow.
+
+@inputs
+
+None of these inputs need to be connected for correct operation of the
+Hair Model node. When left disconnected, the correspondingly named
+global variable or attribute will be bound automatically.
+
+P:
+    Surface position, used as the origin for raytracing operations
+    from the surface.
+
+N:
+    Surface normal.
+
+I:
+    Incident ray direction.
+
+tip:
+    Direction of the hair's tip. If not specified, `dPdt` is used.
+
+@outputs
+
+The output values can be connected to the output variables in the
+surface context of the same name.
+
+layer:
+    The shading layer, containing all of the shading components below.
+
+F:
+    The surface BSDF.
+
+Of:
+    The surface opacity.
+
+@related
+
+- [Physically Based Hair (Primary Reflection)|Node:vop/pbrhair_r]
+- [Physically Based Hair (Secondary Reflection)|Node:vop/pbrhair_trt]
+- [Physically Based Hair (Transmission)|Node:vop/pbrhair_tt]
+- [Surface Model|Node:vop/surfacemodel]

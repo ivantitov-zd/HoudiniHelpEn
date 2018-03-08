@@ -1,0 +1,225 @@
+#type: node
+#context: sop
+#internal: tetrahedralize
+#icon: SOP/tetrahedralize
+#tags: polygons, topology, cleanup, cloth
+
+= Tetrahedralize =
+
+"""Performs variations of a Delaunay Tetrahedralization."""
+
+Tetrahedralize generates tetrahedral meshes given a set of 3D points and polyhedral meshes. It also refines existing tetrahedral meshes and can detect intersecting polygons that thwart tetrahedralization.
+
+A tetrahedral mesh consists of tetrahedron primitives. A tetrahedron is a four-sided shape where each side is triangular. The plural of tetrahedron is tetrahedra or tetrahedrons, and it's abbreviated as "tet".
+
+This operator is a low level tool that creates tetrahedralizations from closed and self-intersection free inputs. It is used inside [Solid Conform|Node:sop/solidconform] and [Solid Embed|Node:sop/solidembed] to create solid repesetnations of surface meshes.  
+
+Tetrahedral meshes are required for various dynamic solvers such as the [finite element solver|Node:dop/finiteelementsolver] for soft body dynamics.  A generated tetrahedral mesh can also be used to generate realistic fractures.
+
+The Tetrahedralize SOP allows you to create a constrained delaunay tetrahedralization (i.e. in [Conform to Surface|#conform] [Mode|#mode]) for an input polygon mesh. This roughly means that the interior of the input surface mesh is filled with nicely shaped tetrahedrons that fit exactly to the existing polygons and don't cut through the polygons.
+
+In addition, this operator is useful for building a graph connecting nearby points together in space.  It is also useful for building convex hulls.
+
+TIP:
+    Use [Solid Conform|Node:sop/solidconform] instead of this node to create conforming tetrahedralizations from surface meshes.  This node is low level and cannot handle holes and self-intersections in the input surface, however it is sufficient for creating tetrahedralizations from points.
+
+NOTE:
+    In [Conform to Surface|#conform] [Mode|#mode] (i.e. with polygons in the input), you must insure that the input surface is closed and not self-intersecting. Poorly formed surfaces may not be tetrahedralized.
+
+TIP:
+    Although there is no direct option to control the number of generated tetrahedra, you can control their sizes.  Use the [Sizing|#sizing] options to control the sizes of individual tetrahedra.  Naturally, smaller size parameters will produce more tetrahedra.
+
+The secondary input provides a way to add internal point constraints to the resulting tetrahedron mesh.
+
+@parameters
+
+Group:
+    The point group to use for tetrahedralization.  Only primitives whose points are in the given point group are used as constraints or tetrahedra for refinement.
+    
+Batch:
+    #id: batch
+
+    Determines which pieces of the input to treat individually.  This allows Tetrahedralize to process pieces separately, which is useful when fracturing.
+    
+    Entire:
+        Tetrahedralize the input as a whole.
+
+    Connected Components:
+        #id: connected
+
+        Automatically determine pieces of the input, and tetrahedralize each piece individually.
+
+    Attribute:
+        #id: attrib
+
+        Use [Piece Attribute|#pieceattrib] and tetrahedralize each group of polygons with the same attribute value as one.
+
+Piece Attribute:
+    #id: pieceattrib
+
+    Name of an attribute used to determine independent pieces of geometry (if [Batch|#batch] is set to [Attribute|#attrib]), or to output automatically determined pieces (if [Batch|#batch] is set to [Connected Components|#connected]).
+
+Remove Unused Points:
+    Remove duplicate points and other points not used in the tetrahedralization. Only points in the source group are considered.
+
+Mode:
+    #id: mode
+
+    Select what you would like tetrahedralize to do.
+
+    Conform to Surface:
+        #id: conform
+
+        Generate a tetrahedral mesh from a closed and self-intersection free polyhedral mesh. This is the standard way to use this node.
+
+    Refine Tets:
+        Given a tetrahedral mesh in the input, this option will refine the existing mesh. Together with the [Quality|#quality] controls, you can improve the quality of an existing mesh.
+
+    Convex Hull:
+        This forms a convex hull of the object, the smallest convex shape that contains all the points. In this mode, only input points are considered, polygons in the input are ignored.
+
+        TIP:
+            Generating a convex hull this way will never scale as well as a dedicated convex hull algorithm. So if you have lots of points, such as more than 250,000 it will start to slow down. 
+
+            Also, it can only return a convex hull for sets of points with valid tetrahedralization. So no primitives will be returned for things such as points on a 2D plane. However, you can special case these cases and for example use [Triangulate2D|Node:sop/triangulate2d] followed by [Divide|Node:sop/divide] and turn on [Remove Shared Edges|Node:sop/divide#removesh].
+        
+    Detect Intersections:
+        #id: detect
+
+        This mode skips tetrahedralization, and simply attempts to detect any intersections in the input geometry, which will otherwise cause problems when tetrahedralizing.
+
+Intersection Color:
+    The color to give polygons, which intersect other polygons. This option is available in the [Detect Intersections|#detect] [Mode|#mode] only.
+    
+Intersection Group:
+    The group created on the output, which contains all intersecting polygons. This option is available in the [Detect Intersections|#detect] [Mode|#mode] only.
+
+Output:
+    Connected Polylines:
+        Each point is connected to its neighbor in the Delaunay Tetrahedralization.  This point connectivity graph is very useful for determining which points are adjacent.  The set of connected points are those which have some third point that they are both closer to than any other point.
+        
+    Tetrahedra:
+        Constructs a mesh consisting of individual tetrahedra. 
+
+    Polygons:
+        Constructs a triangle for each tetrahedron face on the surface.
+
+    Polygons and Tetrahedra:
+        Outputs triangles and tetrahedra as in the above two outputs, but together.
+
+Keep Primitives:
+    Whether to keep the original primitives.
+
+Avoid Boundary Modifications:
+    Prevents any changes to the input surface. Only new internal points (Steiner points) are allowed.
+    
+== Attribute Transfer Control ==
+
+One Surface Face per Tetrahedron:
+    Insure that no two surface triangles belong to the same tetrahedron.
+
+Propagate Primitive Attributes Away from Normals:
+    Copy attribute values from the surface polygons to tetrahedra on the side opposite to the polygon normal.  This, along with the [Propagate Primitive Attributes to Internal Tetrahedra|#internattrib] toggle, allows you to get attributes onto output tetrahedra within a particular closed region, by placing attributes onto input polygons.
+
+Propagate Primitive Attributes to Internal Tetrahedra:
+    #id: internattrib
+
+    Interpolate attribute values from the surface polygons to output tetrahedra inside the mesh (not just to surface tetrahedra, which happens irrespective of this toggle).
+
+== Tet Quality ==
+#id: quality
+
+Enable:
+    Turns on the controls for this section and allows you to control the quality of the resulting tetrahedron mesh.
+
+Max Radius-Edge Ratio:
+    #id: radedgetol
+
+    This option specifies a constraint on each generated tetrahedron.  In particular, the radius of the circumscribed sphere of each tetrahedron, divided by the length of the shortest-edge of the same tetrahedron must be smaller than the value given in this parameter.  This is a heuristic that helps generate tetrahedrons that are as close as possible to being equilateral.
+
+Min Dihedral Angle:
+    This parameter specifies a constraint on the minimum angle allowed between each two faces of each tetrahedron in the output mesh.  Together  with the [Max Radius-Edge Ratio|#radedgetol], this constraint forces out a good quality generated tetrahedral mesh.
+
+=== Size ===
+#id: sizing
+
+Target Size Attribute:
+    The name of a point attribute given to points in the input geometry, which specifies the desired lengths of edges in the output mesh. Each edge in the output mesh aims to conform to this size attribute given by the nearest input points.
+
+Max Size:
+    #id: maxsize
+
+    The uniform maximum size constraint. This constrains the maximum volume of all output tetrahedra by `V = a*a*a/(6*sqrt(2))` where `V` is volume and `a` is the given size.
+
+Max Size Attribute:
+    The primitive attribute used to constrain the size of each tetrahedra on the output.  This constrains the maximum volume of each output tetrahedron by `V = a*a*a/(6*sqrt(2))` where `V` is volume and `a` is the given size.
+
+=== Stopping Conditions ===
+
+These options help prevent long tetrahedralizations. Use these to premptively stop mesh improvement when quality constraints are too restrictive.
+
+Max Repair Iterations:
+    Maximum number of iterations used internally by the Delaunay Tetrahedralization algorithm.  This forces this operator to finish tetrahedralizing a mesh, even if the resulting mesh may not fully satisfy all the given quality constraints.
+
+Max Added Points:
+    Maximum number of internal points allowed to be inserted into the tetrahedron mesh on the output.  This may prevent the resulting mesh to satisfy all the given quality constraints.
+
+== Post-Optimization ==
+
+    Mesh optimization further improves the mesh quality after a mesh as been generated.
+
+Post-Optimization Iterations:
+    Number of iterations the algorithm takes to improve the quality of the mesh.  A larger number may slow down tetrahedralization.
+    
+Edge/Face Flips:
+    Allow edge and face flips between neighboring tetrahedra.
+    
+Vertex Smoothing:
+    Allow vertex smoothing.
+    
+Vertex Insertion/Deletion:
+    Allow inserting and/or deleting vertices after a mesh has been generated to improve quality.
+
+== Troubleshooting ==
+
+Handle Failure:
+    This control provides various workflow options, by changing how this node behaves when a piece or components (as determined by the [Batch|#batch] option) fails to tetrahedralize.
+
+    Remove Failed Components: 
+            Ignore any pieces that failed to tetrahedralize. Give a warning if something went wrong but no other indication of failure.
+
+    Keep Failed Components:
+            Keep failed components for debugging purposes, such that the user may chose to mark these with a color and/or add them to a group.
+
+    Fail on Error:
+            Let the node \"error out\" as soon as a single piece fails to tetrahedralize. This is the least forgiving option.
+
+Random Seed:
+    #id: randomseed
+    An internal random number generator uses this seed to generate random numbers.  Changing this value may produce a slightly different result in complex tetrahedralizations.
+
+Precision Tolerance:
+    An internal tolerance used to determine if two neighboring triangles are coplanar for edge flips, and other proximity tests in the algorithm. It may be useful to change this tolerance in case the input contains prohibitively small features.
+
+Dihedral Angle Tolerance:
+    Tetrahedralization will fail when the input mesh contains a dihedral angle smaller than this tolerance.  Increasing this value helps prevent poorly formed inputs from producing tetrahedralizations that are bad for simulation.  Decreasing this value makes this node more permissive.
+
+Maximum Attempts:
+    Sometimes the tetrahedralization algorithm encounters an unrecoverrable problem.  This parameter controls how many times this node retries to tetrahedralize by perturbing the input points or adjusting the [Random Seed|#randomseed].  This node warns when tetrhedralization fails at the first attempt.
+
+Invalid Prim Color:
+    The color to give components that couldn't be tetrahedralized.
+    
+Invalid Prim Group:
+    The group created on the output that contains all primitives which were part of components that couldn't be tetrahedralized.
+
+@related
+
+- [Node:sop/solidembed]
+- [Node:sop/solidconform]
+- [Node:sop/solidify]
+- [Node:sop/remesh]
+- [Node:sop/divide]
+- [Node:sop/polyreduce]
+- [Node:sop/triangulate2d]
+- [Node:sop/pointcloudiso]

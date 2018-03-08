@@ -1,0 +1,112 @@
+#type: node
+#context: dop
+#internal: finiteelementsolver
+#version: 1.0
+#icon: DOP/finiteelementsolver
+
+= Finite Element Solver =
+
+"""Sets and configures a Finite Element solver."""
+
+The Finite Element Solver DOP sets objects to use the Finite Element solver.
+
+If an object has this DOP as its `Solver` subdata, it will evolve
+itself as a cloth object.
+
+This solver recognizes the following special subdata, if present:
+
+* [Shell Mass Properties|Node:dop/shellmassproperties] data with the name `ShellMassProperties
+* [Solid Mass Properties|Node:dop/solidmassproperties] data with the name `SolidMassProperties
+* [Soft Body Material Behavior|Node:dop/softbodymaterialbehavior] data with the names `ShellStretchBehavior`, `ShellShearBehavior`, `ShellWeakBendBehavior`, `ShellStrongBendBehavior`, `SolidStretchBehavior`, `SolidShearBehavior`, and `SolidVolumeBehavior`.
+* [Solid Aniso Properties|Node:dop/solidanisoproperties] with the name `SolidAnisoProperties`]
+* [Seam Properties|Node:dop/seamproperties] with the name `SeamProperties`
+* [Soft Body Rest Properties|Node:dop/softbodyrestproperties] with the name `RestProperties`.
+* [Soft Body Target Properties|Node:dop/softbodytargetproperties] with the name `TargetProperties`.
+* [Soft Body Collision Properties|Node:dop/softbodycollisionproperties] data with the name `CollisionProperties`.
+* [Soft Body Drag Properties|Node:dop/softbodydragproperties] data with the name `DragProperties`.
+
+It also recognizes most standard subdata:
+
+* Geometry data with the name `Geometry`
+
+* Constraint data
+
+* Force data
+
+Before each solve, the finite element solver reads the simulation state of each object from the attributes on the simulation geometry `Geometry` to get the previous state.
+After the solve, the new state is written to attributes the `Geometry`.
+In addition, the solver may maintain an `EmbeddedGeometry`. This would typically be a more higher-resolution geometry that moves and fractures along with `Geometry`. The embedded geometry can consists of polygons or tetrahedrons (or a mix of these two).
+
+The finite element solver approximates the physics of continuous materials by splitting them up into a finite number of elements. In the case of the Solid object, the elements are determined by the tetrahedrons. In the case of the [Cloth Object|Node:dop/clothobject], the elements are determined by triangles and quadrangles. The resolution of the tetrahedrons and the orientations of the individual tetrahedrons have little influence over the overall movement; as long as the overall solid shape is the same the behavior is roughly the same (except for very coarse meshes). The finite element method (FEM) treats the elements an approximation of a continuous material. This property makes the results very predictable when you simulate the same shape using a lower-res and a higher-res mesh.
+
+@parameters
+
+== Substepping ==
+
+Substeps:
+    This is the number of substeps per frame. The higher this value, the better the quality and the accuracy of your simulation will be. However, the solve time per frame may increase. When you're having trouble with a simulation's quality or stability, the first thing to try is increasing the __Substeps__. One particular case where this may be needed is when you have fast moving objects that collide. When the relative velocity is large compared with the feature size, you may need to manually increase the __Substeps__ to get better looking results.
+
+== Capabilities ==
+
+Enable Collisions:
+    When this is disabled, no collisions will happen in the simulation, regardless of any other collision settings on the solver or on any of the objects that are solved. This is a convenient toiggle that allows you to quickly see how an object behaves without collisions.
+
+Enable Fracturing:
+    When this is disabled, no fracturing or tearing will occur on any of the [Solid Objects|Node:dop/solidobject] or [Cloth Objects|Node:dop/clothobject] attached to this solver.
+
+== Accuracy ==
+
+Absolute Tolerance Implicit Solve:
+    The absolute tolerance that is used to decide when the finite element solver has found a good enough approximate solution for the implicit integration step. This roughly indicates the amount of error allowed in the acceleration that is computed in each integration step. It is not recommended to increase this tolerance too much from its default.
+
+Relative Tolerance Implicit Solve:
+    The relative tolerance that is used to decide when the finite element solver has found a good enough approximate solution for implicit integration step. In contrast with the absolute tolerance, this parameter has no units. It is not recommended to increase this tolerance from its default, because this may produce results that are unstable or poor quality. In some types of simulations, it may be necessary to reduce the __Relative Tolerance Implicit Solve__ to a lower value, say 0.0001 or even smaller. For example, the tolerance may need to be lowered in fracturing simulations with very stiff objects.
+
+Max Collision Passes:
+    This is the maximum number of times, within a single substep, that the solver is allowed to detect and resolve new collisions. The collision resolution step in each pass may introduce new, secondary collisions that must be resolved in later passes.
+
+== Attributes ==
+
+Create Quality Attributes:
+    This creates float-valued primitive attribute `quality` on the simulation geometry. This attribute allows you to find primitives that have a bad effect on the simulation. The closer the value is to 1, the better. Bad tetrahedrons have a value close to 0 and should be removed or improved.
+   
+Create Energy Attributes:
+    This creates float-valued vertex attributes on the simulation geometry. These attributes `potentialdensity`, `dissipationdensity`, and `kineticdensity` show the potential energy density, the density of energy dissipation, and the kinetic energy, respectively.
+    
+Create Fracture Attributes:
+    This allows the `fracturecount` point attribute to be created. Any point that was fractured at any time in the simulation will have a `fracturecount` of 1 or higher ever after.
+
+== Advanced ==
+
+Float Precision:
+    This determines the floating point precision that is used internally by the finite element solver. __Float 32 bit__ uses less memory and is generally faster than __Float 64 bit__. However, the extra accuracy of 64-bit floating point numbers may be needed when you are simulating object with very high overall stiffness or when your geometry is positioned very far away from the origin. 
+
+Integrator Type:
+    This determines the type of integration that is used. The default is `Implicit`, which is the most stable option for simulations that have fracturing stiff objects. The `Implicit Order 2` allows more lively looking simulations of higher quality for about the same solve time. This is best used when doing finite element simulation of flesh on characters.
+
+Max Fully Implicit Passes:
+    For highly nonlinear finite element simulations, increasing this parameter may result in better quality without having to increase the sub-steps. This may be needed for simulations in which the deformations of the tetrahedrons are relatively large.
+
+== Attributes ==
+
+[Include:standard_finiteelement_attribs]
+        
+[Include:/dyno/solids#solverwarnings]
+[Include:/dyno/solids#solvererrors]
+[Include:/dyno/solids#troubleshooting]
+[Include:/dyno/solids#guidelines]
+
+
+@inputs
+    [Include:standard_data_inputs]
+
+@outputs
+    [Include:standard_data_outputs]
+
+@locals
+    [Include:standard_locals]
+
+
+@related
+    - [Node:dop/clothobject]
+

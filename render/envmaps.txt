@@ -1,0 +1,105 @@
+= Environment lighting =
+
+== Overview ==
+
+Environment lighting adds light to the scene as if it came from a sphere surrounding the scene. The light is usually colored using an image called an _environment map_. An environment map can match the lighting (and reflections) in a scene to a real-world location, or may simply be used to add interesting variation to the scene's lighting.
+
+In a PBR rendering setup, realistic environmental lighting is cheap to render.
+
+A typical PBR lighting setup will use an environment light to create a base light level and area lights to represent motivated light sources.
+
+== How to ==
+
+:task:Light using an environment map:
+    # Use the [Icon:OBJ/light_environment] [Environment light|Node:obj/envlight] tool on the __Lights and cameras__ tab to create an environment light.
+    
+    # Set the environment light's __Environment map__ parameter to your image.
+    
+    Houdini includes a few [example environment maps|#maps] you can use to try out the environment light.
+
+:task:Add outdoors environment lighting:
+    The [Icon:OBJ/light_sky] Sky Light tool on the __Lights and cameras__ shelf tab lets you add outdoors (sun and blue sky) lighting with parameters such as time of day.
+
+:task:Surround the scene with an environment:
+    # Create a large sphere or box around the entire scene.
+    
+    # In the [Material Palette pane|/ref/panes/materialpalette], create an "Environment Box" material and assign it to the surrounding object.
+    
+    # In the material's parameter editor, click the __Surface > Env Map__ sub-tab and set its __Environment map__ parameter.
+
+== Indirect lighting ==
+
+Photon maps are _colored point clouds_. The [Indirect light|Node:obj/indirectlight] can generate a photon map by shooting rays from the light and recording the shaded color of the surface at each hit point. This essentially caches the lighting, making subsequent uses of the light much faster.
+
+Photon maps are not very good at capturing "contact shadows" -- where an object is close to the ground or in corners. To directly control how often the photon map is used, you can adjust the __Indirect light options > Photon distance threshold__ parameter on the Indirect Light node.  Larger values will use the photon map only for more distant intersections - and will prefer to use path tracing in sharp corners or for nearby objects.
+
+:task:Add indirect lighting:
+    To get efficient indirect light (global illumination), add an [Icon:OBJ/light_gi] [Indirect Light|/shelf/gilight] to the scene.
+  
+    You must also increase the [Diffuse Limit|Mantra:vm_diffuselimit] in the render node (On the __Properties > Shading__ tab) to make the renderer follow multiple light bounces.
+
+Indirect light is prone to sparkling when animated. You may need to [decrease noise|quality#noise] to make it less noticeable.
+
+== Environment maps == (maps)
+
+Environment maps are special images that represent the view from a certain point in all directions. You can use Environment maps in several places in Houdini.
+
+* [Area lights and Environment lights|/shelf/lightsandcameras] have a parameter that lets you use an environment map to control the light color emitted. Using an environment map to do this kind of image-based illumination creates the illusion that light from the surrounding environment is bouncing onto the objects in the scene.
+
+* Some materials, especially highly reflective ones such as chrome, often let you specify a _reflection map_. This map is used to control the reflections that appear on the surface of an object with the material. This is much faster, though less realistic, than actually raytracing accurate reflections.
+
+* Many VEX functions and VOPs can take an optional environment map argument to give the color for a ray that doesn't hit any geometry.
+
+Houdini includes three sample HDRIs (high dynamic range images) (in `$HFS/houdini/pic`) courtesy of [Dosch Design|http://www.doschdesign.com/products/hdri/]. These are low-res samples of HDRIs you can purchase from the Dosch website.
+
+[Image:/images/light/DOSCH_CARB_04SN.jpg]
+
+[Image:/images/light/DOSCH_DH207SX.jpg]
+
+[Image:/images/light/DOSCH_SKIESV2_01SN.jpg]
+
+== Generating cubic environment maps ==
+
+You can generate a cubic environment map from six images using the [isixpack|/ref/utils/isixpack] utility. Mantra also lets you automatically generate cubic environment maps for an object during rendering.
+
+NOTE:
+    Mantra also supports a cubic environment map stored as standard image files (`.tif` or `.exr`) but this format is limited to 1024x512 pixels and has poor anti-aliasing compared to `.rat`. You should use `.rat` textures instead.
+
+The basic idea behind a cubic environment map is to render six images from the perspective of the object you want to apply the map to (i.e. up, down, forward, back, left, right), and then combine them using `isixpack`. You can apply [properties|/props] to an object that tell mantra to automatically generate a cubic environment map for the object when it renders.
+
+# Select the object.
+
+# In the [parameter editor|/ref/panes/parms], open the [Icon:BUTTONS/gear] Gear menu and choose __Edit Rendering Parameters__.
+
+# In the __Render Properties__ tab, open the __Mantra X.X__ folder.
+
+# Add the following properties to the object's parameters by dragging them to the list of parameters in the middle pane, or select them and click the [Icon:BUTTONS/move_to_right] right pointing arrow.
+
+    * In the __Output__ folder: __Auto-generate environment map__ (`render_envmap`) and __Output picture__ (`vm_picture`).
+    
+    * In the __View__ folder: __Resolution__ (`res`).
+
+# Click __Accept__.
+
+# In the object's parameter editor, click the __Output__ tab and set the __Output picture__ (the default `ip` is a special value that opens the rendered environment map in [mplay|/mplay]).
+
+# Click the __View__ tab and set the __Resolution__ for the generated images. The horizontal and vertical resolution must match (that is, the images must be square).
+
+    The __Auto-generate environment maps__ parameter on the __Render__ tab is on by default.
+
+* The object itself is automatically made invisible in the generated images.
+
+* Aperture and focal length properties will be ignored since mantra specifies these so the 6 images stitch together properly. When generating an environment map, focal length will be 1.0 and aperture will be 2.0 (giving a field of view of 45 degrees).
+
+* The resolution override properties do not apply to environment map generation. Only the resolution parameter is used.
+
+You can add extra camera-related properties for more control over the rendering of the environment map, such as the following:
+
+* Pixel filter
+* Pixel samples
+* Quantization
+* Near/far clipping
+* Background images
+
+
+

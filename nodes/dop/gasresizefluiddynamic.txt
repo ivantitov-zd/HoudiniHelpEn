@@ -1,0 +1,87 @@
+#type: node
+#context: dop
+#internal: gasresizefluiddyanmic
+#icon: DOP/gas
+
+= Gas Resize Fluid Dynamic =
+
+"""A microsolver that resizes a fluid to match simulating fluid bounds"""
+
+The Gas Resize Fluid Dynamic DOP is a microsolver used in building larger fluid
+simulations. The [Fluid Solver|Node:dop/fluidsolver] and [Smoke Solver|Node:dop/smokesolver] DOPs allow microsolvers to be added before or after the main solver step to extend or tweak the simulation. Alternatively, advanced users may attempt to build an entire new solver out of microsolvers.
+
+The Gas Resize Fluid Dynamic DOP will resize the fields required for different
+types of fluid simulations according to a reference field. A [SOP Solver|Node:dop/sopsolver]  is
+used to recalculate the new bounds every timestep. This
+resizing is done with the [Gas Resize Field DOP|Node:dop/gasresizefield] so it does not affect the actual voxel sampling, just the total number of voxels.
+
+@parameters
+    Fluid Type:
+	    The type of fluid controls what sort of fields need to be resized.
+
+	    DSD Fire:
+		The following fields are resized in __DSD Fire__ mode: `heat`, `burn`, `collision`, `collisionvel`, `confinement`, `d`, `ddot`, `density`, `divergence`, `dt`, `flamefront`, `fuel`, `fuelvolume`, `kappa`, `kappastar`, `pressure`, `pump`, `pumpindex`, `rest`, `sink`, `source`, `sourceindex`, `temperature`, and `vel`.
+
+	    Smoke and Pyro:
+		The following fields are resized in __Smoke and Pyro__ mode: `collision`, `collisionvel`, `density`, `divergence`, `pressure`, `pump`, `pumpindex`, `rest`, `rest2`, `sink`, `source`, `sourceindex`, `temperature`, `vel`, `burn`, `fuel`, and `heat`.
+
+	    Fluid:
+		The following fields are resized in __Fluid__ mode: `collision`, `collisionvel`, `surface`, `pressure`, `pump`, `pumpindex`, `rest`, `sink`, `source`, `sourceindex`, `temperature`, and `vel`.
+		
+    Extra Fields:
+	    Any additional fields, such as those you have added with a [Scalar Field DOP|Node:dop/scalarfield], can be listed here to ensure they are also resized.
+    Delay Frames:
+        Specifies the number of frames to wait before starting the resize operation.
+        In order to resize correctly, there must be data of the field specified as a reference.
+    
+    Bounds:
+        Padding:
+            The computed container bounding box is enlarged by these padding values. 
+            
+        Subtract Threshold:
+            Controls how smooth the bounds should grow or shrink, preventing jitter. A field that expands will always be encapsulated. Shrinking fields will blend toward their new bounds based on the threshold specified. Higher values will result in smoother transitions but larger grid sizes to compute.
+            
+        Reference Field:
+            Fluid field whose bounds will be computed and used as resize reference.  This can be a space delimitted list of fields to use more than one reference field.
+        Resolution Scale:
+            Controls the sample resolution of the field specified as the __Reference Field__. A value of 1 samples the field at full resolution.
+
+	Field Cutoff:
+	    Controls what values trigger resizing.  Values in the field less
+	    than this cut off will not contribute to the final field size.
+	    This avoids very faint smoke from continuing to expand the field.
+            
+        Track By Object:
+            Includes an external object when computing the new bounds. 
+            Sometimes an emitter might move too fast or emit sporadically. 
+            Specifying this object to be the __Tracking Object__ prevents the resize operation from excluding fluid calculations outside the original (or initialized) fluid bounds.
+    Max Bounds:
+       Clamp To Maximum Size:
+           Prevents the box from growing indefinitely. 
+           By specifying a bound mode, the fluid will be contained with in a certain volume or space but can grow or shrink within those conditions.
+       From Object:
+           Maximum bounds derived from geometry.
+       Initialization Static:
+           Maximum bounds derived from fluid object. When the object is created the size and center are analyzed and stored as `init_size` and `init_center`.
+           Every iteration the bounds are compared to the maximum size specified at creation time and adjusted accordingly.
+       Initialization Dynamic:
+           Maximum bounds derived from the fluid object, but measured against the specified object's current position. The bounds will grow or shrink to a maximum size relative to the objects position in space.
+           When an object is animated, the bound conditions should travel with the object. This option enables that behavior. If no object is found the bounds are centered or reverted to static.
+       Manual:
+           Manually define the maximum bound conditions.
+       Enforce Boundaries:
+           Resizes the specified axis to the maximum allowed bound condition. This is useful when a fluid needs to collide with a wall or roof.
+       
+@inputs
+[Include:standard_data_inputs]
+
+@outputs
+    [Include:standard_data_outputs]
+
+@locals
+    [Include:standard_data_locals]
+    [Include:standard_locals]
+
+@related
+    - [Node:dop/gasresizefield]
+    - [Node:dop/gasresizefluid]

@@ -1,0 +1,223 @@
+= Groups =
+
+#bestbet: group
+
+== Overview ==
+
+Groups are named collections of points or faces.
+
+The [Group surface node|Node:sop/group] lets you sort points or
+faces in its input geometry into groups based on an various criteria.
+Other operators may also create groups as a side effect.
+
+Most nodes that operate on points or primitives give you the option to apply the
+node's effects only to one or more groups in the input stream, instead of every
+point/primitive. So, you can identify groups of points based on certain
+properties, and then only apply some nodes to those groups, and not other
+points.
+
+When a point is deleted, Houdini automatically removes the point from
+all the point groups it belongs to.
+
+== Ordered and unordered groups ==
+
+A point group can be _ordered_ or _unordered_. Unordered groups
+store their points in creation order; ordered groups store points in
+selection order.
+
+When you select points in the viewer pane, a single click performs
+an ordered selection, while a marquee box generates an unordered
+group. (The only time bulk selections generate or maintain an
+ordered selection is when only one point is caught in the marquee
+box.)
+
+:task:Create a point or primitive group:
+    # Set the  [selection type|/basics/select]  to points (choose
+      __Select > Selection Type > Points__ or press ((2))) or
+      primitives (choose __Select > Selection Type > Primitives__ or
+      press ((4))).
+
+    # In the viewer, use the  [tab menu|/basics/tabmenu]  to choose
+      [Group Geometry|Node:sop/group].
+
+    # Select the points/primitives you want in the new group, then
+      click ((RMB)) to finish the selection.
+
+    # In the parameter editor, set the name of the new group in the
+      __Group name__ field on the __Create__ tab.
+
+:task:Use existing groups when selecting points/primitives for a new group:
+    # Choose the Group operator.
+
+    # In the  [operation controls toolbar|/basics/tools] , choose the
+      name of an existing group from the pop-up menu.
+
+    # Use the buttons in the toolbar to change the current selection
+      based on the group selected in the pop-up menu:
+
+
+== Combine and filter groups ==
+
+The controls on the [Group node|Node:pop/group]'s __Combine__ tab
+let you create a group that is a combination of existing groups.
+
+steps>>
+    # [Create|/model/groups] a [Group node|Node:sop/group] and connect
+      the geometry containing the groups to it.
+
+    # In the parameter editor, click the __Combine__ tab.
+
+    # Enter the name of the new group to create in the left-hand field
+      on the first row.
+
+    # Enter the name of the group from which to take particles in the
+      right-hand field (or click the box beside the equal sign so the
+      exclamation point is visible if you want to start with particles
+      _not_ in the right-hand group).
+
+      Once you set up the top row, additional rows become available to
+      further combine and/or filter the contents of the new group.
+
+    # For the additional rows, on the right-hand side, enter the name of
+      another group of particles you want to combine with or filter from
+      the new group.
+
+    # Use the menu on the left side to choose how to combine/filter the
+      groups.
+
+    # Use the menu to choose how to combine this group with the new
+      group.
+
+      Click the box beside the equal sign so the exclamation point is
+      visible if you want to do the logical opposite of the operation in
+      the menu.
+
+
+== Group syntax == (manual)
+
+#index: document
+
+Many geometry operators (SOPs) work on a specific subset of points or
+primitives. When you use the operator in the viewer, you select the
+points/primitives you want to use. In the parameter editor, this list of
+points/primitives is specified in the __Group__ parameter using the
+following patterns.
+
+You can use multiple patterns separated by spaces. The matches for each
+pattern are combined to form the group.
+
+Pattern ||
+    Meaning ||
+`*` |
+    In the Group SOP: all points/primitives. In other SOPs:
+    every named group.
+
+`<<n>>` |
+    Component number <<n>>.
+
+`<<group_name>>` |
+    In SOPs other than the Group SOP, you can specify a named
+    group of points/primitives (created with the Group SOP).
+
+    You can use pattern matching (`*`, `?`, and `[ ]`) in the
+    group name. For example, `arm*` includes all point/primitive
+    groups whose names start with `arm`. `^` can be used in the
+    pattern by enclosing the pattern in `{` `}`.  For example,
+    `{arm* ^arm3*}` includes all groups whose names start with
+    `arm`, but not `arm3`.
+
+`<<n>>-<<m>>` |
+    Components numbered from <<n>> to <<m>> (inclusive).
+
+`<<n>>-<<m>>:<<step>>` |
+    Components numbered from <<n>> to <<m>> (inclusive)
+    skipping every <<step>>. For example, `1-100:2` means every
+    other number from 1 to 100.
+
+`<<n>>-<<m>>:<<keep>>,<<step>>` |
+    Components numbered from <<n>> to <<m>> (inclusive).
+    Use the first <<keep>> numbers and then skip every <<step>>
+    after that.
+
+`!<<pattern>> ` |
+    Every component except the ones matching the pattern.
+    For example, `!1-10` means every point/primitive except the
+    numbers 1 to 10.
+
+    <<pattern>> may be a numeric pattern, attribute pattern, or
+    group name pattern.
+
+`^<<pattern>>` |
+    Remove components matching the pattern from the
+    results of the preceding pattern. For example, `0-100:2
+    ^10-20` means every other number from 1 to 100 except the
+    numbers 10 to 20.
+
+    <<pattern>> may be a numeric pattern, attribute pattern, or
+    group name pattern.
+
+`@<<attribute>><<op>><<value>>` |
+    Components where <<attribute>> matches
+    <<value>>, based on the <<op>>, which can be one of
+    `=`, `==` (same as `=`), `!=`, `>`, `<`, `>=`, or `<=`.
+
+    For example, `@v>0` will create a group of all points
+    whose `v` attribute is greater than `0`.
+
+    You can specify components using `[<<index>>]` after the
+    attribute name, for example `@Cd[2]` will get the blue channel
+    of the diffuse color (`Cd`) attribute.
+    
+    As a convenience, you can also use `.x`/`.r`/`.u`, `.y`/`.g`/`.v`, and `.z`/`.b`/`.w` instead of `[0]`, `[1]`, and `[2]`. For example `P.x` to get the X-axis component of the
+    position (`P`) attribute.
+    
+    (If you don't specify a component for a multi-component attribute type, the comparison will use the first component.)
+
+    For example, `@P.y>0` will create a group of all points
+    whose Y component is greater than 0.
+
+    For string attributes you must put quotation marks around the
+    <<value>> if it contains spaces, for example
+    `@myattr="foo bar"`.
+
+    You can use wildcards (`*` and `?`) in the <<value>> when
+    using `=`, `==`, and `!=` on string attributes.
+
+    You can combine the attribute syntax and the range syntax:
+
+    {{{
+    @id=5-10
+    }}}
+
+    You can also use the attribute syntax with a space separated
+    list of integer values, but you need to enclose the list in quotes:
+
+    {{{
+    @id="5 8 10 15"
+    }}}
+    
+    You can use this to compare against [intrinsic attributes|attributes#intrinsic] as well:
+    
+    {{{
+    @intrinsic:indexorder<100
+    }}}
+
+`@<<attribute>>=<<val>>,<<val>>,...` |
+    Components with the given attribute containing one of the listed values.
+    For example:
+    
+    {{{
+    @id=1,2,90,120
+    }}}
+    
+    For string attributes, you must enclose values containing spaces in double quotes, for example:
+    
+    {{{
+    @path=/foo/*,/bar,"some string"
+    }}}
+
+
+
+
+
+

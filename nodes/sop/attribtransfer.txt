@@ -1,0 +1,132 @@
+= Attribute Transfer =
+
+#type: node
+#context: sop
+#internal: attribtransfer
+#icon: SOP/attribtransfer
+#tags: attrs, character
+
+"""Transfers vertex, point, primitive, and/or
+detail attributes between two models."""
+
+NOTE:
+    Attribute transfer works by _proximity_. It transfers attributes
+    from one piece of geometry to the closest points on a different
+    piece of geometry, so you can copy the attributes from one model
+    to another even if they have completely different topologies.
+    
+    If you want to copy attributes between models with the same
+    topology, use [Attrib Copy|Node:sop/attribcopy] instead, because
+    it's much faster.
+
+TIP:
+    If you wire the same geometry into both inputs of this node, you
+    can use it to "blur" attributes across surfaces.
+
+The attributes may be explicitly specified in the corresponding
+attribute text field. Exclusion is specified by preceding an attribute
+name with the caret character (^). All available attributes can be
+specified by leaving the field blank or entering an asterisk (*) in the
+field. If the first attribute is preceded by a caret then all attributes
+are assumed to be transferred except where explicitly excluded. In all
+other cases, no attributes are assumed except where explicitly
+included.
+
+Destination attributes are interpolated from the source attributes using
+a weighted proximity technique. Proximities used in point attribute
+calculations are determined as the distance between the destination
+point and the candidate source points. For primitive attribute
+calculations, the barycenter-to-barycenter distance between the
+destination primitive and the candidate source primitives is used. In
+the case of vertex attributes, each destination vertex is first mapped
+to the closest position and primitive in the source geometry. The vertex
+attribute is then determined using a barycentric-like interpolation
+technique. The source detail attribute is simply copied to the
+destination detail attribute.
+
+The __Conditions__ tab contains several parameters that control how the
+source attributes are combined, or filtered, to give the resulting
+destination values. The __Kernel Function__ can be set to any available
+metaball kernel. The kernels are parameterized by distance and typically
+give more weight to source points/primitives/vertices that are closer.
+The __Max Sample Count__ parameter specifies the maximum number of
+points/primitives/vertices to interpolate from. A maximum sample count
+of 1 gives nearest neighbor interpolation. The __Kernel Radius__
+specifies the drop-off radius for the kernel function. As the kernel
+radius parameter approaches zero, the filter resembles nearest neighbor
+interpolation. As the kernel radius parameter increases, the filter
+approaches uniform weighting. The __Distance Threshold__ parameter
+specifies the maximum distance source points/primitives must be to be
+considered. Switching off this option indicates that no
+points/primitives will be excluded based on distance. Within the
+distance threshold, the final attributes are determined solely from the
+source selection. In cases where all source points/primitives/vertices
+lie beyond the distance threshold, the destination attributes remain
+unchanged. The __Blend Width__ parameter relaxes the distance threshold
+and optionally sets a region outside the distance threshold where the
+influence of the source attributes gradually tapers off. In this region,
+the interpolated source attribute value is blended with the original
+destination attribute value using the selected kernel function to
+produce the interpolation factors. In this blending process, the blend
+width is used as the kernel radius. The __Uniform Bias__ parameter
+specifies the linear interpolation factor that is used when blending
+with the Uniform kernel function. The Uniform Bias value is used as the
+source blending factor, whereas the destination blending factor is set
+to one minus this value.
+
+
+@parameters
+
+Source Group:
+    A subset of the source geometry where attribute values are
+    transferred from.
+Source Group Type:
+    The type of elements referenced in the Source Group field.
+Destination Group:
+    A subset of the destination geometry where attribute values are
+    transferred to.
+Destination Group Type:
+    The type of elements referenced in the Destination Group field.
+Detail:
+    Source detail attributes to transfer.
+Primitives:
+    Source primitive attributes to transfer.
+Points:
+    Source point attributes to transfer.
+Vertices:
+    Source vertex attributes to transfer.
+Copy Local Variables:
+    All local variables referring to the copied attributes are also copied.
+Match P Attribute:
+    If enabled, patterns used in the __Points__ parameter can match the `P`
+    attribute.
+Kernel Function:
+    Interpolating  [metaball
+    kernel|/nodes/sop/metaball#kernels] .
+Max Sample Count:
+    Number of closest samples to interpolate from.
+Kernel Radius:
+    Radial extent of the kernel function.
+Distance Threshold:
+    Radial extent of the filter domain where the final attributes
+    are determined from the source selection only.
+Blend Width:
+    The radial extent beyond the distance threshold where the final
+    attributes are blended from the source and destination
+    selections using the Kernel Function and the Blend Width as the
+    kernel radius. In regions outside the Distance Threshold + Blend
+    Width, the destination attributes remain unchanged.
+Uniform Bias:
+    The linear interpolation factor that is used when blending with
+    the Uniform kernel function. This value is used for the source,
+    whereas the destination factor is set to '1 - Uniform Bias'.
+
+@related
+    - [Node:sop/attribute]
+    - [Node:sop/attribcopy]
+    - [Node:sop/attribcreate]
+    - [Node:sop/point]
+    - [Node:sop/primitive]
+    - [Node:sop/vertex]
+    - [Node:sop/grouptransfer]
+

@@ -1,0 +1,218 @@
+#type: node
+#context: dop
+#internal: gasintegrator
+#icon: DOP/gas
+
+= Gas Integrator =
+
+"""A microsolver that applies forces to a particle fluid system."""
+
+The Gas Integrator DOP is a microsolver used to build larger fluid
+simulations.  It applies forces to particles in a particle fluid
+system and adjusts the velocities and positions of the particles
+according to the applied forces. It is currently used to apply in
+the [Particle
+Fluid Solver DOP|Node:dop/particlefluidsolver].
+
+
+@parameters
+        Geometry:
+            The geometry containing the points to integrate forces and velocities for.
+	Point Group:
+	    An optional point group to specify which points will be integrated.
+        Simulation Method:
+            The numerical simulation method to be used when applying forces
+            to the particle system.
+            
+            Euler:
+                This is a basic first-order simulation method.  
+
+		It is the
+                fastest available method, but due to its simplicity, may
+                require very small substeps to ensure stability.
+
+            Midpoint:
+                This is a second-order simulation method that is slower but
+                more stable than the first-order Euler method.
+            
+            Runge-Kutta:
+                This is the standard fourth-order Runge-Kutta simulation
+                method.  Again, it is slower than both the Euler and
+                Midpoint methods, but also more stable.
+
+            Runge-Kutta-Fehlberg:
+                This method combines fourth and fifth-order simulation
+                methods to adaptively determine an appropriate substep
+                length for the simulation by comparing the results of
+                these methods.  
+
+                NOTE:
+                    This method must be used in conjunction with the Gas Substep node.
+
+            Runge-Kutta 2(1):
+                Like the Runge-Kutta-Fehlberg (RKF) method, this method
+                also combines two different simulation steps to adaptively
+                determine an appropriate substep length.  
+
+		It combines
+                first and second-order methods.  Like the RKF method,
+                this method must be used in conjunction with the Gas
+                Substep node.
+
+                NOTE:
+                    This method must be used in conjunction with the Gas Substep node.
+
+            Runge-Kutta 3(2):
+                Like the Runge-Kutta-Fehlberg (RKF) method, this method
+                also combines two different simulation steps to adaptively
+                determine an appropriate substep length.  
+
+		It combines
+                second and third-order methods.  Like the RKF method,
+                this method must be used in conjunction with the Gas
+                Substep node.
+
+                NOTE:
+                    This method must be used in conjunction with the Gas Substep node.
+
+        Advection Method:
+            The technique used to update particle positions.
+            
+            Standard:
+                Particle positions are updated directly using the current
+                particle velocity and time step length.
+
+            XSPH:
+                Particle positions are updated using a velocity which is
+                blended between each particle's current velocity and the
+                average velocity of its neighbors.
+
+        XSPH Constant:
+            When __Advection Method__ is set to "XSPH", this constant
+            controls the degree of blending between a particle's velocity
+            and the velocity of its neighbors.  A value of zero ignores
+            neighbor velocities entirely, while larger values increasingly
+            make use of neighbor velocities.
+
+        Error Tolerance:
+            This parameter applies exclusively to the Runge-Kutta-Fehlberg,
+            Runge-Kutta 2(1) and Runge-Kutta 3(2) methods.  
+
+	    It controls the amount of error tolerated by these methods when setting a new
+            substep length for the simulation. A higher error tolerance
+            results in less substepping, but may lead to more instability
+            in the system.
+
+        Substep Repetition Tolerance:
+            This parameter applies exclusively to the Runge-Kutta-Fehlberg,
+            Runge-Kutta 2(1) and Runge-Kutta 3(2) methods.  After each
+            application of the Gas Integrator DOP, these methods recommend
+            a new substep length for the input system.  
+
+	    If the recommended
+            substep is lower than the previous substep, that substep may
+            need to be repeated.  This parameter controls how willing the
+            Gas Integrator is to repeat a substep.  
+
+	    For example, if the
+            Substep Repetition Tolerance has a value of 0.75, then substeps
+            will only be repeated if the new recommended substep is less
+            than 0.75 times the length of the preceding substep.
+
+        Minimum Substep:
+            This parameter applies exclusively to the Runge-Kutta-Fehlberg,
+            Runge-Kutta 2(1) and Runge-Kutta 3(2) methods.  
+
+	    It controls the
+            minimum substep length that any of these methods will recommend.
+
+        Maximum Substep:
+            This parameter applies exclusively to the Runge-Kutta-Fehlberg,
+            Runge-Kutta 2(1) and Runge-Kutta 3(2) methods.  
+
+	    It controls the
+            maximum substep length that any of these methods will recommend.
+
+        Scale Forces By:
+            The quantity by which forces should be scaled to determine the
+            acceleration of particles in the system. Density is typically
+            used to scale forces in a particle fluid simulation.
+        Enable Collision Detection:
+            Enables collision detection/response between particles in the
+            system and rigid body objects.
+	Move Out of SDF Colliders:
+	    When colliding with SDFs, do not do bouncing but instead
+	    just move particles out of them.  This is can be more robust
+	    when SDF colliders overlap.
+	Store Original Point Positions:
+	    Some types of collision detection will create a previous
+	    attribute to store the previous frame's particle position.
+	    Turning this on will always store this data.  It will also
+	    store it prior to the position integration of this node
+	    (rather than after collision detection) making for a more
+	    useful value for introspection later in the simulation.
+	Add Impact Data:
+	    Enables the addition of Impact data onto the particles.  Normally
+	    these are not added to save memory, and particle collision attributes
+	    are more easily created with the [Gas Collision Detect|Node:dop/gascollisiondetect]
+	    DOP.
+	Enable Collision Feedback:
+	    Enables the addition of Feedback impacts onto colliding objects,
+	    which are required for two-way interaction.
+	Compute UVs for Collisions:
+	    Determine if the `otherprimnum` and `otherprim[u/v]`
+	    components of the collision impact should be computed.
+	    Disabling the computation avoids sending additional rays
+	    for collision events, speeding up the simulation.
+        
+	Apply Forces Incrementally:
+	    When this parameter is enabled, the forces applied by each
+	    solver input are applied one at a time. When it is disabled, a
+	    single force is accumulated from all of the input solvers and
+	    then applied in a single iteration.
+	
+	Integrate Velocity:
+	    When turned on, velocity is not updated from the force
+	    attribute and the force attribute is not cleared.  Further,
+	    none of the sub solvers attached to the integrate will
+	    be evaluated.
+
+	    This toggle only has an effect in Euler update mode.
+
+	Integrate Orientation:
+	    When this toggle is disabled, the integrator only affects the position
+	    and velocity attributes of particles in response to values
+	    set in the force attribute by the node's input solvers.  
+
+	    When this toggle is enabled, the integrator also affects the
+	    orientation and angular velocity attributes of particles in
+	    response to values set in the torque attribute by the node's input
+	    solvers.
+
+	Use PScale for SDF:
+	    Uses the `pscale` attribute to collide with SDF collision objects.
+	    For backwards compatibility, the default is to ignore `pscale` with
+	    these collisions.
+
+	PScale Is Radius:
+	    For non-SDF collisions, controls if the `pscale` attribute is
+	    treated as radius or a diameter.
+
+        [Include:standard_solver_parms]
+
+@inputs
+    [Include:standard_data_inputs]
+
+@outputs
+    [Include:standard_data_outputs]
+
+@locals
+    [Include:standard_data_locals]
+
+    [Include:standard_locals]
+
+
+@related
+    - [Node:dop/particlefluidobject]
+    - [Node:dop/particlefluidsolver]
+

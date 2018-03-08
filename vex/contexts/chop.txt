@@ -1,0 +1,181 @@
+#type: vexcontext
+
+= chop =
+
+"""Define a custom CHOP operator with a program that edits channel
+values."""
+
+The CHOP context allows users to change values of channels in a CHOP.
+Each CHOP function works on a single sample of a single channel of a
+CHOP.
+
+
+== Constraints == (constraints)
+
+CHOP contraints make use of VEX structures defined in `$HFS/houdini/vex/include/chop_constraints.h`.
+
+
+=== chopTRS ===
+
+Holds transform channels within a structure.
+
+{{{
+struct chopTRS
+{
+    vector t; // tx ty tz channels
+    vector r; // rx ry rz channels
+    vector s; // sx ry rz channels
+
+    void fromIdentity();
+    void fromMatrix(const matrix m; const vector pivot; const int trs; const int xyz);
+    void fromMatrix(const matrix m);
+}
+}}}
+
+
+=== chopConstraintContext ===
+
+Holds the current evaluated transform channels within a structure.
+This abstracts the global variables 'C' and 'I', so you don't have to worry about the current time and the current channel index.
+
+{{{
+struct chopConstraintContext
+{
+    vector t; // tx ty tz channels
+    vector r; // rx ry rz channels
+    vector s; // sx sy sz channels
+
+    void init();
+    void init( vector t0; vector r0; vector s0; const string prefix0 );
+
+    void fromMatrix(const matrix m;
+		   const vector pivot; const int trs; const int xyz);
+
+    void fromMatrix(const matrix m);
+
+    chopTRS fetchInput( const int i );
+    float fetchInput( const int i; const string name; int result );
+    float fetchInput( const int i; const int index; int result );
+
+    matrix fetchInputMatrix( const int i );
+
+    int isConnected( const int i );
+    int numInputs();
+
+    // Evaluate a channel input by name
+    float chinput( int i; const string name; int ret );
+
+    // Evaluate a float parameter on the current CHOP node
+    float chf( const string parm );
+
+    // Evaluate an integer parameter on the current CHOP node
+    int chi( const string parm );
+
+    // Evaluate a vector parameter on the current CHOP node
+    vector chv( const string parm );
+}
+}}}
+
+Here's an example of how to blend the translations of the 4 inputs.
+
+{{{
+// Declare the context
+// This is done automatically on transform wrangles
+chopConstraintContext c;
+
+// Fetch transform inputs
+chopTRS c0 = c->fetchInput(0);
+chopTRS c1 = c->fetchInput(1);
+chopTRS c2 = c->fetchInput(2);
+chopTRS c3 = c->fetchInput(3);
+matrix m0 = c->fetchInputMatrix(0);
+matrix m1 = c->fetchInputMatrix(1);
+matrix m2 = c->fetchInputMatrix(2);
+matrix m3 = c->fetchInputMatrix(3);
+
+// Compute transform
+@t = c0.t + c1.t + c2.t + c3.t;
+@t *= 0.25;
+@r = c0.r;
+@s = c0.s;
+
+}}}
+
+
+@globals
+
+::V:
+    #type: float
+    
+    Value of the current sample. This variable should be set to the new
+    value by the function. The variable is initialized to the value of
+    the first input's channels.
+
+::I:
+    #type: int
+    #mode: r
+    
+    Index or sample number of the current channel.
+
+::S:
+    #type: int
+    #mode: r
+    
+    Index of the start of the current channel. This is the index of the
+    first sample.
+
+::E:
+    #type: int
+    #mode: r
+    
+    Index of the last sample (end sample).
+
+::SR:
+    #type: float
+    #mode: r
+    
+    Sample rate for the current channel.
+
+::L:
+    #type: int
+    #mode: r
+    
+    Length of the channel (total number of samples).
+
+::C:
+    #type: int
+    #mode: r
+    
+    Channel number for the current channel. When processing multiple
+    channels, this is the index of the channel currently being
+    evaluated.
+
+::NC:
+    #type: int
+    #mode: r
+    
+    Total number of channels the CHOP will affect.
+
+::CN:
+    #type: string
+    #mode: r
+    
+    Name of the current channel.
+
+::FF:
+    #type: float
+    #mode: r
+    
+    Frame number as a float corresponding to the sample being evaluated.
+    
+::T:
+    #type: float
+    #mode: r
+    
+    Time in seconds corresponding to the sample being evaluated.
+
+
+@subtopics Functions
+
+:list:
+    #query: type:vex context:chop

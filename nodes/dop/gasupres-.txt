@@ -1,0 +1,206 @@
+#type: node
+#context: dop
+#internal: gasupres
+#icon: DOP/gas
+#index: no
+
+= Gas Up Res =
+
+"""Upscales a smoke simulation to a higher resolution by adding
+turbulence."""
+
+The Gas Up Res DOP is designed to scale a low resolution
+smoke simulation to a higher resolution one.  It adds detail by adding
+turbulent noise at a small enough scale to avoid affecting the bulk
+motion of the smoke.
+
+@parameters
+
+Fluid Type:
+    This hint controls how source relationships are used.
+
+	None:
+	    Source relationships are ignored so only the original
+	    density will be advected.
+
+	Smoke:
+	    Sources are added by the maximum of their fog value
+	    and then density field.
+
+	Fire:
+	    Sources are added to the temperature and smoke fields.
+
+	Liquid:
+	    Density is considered to be an SDF so sources are
+	    added as the minimum of the source SDF and the density
+	    field.
+
+	Pyro:
+	    The Advanced::Pyro tab is used to control both the
+	    sourcing of the new fuel/temperature/smoke, as well as
+	    potentially recomputing the combustion model.
+
+Use Low Res Source:
+    Rather than computing the source relationship at the full
+    resolution of the upres sim, it is computed at the lower
+    resolution of the base sim.  This is faster and will preserve
+    the fuzziness of the base sim's source.  Using the high
+    resolution for the source will create a tighter smoke effect.
+
+Auto Regenerate Rest Field:
+    The turbulence needs a rest field so it tracks naturally with
+    the smoke.  One option is to use the rest field from the base
+    simulation, in which case this should be turned off.  If this
+    is turned on, a new rest field is created.  This rest field is
+    partly-updated on demand, so is not useful for shading
+    purposes.
+
+Rest Regeneration Threshold:
+    How stretched the rest field can get before it is reset.
+    Making this too near one will just cause the rest field to
+    always be reset.
+
+Rest Advection Speed:
+    How quickly the rest field moves compared to the rest of the
+    fluid sim.  Slowing down the rest field reduces the rate it
+    stretches, but can cause the turbulence to appear to stick or
+    lag.
+
+== Turbulence Scale ==
+
+    Source:
+	Controls how the turbulence field is built.  The turbulence
+	field defines a per-voxel scale for the amount of turbulence
+	to add to the upres simulation.
+
+	    Constant:
+		No special turbulence scale calculation is done.
+		However, if a turbulence scale field is provided, it
+		will be multiplied with the amplititude.  This allows
+		one to modulate the turbulence according to space.
+	    Wavelets:
+		A wavelet decomposition is performed on the low
+		resolution velocity field and the power of the finest
+		detail coefficients used as a multiplier for
+		turbulence.  This will only introduce turbulence where
+		there existed some in the coarser smoke simulation,
+		thereby keeping smooth areas smooth.
+	    Curl:
+		The magnitude of the curl of the velocity field is
+		used to scale the turbulence.  This matches the scale
+		used for vortex confinement, for example, so will add
+		extra turbulence where vortices are detected.
+
+    Peak Turbulence:
+	The output of the sourcing operation might not be in a 0..1
+	interval.  The peak turbulence acts as the hard cap in the
+	turbulence calcluation that will scaled to 1.
+
+    Blur Radius:
+	Sharp changes in the turbulence amplitude will result in kinks
+	in the resulting velocity field.  The Blur Radius allows one
+	to smooth out the turbulence field by the given world
+	distance.
+
+    Scale By Density:
+	Multiplies the turbulence field by the low resolution density
+	field, after the latter is sent through remap density.  This
+	only works if there is a lowresdensity field which currently
+	requires the Gas Upres Object to have Import Density turned on
+	and be in Pyro mode for Fluid Type.
+
+    Remap Turbulence Scale:
+	The turbulence field is sent through this mapping to get the
+	final amplitude.  This allows one to sculpt the fall off or
+	perform an edge detection.
+
+== Noise ==
+
+    Amplitude:
+	An overall scale to the added turbulence.
+    Separate Temperature Amplitude:
+	When performing a Pyro fluid upres you can have a different
+	amplitiude for the temperature than the density.  One can thus
+	have the temperature field move smoother than the density
+	field.  This will double the cost of the operation.
+
+    Compute Frequency Cutoff:
+	Because the goal of the upres stage is not to affect the low
+	resolution simulation, this automatic frequency cut off can
+	have the solver properly determine what frequency will add
+	detail without changing the base simulation's behaviour.
+    Low Res Divisions:
+	The divisions of the low resolution smoke.  This is used to
+	determine the cutoff frequence for the turbulent noise.  The
+	uniform divisions is divided by the largest size parameter to
+	get the frequency.
+    Size:
+	The size of the low resolution smoke.  This is used only in
+	calculating the cut off frequency.
+    Frequency Scale:
+	The calculated frequency is then multiplied by this scale.
+	Values less than one will introduce lower frequencies,
+	possibly overwriting frequencies already present in the base
+	simulation.  However, because numerical diffusion has tended
+	to dampen those frequencies already, it is often useful to
+	dial this down to 0.7 to avoid their being an apparent
+	frequency gap, or lacunarity, between the base sim and the
+	upres sim.
+    Temporal Frequency:
+	Controls how quickly the turbulence changes over time.
+    Noise Type:
+	What form of noise basis to use for the curl noise.
+    Turbulence:
+	Controls how many octaves of noise are added.  Each octave
+	doubles the effective resolution of the grid, so this should
+	be set to the number of doublings.  For example, if the base
+	smoke is 32^3 and the high res 128^3, there are two doublings
+	so 2 octaves is necessary.  If you have a frequency scale of
+	0.5, you will need an extra doubling to account for it.
+	Turbulence above this amount will show up as chatter at the
+	finest detail level, which may or may not be what you are
+	looking for.
+    Step Size:
+	When computing curl noise, derivatives are computed by making small
+	steps in each axis of this size.  If you have a very large (in terms of
+	size, not resolution) simulation the default may lead to precision
+	issues.  For example, a volume 10,000 houdini units on a size might
+	need a stepsize of 1 rather than the default.
+
+== Advanced ==
+    These options control the resimulation that has to be done in the
+    upres stage.  They are usually linked to the corresponding base
+    simulation, but can be overridden to give a different behaviour in
+    the upres.  For example, overriding soot rate with a lower value
+    will cause the upres pyro solver to have less smoke than its base
+    simulation did.
+
+    Clear:
+	Fields to Clear:
+	    Zeros out the specified types of fields after the solve
+	    step.  This ensures the .sim files, which store the
+	    complete state of the simulation, do not have any
+	    information not needed, reducing their size and save time.
+		None:
+		    No special clearing of fields is done.
+		Hidden:
+		    Fields not needed for the next time step that do
+		    not have guide parameters are cleared.
+		Static:
+		    Fields not needed for next time step are cleared.
+		    Note that some guides will thus start showing up
+		    as zero as the underlying field got cleared.
+	Additional:
+	    A space separated list of extra fields that should be
+	    cleared post-solve.
+
+@outputs
+    [Include:standard_data_outputs]
+
+
+@locals
+    [Include:standard_data_locals]
+
+    [Include:standard_locals]
+
+

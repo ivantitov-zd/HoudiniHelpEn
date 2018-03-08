@@ -1,0 +1,153 @@
+#type: node
+#context: shop
+#internal: v_gilight
+#icon: SHOP/v_gilight
+
+= VEX Global Illumination =
+
+"""This light source can be used to add some global illumination
+effects."""
+
+This light source can be used to add some global illumination effects.
+
+There are two techniques for computing global illumination. Irradiance
+computation will sample the hemisphere over the point being shaded to
+compute the incoming "ambient" light. This operation is typically
+quite expensive but can be sped up using irradiance caching (see the
+mantra output driver)
+
+Photon maps are another mechanism to allow evaluation of the indirect
+light paths to the surface. These can be used to simulate caustics or
+more complex irradiance effects. It is possible to specify up to two
+photon maps.
+
+Caustic map:
+    This map contains photons which have been
+    bounced off a specular or transparent surface.
+
+Global map:
+    This map contains photons which have been
+    bounced off any diffuse surfaces.
+    
+If you want both global illumination and caustics, you can specify both
+photon maps.
+
+When just evaluating ambient occlusion, the irradiance of other surfaces
+will not be evaluated. This speeds up computation but provides a simpler
+lighting model (i.e. no color bleeding) When computing irradiance (or
+ambient occlusion), it is possible to specify what the color of rays
+which don't hit objects is. This is done by using an environment map or
+by specifying a constant background color. When specifying an
+environment map, the map color can be tinted. As well, the space of the
+environment map may be specified by specifying a null object.
+
+See [how to create an environment/reflection map|/render/envmaps].
+
+@parameters
+
+== Irradiance ==
+
+Global Tint:
+    An overall multiplier on the global illumination. This
+    affects all aspects of illumination (i.e. environment,
+    background, photon maps, irradiance, etc.).
+    
+Irradiance Style:
+    No Irradiance:
+	Disable irradiance calculations entirely.  Lighting will be
+	computed solely from the specified photon map files.
+
+    Ambient Occlusion:
+	Lighting will be computed from the environment map or background
+	color for rays that miss geometry.
+
+    Transparent Ambient Occlusion:
+	Lighting will be computed from the environment map or background
+	color for rays that miss geometry.  Rather than treating any hit
+	surface as fully opaque, Transparent Ambient Occlusion will
+	attenuate the environment color by the opacity of hit surfaces
+	resulting in a more accurate result in scenes using transparency.
+	There is a small additional performance penalty to using this mode
+	as opposed to plain Ambient Occlusion since shaders need to be
+	executed on hit surfaces.
+
+    Full Irradiance:
+	The surface color (Cf) will be computed on the hit surface by
+	executing the surface shader.  This is the most computationally
+	intensive mode, as the hit surface must execute in full - including
+	texture lookups and lighting.  When using full irradiance, it is
+	often beneficial to specify a global photon map that includes
+	direct lighting - as this will prevent hit surfaces from executing
+	all light shaders.
+    
+Sampling Quality:
+    The number of rays to send out for irradiance/ambient
+    occlusion.
+    
+Adaptive sampling:
+    Turns on an automatic optimization that will reduce the
+    number of samples when there is little variation in occlusion
+    above the sample point. This can improve performance at the
+    expense of some possible flickering or additional noise.  Adaptive
+    sampling will only take effect with more than 64 samples.
+
+Maximum distance:
+    Maximum distance from the sample point to consider geometry
+    for irradiance/occlusion.
+    
+Environment map:
+    If irradiance/occlusion rays miss all objects in the scene,
+    lookup the color from this environment map rather than
+    returning the background color. The environment map should
+    most likely be a .rat file which was processed by the
+    stand-alone tool isixpack.
+    
+Environment tint:
+    Tint the environment map by this color.
+    
+Null object:
+    This parameter refers to a null object in the scene. The
+    null object is used to specify the orientation of the
+    environment map (only rotations matter). If no object is
+    specified, then the transform of the light this shader is
+    bound to will be used to orient the environment.
+    
+Background color:
+    If irradiance/occlusion rays miss all objects in the scene,
+    use this color. If there is an environment map specified,
+    then this parameter is ignored.
+
+== Photon Maps ==
+
+Global Map:
+    For secondary irradiance (or primary irradiance if no
+    ray-traced irradiance is used), this photon map will be used
+    to estimate irradiance.
+    
+Global Sampling:
+    How many photons to use for irradiance evaluation.  When the photon map
+    is prefiltered, normally this should be set to a small value (default
+    1).
+
+Global photon map stores direct lighting:
+    Indicate that the photon map stores direct lighting.  When evaluating
+    irradiance, mantra will ignore any lights other than the GI light
+    shader.
+
+Prefiltered Global photon map:
+    Indicates that the global photon map is prefiltered.  Prefiltered
+    photon maps require a much lower number of samples, since lighting has
+    already been averaged during prefiltering.
+    
+Caustic Map:
+    Specifies a map containing "specular" photons. These photons
+    are typically the results of transmission or reflection.
+    
+Caustic Sampling:
+    How many photons to consider when evaluating caustics.
+
+Prefiltered Caustic photon map:
+    Indicates that the caustic photon map is prefiltered.  Prefiltered
+    photon maps require a much lower number of samples, since lighting has
+    already been averaged during prefiltering.
+    

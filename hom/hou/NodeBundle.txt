@@ -1,0 +1,196 @@
+= hou.NodeBundle =
+#type: homclass
+#cppname: HOM_NodeBundle
+#group: organize
+
+"""A named set of nodes whose contents can be from different networks.  A
+bundle's contents may be fixed or may be determined from a pattern, and
+the contents may be filtered by node type."""
+
+Unlike node groups, the nodes in a bundle may be from different node networks.
+For example, the same bundle may contain `/obj/geo1` and `/obj/subnet1/geo2`.
+Node groups are primarily used to organize and display very large networks,
+while node bundles are normally used to track which objects are lit by
+a light, which objects are visible in a scene, etc.
+
+There are two types of node bundles: regular and smart.  You can add and remove
+individual nodes to and from a regular bundle.  The nodes in a smart bundle,
+on the other hand, are determined from a pattern stored in the bundle.
+As nodes matching the pattern are created or deleted in Houdini, the contents
+of the bundle will update automatically.  You can use
+[Hom:hou.NodeBundle#pattern] to determine if the bundle is a smart bundle
+or a regular one.
+
+When a node matches the pattern in a smart bundle, that node and its children
+will be added to the bundle.  For example, if the pattern in `"/obj/*"` and
+`/obj/box_object1` is a geometry object, all the nodes inside
+`/obj/box_object1` will be added to the bundle, recursively.  Carets (`^`) in
+the pattern can be used to remove nodes; for example, `"/obj/* ^/obj/geo1"`
+will match everything in `/obj` except for `/obj/geo1`.
+
+A bundle may also have a filter to specify what types of nodes may be in
+the bundle.  See [Hom:hou.nodeTypeFilter] for the possible filters.  If
+you try to add a node to a regular bundle but the node does not match the
+filter, Houdini will fail to add the node.  For smart bundles, the filter
+is applied after doing any pattern matching.  For example, if the pattern
+is `"/obj/*"` and the filter is `hou.nodeTypeFilter.Obj`, the bundle will
+contain only the objects in `/obj`, without any SOPs, etc. inside them.
+Because the pattern is applied recursively, however, any objects inside object
+subnets will also be in the bundle.
+
+To specify a bundle in a node parameter that expects a list of nodes, prefix
+the bundle name with `@`.  For example, you can enter `@bundle1` in the
+light mask parameter of an object so it is lit by the nodes inside the bundle
+named `bundle1`.
+
+You can view and edit node bundles in Houdini's Bundle List pane.  Use
+[Hom:hou.nodeBundle_] and [Hom:hou.nodeBundles] to access existing node
+bundles, and [Hom:hou.addNodeBundle] to create a new bundle.
+
+@methods
+
+::`name(self) -> str`:
+    #cppname: HOM_NodeBundle::name
+    #replaces: Cmd:opbls
+    Return the name of the bundle.
+
+::`setName(self, name)`:
+    #cppname: HOM_NodeBundle::setName
+    #replaces: Cmd:opbname
+    Change the name of the bundle.
+
+    Raises [Hom:hou.OperationFailed] if the name contains non-alphanumeric
+    characters other than `_`, or if a bundle with that name already exists.
+
+::`destroy(self)`:
+    #cppname: HOM_NodeBundle::destroy
+    #replaces: Cmd:opbrm
+    Remove this bundle.
+
+::`pattern(self)` -> `str` or `None`:
+    #cppname: HOM_NodeBundle::pattern
+    #replaces: Cmd:opbls
+    Return None if this bundle is a regular bundle, or a string pattern if
+    the bundle is a smart bundle.
+
+    See the class documentation for more information on smart bundles.  Note
+    that if a node matches the pattern, all its subchildren will be in the
+    bundle, as long as they match the filter.  For example, if the pattern is
+    `"/obj/*"` and the filter is hou.nodeTypeFilter.NoFilter, the bundle will
+    contain all nodes under `/obj`, recursively.
+
+::`setPattern(self, pattern_or_none)`:
+    #cppname: HOM_NodeBundle::setPattern
+    #replaces: Cmd:opbop
+    Change the pattern of this bundle.
+    
+    Setting the pattern to None changes the bundle into a regular bundle.  In
+    this case, the bundle's contents are unchanged, but Houdini will no
+    longer do pattern matching to determine the bundle's contents.
+
+    If the pattern is a string, the bundle becomes a smart bundle and its
+    contents immediately change to match the pattern.  The bundle's contents
+    will update as nodes are created and deleted in Houdini.
+
+    See [Hom:hou.NodeBundle#pattern] and the class documentation for more
+    information.
+
+::`findBestFilter(self)` -> [Hom:hou.nodeTypeFilter] enum value:
+    #cppname: HOM_NodeBundle::findBestFilter
+    Return the most restrictive bundle filter that matches all the nodes in
+    the bundle.
+
+    See [Hom:hou.nodeTypeFilter] for the possible filters.
+    `hou.nodeTypeFilter.NoFilter` is a special value to indicate that there
+    is no filtering.
+
+::`filter(self)` -> [Hom:hou.nodeTypeFilter] enum value:
+    #cppname: HOM_NodeBundle::filter
+    #replaces: Cmd:opbls
+    Return the bundle's filter.  For smart bundles, the filter is applied
+    after matching nodes to the pattern, and nodes whose types do not match
+    the filter are removed from the bundle.
+
+    See [Hom:hou.nodeTypeFilter] for the possible filters.
+    `hou.nodeTypeFilter.NoFilter` is a special value to indicate that there
+    is no filtering.
+
+    See the class documentation for more information about
+    filtering.
+
+::`setFilter(self, node_type_filter)`:
+    #cppname: HOM_NodeBundle::setFilter
+    Set this bundle's filter to a [Hom:hou.nodeTypeFilter] enumerated value.
+    Use `hou.nodeTypeFilter.NoFilter` to clear the filter.
+
+    See [Hom:hou.NodeBundle#filter] and the class documentation for more
+    information.
+
+::`nodes(self)` -> tuple of [Hom:hou.Node]:
+    #cppname: HOM_NodeBundle::nodes
+    #replaces: Cmd:opbls, Exp:opblist
+    Return a tuple of the nodes in this bundle.
+
+::`containsNode(self, node)` -> `bool`:
+    #cppname: HOM_NodeBundle::containsNode
+    #replaces: Exp:opexist
+    Return True if the node is in the bundle and False otherwise.  `node` must
+    be a [Hom:hou.Node] object.
+
+    This method is a shortcut for `node in bundle.nodes()`.  For bundles with
+    many nodes, this method will be slightly faster.
+
+::`addNode(self, node)`:
+    #cppname: HOM_NodeBundle::addNode
+    #replaces: Cmd:opbop
+    Add a node to the bundle.
+
+    Raises [Hom:hou.OperationFailed] if this bundle is a smart bundle, since
+    the contents of smart bundles are automatically determined by their pattern.
+
+::`removeNode(self, node)`:
+    #cppname: HOM_NodeBundle::removeNode
+    #replaces: Cmd:opbop
+    Remove a node from the bundle.
+
+    Raises [Hom:hou.OperationFailed] if this bundle is a smart bundle, since
+    the contents of smart bundles are automatically determined by their pattern.
+
+::`clear(self)`:
+    #cppname: HOM_NodeBundle::clear
+    #replaces: Cmd:opbop
+    Remove all nodes from the bundle.
+
+    Raises [Hom:hou.OperationFailed] if this bundle is a smart bundle, since
+    the contents of smart bundles are automatically determined by their pattern.
+
+::`isSelected(self)` -> `bool`:
+    #cppname: HOM_NodeBundle::isSelected
+    #replaces: Cmd:opbls
+    Return True if the bundle is selected in the bundle list pane and
+    False otherwise.
+
+::`setSelected(self, on, clear_all_selected=false)`:
+    #cppname: HOM_NodeBundle::setSelected
+    Select this bundle in the bundle list pane.  If `clear_all_selected` is
+    True, only this bundle will remain selected.  Otherwise, this bundle will
+    be added to the existing selection.
+
+::`convertToNormalBundle(self)`:
+    #cppname: HOM_NodeBundle::convertToNormalBundle
+    Convert the bundle into a normal bundle.  The smart bundle pattern is removed.
+
+    Do nothing if the bundle is already a normal bundle.
+
+::`convertToSmartBundle(self)`:
+    #cppname: HOM_NodeBundle::convertToSmartBundle
+    Convert the bundle into a smart bundle.  A regular expression is
+    constructed from the contents of the bundle and then set as the bundle
+    pattern.
+
+    Do nothing if the bundle is already a smart bundle.
+
+::`asCode(self)` -> `str`:
+    #cppname: HOM_NodeBundle::asCode
+    #status: ni
+

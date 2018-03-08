@@ -1,0 +1,143 @@
+= Snippet =
+
+#type: node
+#context: vop
+#internal: snippet
+#icon: COMMON/wrangle
+
+"""Runs a VEX snippet to modify the incoming values."""
+
+== Overview ==
+
+This is a very powerful, low-level node that lets experts who are
+familiar with VEX tweak values using code.
+
+This node is similar to the [Point Wrangle SOP|Node:sop/pointwrangle]
+and other "wrangle" nodes, which let VEX snippets manipulate geometry.
+
+WARNING:
+    This node requires that you understand the [vex language|/vex].
+    It is very easy to write incorrect code using this node.
+
+This node runs the snippet when the node cooks.
+The values on the incoming wires are available as VEX variables.
+The snippet can modify the variables, then the values are passed as the node's outputs.
+Each input has a corresponding output, whether the snippet modifies its value or not.
+
+For example, if you have an incoming wire named `foo`, you can write the snippet:
+
+{{{
+#!vex
+foo *= 2
+}}}
+
+...and the `foo` output will have double the value of the `foo` input.
+
+* Press ((MMB)) on the node to see any error output from the snippet.
+
+* You can use the VEX function `ch` to evaluate parameters.
+  The path is relative to this node (`ch("parm")` will evaluate the parameter `parm` on this node).
+  This evaluation will be done at the current time.
+
+== Creating inputs ==
+
+* The node has a "multi-input" that can accept any datatype wire.
+  Wiring into this input creates a new input on the node.
+  You can then use the value of the input by referencing its internal name as a variable.
+  You can hover over a VOP node input/output to see its internal name.
+
+* You can rename an input by number to a fixed name using the __Variable name #__ parameters.
+  For example, you can say the first input will map to the variable `foo`.
+  This allows you to rewire the input without having to change your code.
+
+* It's possible to read and write global variables directly (for example, `P` and `Cd` in the SOP context).
+  However, we _strongly recommend you don't use global variables directly_.
+  Houdini does not guarantee the order in which VOPs generate their code,
+  so assigning values to globals can give unpredictable results.
+  Instead, you should explicitly wire from the globals node into this node.
+
+* Unlike the [Inline VOP|Node:vop/inline], you do not prefix variables with `$`.
+  (The snippet will be encapsulated in a function definition.)
+
+== Binding geometry attributes to VEX variables ==
+
+In the SOP context and CVEX shaders applied to geometry,
+you will usually want to read and write geometry attributes in the snippet.
+The best way to access geometry attributes is by wiring a [Bind VOP|Node:vop/bind] into this node.
+
+However, in some cases, you may want to promote snippet parameter while the VOP network is locked,
+preventing the user from binding variables.
+In this case, the user can access attributes using the `@` syntax
+[explained below|#attributes].
+
+[Include:/nodes/sop/wrangle_syntax]
+
+@parameters
+
+Code Snippet:
+    #contentfrom: /nodes/sop/pointwrangle#snippet
+
+Include Files:
+    List any files that need to be included at the start of your
+    shader. You can use this facility to write complex functions,
+    and then call them with a single line of VEX code.
+    This is simply a list of files, such as
+    `voplib.h shading.h`.
+    
+Outer Code:
+    This parameter specifies the source code that should appear outside
+    (before) the shader function definition.
+    
+Expand Expressions in Code:
+    If you wish to use `$` for temporary variables, you have to prevent
+    the expansion of variable names or your temporaries will be
+    expanded.  However, using `$` is not recommended.
+    
+Variable Name #:
+    For each input connected to this operator you can specify the
+    name for the input. 
+    If an empty string is specified in the table, the name 
+    will be copied from the output connected to each input.
+    This will be the name used inside the code snippet to both read from
+    the input and write to the output.
+    
+Bindings to Export:
+    When an ad-hoc binding is created with the `@` syntax, it is brought
+    in as a read-only parameter to the generated VEX function.  If
+    it matches this string, however, it will be flagged as an export.
+    In VOP SOP contexts, for example, this will cause it to create
+    a new attribute.
+
+Enforce Prototypes:
+    Automatic binding with the `@` syntax can be convenient, but if your
+    system becomes more complex there is the risk that a typo in an `@` binding
+    will silently just bind a non-existant attribute.
+
+    This option forces all `@` bindings to be explicitly declared as
+    prototypes before use.
+
+    This applies to all `@` bindings, not just attribute bindings, so
+    if you wish to use `@Frame` you will need to prototype it as
+    `float @Frame;`
+
+Force Code Generation:
+    Because a snippet may have side effects, such as creating geometry
+    or printing output, the code is always added to the generated VEX
+    code even if the outputs of the snippet are not needed.  If you know
+    you have no side effects, you can turn off Force Code Generation
+    and avoid generating the snippet code if the outputs are unused.
+
+@inputs
+
+Next Input:
+    Where the next input value should be connected.  Each input
+    will create a corresponding output
+
+@related
+
+- [Node:vop/inline]
+- [Node:vop/print]
+- [Node:vop/subnet]
+- [Node:vop/subinput]
+- [Node:vop/suboutput]
+

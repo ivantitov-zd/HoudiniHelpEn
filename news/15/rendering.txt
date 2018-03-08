@@ -1,0 +1,457 @@
+= What's new in Houdini 15 |> Lighting, shading, and rendering =
+
+== Shading == (shading)
+
+See also [what's new in general VOPs|vex].
+
+=== Shading in VOPs ===
+#display: pull left
+
+:new:
+    New and updated high-level shader VOPs supporting [layering|/shade/layering].
+    
+    * [Principled shader VOP|Node:vop/principledshader] implements what is sometimes called the "Disney shader", allowing easy access to many varied looks.
+
+    * [Surface Model VOP|Node:vop/surfacemodel] 3.0 uses more physically correct model and parameter defaults.
+    
+    * [Glass shader VOP|Node:vop/glass] with attenuation and fake caustics.
+    
+    * [Skin shader VOP|Node:vop/skin].
+    
+    * [Brushed Metal shader VOP|Node:vop/brushedmetalshader]. A new supporting [Brushed Circles VOP|Node:vop/brushedcircles] makes it easy to calculate tangents for a circular brushed metal look.
+
+:new:
+    New gallery of useful materials wrapping the new VOPs, including [Principled|Node:shop/principledshader] and [Mantra Surface|Node:shop/mantrasurface] "uber-shaders".
+    
+    [Image:/images/shade/piano_material.png]
+
+    * Car paint material.
+    
+    * Metal materials based on physical properties of different metals.
+
+    * [Fake Caustics shader VOP|Node:vop/fakecaustics].
+    
+    * New Pyro shader nodes with much simpler interfaces.
+
+    * Lava material for new [viscous fluids tools|/fluid/lava]. Includes dual rest support.
+
+:new:
+    [Dirt Mask VOP|Node:vop/dirtmask] uses an algorithm similar to ambient occlusion to mask crevices or geometry edges. This is useful for layer blending.
+
+:new:
+    [BSDF Tint VOP|Node:vop/bsdftint] 
+
+:new:
+    [Conductor Fresnel VOP|Node:vop/conductorfresnel] computes a reflection blending factor based on reflectivity and edge tint (or eta and kappa).
+
+:changed:
+    The [Material SOP|Node:sop/material] can now reference shader VOPs in addition to SHOPs.
+
+:changed:
+    Reorganized the VOP network ((Tab)) menu.
+
+=== Layered shaders ===
+#display: pull left
+
+:new:
+    [Layering of shaders|/shade/layering] at the VOP level. This work anticipates a future version of Houdini where you can shade entirely at the VOP level without creating SHOPs.
+    
+    [Image:/images/shade/shader_layering.png]
+
+:new:
+    New VOPs for layering: [Layer Pack|Node:vop/layerpack], [Layer Unpack|Node:vop/layerunpack], [Layer Mix|Node:vop/layermix]. [Compute Lighting|Node:vop/computelighting] now has outputs for layer components.
+    
+    [Image:/images/shade/layer_network.png]
+
+=== Detail maps ===
+#display: pull left
+
+:new:
+    Houdini has viewport, rendering, and shading support for generating and using [normal maps|/shade/normalmaps] to add detail to low-poly models at display/render time.
+    
+    [Image:/images/shade/normal_map.jpg]
+
+:new:
+    New [Displace VOP|Node:vop/displace] supports bump, normal, displace along normal, and vector displacement (in object and UV tangent space).
+    
+    [Displacement texture VOP|Node:vop/displacetexture] builds on Displace with built-in texture sampling. The ((Tab)) menu has aliases for the various modes (Bump Texture, Normal Texture, Displacement Texture, and Vector Displacement Texture).
+
+:new:
+    The [Tanget Normals|Node:vop/tangentnormals] and [Tangent Normal Remap|Node:vop/tangentnormalremap] VOPs let you import and export tangent space normal maps.
+    
+    The Mantra materials now export an `Nt` tanget normal image plane. The tangent normals are affected by displacement, normal maps, and bump maps.
+
+:new:
+    [Bump to Normal Map VOP|Node:vop/bumptonormalmap] converts bump maps to normal maps.
+
+=== Material gallery ===
+#display: pull left
+
+:new:
+    You can now use slashes in material gallery entries to put the entry inside a folder (for example, `Metals/Gold`, `Metals/Steel`) in the material list.
+
+:changed:
+    Reorganized material gallery using new materials, removed obsolete materials.
+    
+:fixed:
+    You can now drag and drop material assets from the gallery to assign them, not just SHOPs.
+
+=== Mantra Surface shader ===
+#display: pull left
+
+:changed:
+    Improvements to the Mantra Surface shader:
+
+    * Now a [Precompiled HDA|/shade/precompile], for much faster loading and render startup for scenes with many shader instances.
+    * Supports tangent space vector displacement and tangent space [normal maps|/shade/normalmaps].
+    * Separate bump/normal controls for coat reflections.
+    * Cleaner implementation makes it easier to modify.
+    * Computes tangents using the `uv` attribute, or geometric tangents if the surface has no UVs. This gives usable tangents on NURBS and geometric primitives.
+
+:new:
+    Decomposed the [Mantra Surface|Node:shop/mantrasurface] functionality into smaller re-usable pieces: [Compute Lighting|Node:vop/computelighting] (new version with layer input), [Physically Based Diffuse|Node:vop/pbrdiffuse], [Physically Based Specular|Node:vop/pbrspecular], [SSS Component|Node:vop/physicalsss], [Attenuate|Node:vop/atten].
+
+:changed:
+    New [Surface Model VOP|Node:vop/surfacemodel] version 3.0.
+    * Adds [layer output|/shade/layering].
+    * Uses Fresnel blending by default.
+    * Intensities are now set to `1.0` by default. Diffuse color is `0.2` grey so it reads as 50% grey after 2.2 gamma correction. __Tangent style__ is now "Compute from UV".
+    * Replaces `N` input with `baseN` and `coatN` to support clear coat.
+    * Metallic and edge tint controls.
+    * Removes unused inputs.
+    * Fades out reduction of diffuse intensity at grazing angles when specular intensity is reduced. This means overall energy should stay constant when you reduce specular intensity. This is not based on physical laws, but fixes dark edges that would otherwise appear around objects.
+
+=== Principled shader ===
+#display: pull left
+
+:new:
+    [Principled Shader|Node:shop/principledshader] wraps the the Principled Shader VOP and adds texture inputs for all main parameters.
+
+=== Liquid shader ===
+#display: pull left
+
+:new:
+    Rewritten Basic Liquid shader.
+
+    * Controls for boosting diffuse intensity in high-vorticity areas.
+    * "Vorticity waves": extra bump-mapped wave detail added in high-vorticity areas, driven by FLIP Fluid's dual-rest attributes.
+
+=== Toon shader ===
+#display: pull left
+
+:new:
+    New [Toon Color Shader|Node:shop/tooncolorshader] and [Toon Outline Shader|Node:shop/toonoutlineshader] create stylized cartoon looks.
+    
+    [Image:/images/nodes/shop/tooncolorshader_simpleexample.png]
+
+=== Volumes ===
+#display: pull left
+
+:changed:
+    The Volume Model VOP is now hidden. Use the [Volume Shader VOP|Node:vop/volumeshader] instead.
+
+=== Shadow terminator ===
+#display: pull left
+
+:fixed:
+    Added [Vex:getsmoothP] VEX function and updated existing shaders to use it to eliminate shadow terminator artifacts.
+    
+    [Image:images/term_bad.jpg]
+    [Image:images/term_good.jpg]
+
+    You can disable this fix using the [Fix shadow terminator|Mantra:vm_smoothP] render property.
+
+== Material stylesheets ==
+
+:new:
+    [Material stylesheets|/shade/stylesheets] let you select and apply materials to any geometry (including packed geometry and instances) at render time. The foundation existed in Houdini 14, but Houdini 15 adds refinements and includes a tree editing pane making it easier to create and edit stylesheets.
+    
+    [Image:/images/shade/bottlecaps.jpg]
+
+:new:
+    Material stylesheets can now enable/disable subdivision rendering.
+
+:new:
+    The [Material geometry node|Node:sop/material] has a parameter to add a stylesheet attribute to the geometry.
+
+== Pyro shading == (pyro)
+
+=== Updated ===
+#display: pull left
+
+:changed:
+    Updated [Pyro Material 3.0|Node:shop/pyro].
+    * Streamlined interface, removed rarely used functionality.
+    * Commonly used parameters are all on one tab.
+    * Improved interactivity (parameter changes no longer cause recompilation).
+
+:changed:
+    New [Pyro Shader Core VOP|Node:vop/pyroshadercore] replaces Pyro Shade VOP.
+    
+    * [Layer output|/shade/layering].
+    * Uses common input/output names.
+    * No scripted parameter promotion magic.
+    * Removes `draw` input. If you need masking, you need to do it externally.
+    * Parameter changes don't trigger recompilation.
+    * Only supports the new density and brightness models. Removes model choice and `fireexist`.
+    * Smoke brightness now matches other volume shaders.
+    * No longer computes `Cf` internally, since this is not compatible with layering. Instead the Compute Lighting VOP takes care of this. This means the node doesn't support turning off shadow computation.
+
+:changed:
+    A new version of the [Unified Noise VOP|Node:vop/unifiednoise].
+    
+    * Simplified implementation, removed parameter promotion magic.
+    * Parameters have corresponding inputs.
+    * Parameter changes don't trigger code-generation (except signature parameter). This means that it can now be used in [Precompiled HDAs|/shade/precompile].
+    * Instead of multiple dual rest inputs, a single input that accepts a `DualRest` or `DualRest4` struct input, as produced by the updated [Dual Rest Solver VOP|Node:vop/dualrest].
+
+:changed:
+    New versions of many Pyro-related VOPs remove scripted parameter-promotion magic.
+
+:changed:
+    A new version of the [Ramp Filter VOP|Node:vop/rampfilter] now accepts a Ramp struct instead of individual arrays.
+
+:changed:
+    A new version of the [Dual Rest Solver VOP|Node:vop/dualrest] has a `DualRest` struct output, which you can wire directly into the updated [Unified Noise VOP|Node:vop/unifiednoise].
+
+=== Other changes ===
+#display: pull left
+
+:changed:
+    Default Pyro smoke is now half as bright to match other volume shaders.
+
+== Lighting ==
+
+=== Physically correct ===
+#display: pull left
+
+:changed:
+    The default lights now use "physically correct" attenuation, meaning the light drops off exponentially with distance.
+    
+    A new __Light exposure__ parameter on lights lets you exponentially scale brightness (value = intensity × 2<sup>exposure</sup>).
+    
+    When you create a physically correct light by ((Ctrl))-clicking a light tool on the shelf (which positions the light based on the current view), the tool automatically adjusts the intensity of the light so that the brightness of the light at the viewport pivot will be 1.
+
+:new:
+    Houdini now includes IES light scattering profiles from [derekjenson.com|http://derekjenson.com/3d-blog/ies-light-profiles]. You can find them in `$HFS/houdini/ies`. You can apply them to a spotlight using the __Environment/IES Map__ parameter on the __Spotlight options__ tab.
+
+:changed:
+    The [Mantra Surface|Node:shop/mantrasurface] shader and [Surface Model VOP|Node:vop/surfacemodel] use more physically plausible defaults.
+
+=== Tube light ===
+#display: pull left
+
+:new:
+    You can now create a "tube" [Area light|Node:obj/hlight]. The __Size__ parameters control the length of the tube and the radius.
+
+=== Interface ===
+#display: pull left
+
+:changed:
+    Looking through a distant light displays an orthographic view.
+
+== Rendering ==
+
+=== IPR ===
+#display: pull left
+
+:new:
+    The render view now shows elapsed and final render times, peak memory usage, and estimated time remaining.
+
+    This information is saved in image files that support arbitrary metadata (Pic, Rat, and OpenEXR). MPlay will display the metadata when you load files that contain it. The [itilestitch|/ref/utils/itilestitch] utility properly handles the metadata when combining files.
+
+=== Quality controls ===
+#display: pull left
+
+:new:
+    The [Mantra render node|Node:out/ifd] now has controls to scale the __Max samples__ setting separately for the diffuse, reflection, and refraction components. Increasing the scale decreases the acceptable noise level when rendering that component. This lets you have Mantra devote more effort to components that have high variance.
+
+:new:
+    Adaptive BSDF sampling super-samples the BSDF in areas where radiance is changing quickly. This generates images faster with better distributed noise in PBR mode.
+    
+    For now this is not available in the default render node parameters. To add it, use the __+(fa-cog) > Edit Rendering Parameters__ interface to add the [Mantra:vm_adaptivesamplingenable] and [Mantra:vm_adaptivesamplingthreshold] properties.
+
+=== Efficiency ===
+#display: pull left
+
+:new:
+    By default Mantra now writes out "checkpoint" files containing the current render state at certain intervals. If the render fails because of a fixable problem such as out-of-memory, you can resume the render from the last checkpoint by turning on __Resume from checkpoint files__ on the render node.
+    
+    Checkpointing is available for Mantra's native image formats (`.pic` and `.rat`) as well as `.exr`.
+    
+    If the checkpoint files are taking up too much disk space, you can turn them off on the render node.
+    
+    HQueue has a new __Mantra options > Enable checkpoints__ setting. When this is on (the default), HQueue will resume rescheduled jobs using checkpoints.
+
+:new:
+    New __File compression__ parameter on the __Driver__ tab of the [Mantra render node|Node:out/ifd] to control compression of IFD output.
+
+:new:
+    New "Automatic velocity blur" setting for __Allow motion blur__ only enables blur if a velocity attribute exists in the scene.
+
+=== Z-back ===
+#display: pull left
+
+:new:
+    Houdini now supports both "Z front" and "Z back" in deep images.
+    
+    By default, Houdini will only add `zfront` and `zback` for deep camera images, unless the planes are listed in the __Depth planes__ parameter.
+
+    When rendering `.rat` texture images, Mantra will store `zfront`/`zback` as `Pz` and `dPdz` (delta Z) planes. When rendering `.exr` images, Mantra will store them as `Z` and `Zback`. The `dcmconvert` command line utility knows to map between the different names.
+
+=== RenderMan 20.0 ===
+#display: pull left
+
+:new:
+    Houdini supports RenderMan 20.0 and RIS shading. RIS shaders are available in the RIS Shader Network SHOP.
+
+:new:
+    Added RIS shader nodes.
+    
+    * Complete set of RenderMan BxDF, Pattern, and Integrator RIS shaders.
+    
+    * PxrStdAreaLight, PxrStdEnvDayLight, and PxrStdEnvMapLight RIS light shaders.
+    
+    * Camera, Light Probe, and Rolling Shutter RIS projection shaders. You can add projection shaders to a camera using the [Lens Shader property|Mantra:vm_lensshader].
+
+:new:
+    New RIS render node. This allows the RIB and RIS render nodes to have cleaner interfaces specific to each mode. 
+
+:changed:
+    Removed support for RenderMan versions before 17.
+
+== Compositing ==
+
+=== PSD import ===
+#display: pull left
+
+:new:
+    Houdini can now import Photoshop (PSD and PSB) files into a compositing network, preserving layers. Use __File > Import > Image__ to choose a file to import.
+
+=== Drop shadow ===
+#display: pull left
+
+:new:
+    Added [Drop Shadow|Node:cop2/dropshadow] compositing node to simplify creating shadowed text layers.
+
+== Other changes and improvements ==
+
+=== HQueue ===
+#display: pull left
+
+:new:
+    You can configure Houdini's [HQueue Render|Node:out/hq_render] and [HQueue Simulation|Node:out/hq_sim] nodes to display the job ID when you submit a new job to HQueue.
+
+:new:
+    You can now download diagnostic information from HQueue's details page to send to Side Effects software support.
+
+:new:
+    You can now add and remove clients to/from a job in the browser, and through the HQueue Python API using `getPermittedClientList` and `savePermittedClientList`.
+
+:changed:
+    The "Download output" button is now "Download Output Log" to make it clearer.
+
+:changed:
+    Changed how client disabling works. You now specify in `hqserver.ini` the maximum number of failures allowed on a client under a single root job. Clients with more than this number of failures will not be assigned new jobs.
+    
+=== Bake UVs ===
+#display: pull left
+
+:new:
+    Rendering UV texture maps is now handled by a separate [Bake Texture render node|Node:out/baketexture]. UV texture rendering functionality has been removed from the Mantra render node. UV rendering with micropolygons is deprecated in favor of raytraced UV rendering.
+
+=== Particle radius ===
+#display: pull left
+
+:changed:
+    Mantra now renders particles using the object's __Point Scale__ and __Treat point scale as diameter instead of radius__ parameters (on the __Render > Geometry__ sub-tab). This may change the scale of particles when rendering old scenes. The quick fix it to turn on __Treat point scale as diameter instead of radius__.
+
+=== Mantra verbosity ===
+#display: pull left
+
+:new:
+    New verbose flags: `-t/T` -- turn on/off time stamps on log messages (on by default), `-a/A` -- Turn on/off Alfred-style progress updates.
+    
+    For example, `mantra -VaT3` will render at verbosity level 3, with Alfred-style progress reports, but no time stamps on log messages.
+
+:changed:
+    Mantra's console output is now timestamped and errors/warnings are color-coded. You can turn off coloring in the parameters of the [Mantra render node|Node:out/ifd].
+
+=== Utilities ===
+#display: pull left
+
+:new:
+    Added an option to [hrender|/ref/utils/hrender] to specify the take to render.
+
+:new:
+    The `vexexec` utility now has a `-V` verbose option.
+
+:fixed:
+    MPlay will now load images from an `http:` URL on the command line.
+
+:fixed:
+    `hrender` is more responsive.
+
+=== Misc ===
+#display: pull left
+
+:new:
+    Added limited support for motion segments on arbitrary attributes. They are not shaded, but you can query the segment values. The `geometry:segmentattrs` property specifies which attributes should create motion segments (automatically includes `P`).
+
+:new:
+    You can now disable specific image planes in filter scripts using a `disable` property.
+
+:new:
+    You can add the [Hprop:vm_open] now automatically sets the "data window" on OpenEXR images after rendering, equivalent to running the `iautocrop` utility. You can turn this off if necessary.
+
+:changed:
+    Removed the Metal SHOP since its functionality is now available in the general shaders.
+
+:changed:
+    The [Composite render node|Node:out/comp] now uses the metadata controls from Mantra, instead of a hard-coded list of image formats.
+
+:changed:
+    The name of a shader defined by a VOP network is now the VOP network's _path_ instead of its _name_. This avoids naming conflicts with exported parameter names and symbols from included `.h` files.
+
+:changed:
+    Encapsulated shaders can now use a custom SHOP's __Shader name__ in the `import` keyword instead of the node name. This allows you to import namespaced/versioned nodes, which can't be imported by their node names because the names contain `:` characters.
+
+:changed:
+    Improvements to the OpenGL render node:
+    * Transparent surface now rendered correctly.
+    * Animated materials now correctly update.
+    * Stereo cameras are now correct, no longer anaglyph tinted, in separate files mode.
+    * Added background image and viewport comment parameters.
+    * Increased the default quality settings.
+    * Added a 32-bit floating point HD option.
+
+:changed:
+    The [Texture VOP|Node:vop/texture] has a new parameter to control the orientation of the texture relative to the UV coordinates.
+
+:changed:
+    Renamed the Alfred render node to [Tractor|Node:out/alf].
+
+:fixed:
+    In the [Mantra Surface|Node:shop/mantrasurface] shader/material, turned off "use point color" on VOPs not in the diffuse branch. This was affecting bump maps and reflections.
+
+:fixed:
+    Significant speed improvement rendering a single object that contains multiple packed primitives referencing different disk files/geometry.
+
+:fixed:
+    Dragging materials from the gallery onto objects now works correctly with assets.
+
+:fixed:
+    You can now specify bundles in the object mask parameters of the [OpenGL render node|Node:out/opengl].
+
+:fixed:
+    Frustum culling is now disabled when generating shadow maps, so objects outside the view can cast shadows.
+
+:fixed:
+    You can now crop OpenEXR deep pixel images.
+
+:fixed:
+    Poly Soup primitives now work with RIB rendering.
+
+:fixed:
+    Alembic primitives now work with RIB rendering using the `AlembicPrimProc` procedural shader.
+

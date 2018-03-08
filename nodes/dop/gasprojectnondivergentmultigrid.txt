@@ -1,0 +1,102 @@
+#type: node
+#context: dop
+#internal: gasprojectnondivergentmultigrid
+#icon: DOP/gas
+
+= Gas Project Non Divergent Multigrid =
+
+"""A microsolver that removes the divergent components of a velocity
+field using a multi-grid method."""
+
+The Gas Project Non Divergent Multigrid DOP is a microsolver used in building
+larger fluid simulations. The [Fluid Solver|Node:dop/fluidsolver] and [Smoke Solver|Node:dop/smokesolver] DOPs that
+allow microsolvers to be added before or after the main solver step to
+extend or tweak the simulation. Alternatively, advanced users could try to build an entire new solver out of microsolvers.
+
+The Gas Project Non Divergent Multigrid DOP removes any divergent portions of a
+velocity field. These are parts of the velocity field that represent
+expansion or contraction. This is done by computing a pressure field
+that counteracts any compression or rarefication and applying that
+pressure field instantaneously.
+
+This differs from Gas Project Non Divergent DOP in that it does not support
+collisions or free surfaces.  It is also much faster.  The lack of
+collision support can be worked around by explicitly zeroing out the collision
+velocity values and repeating the projection.
+
+NOTE:
+    The [Curl Noise POP|Node:pop/curlnoise] is often used with this node in FLIP fluid simulations, because it plays very predictably with any fluid simulations that contain the Gas Project Non Divergent Multigrid DOP.
+
+
+@parameters
+    Velocity Field:
+        The velocity field to make divergence free. This must be a
+        vector field. 
+	
+	The velocity field is optional.  If the velocity field is 
+	not present; the divergence field must be provided as the 
+	input, and the results will be written to the pressure
+	field.  This can be used to solve general Poisson Equations.
+	
+    Goal Divergence Field:
+        While the purpose of this micro solver is to remove
+        divergence, one may want instead to make a field match a
+        certain divergence pattern.  
+
+	The goal divergence field is a
+        scalar field which will be matched.  If not specified, a zero
+        field is used, thereby having the equivalent of no-divergence.
+        The field is scaled by the surface area of the voxels so can
+        be specified independently of the resolution of the actual gas
+        geometry.
+
+        NOTE:
+            Gas Advection micro solver relies on the field
+            being non-divergent. Divergent fields may be inconsistent and
+            not exhibit the proper rarefication/compression of scalar
+            fields.  One can add in the rarefication/compression step by
+            using a Gas Velocity Stretch micro solver on the density field
+            using the modified velocity field as a reference.
+    Pressure Field:
+        The pressure required to make the velocity field divergence
+        free is output into this field.
+    Relative Tolerance:
+	When the error in the initial velocity field is reduced to this
+	fraction of its original error, the operation will stop.  Higher values
+	will leave the velocity field with divergence still present.
+    Absolute Tolerance:
+	If the velocity field is already almost non-divergent, a relative error
+	can be very hard to achieve.  Thus the absolute tolerance marks a total
+	error in the velocity field at which point the solver will stop.
+    Min Iterations:
+	The minimum number of multigrid iterations before the solver will stop.
+	More iterations provide more accuracy, but it is probably better to
+	adjust the tolerance if that is needed.
+    Max Iterations:
+	The maximum number of multigrid iterations.  The solver will stop at
+	this point even if the error tolerance are not reached.
+    Use OpenCL:
+	Will attempt to use the OpenCL driver on the system to perform the
+	projection.  If the driver is not setup, or runs out of memory, will
+	fail.
+    Treat Internal Faces as Closed:
+	When a volume is broken into slices by the Slice setting, this controls
+	if the internal slice faces should be treated as closed or open
+	boundary conditions.  Closed boundary conditions avoid smoke loss
+	across the boundary, but also create vortex walls that may be
+	more objectionable.
+
+    [Include:standard_solver_parms]
+
+@inputs
+    [Include:standard_data_inputs]
+
+@outputs
+    [Include:standard_data_outputs]
+
+@locals
+    [Include:standard_data_locals]
+
+    [Include:standard_locals]
+
+

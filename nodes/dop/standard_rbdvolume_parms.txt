@@ -1,0 +1,254 @@
+#type: include
+
+== Collisions ==
+
+=== Volume === (volume)
+
+Use Volume Based Collision Detection:
+    Turning on this option causes the [RBD solver|Node:dop/rbdsolver] to use a volume
+    representation of this object for collision detection. 
+    
+    The volume representation results in very fast collision detection
+    and very robust results that are tolerant of temporary
+    interpenetrations. The disadvantage is that a volume
+    representation cannot be used to represent a flat object such as
+    a grid, or a hollow sphere. 
+    
+    When this toggle is turned off, the collision detection is geometry-based rather than volume-based. 
+    In this case, the collision code will track the trajectories of moving objects over time to find out whether collisions occurred.
+    This allows more accurate results than volume-based collision detection.
+    For this to work, __Cache Simulation__ must be enabled on the DOP network.
+
+Collision Guide:
+    The internal representation used for collision detection is
+    converted to visible geometry. This is useful for debugging
+    problems with collision detection.
+    
+    This parameter controls the color of the guide geometry.
+    
+Mode:
+
+    Ray Intersect:
+        Use ray intersection with the geometry to create an
+        accurate volumetric representation of the geometry.
+    Meta Balls:
+        Instead of using rays to determine if points are inside or
+        outside, evaluate the metaball field.  
+        
+        This should be used
+        with __Laser Scanning__ turned off on geometry that consists
+        solely of metaballs.
+    Implicit Box:
+        Calculate the bounding box for the geometry, and create a volumetric representation that precisely fills that bounding box. This box is always axis aligned in the DOP object's local space, which is set by the position data.
+        
+        NOTE:
+            __Use Object Transform__ bakes the object transform into the geometry's transform, leaving the __Position Data__ in world space. Turning this off causes the object transform to be send to the __Position Data__, which causes the object's local space to be reoriented.
+            
+    Implicit Sphere:
+        Calculate the bounding sphere for the geometry, and create
+        a volumetric representation that precisely fills that
+        bounding sphere.
+    Implicit Plane:
+        Calculate the bounding box for the geometry, and create a
+        volumetric representation that divides that box along its
+        smallest axis. Everything below that plane is considered
+        inside, and everything above is outside. 
+        
+        This mode is primarily useful for creating ground planes or immovable
+        walls.
+
+    Minimum:
+        Use the distance to the surface or curve.  If the Offset
+        Surface is 0, no volume will be made.  A positive offset
+        surface will create just that - an offset volume around
+        the object's surface.  This is useful for turning thin
+        objects or wires into actual solids.
+    Volume Sample:
+        The divisions are ignored in this mode, instead they are
+        computed from the first volume or VDB primitive in the geometry.
+        The computed divisions are chosen to match the voxel
+        size of the source volume.
+        The volume primitive is sampled raw and treated as a
+        signed distance field.  The assumption is that the source
+        is the output of an [Iso Offset|Node:sop/isooffset] or
+        [VDB From Polygons|Node:sop/vdbfrompolygons] SOP.  If it isn't a true
+        signed distance fields, unusual things may happen with RBD
+        collisions.
+        
+Division Method:
+    #id: sdf_uniformvoxels
+
+    If __Non Square__ is chosen, the specified size is divided into the given number
+    of divisions of voxels.  However, the sides of these voxels may not be
+    equal, possibly leading to distorted simulations.
+
+    When an axis is specified, that axis is considered authoritative
+    for determining the number of divisions.  The chosen axis' size
+    will be divided by the uniform divisions to yield the voxel
+    size.  The divisions for the other axes will then be adjusted to
+    the closest integer multiple that fits in the required size.
+    
+    Finally, the size along non-chosen axes will be changed to
+    represent uniform voxel sizes.  If the __Max Axis__ option is chosen,
+    the maximum sized axis is used.
+
+    When __By Size__ is chosen, the __Division Size__ will be used to
+    compute the number of voxels that fit in the given sized box.
+    
+Divisions:
+    Controls the creation of the volumetric representation of this
+    object. This should be set fine enough to capture the desired
+    features of the geometry.
+    
+Uniform Divisions:
+    #id: sdf_uniformdiv
+    
+    The resolution of the key axis on the voxel grid.  This allows you
+    to control the overall resolution with one parameter and still
+    preserve uniform voxels.  The __Uniform Voxels__ option specifies
+    which axis should be used as the reference. It is usually safest
+    to use the maximum axis.
+    
+Division Size:
+    The explicit size of the voxels.  The number of voxels will be
+    computed by fitting an integer number of voxels of this size into
+    the given bounds.
+    
+Laser Scan:
+    In laser scan mode the volumetric representation is built by
+    sending rays along the primary axes. Only the closest and
+    farthest intersections are used. The space between these two
+    points is classified as inside, and the rest outside.
+
+    The laser scan mode will work even with geometry which has
+    poorly defined normals, self intersects, or is not fully
+    watertight. The disadvantage is that interior features can't be
+    represented as they are not detected.
+
+    When laser scanning is turned off, the volumetric
+    representation is still built by sending rays along the primary
+    axes. All intersections are found, however. Each pair of
+    intersections is tested to see if the segment is inside or
+    outside. This relies on the normal of the geometry being well
+    defined (i.e., manifold, no self intersections), and the
+    geometry being watertight. Complicated shapes with holes can be
+    accurately represented, however.
+
+Fix Signs:
+    Even with the best made geometry, numerical imprecision can
+    result in incorrect sign choices. This option will cause the
+    volumetric representation to be post-processed to look for
+    inconsistent signs. These are then made consistent, usually
+    plugging leaks and filling holes.
+
+    This takes time, and can be turned off in cases where the
+    volumetric representation is known to generate without problems.
+
+Force Bounds:
+    The __Fix Signs__ method alone will smooth out, and usually
+    eliminate, sign inversions. However, it is possible for regions
+    of wrong-sign to become stabilized at the boundary of the
+    volumetric representation. This option will force all voxels on
+    the boundary to be marked as exterior. The __Fix Signs__ method
+    will be much less likely to stabilize incorrectly then.
+    
+Invert Sign:
+    If you want a hollow box, one method is to build one box inside
+    the other and not use __Laser Scanning__. A more robust method
+    is to just specify the inner box and use sign inversion. This
+    treats everything outside of the box as inside, allowing the
+    more robust __Laser Scanning__ method to be used.
+    
+Sign Sweep Threshold:
+    #id: sdf_sweepalpha
+    
+    After the fix signs process is complete there can still be
+    inconsistent areas in the SDF.  Large blocks can become
+    stabilized and stick out of the SDF.  A second sign sweep pass
+    can be performed to try to eliminate these blocks.
+
+    The sign sweep threshold governs how big of a jump has to
+    occur for a sign transition to be considered inconsistent.  If
+    the values of the sdf change by more than this threshold times
+    the width of the cell, it is considered an invalid sign
+    transition.  The original geometry is then ray intersected to
+    determine inside/outside and the result used to determine
+    which sign is correct.  The correct sign is then propagated
+    forward through the model.
+    
+Max Sign Sweep Count:
+    #id: sdf_sweepcount
+    
+    The sign sweeps are repeated until no signs are flipped (ie,
+    all transitions are within the threshold) or this maximum is
+    reached.  Too low of a sign sweep threshold may prevent the
+    process from converging.  Otherwise, it tends to converge very
+    quickly.
+
+Offset Surface:
+    A constant amount to offset the signed distance field by.
+    This can be used grow the object slightly or shrink it.  Note
+    that it can't be grown much beyond its original size or it
+    will hit the bounding box of the signed distance field.
+    
+Tolerance:
+    #id: sdf_tol
+    
+    This specifies the tolerance used for ray intersections
+    when computing the SDF. This value is multiplied by the size
+    of the geometry and is scale invariant.
+    
+Proxy Volume:
+    The geometry which will be used rather than the base geometry for
+    computing the SDF.  This can be a volume or VDB in the case of Volume Sample
+    mode to allow one better control over the cached data.
+    
+File Mode:
+    Controls the operation for this object's volume data.
+
+    Automatic:
+        If a file with the specified name exists already, it is
+        read from disk. Otherwise the volume is created based on the
+        other parameters on this page, and the specified file is
+        created on disk. This file will never be deleted
+        automatically, even when exiting the application.
+    Read Files:
+        The specified file is read from disk.
+    Write Files:
+        The volume is created using the other parameters on this
+        page, and is then written to the specified file on disk.
+    No Operation:
+        The file is never read or written. The parameters on this
+        page are used to create the volume.
+File:
+    The name of the file to access according to the choice of File
+    Modes above.  This is always .simdata file format.  Saving to
+    a .bgeo extension will *not* save a .bgeo file.
+    
+=== Surface ===
+
+Surface Representation:
+    Chooses between colliding points against volume or colliding
+    edges against volume. 
+    
+    Optionally, the point attributes `nopointvolume` and `noedgevolume` may be added to the geometry to disable individual points/edges from participating in
+    collision detection against a volume object. An edge is disabled
+    if either of its endpoints is disabled.
+    
+Convert To Poly:
+    This enables conversion of primitives (such as spheres) in the
+    geometry into polygons. Only polygons are used for collision
+    detection.
+    
+Triangulate:
+    When this flag is turned on, polygons in the geometry are
+    triangulated.
+    
+LOD :
+    This controls the Level Of Detail of the triangulation. It is
+    used to specify the point density in the U and V directions.
+    
+Add Barycenters:
+    The barycenters of each polygon can be included in the
+    collision detection as points or edges (connected to the
+    vertices of the primitive).

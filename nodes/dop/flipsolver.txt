@@ -1,0 +1,1136 @@
+= FLIP Solver =
+
+#type: node
+#context: dop
+#internal: flipsolver::2.0
+#icon: DOP/flipsolver
+#version: 2.0
+
+"""Evolves an object as a FLIP fluid object."""
+
+The FLIP Solver DOP evolves an object dynamically as a particle fluid.
+
+A FLIP solver is a type of hybrid between a particle based and volume
+based fluid simulations.  All fluid data is stored in the particles and
+only particles need to persist frame to frame, ensuring no unwanted
+mixing or loss of fluid can occur.  However, the pressure projection
+step is done on a volume that is created just in time. The fluid is
+represented by particles with their `pscale`, and can be moved around
+with POP and DOP forces.
+
+When FLIP fluids are solved, a temporary velocity field is made. The
+particle velocities are transferred to this grid and the grid is used to
+perform the fluid projection. This is what prevents the particles from
+all going on top of each other and start moving in similar directions.
+
+NOTE:
+    Advanced users can also add volume velocity forces at this stage as
+    well.
+
+FLIP fluids are faster than SPH fluids, if you don't need to substep the
+FLIP fluid. If you need to substep the FLIP fluid because of fast moving
+colliders, you may find SPH just as a fast or faster. FLIP fluids are
+also useful because particles can be placed on top of each other without
+destabilizing the system. SPH tends to blow up if you move particles too
+close.
+
+The advantage of the FLIP Solver is that you run with only a few time
+steps per frame while SPH requires anywhere from 7 to 20 time steps or
+more per frame to stabilize. FLIP utilizes a few grids (volume fields)
+to help tame the instantaneous impulses that can arise in a fluid sim.
+
+Various fields are used to tame the FLIP Solver so that you can run far
+fewer points at far fewer time steps and the inter-spacing between
+particles can be random. You can introduce new particles at any time
+with little to no consequence. This opens up so many new work flows in
+POPs that were simply not possible with SPH. For example, introducing
+splash particles with their own property attributes is now possible.
+
+The FLIP Solver contains an embedded POP Solver, enabling the use of
+POP forces by plugging them into the __Particle Velocity__ input or
+inline below any [Source Volume|Node:dop/sourcevolume] emitters.  Any
+POP node that updates the `v`, `targetv`, or `force` attribute can
+be used, as well as others that affect attributes like particle color
+or age.  The POP Solver also supports other particle behavior such
+as aging and reaping particles.
+
+== Splashy vs Swirly Kernel ==
+
+The __Velocity Transfer__ parameter allows you to choose between the default __Splashy Kernel__ and a __Swirly Kernel__.  The __Splashy Kernel__ is typically used for high energy, noisy large FLIP simulations like rivers or oceans, where the surface from FLIP noise isn't a problem. The __Swirly Kernel__ is typically used for high vorticity simulations where you need to reduce surface noise as much as possible while still retaining the swirling nature of the simulation. For example, for small scale fluids where surface noise can be really distracting or for lava type simulations. 
+
+NOTE: 
+    The __Splashy Kernel__ corresponds to the __FLIP/PIC__ method of velocity transfer, while the __Swirly Kernel__ is implemented with the newer __APIC__ method.  All of the [Viscous shelf tools|/shelf/viscousfluids] use the Swirly Kernel.
+
+== Tips ==
+
+For emitting large numbers of particles, the [Source Volume
+DOP|Node:dop/sourcevolume] can be much faster than the [Particle Fluid
+Emitter DOP|Node:dop/particlefluidemitter]. You can set up surface
+emission using the [Source From Surface|/shelf/sourcefromsurface] shelf
+tool or volumetric emission using [Source From
+Volume|/shelf/sourcefromvolume] from the __Populate Containers__ shelf.
+
+If your scene is modeled in units besides meters, be sure to set
+__Spatial Scale__ correctly. Otherwise the FLIP Solver will adjust
+particle positions with more accuracy than required for the scene scale.
+The resulting performance degradation mostly affects __Reseeding__ and
+the __Move Outside Collision__ collision detection method.
+
+Turning off __Use Preconditioner__ might improve solve performance if
+simulating on a system with multiple CPU cores.
+
+Use the Performance Monitor to detect bottlenecks in your FLIP
+simulations.  In general the FLIP Solver should consume most of the
+solve time for a typical DOP Network.  If emitting particles is taking a
+large amount of time, consider using [Source
+Volume|Node:dop/sourcevolume] emission as described above and possibly
+even caching the points created by the corresponding [Fluid Source
+SOP|Node:sop/fluidsource].
+
+If writing out large FLIP simulations to disk using the [Dop I/O
+SOP|Node:sop/dopio], enable __Save In Background__ to allow the
+simulation to continue while the disk writes occur in the background.
+Deleting any unneeded attributes using the Compression tab will also
+save disk space and write time.
+
+Enable __Reseeding__ to help preserve surface detail, possibly
+increasing __Surface Oversampling__ to 2 or more.
+
+The __Velocity__ fields are heavily blurred and thresholded for large
+changes in velocity, which is completely tunable if the FLIP solver
+appears to be exploding. The __Pressure__ field is used to monitor any
+areas of very high and very low pressure and then the fluid sim can
+compensate the __Velocity__ fields which then push the points around.
+This is where the controls for cavitation, entrapped air, and fluid
+escape are managed to a great extent. The __Surface__ field can be used
+to test the past if some particles have flown far too far off the
+surface and then constrained back.
+    
+Increasing the __Particle Separation__ will lower the resolution, which will make your simulation faster to process.
+
+Usually you will not need to increase __Substeps__ with FLIP. However, you may want to increase this value when simulating fast moving fluid that collides with other objects. You can also increase __Substeps__ to improve the look of slow moving viscous fluid. Surface tension is an exception where substepping is likely required to maintain stability.
+
+You can vary amounts of stickiness to different objects, by building your own sticky field. The [Fluid Source|Node:sop/fluidsource] can be used to take a point attribute like `sticky` and make it a varying volume where you want stickiness to occur. Then, in the solver, you can use this field as the control field for the __Stick On Collision__ function on the __Collisions__ tab of the solver.
+
+A good debugging rule of thumb for FLIP when seeing unexpected collision behavior is to immediately enable the __Collision__ and __Collision Velocity__ visualization on the [FLIP Object|Node:dop/flipobject], so you can see exactly what the solver is seeing for collisions.
+        NOTE:
+                This is different from just turning on __Show Collision Guide Geometry__ on the collision object. The collision fields on the [FLIP Object|Node:dop/flipobject] are the result of sampling from that volume and building a velocity field from object transforms or point velocities.
+
+Turning __Reseed Particles__ off and having the __Jitter Scale__ set to 0 gives a uniform-spaced grid of particles. This is generally not recommended, because you won't end up filling the voxels as effectively as with jittered points, and as they move around you'll get an uneven distribution due to numerical error, especially with __Reseed Particles__ turned off.
+
+
+=== Collision Tips === 
+
+Accurate velocities for moving collision objects are extremely important for
+fluid simulations in general, but particularly for FLIP. Incorrect collision
+velocities can lead to less dynamic splashes or fluid leaking through
+geometry.  For DOPs to calculate accurate collision velocities with moving or
+deforming DOP objects, the  [DOP network|Node:obj/dopnet] must have __Cache
+Simulation__ enabled. However, with very large FLIP simulations, the FLIP
+object data for a single timestep might not fit in cache memory.  In this
+case, disable __Allow Caching__ on the [FLIP Object|Node:dop/flipobject] to
+remove the FLIP data from the cache, while still caching the collision 
+objects.
+
+Many FLIP simulations use 2 or more substeps.  For deforming collision
+objects, make sure that the input geometry properly interpolate to subframes. 
+The [Collision Source|Node:sop/collisionsource] SOP handles interpolating the
+geometry and creating VDB Signed Distance volumes that can be used with FLIP.
+Use the [Deforming Object|/shelf/deformingobject] shelf tool to set up deforming
+geometry as a FLIP collision object.
+
+Another option for adding collision objects to fluid simulations was the 
+[Collide With Object|/shelf/collidewithobjects] shelf tool, which adds
+collision volumes directly to the simulation using the
+[Source Volume|Node:dop/sourcevolume] DOP. However, as of Houdini 14, this
+option is deprecated and not recommended.  Instead use the the
+[Deforming Object|/shelf/deformingobject] shelf tool.
+
+NOTE:
+    If using __Source Volume__ based collisions, you _must_ use the
+    __Move Outside Collision__ method for particle collisions, because the __Particle__
+    method only works when a collision is represented by an actual DOP object.
+
+NOTE:
+    The default velocity scale for Source Volume is 1.5, which will cause
+    larger splashes by default, but for moving containers this should be
+    set to 1.
+
+In some cases, especially with thin collision objects, the FLIP Solver
+may not resolve the collision properly when simulating at relatively low
+resolutions. Enabling __Collision Separation__ on the [FLIP
+Object|Node:dop/flipobject] and setting this value to the __Particle
+Separation__ or smaller will create a higher-resolution collision field
+that will help the solver resolve the collision better.  With very thin
+objects you may even need to create proxy collision geometry that
+generates a thicker SDF.
+
+__Move Outside Collision__ is the fastest collision handling method and provides
+the smoothest splashes, however it is not as accurate with fast-moving collision geometry.
+It is also the only collision method that works with __Source Volume__ based collisions.
+
+
+@parameters
+
+== Substeps ==
+
+Timescale:
+    A scaling factor for time inside this solver. `1` is normal speed, greater than `1` makes the FLIP simulation appear speeded up, less than `1` makes the simulation appear to be in slow motion.
+    
+    You can use expression functions such as [Exp:doptime], [Exp:dopframe],[Exp:dopsttot], and [Exp:dopttost] to convert between global times and simulation times.
+
+    NOTE:
+        Changing the __Timescale__ only affects the timestep of the simulation. If adding velocities calculated in SOPs to the simulation for collisions or pumps with the [Source Volume DOP|Node:dop/sourcevolume], scale the incoming velocities by `1 / Timescale` to match the timestep of the simulation.
+
+Min Substeps:
+    The FLIP solver will always enforce this minimum number of substeps.
+
+    This should only rarely need to be changed.
+Max Substeps:
+    The FLIP solver will not break the simulation down in to more
+    substeps than this value.
+
+CFL Condition:
+    The CFL condition is a factor used to automatically determine what
+    size substep the scene requires. The idea is to control the distance
+    that a particle in the particle fluid object can travel in a given
+    substep.
+
+    For example, when this parameter is set to 0.5, the solver will set
+    the length of each substep such that no particle travels more than
+    50% of its particle separation in a given substep.
+
+Particle Advection CFL:
+    The CFL condition for particle advection.  This can be set lower
+    than the CFL condition for the entire solver, as it only affects the
+    accuracy of particle advection in the velocity field.
+
+Quantize to Max Substeps:
+    Alway use substeps that divide up the frame by __Max Substeps__.  For example,
+    if __Max Substeps__ is set to 4, but the __CFL Condition__ only requires 3 substeps,
+    the solver will take frame steps of 0.25, 0.5, and 0.25.  This option can be useful for
+    re-using input geometry that has been cached to file at increments of 1/__Max Substeps__.
+
+== Particle Motion ==
+
+Apply External Forces:
+    Standard DOP forces, such as gravity from a [Gravity
+    DOP|Node:dop/gravity], will be applied to the particles.
+
+    This would only be turned off if you are combining a FLIP solver as
+    part of a larger solver system.
+
+Force Override:
+    If enabled, this attribute will disable the volume forces wherever
+    it is 1 on the particles, and enable it when where it is 0.  Ie,
+    particles with this attribute at 1 will fly ballistically with no
+    reference to other particles. However, their motion will still
+    affect other particles which have volume forces.
+
+Under-Resolved Particles:
+    Depending on the values of the __Particle Radius Scale__ and the
+    volume __Grid Scale__ on the [FLIP Object DOP|Node:dop/flipobject],
+    individual particles can become under-resolved on the grid and
+    "disappear" from the pressure solve.  This parameter controls how
+    the solver treats such particles:
+
+    No Detection:
+        Make no attempt to detect under-resolved particles.
+    Detect Only:
+        Set a float-valued `underresolved` attribute on each particle
+        that indicates the amount it is under-resolved.
+    Treat as Ballistic:
+        Set the `underresolved` attribute and combine it with any
+        specified __Force Override__ attribute to determine whether the
+        particle should be treated ballistically or as a fluid.
+    Use Extrapolated Velocity:
+        Use the extrapolated fluid velocity unless a particle is
+        outside the range of valid extrapolated values as specified by 
+        __Max Cells to Extrapolate__. For particles outside the valid
+        range, this setting is the same as __Treat as Ballistic__. This will reduce stringiness in splashes.
+    Kill:
+        Kill any fully under-resolved particles.
+
+    NOTE:
+        If the __Particle Radius Scale__ / __Grid Scale__ >= sqrt(3) /
+        2, then particles will never be under-resolved.
+
+Collision Detection:
+    Controls handling of collisions between particles and other objects.
+
+    None:
+        Do not perform particle collision detection.  Particles will
+        only avoid collisions as a result of the pressure solve, but due
+        to numerical error can possibly end up inside collision objects.
+    Particle:
+        Perform particle collision detection, including Feedback between
+        particles and other simulated objects. This collision method
+        also supports friction and bounce.  It is the most accurate, but
+        slowest collision method.
+    Move Outside Collision:
+        Perform collision detection by moving particles outside any
+        collision objects.  This is faster than the __Particle__ method,
+        but not as accurate for thin or fast-moving objects.
+
+Kill Unmoveable Particles:
+	Kill any particles that become stuck inside the collision SDF (in local minima) when using __Move Outside Collision__ collision handling.
+
+=== Behavior ===
+
+Collide with Volume Limits:
+    For __Closed Boundaries__ as specified on the [FLIP Object
+    DOP|Node:dop/flipobject], particles will be constrained to stay
+    inside the extents of the volumes as specified in the __Volume
+    Limits__ tab.  This setting is useful for closed "tank" type fluid
+    simulations.
+
+Kill Outside Volume Limits:
+    Kill any particles outside the volume limits.
+
+Use Friction and Bounce:
+    Enable support for particle __Friction__ and __Bounce__ as specified
+    on the __Physical__ tab of the [FLIP Object
+    DOP|Node:dop/flipobject].  Only enabled if __Collision Detection__
+    is set to __Particle__.
+
+Add ID Attribute:
+    Add a unique ID attribute to each particle.
+
+Age Particles:
+    Age the particles over time.
+
+Reap Particles:
+    Kill any particles whose age attribute is greater than its life attribute.
+
+Delete Attributes:
+    Deletes internal attributes that are typically not required in the output of 
+    the simulation.  Removing an attribute from this list will ensure it exists
+    at the end of the timestep.
+
+=== Reseeding ===
+
+Reseed Particles:
+    Create new particles in voxels where the particle count has dropped
+    too low to properly represent the fluid surface, and delete
+    particles in voxels that have become too crowded.  Reseeding can
+    help avoid collapsing pockets of air forming in the fluid near
+    collisions, as well as provide a smoother surface from which to
+    generate a polygonal mesh.
+
+Particles Per Voxel:
+    The goal number of particles per voxel.
+
+Surface Oversampling:
+    The goal number of particles will be scaled by this amount when within
+    __Oversampling Bandwidth__ of the surface.
+
+Oversampling Bandwidth:
+    Oversample within this number of voxels from the surface or any
+    __Surface__ volume boundaries, if __Oversample at Boundaries__ is
+    enabled.
+
+Oversample At Boundaries:
+    Oversample within __Oversampling Bandwidth__ voxels of the fluid
+    volume boundaries. This setting helps avoid collapsing pockets of
+    fluid at the boundaries of a "Tank"-type simulation.
+
+Birth Threshold:
+    Particles will be added to a voxel once the current number drops
+    below the product of this parameter and the goal number of
+    particles.
+
+Death Threshold:
+    Particles will be deleted from a voxel once the current number rises
+    above the product of this parameter and the goal number of
+    particles.
+
+Random Seed:
+    A seed that controls the time-varying random function used to generate
+    new particle positions when reseeding.  Because high-frequency splashes
+    in a simulation are strongly influenced by particle positions, varying
+    this value (e.g. with a [Wedge ROP|Node:out/wedge]) can generate
+    multiple simulations with similar bulk motion but different splash behavior
+    from otherwise identical simulation parameters.
+
+Interpolate Attributes:
+    All attributes matching this pattern will be interpolated to newly
+    seeded particles from the surrounding existing particles.  This interpolation
+    is more expensive than the default nearest neighbor copy, but yields
+    a smoother particle sampling for attributes like velocity.  For example, the
+    `viscosity` attribute might be added to this list for fluids smoothly transitioning
+    between melting or freezing, while it should be omitted for "multi-phase" fluids
+    with distinct viscosity values.
+
+NOTE:
+    Setting the various __Reseeding__ values too high can lead to fluid
+    gaining volume over time in very splashy fluid simulations.
+    Decreasing the __Particle Radius Scale__ or the __Death Threshold__
+    can reduce the volume by causing overcrowded voxels to be pruned
+    earlier.  Decreasing the amount and/or bandwidth of __Surface
+    Oversampling__ can help alleviate this problem as well.
+
+=== Separation ===
+
+Apply Particle Separation:
+    Despite the velocity projection stage, particles can end up closer
+    together than their `pscale` attribute.  When this happens, internal
+    forces can't separate the particles because the velocity projection
+    will remove those forces.  This results in the fluid compressing
+    over time.
+
+Separation Iterations:
+    The number of times to perform the separation relaxation step.  This
+    value can usually be set to 1 since successive frames of separation
+    will have the same effect.
+
+Separation Rate:
+    How far to move the particles towards their desired separation
+    locations.  This can be reduced to get the effect of a fractional
+    iteration.
+
+Separation Scale:
+    A fudge factor to account for the inability for the particles to
+    actually pack at the `pscale` amount due to the sphere packing
+    problem.  To test different values, run a FLIP solve without any
+    volume or particle forces and see which values cause your initial
+    particles to retain the desired volume.
+
+=== Droplets ===(droplet)
+
+Detect Droplets:
+    Identify particles that separate from the main body of fluid via a
+    float `droplet` attribute that ranges from 0 to 1.  As a particle approaches
+    full droplet status, it will be less influenced by fluid forces.  A fully
+    droplet particle also does not contribute velocity back to the fluid
+    simulation, which can alleviate the problem of individual falling particles
+    causing unrealistically large disturbances on a smooth fluid surface.  Enabling
+    droplets can also break up tendrils on the leading edge of splashes, giving them
+    a more diffuse look.
+
+Min Particle Density:
+    A particle has a droplet value of 1 (droplet) when the surrounding
+    fluid particle density is below this value.
+
+Max Particle Density:
+    A particle has a droplet value of 0 (fluid) when the surrounding
+    fluid particle density is above this value.
+
+Behavior:
+    Controls handling of droplet particles.
+
+    Blend With Fluid:
+        When a fully droplet particle rejoins the fluid, make its velocity a
+        blend between the the droplet's velocity and the existing fluid velocity,
+        as specified in the __Velocity Blend__ parameter.
+
+    Kill On Detection:
+        Immediately kill any fully droplet particles.
+
+    Kill At Fluid:
+        Kill any fully droplet particles that rejoin the fluid.
+
+Velocity Blend:
+    Controls the blend between droplet particle velocity and the fluid velocity
+    when __Behavior__ is set to __Blend With Fluid__.
+
+=== Vorticity ===
+
+Add Vorticity Attribute:
+    Compute the vorticity of the fluid velocity field and mix it into the `vorticity`
+    attribute on the particles.
+
+Preservation Rate:
+    The amount of existing vorticity measurement on the particles to preserve
+    per second before mixing in the current computed value.  For example a value
+    of 0.1 will retain 10% of the vorticity measurement over a second.
+
+Mix Method:
+    #id: vorticitymix
+    How to blend the computed vorticity with the existing `vorticity` attribute value.
+
+Vorticity Scale:
+    A scale applied to the computed vorticity.
+
+=== Rest ===
+
+Add Rest Attribute:
+    Creates a `rest` attribute, which can be used to track the position of the fluid over time. Turn this on to map noise or textures in the liquid shader.
+
+Dual Rest Attributes:
+    Creates a `rest2` attribute that is one back from the the main `rest` attribute, allowing you to run longer simulations without popping by blending between the two attributes.
+    
+Frames Between Reset:
+    Number of frames before resetting the rest attributes.
+
+Frame Offset:
+    Which frame the rest attributes will be reset on. If you are prerolling the simulation, delaying the rest attribute initialization until after the preroll will usually give a better result.
+
+== Volume Motion ==
+
+Velocity Transfer:
+    Specifies the method used for transferring velocity from the particles
+    to the underlying grid before solving, then back to the particles.
+
+    Splashy Kernel:
+        Transfers the change in velocity from solving back to the particles,
+        along with a small portion of the current velocity as specified by the
+        __Velocity Smoothing__ parameter. This method gives splashy, high-energy
+        simulations, but can also introduce noise at the surface which can be distracting
+        for small scale or viscous fluids.
+
+    Swirly Kernel:
+        Transfers the velocity field directly to the particles using additional
+        attributes to preserve the angular momentum of the fluid.  This method retains vortices
+        well with reduced noise at the surface, yielding swirling simulations with fewer splashes that
+        can be effective at small scale or high viscosity.
+
+        In this case, the transfer radius is based on the voxel size, so using smaller voxels by
+        setting the __Grid Scale__ on the [FLIP Object|Node:dop/flipobject] to 1.5 can help retain
+        small fluid details.  Because of the larger radius and extra attributes, this method is slightly
+        slower and uses more memory than the __Splashy Kernel__.  Also, the __Under-Resolved Particles__
+        options are disabled for this method, as particles will always be fully resolved on the grid.
+
+    NOTE: 
+        The __Splashy Kernel__ corresponds to the __FLIP/PIC__ method of velocity transfer, while the __Swirly Kernel__ is implemented with the newer __APIC__ method.
+
+Force Scale:
+    The result of the velocity projection is a suggested change to the
+    particles velocity.  The force scale allows you to scale this
+    change.  A value of 1 will update the particles to the new desired
+    velocity, 0 will leave them unchanged.
+
+Velocity Smoothing:
+    Particles can either update themselves with the change in velocity
+    determined by the projection, or update themselves with the actual
+    new velocity from the projection.  The latter causes particle velocities
+    to smooth out as they share more of their velocities with their
+    neighbors.
+
+Smooth Surface:
+    Use a more accurate algorithm for tracking the surface SDF over time,
+    providing smoother surfaces for stationary or slow moving liquids.
+    This improvement may not be noticeable in very turbulent simulations
+    such as rivers or waterfalls and can be disabled for a small performance gain.
+
+Update Surface:
+    Controls how the surface SDF is updated at the end of each substep
+    to match the particle positions.
+
+    None:
+        Do not update the surface SDF.
+
+    Advect:
+        Advect the surface SDF through the velocity field.  This is the
+        faster than Rebuild, but not as accurate.
+
+    Rebuild:
+        Rebuild the entire surface SDF from the particles.  This the
+        most accurate method, but also the slowest.
+
+    NOTE:
+        Because particle positions are updated last in the solve order,
+        the surface SDF will lag slightly behind the particle positions
+        if __Update Surface__ is set to None.
+
+Update Velocity:
+    Controls how the velocity field is updated at the end of each
+    timestep to match the particle positions.
+
+    None:
+        Do not update the velocity field.
+    Advect:
+        Advect the velocity field through itself.  This is the faster
+        than Rebuild, but not as accurate.
+    Rebuild:
+        Rebuild the entire velocity field from the particles.  This the
+        most accurate method, but also the slowest.
+
+    NOTE:
+        Because particle positions are updated last in the solve order,
+        the velocity field will lag slightly behind the particle
+        positions if __Update Velocity__ is set to None.
+
+=== Volume Limits ===
+
+If stray particles fly off too far, the resulting volume grid can become
+unwieldy even with constant tile compression.  This tab allows you to
+set maximum bounds.
+
+Visualize Limits:
+    Display the guide showing the maximum limits of the simulation.  The
+    actual simulation size will most likely be smaller if __Dynamically
+    Resize Fields__ is enabled.
+
+Box Size:
+    The size of the maximum volume.
+
+Box Origin:
+    The origin of the maximum volume.
+
+Dynamically Resize Fields:
+    Resize the volumes each timestep to contain the particle geometry,
+    within the limits specified. The volumes will be padded by the
+    number of voxels specified in __Max Cells to Extrapolate__.
+Fill New Volume:
+    If the __Volume Limits__ change between frames, this option allows
+    particles to be seeded into a new empty region in the volume.
+    __Use Waterline__ and __Use Boundary__ controls how the new particles
+    are created.
+Use Waterline:
+    If the __FLIP Object__ uses __Closed Boundaries__, this option will
+    set each corresponding boundary to be open above the waterline. This
+    allows particles to elegantly leave the simulation and reduces reflections
+    at the boundaries. This can also be used instead of the __Surface
+    Volume__ for __Fill New Volume__ and __Use Boundary Layer__.
+Visualize Waterline:
+    Display the waterline plane where fluid above the plane can freely flow out of
+    an otherwise closed boundary.
+Waterline:
+    The __Waterline__ level and __Waterline Direction__ define the waterline plane. Along
+    a closed boundary, simulation voxels above this plane will be set as
+    an open boundary. For __Fill New Volume__ and  __Boundary Layer__, the plane
+    is defines the surface, where particles above the plane are considered to be
+    outside of the surface.
+Waterline Direction:
+    The waterline direction specifies the "up" direction of the waterline plane.
+    The border between the closed and open boundary region is a combination of the 
+    waterline level and the waterline direction.
+Use Boundary Layer:
+    Maintaining a thin region around the FLIP simulation can be used to imitate
+    the behavior of an infinite tank. By deleting and reseeding particles
+    according to a provided surface and velocity field, reflections at simulation
+    boundaries can be reduced. Particles entering the boundary layer that are
+    above the specified surface (given by the waterline or surface volume option)
+    will be removed. Particles entering the boundary layer that are below the
+    surface will be assigned a new velocity if the velocity volume option is used.
+Apply Boundary Velocities:
+    The __Velocity Volume__ is automatically applied along the __Closed Boundaries__ when
+    __Use Boundary Layer__ is activated. This option will also overwrite the velocity field
+    inside the boundary layer according to the __Velocity Volume__ (or the default of zero
+    velocity when using the waterline). When this is turned off, newly created
+    particles will interpolate velocities from neighbouring particles.
+
+Lower Padding:
+    The __Boundary Layer__ will be offset into the simulation volume by the specified
+    amount from the lower boundary of the simulation volume.
+Upper Padding:
+    The __Boundary Layer__ will be offset into the simulation volume by the specified
+    amount from the upper boundary of the simulation volume.
+Surface Volume:
+    The surface in boundary layer can be maintained by a provided SDF. Particles
+    above the surface will be removed. The volume below the surface will re-seeded.
+    The particles seeded in a new volume region will be created based on this surface.
+Velocity Volume:
+    The velocity of the particles in the boundary layer and new volume will be
+    assigned a velocity sampled from this velocity volume.
+
+=== Collisions ===
+
+Velocity Scale:
+    Scale the input collision velocities, increasing the effect of
+    moving objects on the fluid and creating bigger splashes, for
+    example.  This value should usually be 1 or greater.
+
+    NOTE:
+        Use __Transparency__ to reduce the overall effect of collisions
+        on fluid.
+
+Velocity Type:
+    The method used to calculate collision velocities for colliding DOP
+    Objects. This setting does not affect collision velocities
+    introduced by a [Source Volume DOP.|Node:dop/sourcevolume]
+
+    Rigid Velocity:
+        The collision velocity of the objects is calculated by treating
+        it as a rigid body.  Only the angular velocity and linear
+        velocity will be used, no local deformation will be taken into
+        account.
+
+    Point Velocity:
+        The collision velocity of the objects tries to take into account
+        deformation by using point history.  This only works if the
+        topology doesn't change.
+
+    Volume Velocity:
+        Uses the SDF representation of the object to detect deformation.
+        Does not require a fixed topology over time, but cannot detect
+        tangential velocities.
+
+Surface Extrapolation:
+    When the fluid surface is within this voxel distance of a collision,
+    the solver will consider it part of the collision object.  This
+    extrapolation helps fluid flow smoothly along curved surfaces, but
+    can create a slight stickiness.  Decreasing this value can create
+    more dynamic splashes from collisions, especially as objects enter
+    the fluid.
+    
+    NOTE:
+        Setting this to 0 is not recommended.
+
+Volume Fraction Method:
+    The solver uses fractional estimates of collision volumes to
+    increase the accuracy of the pressure solve around curved or sloped
+    surfaces.
+
+    Voxel Face Area:
+        Estimate the fractional collision weight by determining how much
+        of each voxel face is occluded by the collision volume.  This
+        method provides the smoothest handling of sloped objects, but
+        can treat square objects as excessively smooth.
+
+    Collision Supersampling:
+        Estimate the fractional collision weight by sampling the
+        collision volume multiple times for each voxel. This method
+        handles square-shaped collision objects better, but can
+        introduce some false friction-like forces on sloped surfaces.
+
+    None:
+        Do not calculate collision weights.  This should only be used by
+        advanced users for a high degree of control over the collision
+        weights by calculating them manually, usually with a [Gas SDF To
+        Fog DOP.|Node:dop/gassdftofog] attached to the __Volume
+        Velocity__ input.
+
+Samples Per Axis:
+    How many samples are taken per axis when the __Volume Fraction
+    Method__ is set to __Collision Supersampling__.  Increasing this
+    value makes for a more accurate estimate, but note that the total
+    number of samples taken is the _cube_ of this number.
+
+Transparency:
+    Make all collision objects "transparent" to the fluid by this
+    amount, decreasing the effect of objects on the fluid and allowing
+    some fluid to flow through the objects.
+
+    NOTE:
+        If using __Transparency__, the __Collision Detection__ method of
+        the __Particle Motion__ tab should usually be set to __None__,
+        otherwise the particle collision detection will not allow any
+        particles to intrude into collision objects, no matter what the
+        __Transparency__ value.
+
+Stick on Collision:
+    Causes the fluid's velocity to match the collision velocity when
+    close to collision objects.  See the 
+    [Gas Stick On Collision DOP|Node:dop/gasstickoncollision] for more
+    information.
+
+Stick Scale:
+    The amount of collision velocity to blend into the fluid's velocity,
+    where a value of 1 indicates fully matching the collision velocity.
+
+Max Distance:
+    Specifies the world-space distance within which to apply the effect.
+
+Max Cells:
+    Specifies the maximum number of voxels within which to apply the
+    effect.
+
+Stick Bias:
+    Controls how quickly within the stick distance the effect will reach
+    the full __Stick Scale__. Values closer to 1 will have more effect
+    throughout the stick distance.
+
+Normal Scale:
+    Scale the amount of velocity adjustment in the direction normal to the collision surface.
+
+Tangent Scale:
+    Scale the amount of velocity adjustment in the direction tangent to the collision surface.
+
+TIP:
+    Keeping a high __Normal Scale__ and decreasing the __Tangent Scale__ can create a "sticktion" effect, where the fluid flows quickly around the collision but remains stuck to the surface.
+
+Control Field:
+    Scale the effect by this spatially varying field, which should match the collision field in resolution.
+
+=== Viscosity ===
+
+NOTE:
+    See [the discussion of viscosity|/fluid/liquids#viscosity] in the
+    user guide.
+
+Enable Viscosity:
+    Enable the viscosity solver.
+
+Viscosity by Attribute:
+    Use the specified attribute to overwrite the viscosity field.
+
+Attribute Name:
+    #id: viscosityattrib
+
+    The float attribute on the particles to use for the viscosity
+    amount.
+
+Mix Method:
+    #id: viscositymix
+
+    How to blend the point attribute with the existing viscosity field.
+
+Viscosity Scale:
+    #id: viscosityscale
+
+    A scale applied to the Viscosity field after applying the attribute
+    effect.  This is useful for quickly adjusting the global amount of
+    viscosity.
+
+Float Precision:
+    #id: viscosityprecision
+    This parameter controls the floating point precision used
+    internally by the viscosity solver. __Float 32 bit__ uses less memory and is
+    generally faster than __Float 64 bit__. However, the extra accuracy of 64-bit
+    floating point numbers may be needed when simulating fluid with very high
+    viscosity or large variations in viscosity.
+
+Slip on Collision:
+    Causes the collision velocity to match the fluid velocity when close to
+    collision objects. This allows a viscous fluid to slide along the collision
+    object.
+
+Slip Scale:
+    The amount of fluid velocity to blend into the collision's tangential 
+    velocity, where a value of 1 indicates fully matching the fluid velocity.
+
+Control Field:
+    Scale the effect by this spatially varying field, which should match the collision
+    field in resolution.
+
+=== Density ===
+
+By default, the fluid has uniform density as set on the __Physical__ tab
+of the [FLIP Object|Node:dop/flipobject]. To simulate fluids of varying
+density, you can use a per-particle density attribute to control the
+density throughout the fluid.
+
+If you override the __Density__ field through the __Volume Velocity__
+input to the flip solver, you can arbitrarily edit the density field.
+
+Density by Attribute:
+    Use the specified attribute to manipulate the density field.
+
+Attribute Name:
+    #id: densityattrib
+
+    The float attribute on the particles to use for the density amount.
+
+Mix Method:
+    #id: densitymix
+
+    How to blend the point attribute with the existing density field.
+
+Density Scale:
+    #id: densityscale
+
+    A scale applied to the Density field after applying the attribute
+    effect.  This is useful for quickly adjusting the global amount of
+    density.
+
+TIP:
+    By setting the __Mix Method__ to Multiply, you can use relative
+    density values that scale the default fluid density.  A density
+    attribute of 1, for example, will have the density of water by
+    default, while a density attribute of 0.5 would indicate fluid of
+    half that density.  Relative density is also known as _specific
+    gravity_; values for typical liquids can be found
+    [here|http://www.engineeringtoolbox.com/specific-gravity-liquids-d_336.html].
+    Note that because the FLIP Solver does not explicitly track the
+    boundary between fluids of different densities, it might be
+    necessary to exaggerate density ratios to avoid excess mixing.
+
+=== Air ===
+
+By default, the air volume is not simulated and is treated entirely as
+a void. This assumption causes air regions to collapse or expand based
+on the motion of the liquid. Enforcing air incompressibility
+restricts the liquid motion to treat each air region as incompressible. 
+
+Enforce Air Incompressibility:
+    #id: doincompressibleair
+    
+    The divergence free constraint will now also be applied to the
+    air volume. This will prevent air volumes from collapsing
+    and create rising bubbles. This is useful for capturing
+    realistic air-liquid interaction like a glugging watercooler.
+
+   Apply Moving Collision:
+    #id: applymovingcollisiontoair
+
+    Moving collisions can interact indirectly with the liquid through
+    an air pocket. Any compression applied to the air pocket by the 
+    collision is compensated for at the liquid surface of the air pocket.
+
+Min Air Region Voxels:
+    #id: minairregionsize
+
+    Air regions containing fewer voxels than the minimum will not have
+    their incompressibility enforced. This is useful for preventing small
+    bubbles from emerging along collision surfaces.
+
+TIP:
+    Turn off __Dynamically Resize Fields__ when enforcing air incompressibility inside collision containers. Otherwise the enforcement might not detect the enclosed air region and the liquid
+    could pour through unaffected.
+
+NOTE:
+    The __Enforce Air Incompressibility__ feature does not solve for the velocity in the air volume. It simply constrains the velocity of the liquid from compressing or expanding the air volume.
+    This approach makes the simulation much more efficient than fully simulating the entire air-volume.
+
+NOTE:
+    Bubbles submerged in the fluid could dissapear during the render stage when using the default settings in [Particle Fluid Surface|Node:sop/particlefluidsurface]. Activate the  __Preserve Bubbles__ in [Particle Fluid Surface|Node:sop/particlefluidsurface] to maintain the bubbles inside the fluid.
+
+=== Divergence ===
+
+By default, the volume motion is divergence free.  These enforces
+neighboring particles to neither separate nor converge.  However, you
+may want to adjust the particle spacing.  Doing this with forces is
+difficult because the volume projection will undo your forces.
+
+Instead, you can add a per-particle float attribute to store how much
+the particles should diverge.  Positive values cause particles to spread
+out, and negative values cause them to clump together.
+
+If you override the __Divergence__ field through the __Volume Velocity__
+input to the flip solver, you can arbitrarily edit the divergence field.
+
+You must turn on __Add Divergence Field__ in the [FLIP
+Object|Node:dop/flipobject] for this to work.
+
+Diverge by Attribute:
+    Use the specified attribute to overwrite the divergence field.
+
+Attribute Name:
+    #id: divergenceattrib
+
+    The float attribute on the particles to use for the divergence
+    amount.
+
+Mix Method:
+    #id: divergencemix
+
+    How to blend the point attribute with any existing divergence field.
+    The divergence field is not reset frame-to-frame.
+
+Divergence Scale:
+    #id: divergencescale
+
+    A scale applied to the divergence field after applying the attribute
+    effect.  This is useful for quickly adjusting the global amount of
+    divergence.
+
+=== Surface Tension ===
+
+Surface tension flattens irregular features and pulls water into
+droplets.  It is useful for small-scale simulations where the
+effect of surface tension is often more important than gravity
+in controlling the dynamics.
+
+For large values, additional substeps are often required to ensure
+stability.
+
+Enabling surface tension will create the `surfacepressure` field.
+This field can be used for other effects than just surface tension,
+such as suction or avoidance.
+
+Enable Surface Tension:
+    Enable the `surfacepressure` field.
+
+Surface Tension:
+    The magnitude of the surface tension.  This depends on the mass-density
+    of the fluid, so must be changed if the mass-density is changed.
+
+    Given the same object, but reduced particle separation (ie, a higher
+    resolution simulation), you may need to reduce the magnitude of the
+    surface tension to maintain the same qualitative result.
+
+    Negative values will cause the surface to rip itself apart in a
+    spectacular fashion.
+
+=== Solver ===
+
+Spatial Scale:
+    Indicates the scale of the simulation. This value controls the
+    tolerance of various particle operations, particularly moving
+    particles to match SDF iso surface values, and some solver defaults
+    for density and viscosity.  If your scene is modeled in meters, then
+    the default value of 1 is sufficient. However, if your scene is
+    modeled in centimeters, you should set __Spatial Scale__ to 0.01.
+
+    TIP:
+        Choose the correct __Unit Length__ in __Edit__ > __Preferences__
+        > __Hip File Options__ before you create your DOP network. That
+        way, the FLIP solver node will automatically get the correct
+        __Spatial Scale__ when it's created.
+
+Mass Scale:
+    Indicates the mass scale of the simulation. This value controls the
+    solver tolerance for density and viscosity.  If your scene is
+    modeled in kilograms, then the default value of 1 is sufficient.
+    However, if your scene is modeled in grams, you should set __Spatial
+    Scale__ to 0.001.
+
+    TIP:
+        Choose the correct __Unit Mass__ in __Edit__ > __Preferences__ >
+        __Hip File Options__ before you create your DOP network. That
+        way, the FLIP solver node will automatically get the correct
+        __Mass Scale__ when it's created.
+
+Feedback Scale:
+    A scale factor used in applying feedback forces to other objects.  A
+    value of zero prevents any feedback from occurring.
+
+    The default [RBD object|Node:dop/rbdobject] has the same density as
+    water, so to balance with the default fluid density a value of 1
+    should be used.
+
+Extrapolation Mode:
+    Controls the method used for extrapolating velocity in the solver.
+
+    Normal:
+        A fast method that properly handles curved collision
+        containers.  This is the recommended extrapolation mode.
+
+    Fast-moving Colliders:
+        A slower method that can be more accurate with fast moving
+        colliders and a low number of substeps.
+
+Automatic Extrapolation By Speed:
+    Improve handling of fast-moving fluid by automatically increasing
+    the extrapolation distance based on the fluid's speed.  In most
+    cases, this avoids tuning the __Max Cells To Extrapolate__ parameter.
+    The final extrapolation distance is the greater of 
+    __Max Cells To Extrapolate__  and the speed-calculated value.
+
+Max Cells to Extrapolate:
+    The number of non-fluid cells that should be filled with velocity
+    values on the non-fluid side of the velocity field. Increase this
+    value for very fast-moving fluids and/or a low number of substeps.
+
+Use Preconditioner:
+    During the pressure projection and viscosity solves, the matrices
+    involved can be preconditioned to speed up the solution.  However,
+    this is a single threaded process.  On machines with 4+ sockets it
+    may be faster to disable this preconditioning and use a simpler
+    Jacobi preconditioner which multithreads well, but can take more
+    iterations to converge.
+Use OpenCL:
+    Solve the linear systems for viscosity and pressure using OpenCL. 
+    This setting is mostly beneficial for high resolution fluid simulations
+    with viscosity, when run on a fast GPU.
+
+NOTE:
+    The following collision fields are used mainly for creating guiding simulations.
+    They are only connected to the collision fields in both the pressure and
+    viscosity solvers. All other nodes that apply collision information use the
+    internal fields. Please refer to [Gas Guiding Volume DOP|Node:dop/gasguidingvolume]
+    for more information about creating guiding fields.
+
+Collision Surface:
+    The collision surface that is connected to pressure and viscosity solvers.
+    
+Collision Weights:
+    The collision weights improve the accuracy of the pressure and viscosity solvers.
+    
+Collision Velocity:
+    The collision velocity is applied to the fluid through the solvers at the collision surface.
+
+NOTE:
+    The following fields are used mainly to maintain FLIP particles for guiding
+    simulations. These fields are connected to a [Gas Seed Markers DOP|Node:dop/gasseedmarkers].
+    
+Source Surface:
+    FLIP particles are seeded into the source surface. This is useful for allowing
+    the fluid to flow out of a guiding simulation surface.
+    
+Sink Surface:
+    FLIP particles are removed when they enter the sink surface. This is useful
+    for removing unneeded particles that flow deep into a guiding simulation surface.
+
+=== Narrow Band ===
+
+When this tab is enabled, FLIP particles are only maintained near the fluid surface. The rest of the fluid is represented by volumes (e.g. surface or velocity).
+
+Removing particles deep inside the fluid reduces the memory footprint
+and can often improve the performance of the fluid simulation. 
+
+NOTE:
+    Because the fluid is largely represented by volumes, __Density
+    by Attribute__ and __Viscosity by Attribute__ are not supported.
+  
+Enable Particle Narrow Band:
+    A narrow band of FLIP particles will be used to update the
+    fluid's surface and velocity volumes within the __Bandwidth__
+    of the fluid surface. Any particles deeper into the fluid than
+    the __Bandwidth__ will be removed from the simulation.
+
+Bandwidth:
+    The narrow band of FLIP particles will be maintained at this voxel
+    thickness. Very fast moving simulations might require a larger
+    bandwidth to maintain stability.
+
+=== Distribution ===
+
+    FLIP simulations are distributed in the same manner as particle
+    simulations; by first specifying a series of Slice planes that
+    divide space up.  Each machine then is responsible for the fluid
+    that lies within its slice.
+
+    Each substep all particles along the slice boundaries are exchanged.
+    The bandwidth specified should thus be large enough to cover how far
+    particles are expected to move in a substep.
+
+    All machines synchronize their substep size automatically, so variable
+    substeps can be used.
+
+    [Include:standard_distribution]
+
+    Distributed Pressure Solve:
+	The pressure projection may be distributed across machines.  This
+	avoids any loss of fluid and is required for tank-style simulations,
+	but not needed for flowing rivers.  It requires considerably more
+	network bandwidth, so becomes advantageous only with very large simulations.
+
+
+[Include:standard_solver_parms]
+
+@inputs
+
+Fluid to Solve:
+    The simulation object to evolve as a particle fluid.
+
+Particle Velocity:
+    This input injects microsolvers after the particle velocity has been
+    updated but before it has been transferred to the volume fields.  It
+    is thus the ideal place to add solvers that manipulate the particle
+    velocity or position still farther.
+
+Volume Velocity:
+    Solvers in the volume velocity input are added after the volume
+    velocity field has been created but before it has been made
+    non-divergent.  This is the best place for field-affecting
+    microsolvers to be attached, and the only place for microsolvers
+    that want to add forces to the velocity field.
+
+    NOTE:
+        Solvers attached to this input should not create or delete
+        particles.
+
+Sourcing (post-solve):
+    The main use for this input is to add or remove particles using the
+    [Source Volume node|Node:dop/sourcevolume] that imports particles
+    and volumes from a geometry network. See [fluid
+    sourcing|/dyno/fluid_sourcing] for more information.
+
+    Nodes attached to this input can also edit the simulation network's
+    velocity fields, for example to apply custom forces, _after_ the
+    main simulation steps.
+
+@outputs
+
+[Include:standard_data_outputs]
+
+@related
+
+- [Node:dop/flipobject]
+- [Node:dop/particlefluidemitter]
+- [Node:dop/particlefluidsink]
+- [Node:dop/gasintegrator]
+- [Node:sop/particlefluidsurface]
+

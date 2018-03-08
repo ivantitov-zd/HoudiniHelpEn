@@ -1,0 +1,147 @@
+= HOM cookbook |> Object transforms and parenting =
+
+== Overview ==
+
+This example shows how to retrieve and set transformations on object nodes.
+
+== Getting and setting transforms ==
+
+# Open `$HFS/houdini/help/files/hom_cookbook/obj_xform.hip`.
+
+	The file contains a series of boxes chained together in a transformation hierarchy. You can translate and rotate a box object in the middle of the chain to see that the outputs of that box inherit the transformations.
+
+# Choose __Window > Python Shell__ and observe the effects on `box_object4` in the viewer and the network editor as you type the following statements:
+
+	{{{
+	#!pycon
+	
+	# Store the hou.ObjNode for /obj/box_object4 into a Python variable.
+	>>> box_object4 = hou.node("/obj/box_object4")
+	>>> box_object4
+	<hou.ObjNode of type geo at /obj/box_object4>
+
+	# Ask for box_object4's world transformation.  This transformation matrix
+	# includes the parm transformation (determined from the translate, rotate,
+	# scale, etc. parameters on the object), pretransformations, parent
+	# transformations, transformations on the containing object, etc.
+	>>> xform = box_object4.worldTransform()
+	>>> xform
+	<hou.Matrix4 [[0.942106, -0.147233, -0.301261, 0],
+	[0.134676, 0.988938, -0.062158, 0],
+	[0.3070 8, 0.017987, 0.951514, 0],
+	[-5.04816, -0.769449, -9.42593, 1]]>
+
+	# Disconnect box_object4's input.  box_object4 will move, since it no longer
+	# inherits its input's transformations.  If we print out its new transformation
+	# matrix, we see that it's different.
+	>>> box_object4.inputs()
+	(<hou.ObjNode of type geo at /obj/box_object3>,)
+	>>> box_object4.setFirstInput(None)
+	>>> box_object4.inputs()
+	()
+	>>> box_object4.worldTranform()
+	<hou.Matrix4 [[0.966956, 0, 0.254942, 0],
+	[0, 1, 0, 0],
+	[-0.254942, 0, 0.966956, 0],
+	[0.885497 , 0, -3.01977, 1]]>
+
+	# Restore box_object4's transformation to its previous value.  We'll leave
+	# its input disconnected, so we'll have unparented it but kept its position.
+	# setWorldTransform will adjust the objects parameters to achieve the
+	# desired end result, accounting for inputs, pretransforms, etc.
+	>>> box_object4.setWorldTransform(xform)
+	}}}
+
+== Create a shelf tool ==
+
+Next, we'll put the logic to unparent a node and keep its position into a function in a shelf tool.
+
+# Reload `$HFS/houdini/help/hom/cookbook/obj_xform.hip` to reset the scene.
+
+# Right-click an empty area of the shelf, choose __New tool__, and name the tool "Unparent". Paste the following into the __Script__ tab:
+
+	{{{
+	#!python
+	def unparentAndKeepPos(obj_node):
+	    """
+		Unparent an object node, but keep it in the same position as it was
+	    when it was parented.
+	    """
+		
+	    xform = obj_node.worldTransform()
+	    obj_node.setFirstInput(None)
+	    obj_node.setWorldTransform(xform)
+
+	unparentAndKeepPos(hou.node("/obj/box_object4"))
+	}}}
+
+# Click the tool in the shelf to unparent `box_object4` without changing its position.
+
+== Generalize the shelf tool ==
+
+Next, we'll generalize the shelf tool to work on the selected node, instead of being hard-coded to unparent `box_object4`.
+
+# Right click the Unparent shelf tool and choose __Edit tool__.
+
+# Paste the following into the __Script__ tab:
+
+	{{{
+	#!python
+	
+	# The toolutils module ships with Houdini and is used to perform common
+	# shelf tool operations.  It can be found in $HFS/houdini/pythonX.Xlibs.
+	import toolutils
+
+	def unparentAndKeepPos(obj_node):
+	    """
+		Unparent an object node, but keep it in the same position as it was
+	    when it was parented.
+	    """
+		
+	    xform = obj_node.worldTransform()
+	    obj_node.setFirstInput(None)
+	    obj_node.setWorldTransform(xform)
+
+	# If an object is already selected, we'll use it.  If nothing is selected,
+	# we'll prompt the user to select something.  If multiple objects are selected,
+	# we'll use the last one, since that should correspond to the parameter pane
+	# contents.
+	viewer = toolutils.sceneViewer()
+	obj_node = viewer.selectObjects(quick_select=True)[-1]
+	unparentAndKeepPos(obj_node)
+	}}}
+
+== Reparenting the Selected Node ==
+
+Finally, we'll create another shelf tool that will reparent the selected node, prompting the user for the new parent node.
+
+# Right-click an empty area of the shelf, choose __New tool__, and name the tool "Reparent". Paste the following into the __Script__ tab:
+
+	{{{
+	#!python
+	
+	# The toolutils module ships with Houdini and is used to perform common
+	# shelf tool operations.  It can be found in $HFS/houdini/python2.7libs.
+	import toolutils
+
+	def parentAndKeepPos(obj_node, new_parent):
+	    """
+		Parent an object node, but keep it in the same position as it was
+	    when it was unparented.
+	    """
+		
+	    xform = obj_node.worldTransform()
+	    obj_node.setFirstInput(new_parent)
+	    obj_node.setWorldTransform(xform)
+
+	# We'll select the object to reparent in the same way the unparent tool works.
+	# We'll prompt the user to select the new parent in the viewer.
+	viewer = toolutils.sceneViewer()
+	node_to_reparent = viewer.selectObjects(quick_select=True)[-1]
+	
+	new_parent = viewer.selectObjects(use_existing_selection=False,
+	    quick_select=True,
+	    prompt="Select new parent node")[-1]
+	
+	parentAndKeepPos(node_to_reparent, new_parent)
+	}}}

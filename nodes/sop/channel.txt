@@ -1,0 +1,111 @@
+= Channel =
+
+#type: node
+#context: sop
+#internal: channel
+#icon: NETWORKS/chop
+#tags: tech, anim, channel
+
+"""Reads sample data from a chop and converts it into point positions
+and point attributes."""
+
+This node is complementary to the
+[Geometry CHOP|Node:chop/geometry]. The Channels created by the
+[Geometry CHOP|Node:chop/geometry] can be modified and then re-inserted
+into the op network via a Channel SOP.
+
+This does what a [Point SOP|Node:sop/point] with a `chopci()` function can
+do, but is much faster.
+
+There are two different ways of importing attribute values, 
+controlled by the  __Method__ parameter. Each method requires that the CHOP 
+channels are set up in a specific way.
+
+The  __Static__ method is used for modeling a surface without any animation. 
+A single channel is required for each attribute component, and its length must
+be the number of points in the geometry or specified point group(s). 
+To modify `P` in a geometry with 100 points, three channels with 100 samples 
+would be required.
+
+The second method, __Animated__, provides animation for the attribute. 
+There must be one set of channels for each attribute component, and this set
+must be indexed from 0 to the number of points minus one, by adding a numeric
+suffix. For the attributes `Cd Alpha` with 3 points, you would need 
+`r0 g0 b0 a0 r1 g1 b1 a1 r2 g2 b2 a2`.  The length of the channels determines 
+the animation length.
+
+The Channel SOP can also update portions of the geometry. By using point groups
+from the incoming op, the channels can be inserted only into the groups' points.
+To modify only some components of a vector, use brackets to specify the 
+component index (_P(1)_ refers to the Y value of the point position). 
+
+@parameters
+
+Group:
+    Modify only the points within this point group. If blank, all
+    points are modified.
+
+CHOP:
+    Retrieves the sample data from this CHOP.
+
+Method:
+    The sample data fetch method.
+
+    Static:
+        Uses one channel for each attribute, and all points use this
+        channel (the first point resides at index 0, the next at 1,
+        and so on). The length of the channels should be at least
+        the number of points modified.
+    
+    Animated:
+        Uses one channel per attribute per point. The channels show
+        the animation of each point's position/attribute values. The channels
+        must have a numeric suffix starting at zero, with at least one channel 
+	for each point. For vector attributes, there should be one channel per
+	component, per point (eg. for the `P` attribute, the channels must 
+        follow the pattern `tx0 ty0 tz0 tx1 ty1 tz1 tx2 ty2 tz2...`).
+
+Channel Scope:
+    The names of the CHOP channels that will modify the attributes. There must
+    be at least one channel name per attribute. Vector attributes may require 
+    multiple channels for all components specified in the __Attribute Scope__  
+    (eg. an attribute scope of `P` should have a channel scope with three 
+     names, such as `tx ty tz`, whereas `P(1)` only needs one, `ty`).
+
+Attribute Scope:
+    A string list of attributes to modify. For only one component of
+    an array, such as the Y value of the point position, specify the
+    number of elements in brackets (in this case, `P(1)` would be
+    used).
+
+    The common attributes are:
+
+    table>>
+        tr>>
+            td>> P
+            td>> Point position (X, Y, Z), 3 values
+        tr>>
+            td>> Pw
+            td>> Point weight, 1 value
+        tr>>
+            td>> Cd
+            td>> Point color (red, green, blue), 3 values
+        tr>>
+            td>> Alpha
+            td>> Point alpha, 1 value
+        tr>>
+            td>> N
+            td>> Point normal value (X, Y, Z), 3 values
+        tr>>
+            td>> uv
+            td>> Point texture coordinates (U,V,W), 3 values
+
+Organize by Attribute:
+    #id: organize
+    
+    (Applies to 'Animated Method' only.)
+    Will reorganize the fetched channels by the value of this
+    attribute. A common example is the `id` attribute found in
+    particles. A channel is built for each unique id since the
+    number of points may vary.
+

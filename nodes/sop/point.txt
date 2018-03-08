@@ -1,0 +1,242 @@
+#type: node
+#context: sop
+#internal: point
+#icon: SOP/point
+
+#tags: points, attrs, core, tech
+
+= Point =
+
+"""Manually adds or edits point attributes."""
+
+In Houdini, each geometry primitive has a list of points (numbered from 0). Each point has _attributes_ such as XYZ location, color, alpha, texture UV, weight, and normal direction.
+
+(Polygons, NURBS, and primitives also have a list of _vertices_, which reference points by their position in the point list. These points are shared between multiple polygons/NURBS/primitives.)
+
+The Point SOP lets you edit the attributes of points, including their position. For example, you can change the distance of a point from the center of the object's bounding box (using the local variables `$BBX`, `$BBY`, and `$BBZ`), change the color of a point (`$CR, $CG, $CB`), or change the normal of a point (`$NX, $NY, $NZ`).
+
+This is an extremely general and powerful operator. You can use it for an almost infinite variety of purposes, including deforming a surface (by changing point positions), creating interesting color effects (by changing point colors), and altering the initial trajectories of emitted particles (by changing the point normals).
+
+It is important to note that the expressions in this operator are
+evaluated _for each point_. The `$PT` local variable contains the point number of the point currently being processed.
+
+== Tips ==
+
+- When writing  [expressions|/expressions]  for
+  editing points, you may find the [point|Exp:point] and
+  [pointavg|Exp:pointavg] functions useful.
+
+- To see the point numbers of points in the viewer, turn on the Point numbers icon in the  [display options
+  window|/ref/windows/displayopts_3d]  (__Viewport Menu > Display > Display
+  Options__, or press ((D))) or in the display toolbar on the right side of the viewer.
+    
+- To flip normals, turn on __Add normals__ and enter `-$NX -$NY -$NZ`.
+
+- While this operator edits the attributes of points, the [Primitive SOP|Node:sop/primitive] edits attributes of entire primitives.
+
+- The local variables in the Point SOP are relative to the point. You can use the prefixes "det", "prim", or "vtx" to use detail, primitive, or vertex variables. For example, `$primTX, $primTY, $primTZ` is the barycenter of the first primitive the point belongs to.
+
+
+
+@parameters
+
+    Match By Attribute:
+	When there are two inputs the standard behavior is to match
+	according to point number.  However, if the inputs are
+	particle systems, this might not match properly as one wants
+	to match the same particle even if particles are deleted or
+	created.  Match By Attribute will have $TX2 refer to the point
+	on the second input whose attribute matches the attribute of
+	the currently evaluated point.
+
+	If more than one point on the second input matches, the point
+	with the greatest point number will be used.
+    Attribute To Match:
+	Which attribute to use for matching.  This attribute must be
+	present on both inputs of the Point SOP.  Equality will be
+	determined by treating it as an integer.
+
+    NOTE:
+        `Keep` uses the default values, `New` and `Add` allow you to assign new values, and `No` removes all values.
+        
+    == Standard ==
+
+        Position:
+            #channels: /tx /ty /tz
+
+            XYZ position.
+
+        Weight:
+            #channels: /weight
+
+            Spline weight of the point.
+
+        Color:
+            #channels: /diffr /diffg /diffb
+
+            Diffuse color (RGB).
+
+        Alpha:
+            #channels: /alpha
+
+            Transparency value.
+
+        Normal:
+            #channels: /nx /ny /nz
+
+            Normal vector.  If you just want to compute normals, please use the [Normal node|Node:sop/normal] instead.
+
+        Texture:
+            #channels: /mapu /mapv /mapw
+
+            Texture coordinates.
+
+
+    == Particle ==
+
+        Mass:
+            #channels: /mass
+
+            Point mass.
+
+        Drag:
+            #channels: /drag
+
+            Drag coefficient.
+
+        Tension:
+            #channels: /tension
+
+            Spring tension for connected edge.
+
+        Spring K:
+            #channels: /springk
+
+            Spring constant per point.
+
+        Velocity:
+            #channels: /vx /vy /vz
+
+            Velocity vector.
+        
+        Up Vector:
+            #channels: /upx /upy /upz
+
+            Up vector attribute.
+
+        Scale:
+            #channels: /pscale
+
+            Particle size multiplier.
+
+        Instance:
+            Geometry to instance on particle.
+
+
+    == Force ==
+
+        Radius:
+            #channels: /radiusf
+
+            Radius of effect.
+
+        Force Scale:
+            #channels: /scalef
+
+            Multiplier for total force.
+
+        Radial Force:
+            #channels: /radialf
+
+            Force directed toward attractor.
+
+        Normal Force:
+            #channels: /normalf
+
+            Directed along normal direction.
+
+        Edge Force:
+            #channels: /edgef
+
+            Directed along edge direction.
+
+        Dir. Force:
+            #channels: /dirf
+
+            Arbitrary directional force.
+
+
+    == Custom ==
+
+        Number of Attributes:
+            The number of attributes available to be set. Clicking the `+` button adds an attribute, clicking the `-` button removes an attribute, and clicking the `Clear` button removes all attributes.
+
+        Apply Attribute #:
+            #channels: /apply#
+            
+            Whether to set this attribute. 
+            
+            It controls how attributes are modified. However, if the attribute does not exist, it will not be created.
+
+        Name #:
+            #channels: /name#
+
+            Name of attribute, for example `Cd`.
+
+        Scalar Value:
+            #channels: /val#i[1-4]
+
+            Value (for scalar attributes).
+
+        String Value:
+            #channels: /sval#
+
+            Value (for string attributes).
+
+@locals
+    PT:
+        Point number.
+    NPT:
+        Total number of points.
+    CEX, CEY, CEZ:
+        Centroid of the input geometry.
+    TX, TY, TZ:
+        Point position.
+    WEIGHT:
+        Point spline weight.
+    BBX, BBY, BBZ:
+        Position of point within bounding box, ranges `[0-1]`.
+    NX, NY, NZ:
+        Point normal directions.
+    MAPU, MAPV, MAPW:
+        Point texture coordinates.
+    CR, CG, CB:
+        Diffuse point color.
+    CA:
+        Point alpha value.
+    MASS, DRAG:
+        Point mass and drag.
+    TENSION, SPRINGK:
+        Spring tension of an edge, and elasticity of a point.
+    AGE:
+        Number of seconds a particle has been alive.
+    LIFE:
+        Particle age divided by life expectancy (0 to 1).
+    DIST:
+        Distance to intersection from the Ray operation.
+    VX, VY, VZ:
+        Point velocity values.
+    UPX, UPY, UPZ:
+        Point up vector values.
+    ID:
+        Particle ID.
+    PSCALE:
+        Particle Scale
+    PT<<n>>, NPT<<n>>:
+        Append <<n>> for the second source.
+
+@related
+    - [Node:sop/vertex]
+    - [Node:sop/primitive]
+    - [Node:sop/xform]
+

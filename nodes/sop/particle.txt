@@ -1,0 +1,212 @@
+#type: node
+#context: sop
+#internal: particle
+#icon: SOP/particle
+
+#tags: particles
+
+= Particle =
+
+"""Creates simple particle simulations
+without requiring an entire particle network."""
+
+This node lets you set up a simple particle network quickly, without
+having to create a [particle network|Node:sop/popnet] and
+[particle nodes|/nodes/pop/].
+
+While you can't create simulations
+anywhere near the complexity of a real particle network, you can
+easily create simulations that are very common and useful, such as
+snowfall or sparks, as well as very interesting deformations.
+
+This node lets you:
+
+- Birth points from the points in the geometry connected to
+  its first input and simulate them as if they were particles,
+  _OR_
+  move the points of the input geometry as if they were particles. 
+  
+  The first input *must* be connected for the node to work.
+  
+- Add an external force (like gravity) in one direction, and
+  a wind (pushes particles up to but not beyond a certain speed)
+  in another direction.
+  
+- Connect collision geometry to the second input to have the
+  particles bounce off it.
+  
+- Set particles to either bounce off of, or die at,
+  a bounding box.
+
+Particles have various attributes that regular geometry does not have,
+such as: _velocity_, _life expectancy_ and _age_. These attributes are
+carried with each point in order to carry out the simulation.
+
+NOTE:
+        __Remove Unused Particles__ checkbox must be turned to remove particles if you set the __Hit Behavior__ to __Die on Contact__.
+
+@inputs
+    Particle Source:
+        Any geometry with points, e.g. polygon sphere, mesh.
+        The points in this geometry become particles.
+
+    Collision Object:
+        This input defines an object for the particles to collide with.
+        When this happens, the particles can either die, stick or
+        bounce, or spawn new particles. It is important to note that
+        when the collision object is deforming, collision detection may
+        fail, causing some particles to "leak through" the collision
+        object.
+
+    Force:
+        The Force input accepts input from a Force op which uses a
+        metaball shape as a force field allowing particles to be sent
+        into vortices or accelerated along an axis. Refer to the [Force
+        SOP|Node:sop/force] for further explanation.
+
+        NOTE:
+            The Particle op will use point normals as initial particle
+            velocity if point normal attributes exist _and_ there are no
+            point velocity attributes in the incoming data. If you add
+            velocity attributes to the points, the point normals are
+            ignored.
+
+
+@parameters
+
+    == State ==
+
+        Behavior:
+            Type of operation to perform.
+        Point Reuse:
+            How to reuse the points from the input geometry. The first
+            two options behave differently only when modifying source
+            geometry.
+        StartTime:
+            #channels: /timestart
+
+            Time at which the simulation resets.
+        Preroll Time:
+            #channels: /timepreroll
+
+            At start time, simulation has already been running this
+            long.
+        Time Inc:
+            #channels: /timeinc
+
+            Time increment to use for each step of the particle
+            simulation. Decrease to get sub-frame cooking.
+        Jitter Births:
+            Jitters pixels of particles at birth.
+        Accurate Moves:
+            Particles move more accurately.
+        Remove Unused points:
+            Removes unused points from input geometry.
+        Attractor Use:
+            How the attractor points affect particles
+
+            All points:
+                All points affect each particle
+            Single point per particle:
+                Only one point affects each particle
+
+    == Forces ==
+
+        External Force:
+            #channels: /external[xyz]
+
+            Force of gravity on particles.
+        Wind:
+            #channels: /windx /windy /windz
+
+            Wind force acting on particles.
+        Turbulence:
+            #channels: /turbx /turby /turbz
+
+            Amplitude of turbulence along axes.
+        Turb Period:
+            #channels: /period
+
+            Inverse variance of turbulence in space.
+        Seed:
+            #channels: /seed
+
+            Seed for random turbulence generator.
+
+    == Particles ==
+
+        Add Particle ID:
+            Each particle receives a unique ID number.
+        Add Mass Attribute:
+            Causes particle mass to be calculated.
+        Mass:
+            #channels: /mass
+
+            Relative mass of each particle.
+        Add Drag Attribute:
+            Causes drag coefficient to be calculated.
+        Drag:
+            #channels: /drag
+
+            Drag of each particle.
+        Birth:
+            #channels: /birth
+
+            Number of particles "born" each second.
+        Life Expect:
+            #channels: /life
+
+            How long each particle exists, in seconds.
+        Life Variance:
+            #channels: /lifevar
+
+            Variance of the life expectancy in seconds.
+
+    == Limits ==
+
+        + Limit Plane, - Limit Plane:
+            #channels: /limitposx /... /limitposz /limitnegx /... /limitnegz
+
+            Particles die or bounce off limit planes on contact.
+        Hit Behavior:
+            Whether particles die or bounce on limit planes.
+        Gain Tangent:
+            #channels: /gaintan
+
+            Energy loss tangent to the collision.
+        Gain Normal:
+            #channels: /gainnorm
+
+            Energy loss perpendicular to the collision.
+        Split:
+            Whether the particle splits upon collision or death.
+        Min/max splits:
+            #channels: /splitmin /splitmax
+
+            Number of particles a particle splits into.
+        Split Velocity:
+            #channels: /splitvelx /splitvely /splitvelz
+
+            Base velocity for split particles.
+        Velocity Variance:
+            #channels: /splitvarx /splitvary /splitvarz
+
+            Random amount added to split velocity.
+
+    == Render tab ==
+
+        Particle Type:
+            How the particle is rendered.
+        Particle Size:
+            #channels: /prsize
+
+            How large particles are.
+        Particle Blur:
+            #channels: /prblur
+
+            Length of particle when rendered.
+
+@related
+    - [Node:sop/pop]
+    - [Node:sop/popnet]
+

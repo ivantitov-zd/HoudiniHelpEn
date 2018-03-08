@@ -1,0 +1,173 @@
+= Rendering on cloud computers =
+
+"""
+<p style="border: 3px solid red; background-color pink">
+This help page is for informational purposes only.
+<br/>
+The Amazon Cloud render service is unavailable indefinitely for Houdini
+%{MAJOR_VERSION}.%{MINOR_VERSION} due to reasons outside of SideFX's control.
+</p>
+You can render scenes on an on-demand render farm running on top of the Amazon EC2 compute service.
+"""
+
+== Overview ==
+
+Traditionally, studios have build and maintained render farms to handle the peak render times at the height of production.
+For many studios, setting up enough computers to handle peak loads means that many computers on the farm sit idle much of the time.
+
+For individuals and students, setting up a render is an ever bigger challenge.
+Besides the expense of dedicating multiple computers, maintaining the farm takes time away from doing the actual work.
+
+Rendering using an internet compute utility such as Amazon EC2 lets you expand your render infrastructure on demand,
+without having to purchase, rack, power, cool, upgrade, and manage a farm of new computers.
+You only pay for the compute power you need as you need it.
+
+This allows studios to use a small local farm for day-to-day rendering,
+and augment it with cloud rendering the height of production.
+It allows individuals access to the speed of a render farm that would otherwise be out of reach.
+
+You can submit render jobs to Amazon's EC2 compute service easily from within Houdini using the Cloud Properties window and the HQueue Render node.
+
+== Set up ==
+
+NOTE:
+    You *do not need to install* Houdini's HQueue render farm management software to render on the cloud.
+
+You only need to set up your Amazon account information once.
+
+# Choose __Render > Cloud properties __.
+
+    This shows a step-by-step interface for getting and entering up your account information.
+
+# Click __Sign up__.
+  Houdini will open the Amazon Web Services sign up page in your default web browser.
+  
+  If you already have an Amazon account (for example to buy books), you can use it to sign in.
+  There is no sign-up fee, you only pay for actual usage.
+
+# Once you've registered for Amazon Web Services, you need to sign up for *Amazon EC2*.
+
+    Specifically, you will sign up for Houdini Cloud Computing tools, which have different prices than the general computing fees listed by Amazon.
+    The Houdini Cloud Computing prices include Amazon's usage costs and Houdini's licensing fees.
+
+# Once you've signed up, enter the __Access key ID__ and __Secret access key__ in the Cloud Properties window.
+
+    These are available from Amazon's Web Services security credentials page.
+    Click __Retrieve from Amazon__ to open the page in your default web browser.
+
+# Enter a __Passphrase__. This is used to encrypt the secret keys and protect access to your Amazon account through Houdini.
+
+# Enter an email address if you want email updates on the status of your render jobs.
+
+== Rendering on cloud ==
+
+# Create the scene you want to render: set up [lights|lights], a [camera|camera], and a [Mantra render node|Node:out/idf].
+
+    Make sure all paths to external resources (such as textures) are specified _relative to the scene file_ using `$HIP`.
+    For example, `$HIP/textures/wood.rat`.
+    Houdini automatically uploads all referenced files to the internet for you.
+
+    You can also use `$JOB` to refer to an overall project directory.
+    First set the location of `$JOB` using __Edit > Aliases and Variables__.
+
+# In the [network editor|/network], go to the Outputs level (`/out`) and create an [HQueue Render node|Node:out/hqueue].
+
+# In [parameter editor|/network/parms], on the __General__ tab, set the __Output driver__ to the [Mantra render node|Node:out/idf] you want to use to render the scene on the cloud. You can drag your render node from the network editor onto the __Output driver__ parameter to set this quickly.
+
+    The cloud servers currently supports the [Mantra|Node:out/ifd], [Geometry|Node:out/geometry], and [Composite|Node:out/comp] render nodes.
+    
+    If the render node you specify is part of a [dependency graph|batch], the dependencies will run as normal on the cloud.
+
+# Below the __Output driver__ parameter, click the __Cloud__ tab.
+
+# Choose the __Machine type__ (this controls the speed, RAM, and disk space of the computers used to render) and the number of computers to use on the cloud.
+
+    The parameter interface shows the hourly rate for your selected computer type and number.
+    
+# Click __Render__.
+
+    Houdini will display a File Dependencies pre-flight interface to check for missing or absolute references.
+    You should double-check any references that appear in red.
+    Some absolute references can be converted to relative references through this interface.
+    
+    Click __OK__ in the File Dependencies window to proceed once you've check the references.
+
+# A dialog appears confirming that you want to start up the servers on the Amazon EC2 cloud, submit your project, and have your account charged. Click __OK__ to submit the job to the cloud.
+
+# Houdini opens a web page in your default browser displaying the current status of the job. Amazon allows itself _up to ten minutes_ to start up new cloud servers. Once the server is available, the page will display progress bars for uploading and rendering.
+
+    See the section on [instance usage|#usage] below for important information about monitoring your jobs.
+
+# When the render is finished, Houdini will download the output file(s) to the location(s) specified in the scene file (for example, `$HIP/pics/frame0001.pic`). You do not need to manually download files from the cloud server.
+
+== Important ==
+
+The HQueue cloud tools are designed to automatically send render jobs from your computer to the Amazon cloud. While our system is designed to shut down the computers at the end of a session if the computer is idle, once the computers are started it is your responsibility to make sure the computers are shut down when you are finished. If some stray process is still active then you may end up being responsible for time you are not using.
+
+It is therefore *very important* to check the Amazon Web Services (AWS) Management Console to make sure the cloud computers shut down properly. You can also shut them down early using the AWS Management Console if you are sure that you are not using it any more.
+
+As a safeguard, don�t forget to set up email notifications when you have computers running in the cloud. When enabled, this option will send you an email approximately once an hour from each machine running in the cloud. Turning on email notifications is highly recommended to detect when you are still being billed for cloud usage.
+
+== Instance usage == (usage)
+
+* All data is encrypted and sent directly to and from Amazon EC2 (not through Side Effects Software). Amazon EC2 instances are isolated from each other so other EC2 users cannot see your data. Only your IP address can connect to your Amazon EC2 servers, and the server will only allow `ssh` and HQueue connections from that IP address.
+
+* Render time is charged per hour.
+
+* The [HQueue Render node|Node:out/hqueue] displays the rate for your selected instance type in the parameter editor on the __General > Cloud__ tab. The hourly fees are made up of Amazon's usage costs and Houdini's licensing fees.
+
+* Server instances will stay active in full hour blocks (that is, if your render takes less than an hour, the server will stay active for the remainder of the hour). If you submit another job with the same machine specifications, Houdini will re-use existing inactive servers.
+
+* If you submit multiple jobs, the server software will queue them . The next job will start uploading and rendering as soon as the current job ends.
+
+* Unused instances should automatically shut down at the end of the hour. However, you are responsible for monitoring your instances to make sure a stray process does not prevent them from shutting down properly.
+
+* Amazon limits each customer to a maximum of 20 active instances at a time. You can contact Amazon to request more instances.
+
+* Your credit card is billed by Amazon, not Side Effect Software.
+
+* You can log into Amazon's Web Services portal to see your usage information and outstanding balance.
+
+* You can use Amazon EC2 Reserved Instances to render, but you will be charged the standard Houdini cloud rates. Your one-time reserved instance payment to Amazon does not include the cost of running the Houdini instance.
+
+== Tips and notes ==
+
+* Files that have not changed between renders to the same instances do not need to be re-uploaded.
+
+* Houdini Apprentice and Houdini Indie can both render on the cloud, with the _same restrictions_ as rendering locally.
+
+* The cloud computers are always loaded with the _current production build_ of recent version of Houdini.
+  We recommend you use the current production build rather than daily builds to set up and submit render jobs to the cloud.
+  
+  The current designated production build is at [sidefx.com/download|http://sidefx.com/download].
+
+* In your scenes, make sure all paths to external resources (such as textures) are specified _relative to the scene file_ using `$HIP` or `$JOB`. For example, `$HIP/textures/wood.rat`.
+
+* [Render dependencies|batch], including Houdini compositing networks, will work on the cloud.
+
+* If you cache geometry to disk, you need to consider whether you want to drive creation of the geometry caches during rendering (using a [Geometry render node|Node:out/geometry] in a [render dependency|batch] network), or generate the caches locally and reference them (causing them to be uploaded by the [HQueue Render node|Node:out/hqueue].
+
+    If geometry caches are slow to generate, you may want to do them locally so you don't spend cloud time on them.
+    However, if the geometry caches are very large, you need to consider the cost of uploading (or downloading) them from the internet.
+
+* For dynamic simulations such as fluids, rigid bodies and wires, you can export a simulation file using a [DOP render node|Node:out\dop] referenced from the [HQueue Render node|Node:out/hqueue].
+
+    This creates `.sim` files you can use to drive simulations in your scene file at render time.
+    These `.sim` files can be quite large.
+    Alternatively you can re-simulate the scene every time you render without caching out `.sim` files,
+    but that will slow down your renders.
+    We generally recommend generating geometry caches from rigid body and particle fluid simulations
+    (because those files are typically smaller).
+
+* To `ssh` to a cloud machine:
+
+    * Get the cloud server machine name from the "Public DNS" field in the Amazon Web Console.
+
+    * Tell `ssh` to use the key pair from `$HOME/houdiniX.Y/aws/<<username>>-ssh-key.rsa` (`$HOME/Library/Preferences/Houdini/X.Y/aws/<<username>>-ssh-key.rsa` on the Mac).
+
+    `ssh -i $HOME/houdini<<X>>.<<Y>>/aws/<<username>>-ssh-key.rsa root@<<address>>`
+
+* Currently we do not support loading or saving to/from Amazon S3 storage service.
+
+* If you encounter a problem with rendering on the cloud, include the contents of the `$TEMP/cloudsubmit.log` file when you submit a support ticket to Side Effects Software.
+

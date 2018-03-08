@@ -1,0 +1,204 @@
+= hou.BaseKeyframe =
+#type: homclass
+#cppname: HOM_BaseKeyframe
+#group: animation
+
+"""Abstract base class for all keyframe class."""
+
+@methods
+
+::`asCode(self, brief=False, save_keys_in_frames=False, function_name=None)` -> `str`:
+    #cppname: HOM_BaseKeyframe::asCode
+
+    Returns a script of Python statements that can be executed to create
+    the keyframe.  To run the script, use either Python's `exec` 
+    or `execfile` functions.
+
+    `brief`:
+	When <<brief>> is True, the output script omits commands for 
+	setting unused values, slopes and accelerations.  This parameter 
+	only applies to non-string keyframes.  The value of <<brief>> must
+	be either True or False.
+
+    `save_keys_in_frames`:
+	When <<save_keys_in_frames>> is True, `asCode` outputs commands
+	for setting channel and key times in samples (frames) instead 
+	of seconds.  The value of <<save_keys_in_frames>> must be either
+	True or False.
+
+    `function_name`:
+        If <<function_name>> is specified, then the output script 
+	is wrapped in a Python function definition with the given name.
+	<<function_name>> must be a non-zero length string consisting of 
+	only alphanumeric and underscore characters.  Any invalid characters 
+	are internally converted to underscores.
+
+	The function returns a reference to the newly created keyframe
+	object.
+
+    Here is an example of saving the output to a file and then loading 
+    it back into Houdini:
+    {{{
+    #!python
+    # Get a reference to the target keyframe.
+    tx_parm = hou.parm("/obj/geo1/tx")
+    key = tx_parm.keyframes()[0]
+
+    # Execute asCode and write the output script to file.
+    script = key.asCode()
+    f = open("create_key.py", "w")
+    f.write(script)
+    f.close()
+
+    # Execute the script.  The new keyframe will be stored 
+    # in the 'hou_keyframe' variable.
+    execfile("create_key.py")
+
+    # Commit the keyframe back into the node parameter.
+    tx_parm.setKeyframe(hou_keyframe)
+    }}}
+
+    Here is an example of saving the output into a function and then 
+    calling it in Houdini:
+    {{{
+    #!python
+    # Get a reference to the target keyframe.
+    tx_parm = hou.Node("/obj/geo1").Parm("tx")
+    key = tx_parm.keyframes()[0]
+
+    # Execute asCode and write the function definition to file.
+    func = key.asCode(function_name="createKeyframe")
+    f = open("keylib.py", "w")
+    f.write(func)
+    f.close()
+
+    # Call the function definition.
+    import keylib
+    hou_keyframe = keylib.createKeyframe()
+
+    # Commit the keyframe back into the node parameter.
+    tx_parm.setKeyframe(hou_keyframe)
+    }}}
+
+::`evaluatedType(self)` -> [Hom:hou.parmData] enum value:
+    #cppname: HOM_BaseKeyframe::evaluatedType
+
+    Returns the type that the keyframe evaluates to.
+
+::`expression(self)` -> `str`:
+    #cppname: HOM_BaseKeyframe::expression
+
+    Returns the keyframe's expression. For example, in cases where the keyframe has had two values set the interpolating function is returned e.g. "bezier()", "spline()" etc.
+
+    This function raises [Hom:hou.KeyframeValueNotSet] if an expression has not been set.
+
+    See `setExpression()` and `isExpressionSet()`.
+
+::`expressionLanguage(self)` -> [Hom:hou.exprLanguage] enum value:
+    #cppname: HOM_BaseKeyframe::expressionLanguage
+
+    Returns the keyframe's expression's language.
+
+    This function raises [Hom:hou.KeyframeValueNotSet] if an expression language has not ben set.
+    
+    See `setExpression()`, and `isExpressionLanguageSet()`.
+
+::`frame(self)` -> `double`:
+    #cppname: HOM_BaseKeyframe::frame
+
+    Returns the keyframe's frame number.
+
+    This function raises [Hom:hou.KeyframeValueNotSet] if the frame or time has not been set.
+    
+    See `setFrame()` and `setTime()`.
+
+::`getReferencedParm(self)` -> [Hom:hou.Parm]:
+    #cppname: HOM_BaseKeyframe::getReferencedParm
+    #status: ni
+
+::`isExpressionLanguageSet(self)` -> `bool`:
+    #cppname: HOM_BaseKeyframe::isExpressionLanguageSet
+
+    Returns whether the keyframe expression's language is set.
+
+    See `setExpression()` and `expressionLanguage()`.
+
+::`isExpressionSet(self)` -> `bool`:
+    #cppname: HOM_BaseKeyframe::isExpressionSet
+
+    Returns whether the keyframe's expression is set.
+
+    See `setExpression()` and `expression()`.
+
+::`isLocked(self)` -> `bool`:
+    #cppname: HOM_BaseKeyframe::isLocked
+    #status: ni
+
+::`isParmReference(self)` -> `bool`:
+    #cppname: HOM_BaseKeyframe::isParmReference
+    #status: ni
+
+::`isTimeDependent(self)` -> `bool`:
+    #cppname: HOM_BaseKeyframe::isTimeDependent
+    #status: ni
+
+::`isTimeSet(self)` -> `bool`:
+    #cppname: HOM_BaseKeyframe::isTimeSet
+
+    Returns whether the keyframe's time is set.
+    
+    See `setTime()` and `time()`.
+
+::`Keyframe(self)`:
+    #cppname: HOM_BaseKeyframe::Keyframe
+    #status: ni
+
+::`lock(self, value=None)`:
+    #cppname: HOM_BaseKeyframe::lock
+    #status: ni
+
+::`moveToIntegerKeyframes(self, mode)`:
+    #cppname: HOM_BaseKeyframe::moveToIntegerKeyframes
+    #status: ni
+    
+::`setExpression(self, expression, language=None)`:
+    #cppname: HOM_BaseKeyframe::setExpression
+
+    Sets the keyframe's expression and language.
+
+    This function raises [Hom:hou.TypeError] if `language` is not a value from [Hom:hou.exprLanguage].
+    
+    See `expression()`, `expressionLanguage()`, `isExpressionSet()`, `isExpressionLanguageSet()`.
+
+::`setFrame(self, frame)`:
+    #cppname: HOM_BaseKeyframe::setFrame
+
+    Sets the keyframe's frame number.  Using the number of frames per second ([Hom:hou.fps]), setting the frame number also sets the time.  For example, with an fps of 24, then setting the frame number to 49 will set the time to 2 seconds.
+    
+    See `frame()`.
+
+::`setTime(self, time)`:
+    #cppname: HOM_BaseKeyframe::setTime
+
+    Sets the keyframe's time in seconds.  Using the number of frames per second ([Hom:hou.fps]), setting the time also sets the frame number.  For example, with an fps of 24, then setting the time to 2 seconds will set the frame number to 49.
+
+    See `time()`.
+
+::`time(self)` -> `double`:
+    #cppname: HOM_BaseKeyframe::time
+
+    Returns the keyframe's time in seconds.
+
+    This function raises [Hom:hou.KeyframeValueNotSet] if the time or frame has not been set.
+    
+    See `setTime()` and `setFrame()`.
+
+@replaces
+
+- [Cmd:chkey]
+- [Cmd:chkeyls]
+- [Cmd:chkey]
+- [Cmd:chround]
+- [Exp:chsraw]
+- [Exp:lock]
+- [Cmd:opscript]

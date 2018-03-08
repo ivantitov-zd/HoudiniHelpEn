@@ -1,0 +1,90 @@
+= Creating a digital asset =
+
+== Overview ==
+
+:vimeo:Asset menu
+    #id: 116797081
+
+You can create a digital asset of any type (Object, Geometry node, Dynamics node) by converting a subnetwork of that type into a digital asset.
+
+See [how to install and use assets|install] for how users can access the new asset after it is created.
+
+== How to create a digital asset ==
+
+# Create a subnetwork containing the nodes that will define the behavior of the asset.
+
+    * Make sure you use _relative references_ in expressions so they will still be valid inside the asset. For example, use `ch('../copy1')` instead of `ch('/obj/geo1/subnet1/copy1')`.
+
+    * To quickly put a bunch of nodes inside a subnetwork, select them, right click and choose __Actions > Collapse into Subnet__.
+
+# Right click the subnet node and choose __Create digital asset__.
+
+    (Houdini will warn you if you have references inside the subnet to nodes outside it, since they won't work in the digital asset.)
+    
+# A dialog appears that lets you name the asset and decide where to save it.
+
+    * The __Operator label__ is the human-readable name that shows up in Houdini's user interface, for example `Three Light Rig`.
+    
+    * The __Operator name__ is a unique internal name to distinguish it from other nodes, for example `threelightrig`.
+    
+        You can change the label later, but you _can't change the name_ without recreating the asset. In a studio environment, you may want to ensure your node names don't collide with Houdini's node names, or vendor node names, by using [namespaces|namespaces].
+
+    * The __Save to library__ path sets the name of a library file to save the asset definition into. See [asset libraries|#libraries] below for more information.
+
+# Click __Accept__.
+
+    Houdini opens the [Type properties window|/ref/windows/optype] for the new node type to let you edit its options. (To open the type properties window again later, you can right click an instance of the asset and choose __Type properties__.)
+    
+    You can use this window to set up the new node type's [parameter interface|asset_ui].
+    
+    You can write documentation on the asset's __Help__ tab to explain its purpose and controls to users, using a [Wiki markup language|/help/format].
+
+== Serving assets and data over HTTP ==
+
+Most places you can specify a file in Houdini will also accept a URL. You can use a web server to serve shared `.hda` asset libraries as well as shared project data (such as textures). 
+
+== Specifying files inside an asset using opdef: == (sections)
+
+#index: document
+#bestbet: opdef
+
+You can embed files inside the digital asset, using the __Extra files__ tab in the [Type properties window|/ref/windows/optype].
+
+In parameters where you can specify a file path, you can use the following syntax to instead specify the content of a section inside an asset:
+
+`opdef:/<<Network_type>>/<<asset_name>>?<<section_name>>`
+
+You can use this to include all the files an asset needs (such as textures) in the asset itself.
+
+For example:
+
+`opdef:/Object/my_asset?Texture.png`
+
+You can also use `opdef:.?<<section>>` (to get a file from the current asset) and `opdef:..?<<section>>` (to get a file from the parent of the current node). For example, if you have a [File node|Node:sop/file] directly inside an asset, you can load a geometry file from the asset using:
+
+`opdef:..?test.bgeo`
+
+Note that relative `opdef:` may not work in all places. For example, in a shader you can say `texture("opdef:/Shop/foo/texture.rat")` but you can't use `opdef:..` because the compiled VEX has no concept of a parent node.
+
+TIP:
+    You can interactively choose embedded files from inside assets using the Houdini file chooser. Click the `opdef:` root on the left side of the chooser window.
+
+== Asset libraries == (libraries)
+
+Digital assets are stored in digital asset library files, with a `.hda` extension. (Older versions of Houdini used a `.otl` extension.) Houdini loads any `.hda` (or `.otl`) files it finds in `HOUDINIPATH/otls`.
+
+The default library save location when you create a new asset is in your user account's Houdini preferences directory (under `HOUDINIPREFS/hda`), so the asset will only be available to you. In a studio environment, you might save the asset in a central, network-accessible directory (that has been added to the Houdini path) so other users can install it.
+
+A library file can contain multiple assets (this means you can keep saving new assets into the library for your account). However, we recommend you store each asset in a separate library file. This makes it straightforward to share some assets and not others, and keep track of which assets are in which files.
+
+== Embedding assets in the current scene file == (embed)
+
+* You can embed an asset in the current `.hip` file instead of in an external file. This may be useful for testing or sharing example files. When you create an asset, set the __Save to library__ field to `Embedded`.
+
+* You can enable an option to save the definitions of any assets used in a scene file with the scene file. This allows you to use the scene file even in environments where the asset libraries are not available, but can cause confusion about which definitions are being used. Choose __Windows > Operator type manager__, click the __Configuration__ tab, and turn on __Save node definitions to HIP file__.
+
+* When an asset is both embedded in the scene file and available from a library file, by default Houdini will load the asset from the library. To reverse this, choose __Windows > Operator type manager__, click the __Configuration__ tab, and turn on __Prefer definitions saved with HIP file__.
+
+* Although Houdini lets you [embed an asset definition|create#embed] in the scene file, we recommend you store all assets in library files.
+
+    One issue is that Houdini only embeds definitions for assets that are used in the scene. If you unknowingly delete the last instance of an asset and save, the definition of the asset will be lost.

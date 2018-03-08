@@ -1,0 +1,206 @@
+#type: node
+#context: sop
+#internal: paint
+#icon: SOP/paint
+
+#tags: color, brush, attrs
+
+= Paint =
+
+"""Lets you paint color or other attributes on geometry."""
+
+* In the viewer, choose the Paint SOP, select the surface you want to
+  paint on and press ((RMB)) to finish the selection. Then you can move
+  the brush over the surface and press the mouse buttons to paint.
+
+* You have two colors: the foreground (__FG__, ((LMB))) and background
+  (__BG__, ((MMB))).
+
+* Use the controls on the operation controls toolbar to set the foreground color
+  (__FG__), background color (__BG__), radius, and opacity.
+
+* Press ((RMB)) to show a menu of tool options. You can assign
+  different operations to ((LMB)) and ((MMB)) (see the __Operation__
+  parameter).
+
+* See the  [brush tools help|/basics/brush]  for more information.
+
+
+TIP:
+    To paint an arbitrary attribute instead of color, turn on __Override
+    color__ and set the attribute name.
+
+TIP:
+    To see the surface colors without lighting affecting the colors,
+    do the following:
+    
+    # Create a VEX Constant shader and [assign it to the object|/shade].
+    # In the parameter editor for the shader, click the
+      [Icon:BUTTONS/gear] Gear menu and choose __Edit Rendering Parameters__.
+    # In the __Render Properties__ tab, open `SHOP Options > OGL` and drag the
+      "Use Lighting" property over to the __Existing Parameters__ side to
+      add it to the shader's interface.
+    # Click __Accept__.
+    # In the shader's parameter editor, turn off __Use Lighting__.
+
+@parameters
+
+    == Operation ==
+
+        Operation:
+            The operation used by Apply To All.
+
+            Paint:
+                Paints your new color onto the geometry.
+            Eye Dropper:
+                sets the foreground color to the color nearest the
+                center of your brush.
+            Smooth:
+                Blends the colors of points under the brush.
+            Erase Changes:
+                Restores the colors under the brush to the pre-paint
+                values.
+            NOTE:
+                This parameter only affects the flood fill options. To change the current paint mode, ((RMB)) in the viewport and select the operation for ((LMB)) or ((MMB)).
+                
+        Merge Mode:
+            How the color is to be applied to the surface.
+
+            Replace:
+                The result is a blend between the original color and
+                the brush color according to the brush alpha.
+            Add:
+                The scaled brush color is added to the original
+                geometry color.
+            Subtract:
+                The scaled brush color is subtracted from the original
+                geometry color.
+            Multiply:
+                The result of multiplying the brush color by the
+                original geometry color is blended into the original
+                color by the brush opacity.
+            Screen:
+		        The colors are mixed together in an additive manner
+		        that clamps at one.  This only really works if the
+		        existing color and painted color are in the 0..1 range.
+            Hue:
+                The hue of the original color is replaced by that of
+                the brush color. The result is blended into the
+                original color.
+            Saturation:
+                The saturation of the original color is changed to that
+                of the brush color. The result is then blended into the
+                original color.
+            Lightness:
+                The lightness of the original color is changed to the
+                brush color. The result is then blended with the
+                original color.
+            Red:
+                Replace only the red (first) channel.
+            Green:
+                Replace only the green (second) channel.
+            Blue:
+                Replace only the blue (third) channel.
+            Invert:
+                Does not use the brush color. Instead, does a replace
+                operation with the inverse (1.0 - orig) of the original
+                color.
+            Custom:
+                When in custom mode, the brush color will be
+                re-evaluated for every point. The evaluated color is
+                then blended using replace semantics. Local variables
+                are present, so you can paint with ($BBX, $BBY, $BBZ).
+                
+        Accumulate To Stencil:
+            See  [about accumulate to stencil|/basics/brush] . By
+            default, the operation is applied and the stencil cleared
+            after every brush stroke. When this option is on, Houdini
+            does not apply the stencil until you click __Apply and Clear
+            Stencil__.
+            
+        Apply & Clear Stencil:
+            Applies the operation and clears the stencil. This is
+            equivalent to right-clicking in the viewport.
+            
+        Foreground/Background:
+            #channels: /fg /bg
+
+            Colors to apply unless bitmap stamping is enabled. If
+            __Accumulate To Stencil__ is on, the left mouse does
+            foreground and the middle mouse erases.
+            
+        Stamp Bitmap Instead Of FG/BG Color:
+            If set, the color channels of the bitmap are used directly
+            rather than the brush color.
+            
+        Apply To All:
+            Paints all of the selected geometry.
+            
+        Operation for All:
+            Operation to use for __Apply to All__.
+
+            You can not use this parameter to switch the Paint SOP into other operations. You can only use the ((RMB)) in the viewport to set these operations. 
+
+            For example, if you set this parameter to __Erase Changes__, but the ((RMB)) menu is set to __Paint__, this parameter will switch to __Paint__ as soon as you click in the viewport.
+
+        Reset All Changes:
+            Restores geometry to initial state.
+            
+        Create Missing Color And Alpha Attributes:
+            Adds the `Cd` and `Alpha` point attributes if not present
+            and not overridden and required.
+            
+        Accumulate Alpha:
+            When set gives a paint-on-glass effect. The painting on the
+            surface will increase the alpha, so painted areas become
+            visible. Note this has no effect on areas with alpha of
+            one.
+            
+            Alpha values are _accumulated_, so you probably want to reset
+            the `Alpha` attribute to `0` using a
+            [Point node|Node:sop/point] before the Paint node.
+            
+        Override Color:
+            If enabled, lets you paint values of the specified attribute
+            instead of the default `Cd` (diffuse color).
+            
+            Only `Cd` and `Alpha` affect the display of surfaces in the
+            viewport (and __Transparency__ on the __Misc__ tab of the
+            [display options|/ref/windows/displayopts_3d] must be on to
+            see `Alpha`). The __Override color__ and __Override Alpha__
+            options let you paint alternate attributes, but they won't
+            automatically show up as color and transparency in the 
+            viewport like `Cd` and `Alpha` do. (You can use
+            __Visualize attribute__ to show a non-color attribute as
+            false colors.)
+            
+        Override Alpha:
+            If __Accumulate alpha__ is on, this node will use the `Alpha`
+            attribute to accumulate alpha data (based on the opacity of the
+            brush). If enabled, this parameter stores the stroke opacity data
+            in the specified attribute instead of the default `Alpha`,
+            similarly to __Override color__.
+            
+            You could instead use __Override color__ set to `Alpha` to
+            paint directly into the Alpha channel. In that case, the value
+            of the color would be set as the alpha value, instead of the
+            opacity of the brush being accumulated.
+            
+        Visualize Attribute:
+            Whether to do a false color visualization of the overridden
+            attribute and what range to map to. See also
+            [visualizing attributes|/basics/attributevisualization].
+            
+        Visualize Mode:
+            How to map the attribute value to a color.
+            
+    The Paint SOP uses the `Cd` attribute to store color data. The __Override Color__ parameter lets you specify a different attribute to use for the color data. Similarly, if __Accumulate Alpha__ is enabled, the Paint SOP will use the `Alpha` attribute to accumulate alpha data. The __Override Alpha__ parameter lets you specify a different attribute to use for the alpha data. Alpha values are accumulated so you often wish to initialize the Alpha value to 0.
+
+    NOTE:
+        If the geometry contains attributes named `Cd` and `Alpha`, they will be used when rendering in the viewport. Overriding the names in the Paint SOP let you manipulate a different set of attributes but the viewport will only recognize `Cd` and `Alpha` as having special meaning.
+
+    [Include:standard_brush]
+
+@related
+
+- [Node:sop/uvbrush]

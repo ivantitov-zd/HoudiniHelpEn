@@ -1,0 +1,194 @@
+= Looping in geometry networks =
+
+#since: 15.0
+#bestbet: block
+
+== Overview ==
+
+:vimeo: For each loop
+    #id: 142494487
+
+:vimeo_ref: H15 Masterclass: Loops
+    #id: 142534639
+
+Normally, Houdini processes the nodes in a geometry network from top to bottom, feeding the output of each node into the input of the next node, down to the node with the display or render flag. However, there are times when it's useful to do _looping_: running the same chain of nodes multiple times.
+
+There are three main uses for looping:
+
+* You want to [process the input geometry over and over again|#repeat].
+
+    For example, you might want to add multiple layers of noise, or create complex procedural geometry by extruding all faces multiple times.
+
+* You want to [process each piece of the input geometry|#foreach].
+
+    For example, you might want to apply the same edits to each rock in some rubble.
+
+* You want to [process one geometry using each piece of another geometry|#swisscheese].
+
+    The classic example of this is the "Swiss cheese problem": you want to loop over each sphere in the set of air bubbles and subtract it from a block of cheese.
+
+The "For Loop" and "For Each Loop" tools in the network editor tab menu set up [Block Begin|Node:sop/block_begin] and [Block End|Node:sop/block_end] nodes, where the nodes between the begin and end are looped.
+
+
+== Repetition == (repeat)
+
+# In the network editor, open the ((Tab)) menu and choose "For loop".
+
+    The tool will create a [Block Begin|Node:sop/block_begin] and [Block End|Node:sop/block_end] node wired together. The Block Begin has the __Method__ parameter set to "Fetch feedback", meaning it will start each loop after the first with the output of the previous loop.
+
+# Select the Block End node and set the __Iterations__ parameter to the number of times you want the loop to run.
+
+    WARNING:
+        You should probably start with _just 1 or 2 iterations at first_ until you know the loop is working they way you want. It's possible to unintentionally create a loop that operates on all geometry _and_ creates new geometry in each loop, exponentially increasing the geometry size and cooking time. Note that if Houdini gets stuck in a long cook you can press ((Esc)) to cancel the cook.
+
+# Wire the geometry you want to process into the Block Begin.
+
+# Wire the nodes to process the geometry between the Block Begin and Block End.
+
+In this example, we simply do two iterations of extruding and scaling every face of a box.
+
+:col:
+    [Image:/images/model/loop_simple_network.png]
+:col:
+    [Image:/images/model/loop_simple_result.png]
+
+NOTE:
+    The point of this type of loop is that the output of one loop becomes the input for the next loops, so any geometry you create in the loop will _accumulate_. If all you want is to apply the same nodes once to multiple copies, you want the [Copy node|Node:sop/copy].
+
+
+== Piecewise (for-each) looping == (foreach)
+
+A "piece" is usually defined as the primitives that have the same value of the `piece` or `name` attribute. Several tool such as [Shatter|/shelf/shatter] create this type of partition attribute for you. You can specify an attribute name other than `piece` using the __Template attribute__ parameter on the [Block End node|Node:sop/block_end] (this parameter is only available when the Block Begin's input is connected).
+
+If no template attribute exists, block will loop over each point or primitive.
+
+# In the network editor, open the ((Tab)) menu and choose "For Each Loop".
+
+    The tool will create a [Block Begin|Node:sop/block_begin] and [Block End|Node:sop/block_end] node wired together. The Block Begin has the __Method__ parameter set to "Fetch piece", meaning it will start each loop with a different piece of the input.
+
+# Select the Block End node and set the __Template class__ to the type of pieces you are iterating over (points or primitives/faces). This will usually be primitives.
+
+    Note that you don't set the number of iterations... the loop will simply loop over each piece in the input.
+
+In this example, we loop over the pieces of a shattered torus and apply [Mountain|Node:sop/mountain] to each one individually.
+
+:col:
+    [Image:/images/model/loop_piecewise_network.png]
+:col:
+    [Image:/images/model/loop_piecewise_result.png]
+
+
+== Multiple inputs == (swisscheese)
+
+A loop can have more than one Block Begin node. So, for example, one branch of the network will get its input _piecewise_ and another branch will be simple repetition accumulating the result of using the pieces.
+
+The classic example of this type of loop is making Swiss cheese: use simple repetition to accumulate the results of processing one input geometry (the cheese block) by looping over pieces from a second input geometry (the air bubbles).
+
+# In the network editor, open the ((Tab)) menu and choose "For loop".
+
+    This loop branch will do the work of accumulating the changes to the cheese block.
+
+# Create another [Block Begin|Node:sop/block_begin] node.
+
+    * Set the __Method__ parameter to "Fetch piece".
+
+    * Set the __Block path__ parameter to the Block End of the existing loop. You can use the [Icon:BUTTONS/chooser_node] node chooser button next to the parameter, or drag the Block End from the network editor onto the parameter in the parameter editor.
+
+    This loop branch will do the work of fetching each bubble from the bubble geometry.
+
+The following shows an example network for making Swiss cheese using the two loop branches:
+
+:fig:[Image:/images/model/swiss_cheese_network.svg] [Image:/images/model/swiss_cheese_result.png]
+
+    1:
+        #display: green compact
+        We start with a box representing the block of cheese, and turn it into a VDB.
+    2:
+        #display: blue compact
+        We scatter some points in the box and copy spheres onto them to represent air bubbles.
+    3:
+        #display: yellow compact
+        The first Block Begin is a simple repetition that takes the VDB "cheese block" as input and accumulates the changes inside the loop.
+    
+    4:
+        #display: red compact
+        The second Block Begin is a "Fetch Piece" that takes the "air bubbles" as input and loops over each primitive sphere. Under it we turn the sphere into a VDB.
+        
+        We wire the "cheese block" VDB into the "air bubble" VDB's second input (5) to make it copy the resolution settings from the cheese block.
+    
+    3:
+        #display: yellow compact
+    
+        Inside the loop we use a [VDB Combine|Node:sop/vdbcombine] to subtract the VDB sphere from the cheese block.
+
+
+== How to get information about the current loop == (metadata)
+
+Sometimes you need the current loop, or the current piece number, in an expression on one of the nodes in the loop. You can get this information with a "Fetch metadata" Block Begin node.
+
+# Set up a looping block using the instructions above.
+
+# Select the Block Begin node. In the parameter editor, click __Create Meta Import Node__.
+
+    This button adds a second Block Begin node to the side of the existing one. This node is set up to generate an empty geometry with some detail attributes.
+    
+    `numiterations`:
+        The expected total number of iterations, taking into account the __Max Iterations__ and __Single Pass__ parameters on the Block End.
+
+    `iteration`:
+        The current iteration number, always starting at `0` and increasing by 1 each loop.
+
+    `value`:
+        In piece-wise loops, this is the current value of the attribute, for example the `piece` integer or `name` string (or the current point or primitive number if there is no attribute).
+        
+        In simple repetition loops, this is a floating point value starting at the Block End's __Start value__ and increasing by __Increment__ each loop.
+    
+    `ivalue`:
+        In simple repetition, this is an integer version of `value`. This can be useful if the value is naturally integer (for example, start at `1` and increment by `2`) and/or if values may be over 24 million (where floating point numbers lose precision).
+
+# To grab the value of these attributes in a node inside the loop...
+
+    * In a Houdini expression, use the [Exp:detail] expression function.
+
+        For example:
+
+        {{{
+        detail("../block_begin2", "iteration", 0)
+        }}}
+
+    * In an [Attribute wrangle|Node:sop/attribwrangle], use the [Vex:detail] VEX function.
+
+    * In Python, use [Hom:hou.Geometry#attribValue]:
+    
+        {{{
+        #!python
+        node("../block_begin2").geometry().attribValue("iteration")
+        }}}
+
+
+== Stop condition ==
+
+If the __Stop condition__ parameter on the Block End node evaluates to `1` before an iteration, looping stops. This lets you write an expression that tests certain conditions. For example, you could stop looping if the number of polygons in a feedback loop passes a certain threshold.
+
+
+== Debugging and testing loops ==
+
+* You can step through the iterations of the loop by setting the __Max iterations__ parameter on the Block End node. For example, start it at `1` and increase to see the results of each loop.
+
+* In piecewise loops, you can see the output of an individual piece/iteration using the __Single pass__ parameter on the Block End node. 
+
+
+== Tips ==
+
+* This node does not allow specifying pieces using groups. Because groups are not necessarily disjoint, it is very slow to translate them into pieces. If your geometry uses groups to specify the pieces, you can create an attribute from the groups using the [Name node|Node:sop/name]'s "Name from Groups" function, then split by the created attribute.
+
+* The color of the blob surrounding the nodes in a loop comes from the color of the Block Begin and Block End nodes. Change the color of one of these nodes to change the color of the blob.
+
+* To hide or show the blobs, click the [Icon:BUTTONS/displayoptions] Display Options button or press ((D)) in the network editor. In the network display options window, click the __Network View > Display__ sub-tab and turn __Display complex hulls__ on or off.
+
+* Currently only nodes between Block Begin and Block End nodes are included in the blob. Unfortunately the blob does wrap around nodes that are included in the loop because of channel reference dependencies. This is a limitation of the current implementation.
+
+
+@related
+
+- [Looping in VOPs|/shade/looping]

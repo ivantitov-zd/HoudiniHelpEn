@@ -1,0 +1,166 @@
+#type: node
+#context: dop
+#internal: sandsolver
+#icon: DOP/sandsolver
+#index: no
+
+= Sand Solver =
+
+"""Sets and configures a Sand solver. """
+
+The Sand Solver DOP sets objects to use the Sand Dynamics solver.
+
+If an object has this DOP as its "Solver" subdata, it will evolve
+itself as a [Sand Object|Node:dop/sandobject].
+
+This solver takes an SDF field called "origsurface" and creates
+particles inside of it to represent the surface.
+
+This solver uses a set of particles to store the velocity and position
+of a fluid.   These particles are then stamped into a voxel grid to
+define a surface for the purpose of pressure correction.  In addition,
+there are sand-like forces to link rigid components together.
+
+To setup an object with the requisite subdata, use the [Sand Configure
+Object DOP|Node:dop/sandconfigureobject].
+
+@parameters
+
+    == Substeps ==
+
+        Minimum Substeps:
+            While the Sand Solver tries to estimate the correct
+            substep size for a stable simulation, if unusual forces are
+            present it may take too large of a step. 
+            
+            By setting the
+            minimum substep one can enforce stability.
+        Maximum Substeps:
+            The Sand Solver will not break the simulation down into
+            more substeps than this. 
+            
+            It is a very good idea to always
+            have a maximum to ensure frames will be finished regardless
+            of their complexity. Lowering this ceiling can ensure a
+            minimum computation time at the expense of accuracy.
+        CFL Condition:
+            The CFL Condition is a factor used for automatically
+            determining what size substep a scene requires. The idea is
+            that any substep should not allow any objects to
+            interpenetrate by more than one voxel cell. 
+            
+            This condition is met when this parameter is at 1. A value of 10 would
+            allow a substep to move the fluid by as much as 10 voxel
+            cells, possibly tunneling through objects rather than
+            properly deflecting.
+
+    == Internal Forces ==
+
+        Viscosity:
+            Viscosity is a force which tries to ensure that
+            neighboring voxels have the same velocity. 
+            
+            A zero value allows fluid in adjacent voxels to move any direction
+            without resistance. Higher values introduce a penalty effect
+            when a voxel's velocity varies from that of its neighbors.
+            
+            
+            This is currently implemented by applying a diffusive term
+            to the velocity field.
+
+	Enable Sand Forces:
+	    Controls if the sand specific forces are computed or not.
+
+	Friction Angle:
+	    Voxels that are not rigid still under go friction proportional
+	    to their stress. 
+	    
+	    The Friction Angle represents the scale of this
+	    friction. The Friction Angle is also used to determine at what
+	    effective rest angle the sand is considered to be rigid.
+	Cohesive Strength:
+	    In addition to the friction angle, when determining if
+	    components should be classified as rigid, the cohesive strength
+	    is also used. 
+	    
+	    While the friction angle represents how the sand
+	    grains stack and thus move rigidly, the cohesive strength
+	    measures how they stick together and hence for rigid clumps.
+
+        Scale by Surface:
+            External forces will be scaled by an estimate of how much
+            of the cell contains liquid.  This allows for sub-voxel
+            waves to be evened out under gravity.  
+
+	    However, it also
+            means that the edges of containers will have less gravity
+            and hence will creep upwards in an undesirable manner.
+
+    == Advanced ==
+
+	Particles Per Voxel:
+	    When converting the origsurface scalar field into particles,
+	    this is the number of particles that will generated inside
+	    each voxel.
+	Particle Size:
+	    The radius, in terms of voxels, of each generated
+	    particle.
+	FLIP vs PIC:
+	    When copying the velocities from the vector field to the
+	    particles they can either overwrite the existing
+	    velocities (PIC, 0) or add the change in velocity (FLIP, 1).
+	    
+	    The PIC method results in more diffusive, viscous, fluid
+	    while the FLIP lets the particles move with no numerical
+	    viscosity.
+	Surface Bandwidth:
+	    In reconstructing the surface field from the particle
+	    values this is the bandwidth, in terms of voxels, that is
+	    searched.
+	Limit Velocity Extrapolation:
+	    When extrapolating the velocity field into non-fluid
+	    cells, the extrapolation is stopped when a certain number
+	    of cells has been filled along the border.
+	Max Cells to Extrapolate:
+	    The number of non-fluid cells that should be filled with
+	    velocity values on the non-fluid side of the velocity
+	    field.
+            
+    == Collisions ==
+
+	Use Point Velocity for Collisions:
+	    Determines if changes in point positions of the collision
+	    object will be used to find a local velocity.  
+	    
+	    This is
+	    useful for deforming colliders which have consistent point
+	    topology.
+
+	Use Volume Velocity for Collisions:
+	    Determines if changes in volume size of the collision
+	    object will be used to find local velocity.  
+	    
+	    This can be
+	    used for deforming colliders that don't have a consistent
+	    point topology.  Tangential deformational velocities are
+	    lost, however.
+
+	Collide with Non-SDF:
+	    Allows the fluid to collide with objects that don't have
+	    Geometry/SDF, such as other fluids.
+
+    [Include:standard_solver_parms]
+
+@inputs
+    [Include:standard_data_inputs]
+
+@outputs
+    [Include:standard_data_outputs]
+
+@locals
+    [Include:standard_data_locals]
+
+    [Include:standard_locals]
+
+
+

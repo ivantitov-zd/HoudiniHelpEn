@@ -1,0 +1,150 @@
+= Compositing terms and concepts =
+
+Houdini includes a _network based_, _procedural_ compositor. As in other
+areas of Houdini, to do compositing in Houdini you load or create pixel
+data with "generator" nodes, and then pipe the data through a series of
+"filter" nodes to modify the data.
+
+A compositing node (COP) manipulates image sequences (internally,
+however, it generally processes one plane at a time) and outputs an
+image sequence.
+
+== Organization and data types == (comp_datatypes)
+
+    The Houdini compositor works with _sequences_ of _images_. An image
+    is made up of _planes_. Planes are two dimensional maps of _pixels_,
+    which can store 1-4 _channels_ or arrays of data.
+
+    Sequence:
+        A sequence is a series of images, with a start frame and a
+        length.
+
+        All images in a sequence have the same dimensions (that is, you
+        cannot have one frame at 800x600 pixels and another frame at
+        1024x768 pixels in the same sequence).
+
+        A sequence can specify how the data behaves outside the
+        sequence's frame range using _pre-_ and _post extend
+        conditions_. For example, you can _hold_ the first/last frame,
+        just show a black frame, cycle the sequence, or _mirror_ (A.K.A.
+        ping-pong) the sequence back and forth.
+
+        The properties of a sequence are constant over time; you cannot
+        animate them.
+
+    Image:
+        An image is a single frame within a sequence. The image can be
+        made up of many planes, each storing different types of
+        information, such as color.
+
+    Plane:
+        The Houdini compositor supports _deep rasters_. This means an
+        image can hold many layers of information for each pixel (up to
+        1000 in the Houdini compositor). Each layer of information is
+        called a plane. In addition to the traditional RGBA color
+        information plane, you can store information such as depth,
+        normals, or mattes. See "standard planes" below.
+
+    Pixel:
+        A plane is a two-dimensional map of pixels. Each pixel can store
+        1-4 channels (see below), or an array of 1-4096 elements.
+
+        When you store arrays, you can refer to the elements of the
+        array using ` <<plane>>[<<index>>]`. Each element can contain
+        different values, but all elements of the array have the same
+        data type and component structure (see components below). This
+        is commonly used to represent cubic environment maps: store
+        6-element arrays in the color (`C`) plane to represent the 6
+        faces of the cube.
+
+        Because pixels can store arrays of data, you could represent a
+        plane of 4-dimensional matrices (Matrix4) as plane of 4-element
+        arrays, where the arrays contain elements with 4 32-bit floating
+        point channels (Vector4).
+
+    Channels:
+        A channel is like sub-data of a pixel. For example, on the color
+        plane (`C`, see "standard planes" below), each pixel has red
+        (`r`), green (`g`), and blue (`b`) channels.
+
+        An element with 1 channel is called _scalar_. An element with 2
+        channels is called _2-channel_. An element with 3 channels is
+        called _Vector3_. An element with 4 channels is called
+        _Vector4_.
+
+        You can refer to channels of a plane using `
+        <<plane>>.<<channel>> `. For example, `C.r` means the red (`r`)
+        channel of the color (`C`) plane.
+
+        Channels can hold one of five different types of data:
+
+        8 bit integer:
+            Can store integer values 0-255. As smallest integer format,
+            uses less memory, faster to process. High level of
+            quantization, OK for video, but very lossy.
+
+        16 bit integer:
+            Can store integer values 0-65535. Traditional representation
+            of color for film. Some optimizations over other formats,
+            less quantization. Uses twice as much space as 8-bit
+            integer. Still not a good HDR format (even with black/white
+            points) because it is linear.
+
+        32 bit integer:
+            Can store integer values 0-232. Not intended to store color
+            information: good for storing object or point IDs, particle
+            lifetimes, etc. Can be used to uniquely identify millions of
+            values, but high memory usage and slow to process.
+
+        16 bit float:
+            Can store fractional values from -65535.0 to 65535.0. Gives
+            good resolution between 0 (black) and 1 (white).
+            Quantization increases with magnitude, which is fine for HDR
+            images. Can represent a very high HDR contrast ratio.
+            Smaller memory usage than 32-bit floating point. Good at
+            representing bump maps and normal maps with good precision.
+
+        32 bit float:
+            Can store fractional values from -1e32 to 1e32. Excellent
+            resolution for most compositing applications. Uses a lot of
+            memory space and bandwidth.
+
+        The integer formats can optionally have _white and black points_
+        set (see  [black point and white
+        point|color_correct] ). By default, the white and
+        black points are the 0 and the maximum value of the format (8
+        bit - 0, 255; 16 bit - 0, 65535; 32 bit - 0, 2 billion).
+
+== Standard planes ==
+
+    The following planes are recognized by the Houdini compositor.
+
+    Color (C):
+        Image color, represented by three channels, `r`, `g`, and `b`.
+    Alpha (`A`):
+        Image alpha, 1 channel.
+    Mask (`M`):
+        Operation mask, which acts as a stencil for a filter operation.
+        1 or 3 channels.
+    Depth (`Z`):
+        Z depth, 1 32 bit floating point channel.
+    Point (`P`):
+        3D camera space point position, 3 32 bit floating point channels
+        `(x,y,z)`
+    Normal (`N`):
+        Object point normals, 3 32 bit floating point channels `(x,y,z)`
+    Bump (`B`):
+        Bump map, 2 32 bit floating point channels `(u,v)`
+    Velocity (`V`):
+        Point Velocity map, 3 32 bit floating point channels `(x,y,z)`
+    Luminance (`L`):
+        1 single channel.
+    Other planes may be generated by mantra, such as any exported shader
+    variables. These may be used by the compositor, but it does not
+    recognize them automatically (similarly to spare channels).
+
+The Houdini compositor is multi-threaded (supporting up to 8 threads)
+for performance, and takes advantage of SSE and MMX instructions on
+processors that support them.
+
+

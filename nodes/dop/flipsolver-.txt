@@ -1,0 +1,273 @@
+#type: node
+#context: dop
+#internal: flipsolver
+#icon: DOP/flipsolver
+#index: no
+
+= FLIP Solver =
+
+"""Evolves an object as a FLIP fluid object."""
+
+The FLIP Solver DOP evolves an object dynamically as a particle fluid.
+
+A FLIP solver is a type of hybrid between a particle based and volume
+based fluid simulations.  All fluid data is stored in the particles and only
+particles need to persist frame to frame, ensuring no unwanted mixing or loss
+of fluid can occur.  However, the pressure projection step is done on a volume
+that is created just in time. The fluid is represented by particles with their `pscale`, and can be moved around with POP and DOP forces. 
+
+When FLIP fluids are solved, a temporary velocity field is made. The particle velocities are transferred to this grid and the grid is used to perform the fluid projection. This is what prevents the particles from all going on top of each other and start moving in similar directions. 
+
+NOTE:
+    Advanced users can also add volume velocity forces at this stage as well.
+
+FLIP fluids are faster than SPH fluids, if you don't need to substep the FLIP fluid. If you need to substep the FLIP fluid because of fast moving colliders, you may find SPH just as a fast or faster. FLIP fluids are also useful because particles can be placed on top of each other without destabilizing the system. SPH tends to blow up if you move particles too close.
+
+The advantage of the FLIP Solver is that you run with only one time step per frame while SPH requires anywhere from 7 to 20 time steps or more per frame to stabilize. FLIP utilizes a few grids (volume fields) to help tame the instantaneous impulses that can arise in a fluid sim. 
+
+Various fields are used to tame the FLIP Solver so that you can run far fewer points at far fewer time steps and the inter-spacing between particles can be random. You can introduce new particles at any time with little to no consequence. This opens up so many new work flows in POPs that were simply not possible with SPH. For example, introducing splash particles with their own property attributes is now possible. 
+
+@parameters
+
+    == Substeps ==
+
+        Min Substeps:
+            The FLIP solver will always enforce this minimum
+            number of substeps. 
+		
+            This should only rarely need to be changed.
+        Max Substeps:
+            The FLIP solver will not break the simulation
+            down in to more substeps than this value. 
+
+        CFL Condition:
+            The CFL condition is a factor used to automatically
+            determine what size substep the scene requires. The idea is
+            to control the distance that a particle in the particle
+            fluid object can travel in a given substep. 
+
+            For example, when this parameter is set to 0.5, the solver will set
+            the length of each substep such that no particle travels
+            more than 50% of its particle separation in a given substep.
+
+    == Particle Motion ==
+
+	Keep Particles Apart:
+	    Despite the velocity projection stage, particles can end up closer
+	    together than their `pscale` attribute.  When this happens, internal
+	    forces can't separate the particles because the velocity projection
+	    will remove those forces.  This results in the fluid compressing
+	    over time.
+    
+	Separation Iterations:
+	    The number of times to perform the separation relaxation step.  This value can usually be set to 1 since successive frames of separation will have the same effect.
+
+	Separation Rate:
+	    How far to move the particles towards their desired separation
+	    locations.  This can be reduced to get the effect of a fractional
+	    iteration.
+
+	Separation Scale:
+	    A fudge factor to account for the inability for the particles to
+	    actually pack at the `pscale` amount due to the sphere packing
+	    problem.  To test different values, run a FLIP solve without any
+	    volume or particle forces and see which values cause your initial
+	    particles to retain the desired volume.
+
+	Detect Particle Collisions:
+	    Performs particle collision detection against SDFs and cloth.
+
+	Apply External Forces:
+	    Standard DOP forces, such as gravity from a [Gravity DOP|Node:dop/gravity], will be applied to the particles.
+
+	    This would only be turned off if you are combining a FLIP solver as
+	    part of a larger solver system. 
+
+	Integrate Particles:
+	    The particles will update their position according to their
+	    velocities.
+
+	    This would only be turned off if you are combining a FLIP solver as
+	    part of a larger solver system. 
+
+    == Volume Motion ==
+
+	FLIP Solve:
+	    Turning this off removes the velocity projection step, turning the
+	    FLIP solver into regular particle solver.
+
+	Force Scale:
+	    The result of the velocity projection is a suggested change to the
+	    particles velocity.  The force scale allows you to scale this
+	    change.  A value of 1 will update the particles to the new desired
+	    velocity, 0 will leave them unchanged.
+
+	Force Override:
+	    If enabled, this attribute will disable the volume forces wherever
+	    it is 1 on the particles, and enable it when where they are 0.  Ie,
+	    particles with this attribute at one will fly ballistically with no
+	    reference to other particles.  Note that their motion will still
+	    affect other particles which have volume forces, however.
+
+	Smoothing:
+	    Particles can either update themselves with the change in velocity
+	    determined by the projection, or update themselves with the actual
+	    new velocity from the projection.  The latter causes particles to
+	    smooth out as they share more of their velocities with their
+	    neighbors.
+
+	== Surface ==
+
+	    Point Radius Scale:
+		Adjusts the effective radius of the particles when computing
+		which grid cells they have influence in.
+
+	    Method:
+		How the influence surface is computed.
+
+	== Divergence ==
+
+	    By default, the volume motion is divergence free.  These enforces
+	    neighboring particles to neither separate nor converge.  However,
+	    you may want to adjust the particle spacing.  Doing this with
+	    forces is difficult because the volume projection will undo your
+	    forces.
+
+	    Instead, you can add a per-particle float attribute to store how
+	    much the particles should diverge.  Positive values cause particles
+	    to spread out, and negative values cause them to clump together.
+
+	    If you override the __Divergence__ field through the __Volume Force__ input to the flip solver, you can arbitrarily edit the divergence field.
+
+	    You must turn on __Add Divergence Field__ in the [FLIP Configure Object|Node:dop/flipconfigureobject]
+	    for this to work.
+
+	    Diverge by Attribute:
+		Use the specified attribute to overwrite the divergence field.
+
+	    Attribute Name:
+		The float attribute on the particles to use for the divergence
+		amount.
+
+	    Mix Method:
+		How to blend the point attribute with any existing divergence
+		field.  The divergence field is not reset frame-to-frame.
+
+	    Divergence Scale:
+		A scale applied to the divergence field after applying the
+		attribute effect.  This is useful for quickly adjusting the
+		global amount of divergence.
+
+	== Projection ==
+
+	    Sticky Fluid:
+		Determine if collision objects should prevent fluid from
+		leaving their surface instead of just preventing the
+		fluid from entering their surface.  
+
+	    Preserve Bubbles:
+		Trapped air will be given a pressure value independent of the
+		boundary pressure conditions. This prevents the bubbles from
+		collapsing in on themselves. If not set, fluid will be free to
+		flow into bubbles from all sides ensuring their
+		swift dissipation.
+            
+            
+	    Ghost Fluid:
+		Pressures are extrapolated into air cells rather than just set
+		to zero.  This causes sub-voxel ripples in the air side to be
+		suppressed.
+		
+	    Variational:
+		Contribution to the pressure equation is proportional to the
+		amount of the cell in the liquid.  This attempts to avoid
+		stairstep boundaries on solid boundaries.  Currently, only at
+		most one of __Ghost Fluid__ and __Variational__ should be set.
+
+	    Feedback Scale:
+		A scale factor used in applying feedback forces to other
+		objects.  A value of zero prevents any feedback from
+		occurring.  
+
+		The value can be thought of as a density, so to
+		have a default [RBD object|Node:dop/rbdobject] to balance, a
+		value of 1000 should be used.
+
+	    Velocity Type:
+		Rigid Velocity:
+		    The collision velocity of the object is calculated by
+		    treating it as a rigid body.  Only the angular
+		    velocity and linear velocity will be used, no local
+		    deformation will be taken into account.
+		Point Velocity:
+		    The collision velocity of the object tries to take into
+		    account deformation by using point history.  This only
+		    works if the topology doesn't change.
+		Volume Velocity:
+		    Uses the SDF representation of the object to detect
+		    deformation.  Does not require a fixed topology over
+		    time, but cannot detect tangential velocities.
+
+	    Preconditioner:
+		Controls which preconditioner is used for the conjugate
+		gradient operation.  This should be left on __Modified Incomplete
+		Cholesky__ as it is the fastest to converge.
+	    Iterations:
+		When the velocity field is center sampled, this specifies the
+		number of iterations used to project it.  The number of
+		iterations also controls the maximum distance any change in
+		the velocity field can have, so should be about the width of
+		the volume in voxels.  Lower iterations will be faster but the
+		field will not be as nice.
+
+	== Volume Limits ==
+
+	    If stray particles fly off too far, the resulting volume grid can
+	    become unwieldily even with constant tile compression.  This tab allows you to set maximum bounds.
+
+
+    == Distribution ==
+
+	When distributing a particle fluid simulation it is important
+	that each machine uses the same number of substeps.  These
+	distribution parameters will synchronize the substeps.
+
+	[Include:standard_distribution]
+
+    [Include:standard_solver_parms]
+    
+@inputs
+    Fluid to Solve:
+        The simulation object to evolve as a particle fluid.
+    Particle Velocity:
+	This input injects microsolvers after the particle velocity has been
+	updated but before it has been transferred to the volume fields.  It is
+	thus the ideal place to add solvers that manipulate the particle
+	velocity or position still farther.
+    Volume Velocity:
+	Solvers in the volume velocity input are added after the volume
+	velocity field has been created but before it has been made
+	non-divergent.  This is the best place for field-affecting microsolvers
+	to be attached, and the only place for microsolvers that want to add
+	forces to the velocity field.
+    Post Solve:
+        NOTE:
+	    This input has be deprecated.   Use a multisolver to do post-solve
+	    operations.
+        
+== Tips ==
+
+The __Velocity__ fields are heavily blurred and thresholded for large changes in velocity, which is completely tunable if the FLIP solver appears to be exploding. The __Pressure__ field is used to monitor any areas of very high and very low pressure and then the fluid sim can compensate the __Velocity__ fields which then push the points around. This is where the controls for cavitation, entrapped air, and fluid escape are managed to a great extent. The __Surface__ field can be used to test the past if some particles have flown far too far off the surface and then constrained back.
+
+@outputs
+    [Include:standard_data_outputs]
+
+
+@related
+    - [Node:dop/particlefluidobject]
+    - [Node:dop/flipconfigureobject]
+    - [Node:dop/particlefluidemitter]
+    - [Node:dop/particlefluidsink]
+    - [Node:dop/gasintegrator]
+    - [Node:sop/particlefluidsurface]
+

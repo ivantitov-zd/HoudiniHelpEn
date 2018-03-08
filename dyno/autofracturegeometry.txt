@@ -1,0 +1,97 @@
+= How to |> auto fracture geometry =
+
+There are several ways to fracture geometry using various shelf tools. For example, you can cut up geometry by using the [Shatter tool|/shelf/shatter] tool on the __Model__ tab of the shelf, or fracture a dynamic object by using the [RBD Fractured Object|/shelf/rbdfracturedobject] tool on the __Rigid Bodies__ tab of the shelf. You can also dynamically smash an object by using the [Make Breakable|/shelf/makebreakable] tool on the __Rigid Bodies__ tab of the shelf. 
+
+The following is a detailed example of how to auto fracture geometry without using the tools on the shelf.
+
+== Import Geometry ==
+
+* Load geometry into the Houdini environment.  Make sure all file operations use `$HIP` as you will need to reference the file if using a render farm for the final simulation.
+
+[Image:/images/howto/autofracture1.png]
+
+NOTE:
+    Analyze the geometry prior to fracturing, make sure all points on the geometry are fused and the object is correctly transformed in correspondence with the XYZ axis to get clean & precise collision geometry.
+
+== Boolean and apply Voronoi SOP ==
+
+* To constrain the fracture to a specific area use a [Cookie SOP|Node:sop/cookie] in conjunction with the [Voronoi Fracture SOP|Node:sop/voronoifracture]. This will divide the geometry into individual pieces, creating interesting fractures with cracks generated over a period of time rather than the entire geometry breaking upon impact.
+
+* The [Voronoi Fracture SOP|Node:sop/voronoifracture] creates clean fractured geometry and works well in conjunction with fracture DOP. 
+
+    NOTE:
+        Using this tool will increase simulation time as it effectively calculating multiple fractures for each new piece of geometry.
+
+[Image:/images/howto/autofracture2.png]
+
+* There is also an OTL called [Exploded View|Node:sop/explodedview] which transforms each piece of geometry by a set amount from the centroid of the object, allowing you to view the interior faces of the shattered geometry.
+
+== Check the names of groups ==
+
+* When an impact is detected using the [Voronoi Fracture Configure Object DOP|Node:dop/voronoifractureconfigureobject] the algorithm creates vast quantities of new geometry, which are allocated a group and labeled to correspond with the initial geometry. 
+    
+    TIP:
+        As large amounts of data are generated upon impact, consider a clear and understandable naming convention so the groups can be easily deciphered later in the process.
+
+== Import to DOPs ==
+
+* Load the geometry into DOPs. If you are using a single piece of geometry, use an RBD object. If the geometry has been pre-fractured, use an RBD glue object.
+
+    NOTE:
+        Make sure when using an [RBD Glue Object|Node:dop/rbdglueobject] the glue value is changed from -1 to 0, otherwise no fracture will take place upon impact.
+
+== Check Collision Geometry ==
+
+* Make sure you check that the collision geometry is precise, since this tool is using rigid body dynamics and is developed to shatter geometry when a force is applied.
+
+    NOTE:
+        Keep the resolution of this collision geometry to a controlled number of divisions, as it will affect the simulation time of the scene.
+
+== Setup Impact Geometry ==
+
+* One of the first things that you must do after importing the geometry into DOPs is to setup and align the object that is going to collide with fractured geometry. 
+
+    Altering density, friction, and bounce settings make a considerable difference to the simulation. For example, the __Density__ field can be used to control factors such as how far the impact geometry will penetrate.
+
+== Setup Constraints ==
+
+* Constraints are very important since this tool is based around forces and impacts. For example, when working with a scene which incorporates a building or any object where a solid base will be retained, constraints will be required. However, it is not possible to assign a pin constraint directly to a individual piece of geometry for the entire sequence, since the group names change every time a fracture occurs.
+
+    This issue can be solved by grouping the dynamic objects and referencing this dynamic object group in the constraint.
+
+== Apply & Configure Autofracture ==
+
+Once the previous steps have been implemented, assign the [Voronoi Fracture Configure Object DOP|Node:dop/voronoifractureconfigureobject] to the specific pieces of geometry and customize accordingly. 
+
+There are a number of features within the [Voronoi Fracture Configure Object DOP|Node:dop/voronoifractureconfigureobject] tool which can be used to solve certain problems or achieve certain effects.
+
+Unwanted Fractures:
+    If an impact or force causes a large section of geometry to fracture from the opposite side of the model to the point of impact, on the __Points__ tab of the [Voronoi Fracture Configure Object DOP|Node:dop/voronoifractureconfigureobject], increase the __Point Density__ and set the __Scatter Location__ to either __Both__ or __Exterior Volume__. This should solve any unwanted fractures occurring.
+
+Exploding Debris:
+    To gain the effect of geometry exploding from the surface or being forced out of its location the __Normal Impulse Scale__ and __Radial Impulse Scale__ parameters on the __Velocity Transfer__ tab will help achieve this look. The __Impulse Distance__ parameter also has to adapted to depending on the size of the scene.
+
+Interior Detail and Cluster:
+    The pieces of geometry generated by the fracture tool are clean and good to work with but can appear uniformed. There are a couple of different ways to resolve this matter.    
+
+    On the __Fracture__ tab, there are two subtabs: __Interior Detail__ and __Cluster__. __Interior Detail__ divides the geometry and applies a noise value to deform the surface, which is useful for generating additional information but can affect the way the fractured pieces react to each other and cause them to stick together. The __Cluster__ tab controls how the pieces connect together and their release can be controlled by the seed value. This again is good for adding detail but they often look like large uniformed pieces rather than different geometry.
+
+== Boolean function ==
+
+When using boolean geometry, to help increase the physically accurate properties of the simulation, apply an additional [Voronoi Fracture Configure Object DOP|Node:dop/voronoifractureconfigureobject] to the neighboring geometry so that upon impact any sections that are in contact with the fractured geometry will crumble and remove any uniformed edges.
+
+== Setup Post-Fracture Constraints ==
+
+NOTE: 
+    If you have setup the initial constraints using an expression to group the base geometry, the following step is not required unless you wish to constrain any additional geometry.
+
+When a fracture being initialized, the geometry is renamed and put into a new group. This means that a single constraint cannot hold a fractured object through an entire sequence. You will have to find the names as the simulation is calculated and create secondary constraints.
+
+== Refine Simulation ==
+
+To enhance the accuracy and detail of the simulation, increase the substeps at the Object level. This will resolve any problems where the geometry fractures a frame before impact, and will help reduce any unwanted penetrations.
+
+== Simulation and Export ==
+
+Once the simulation is setup for the required effect, it can be simulated locally or through a Render Farm.    
+

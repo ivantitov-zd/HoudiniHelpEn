@@ -1,0 +1,66 @@
+= Fluid sourcing =
+
+Since Houdini 12, the preferred method for sourcing is to generate and modify the source fields in a surface network (SOPs) and then import them into the dynamics network (DOPs) and connect them to the fourth ("sourcing") input of the [Pyro solver|Node:dop/pyrosolver], [Smoke solver|Node:dop/smokesolver], or [FLIP solver|Node:dop/flipsolver].
+
+(For pyro effects, the source geometry is used to generate a fog volume. For FLIP fluids, the source geometry is used to generate an SPH volume.)
+
+This allows you to use the full power of the surface node network to noise-ify, combine, edit, etc. the source volume (for example, using the [Volume Mix surface node|Node:sop/volumemix]) as well as set up attributes such as velocity (`V`) before you import the geometry. The sources must be volumes and mapped correctly.
+
+== Pyro ==
+
+The previous Pyro method for specifying the source volume (merging the pyro object and source volume in DOPs with a "source" relationship or using [Source apply|Node:dop/sourceapply]) is still available for backwards compatibility (on the Pyro solver's [Relationships|#relationships] tab, turn on __Enable relationships__). This is still useful when sourcing from simulated objects. However in most cases the new sourcing input is the preferred method for its much greater flexibility and efficiency.
+
+The default Pyro setup copies the initial source volume into the `fuel` and `temperature` fields of the pyro object. You can use additional tools such as [Expand from objects|/shelf/expandfromobjects] to affect other fields.
+
+== FLIP Fluids ==
+
+The data flow for the connection between the [Fluid Source SOP|Node:sop/fluidsource] and the [Source Volume DOP|Node:dop/sourcevolume] for [particle fluids|liquids] is:
+
+In Fluid Source SOP |
+    # Create surface SDF field and velocity fields as for pyro.
+    
+    # Create particles inside surface SDF with specified particle separation, jitter, and so on.
+    
+    # Sample the velocity field onto particles' `v` (velocity) attribute (this is the last use of velocity field).
+
+In Source Volume DOP |
+    # Import surface field and particles into DOPs.
+    
+    # Delete any incoming particles that overlap with the existing FLIP surface. (This is a fast test to avoid emitting where particles already exist.)
+    
+    # Merge the new particles with existing particles.
+    
+    # Union the emitter's surface field with the existing FLIP surface field. 
+
+== Tools ==
+
+The following shelf tools let you convert selected objects into different types of fields in a Pyro or FLIP fluid effect:
+
+* [/shelf/sourcefromobjects]
+* [/shelf/sinkfromobjects]
+* [/shelf/pumpfromobjects]
+* [/shelf/collidewithobjects]
+* [/shelf/expandfromobjects]
+
+* See the [help for the Fluid Source surface node|Node:sop/fluidsource] and the [help for the Source Volume DOP node|Node:dop/sourcevolume].
+
+* See the [help on working with volumes|/model/volumes].
+
+== Tips ==
+
+* If you are sourcing from SOPs, you should cache the sources before running the simulation, especially when the source volume is high resolution. Caching ensures the SOP chain doesn't re-cook every frame.
+
+    Static SOP sources without noise don't need to be cached, since they are only computed once.
+
+* If you are using relationships (not the "sourcing" input) and the source object deforms (or collides with a deforming object), go to the __Advanced > Forces > Sources__ subtab of the solver node and set the __Velocity Type__ to "Point Velocity".
+
+* You can set the velocity attribute (`v`) on the source geometry and the pyro solver will pick it up and apply it to the simulation.
+    
+    For example, if you created a polygonal tube, you could add a [Point node|Node:sop/point] which set the __Velocity__ to
+    
+    `fit01($BBX, -1, 1)`, `1`, `fit01($BBZ, -1, 1)`
+    
+    This would create upward velocity (`1` in the Y direction) with velocity vectors flared outward (the [Exp:fit01] expressions scale the position of each point within the bounding box of the input geometry (`$BBX` and `$BBZ`) to fit within the range `-1` to `1`).
+
+* See [pyro look development|/pyro/pyro_look] for tips on how to use the source to change the look of a pyro effect.
+

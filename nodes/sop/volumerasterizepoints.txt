@@ -1,0 +1,136 @@
+#type: node
+#context: sop
+#internal: volumerasterizepoints
+#icon: SOP/volumerasterizepoints
+
+#tags: volumes, merge
+
+= Volume Rasterize Points =
+
+"""Converts a point cloud into a volume."""
+
+The Volume Rasterize Points operation  takes a cloud of points fills
+a volume accordingly.
+
+The point attributes, such as `pscale`, `orient`, etc, are incorporated to
+transform the generated noise and displacement fields.
+
+The point attributes `padding_absolute` and `padding_relative` will override
+the per-point computation region.
+
+NOTE: If all you want is a density based stamping, the Volume Rasterize
+Particles will provide a much faster operation.
+
+@parameters
+    Destination:
+	Which volumes or VDBs in the first input to stamp into.
+	If no name attribute is present, there should be a single
+	volume or VDB and is treated as the "density" target.
+
+	If more than one is present, a name attribute should be
+	present.  The name is used to compare with the point attributes.
+
+	`density` will be filled with the alpha mask of the points.
+
+	`vel` will be filled with the local velocity of the points
+	measured both by the `v` attribute and the angular velocity
+	in the `w` attribute.
+
+	All of the destination must be aligned and of the same
+	time (vdb or volume).
+
+    Rasterization Group:
+	A group of points in the second input to rasterize.
+
+    Density Scale:
+	A global scale for the evaluated density of the points.
+
+    Scale Texture Space:
+	Whether the local texture coordinates for displacement
+	and noise will be scaled by the `pscale` attribute.  Scaling
+	causes the noise pattern to stretch as the particle grows,
+	unscaled means the particle will expand into a fixed
+	noise pattern.
+	
+    == Compositing ==
+
+    Merge Method:
+	How to blend each incoming point in with the base grid.
+	Because it is not defined what order the points will
+	actually be stamped in, this must be symmetric.
+
+    Samples per Voxel:
+	If stamping small points a low resolution volume,
+	aliasing artifacts can occur.  To avoid this, you can make more than
+	one sample per destination voxel.
+
+	If this is 1, no random sampling is done, instead a single sample is
+	done in the middle of the voxel.
+
+    Sampling Seed:
+	The seed used for generating the random samples.
+
+    Scalar Attrib:
+	An extra float point attribute that will be composited
+	into a same-named volume, provided both exist.
+
+    Vector Attrib:
+	An extra vector point attribute that will be composited
+	into a same-named volume, provided both exist.
+
+    Integer Attrib:
+	An extra integer point attribute that will be composited
+	into a same-named volume, provided both exist.
+
+    == Fall Off ==
+
+    Smooth Falloff:
+	The density between the solid core and the outside will fall off linearly if smooth falloff is off.  If on, an Elendt model will be used to provide a smoother derivatives at either extreme.
+
+    Solid Ratio:
+	The amount of the particle that gets full density.  0 means only the very center of the particle will have full density.  1 means the entire particle out to the `pscale` will have full density.  Note that such a harsh cut off tends to produce aliasing problems.
+
+    Exterior Pad:
+	The particles will be expanded uniformly outwards by this distance.  This is measured in world space and is thus the same regardless of the particle's `pscale`.
+
+    == Displacement ==
+
+    Enable Displacement:
+	Turns on displacing of each particle's displacement.
+
+    Amplitude:
+	How much to move the surface of the particle.  Note this is in world space, not relative space!  Making this very large can thus result in unexpectedly long cook times.
+
+    Element Size:
+	The size in worldspace of the largest noise pattern.
+    Element Scale:
+	The noise pattern can be stretched anistropically.  The values are in the local texture coordinates of the particle, so will rotate when the particle does.
+    Animate Displacement:
+	Change the displacement over time.
+    Pulse Length:
+	Time in seconds for the displacement pattern to fully change.
+
+    == Noise ==
+
+    Enable Noise:
+	Turns on applying noise to the density.  This is used to cut out a pattern of holes through the particle's splat pattern.
+
+    Gain:
+	A contrast adjustment for how extreme the noise affects the density.
+    Bias:
+	Controls how much of the density will remain after the noise is applied.
+    Element Size:
+	The size in worldspace of the largest noise pattern.
+    Element Scale:
+	The noise pattern can be stretched anistropically.  The values are in the local texture coordinates of the particle, so will rotate when the particle does.
+    Animate Noise:
+	Change the noise over time.
+    Pulse Length:
+	Time in seconds for the noise pattern to fully change.
+
+@related
+    - [Node:sop/volumestamp]
+    - [Node:sop/volumerasterize]
+    - [Node:sop/volumerasterizeparticles]
+
+

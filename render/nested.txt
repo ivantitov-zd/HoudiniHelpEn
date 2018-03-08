@@ -1,0 +1,192 @@
+= Absorption and nested dielectrics =
+
+#flow: /render/mug
+
+"""Automatically "scoop out" geometry with one shader from inside overlapping geometry with another shader, allowing different shading properties inside."""
+
+
+== Absorption == (absorb)
+
+When light travels through a transparent medium such as glass, the material absorbs certain wavelengths, "coloring" the light rays. This effect is obvious when the medium is tinted, like stained glass or fruit juice.
+
+When rendering with Mantra, you can simulate effect can be simulated in variety of ways, such as using a volume to attenuate light as it travels through an object. However, the easiest method is to use two shader parameters on the [Principled shader|Node:vop/principledshader] (as well as the [Classic shader|Node:vop/classicshader] and the low-level [PBR Nonmetallic node|Node:vop/pbrnonmetallic]):
+
+Transmission Color:
+    [Include:/nodes/vop/standard_shading_parms#transcolor]
+
+At Distance:
+    [Include:/nodes/vop/standard_shading_parms#transdist]
+
+As a ray travels through a transparent object, it "accumulates" tint from the Transmission Color, according to the At Distance value. If this ray then hits an opaque object it combines the evaluated surface color with the accumulated tint.
+
+[Image:/images/render/mug/nested_dielectrics/Absorption-01.jpg]
+
+Using this method, Mantra can accumulate absorption colors across multiple, non-overlapping, transparent objects. (For a solution to _overlapping_ transparent objects, see [nested dielectrics|#nested] below.) The absorption tint values are multiplied together before being combined with opaque object's color.
+
+[Image:/images/render/mug/nested_dielectrics/Absorption-02.jpg]
+
+A ray does not have to exit a transparent object for absorption to take place. For example, if you have an opaque object embedded in a transparent one, the ray still accumulates absorption color before it hits the opaque surface.
+
+[Image:/images/render/mug/nested_dielectrics/Absorption-03.jpg]
+
+The transparent object does not have to be a closed surface. A ray can pick up color from an open surface such as a plane representing a pane of glass. (Note that open transparent surfaces does _not_ work with lights: looking at a light through a transparent plane will not color the light. If you need to tint lights, consider adding depth to your transparent object, or create emissive geometry as a stand-in for your light.)
+
+If the tinted light ray does not eventually hit an opaque object, Mantra discards the absorption information and returns the color black, essentially treating the open surface as an infinitely Deep transparent object which absorbs all light.
+
+[Image:/images/render/mug/nested_dielectrics/Absorption-04.jpg]
+
+
+=== "At Distance" value and scale ===
+
+When using a shader with absorption, remember than that amount of tinting is based on the distance travelled through the object in _world space units_. This means that *the scale of your object can have a large influence on the rendered results*.
+
+[Image:/images/render/mug/nested_dielectrics/AbsorbScaleCompare.jpg]
+
+With absorption you should do your look development on an object at its actual scale in the rendered scene. If you set up the shader on an example object at one scale, but then apply it to render geometry at a different scale, you will not get the same look.
+
+
+=== Absorption and camera position ===
+
+Mantra only starts tracking tint absorption when a light ray crosses a transparent surface facing the camera. This allows it to track when a ray enters an object and when it exits. However, this means placing the camera inside a transparent object will not generate the expected results. In this case, a ray leaves the camera and exits the sphere, but because it never entered the sphere from outside, it never started tracking absorption and so gets no tint from the object.
+
+[Image:/images/render/mug/nested_dielectrics/CamerPlaceExample.jpg]
+
+
+=== Absorption and Volumetric Effects ===
+
+Absorption is a very simple but effective way of representing the attenuation of light through a transparent medium. However, because it is not a truly volumetric effect, it is not appropriate for representing all types of lighting effects.
+
+In some objects, the attenuation of light is caused by particulates suspended in the medium. These particles can both absorb and scatter light. Consider a large fluid effect like an ocean:
+
+[Image:/images/render/mug/nested_dielectrics/AbsorbCompare.jpg]
+
+While the ocean surface has a realistic feeling of depth using absorption (center image), only the true volumetric rendering (right image) displays the characteristic light scattering of a real ocean. However, volumes are slower to render than absorbant surfaces, so you may want to consider quality vs. render time. In many cases, like a swimming pool or shallow river, absorption may be enough to get the look you need.
+
+
+== Nested Dielectrics == (nested)
+#index: document
+
+:fig:[Image:/images/shade/nested_dielectric_render.jpg]
+    #display: narrow
+    
+    Nested dielectrics solve a problem where you have volumes contained within other volumes that need different physical rendering properties.
+
+    For example, for a glass of cola and ice, you want different Index of Refraction values for the glass, the cola, the ice, and the air bubbles inside.
+    
+    Also, in this example, the fact that the cola geometry intersects the glass will obviously give incorrect results. You don't want the cola to shade inside the glass interior.
+
+:fig:[Image:/images/shade/nested_dielectric_gap.svg]
+    #display: narrow
+    
+    You could try modeling the surfaces in such a way that the volumes of the different geometries don't overlap -- instead their surfaces would be coincident, or have a tiny gap.
+    
+    However, shading coincident surfaces will always shade incorrectly due to precision errors, and a gap will not give physically correct results. Further, this is a tedious and error-prone way to model. It would be much easier to just overlap the surfaces.
+
+:fig:[Image:/images/shade/nested_dielectric.svg]
+    The solution is _nested dielectrics_. You set up _priorities_ on the different shaders, and at render time, wherever multiple shaded surfaces overlap, only the shader(s) with the highest priority contribute.
+    
+    Nested dielectrics act like a cheap boolean operation at render time. Higher priority shaders run _instead of_ lower priority shaders, effectively "scooping out" the geometry's volume where they overlap.
+
+:fig:
+    In this case you would give the bubbles and glass higher priority than the cola. This lets you "scoop out" the glass and bubbles from the cola. You would give the ice higher priority than the bubbles. This lets you scatter bubbles throughout the cola and then override them with the ice wherever they overlap. Again, this means you don't have to worry about preventing bubbles from scattering where ice exists.
+
+:task: Enable nested dielectrics on the render node:
+    # In the main menus, choose __Render > Edit render node > <<name>>__.
+
+    # In the parameter editor, click the __Rendering__ tab and then the __Shading__ sub-tab.
+
+    # Turn on __Enable absorption and nested dielectrics__.
+
+    Nested dielectric support has a slight performance and memory cost. You might not want to turn it on until you need it.
+
+:task: Set up nested dielectric shaders:
+    * Built-in shaders should have a priority parameter/input allowing you to set the shader priority for nesting. For example, on the [Principled Shader VOP|Node:vop/principledshader], the __Surface priority__ parameter is on the __Surface__ tab, under "Transparency".
+
+    * If you're building your own shader, the priority is an input on the [PBR Non-metallic node|Node:vop/pbrnonmetallic], which handles reflection and refraction.
+
+    The lower the priority number, the _higher_ the priority. For example, a shader with priority 1 will override a shader with priority 2.
+
+
+=== Surface Priority ===
+
+[Include:/nodes/vop/standard_shading_parms#priority]
+
+
+== Dispersion == (disperse)
+
+In optics, dispersion can refer to the separation of light into its component wavelengths as it travels through a refractive material. A classic example of this effect is the spectrum produced by light travelling through a dispersive prism.
+
+When rendering with Mantra, you can simulate this effect by increasing the __Dispersion__ parameter on the [Principled shader|Node:vop/principledshader] (as well as the [Classic shader|Node:vop/classicshader] and the low-level [PBR Nonmetallic node|Node:vop/pbrnonmetallic]).
+
+Dispersion:
+    [Include:/nodes/vop/standard_shading_parms#dispersion]
+            
+Mantra randomly assigns the wavelengths. However, it tries to make sure that the visible spectrum is uniformly sampled per Pixel Sample.
+
+Because Mantra tags each ray with a single wavelength, it is important to have enough samples to represent the entire spectrum (using the __Secondary rays__ parameter on the Mantra render node).
+
+In the following diagram, you can see how a single Pixel sample, with 3 secondary rays, will not be able to adequately cover the visible spectrum. This will almost certainly result in noise in the final render as each pixel sample returns a random distribution of wavelengths.
+
+[Image:/images/render/mug/nested_dielectrics/DispersionDiagram-01.jpg]
+
+As you increase the number of secondary rays, there is more resolution to represent more of the visible spectrum in a single Pixel Sample. This will result in more consistency pixel to pixel and so less noise in the render.
+
+[Image:/images/render/mug/nested_dielectrics/DispersionDiagram-02.jpg]
+
+The following sequence of renders shows how noise from Dispersion decreases with the number of secondary rays. The renders show 1, 5, 25, and 100 secondary rays.
+
+[Image:/images/render/mug/nested_dielectrics/DispersionRaysCompare.jpg]
+
+
+=== Removing dispersion noise ===
+
+Most often, noise in a render is the result of small changes in brightness (luminance) from one pixel to another. When your shader has dispersion, this grainy look can be amplified by the introduction of color noise alongside on top of luminance noise.
+
+:fig:[Image:/images/render/mug/nested_dielectrics/DispesionNoiseCompare.jpg]
+
+    In this example, both are similarly under-sampled but the image on the right appears to exhibit much more noise. This is because small changes in brightness are far less obvious than dramatic change in color caused by insufficiently sampling the color spectrum. 
+
+:fig:[Image:/images/render/mug/nested_dielectrics/DispesionNoiseCompareClose.jpg]
+
+    If you look closely at the white areas of the sphere, you’ll see very similar noise patterns. However, the image on the right appears dramatically noisier due to the chromatic nature of the noise.
+
+You will often need to increase the amount of sampling on objects with dispersion compared to similar objects without dispersion.
+
+:fig:[Image:/images/render/mug/nested_dielectrics/DispersionBetterNoiseCompare.jpg]
+
+    In the following example, you can see that significantly more sampling was required to achieve similar amounts of noise between both objects.
+
+:fig:[Image:/images/render/mug/nested_dielectrics/DispersionBetterNoiseCompareClose.jpg]
+    In this close-up, you can see that the white areas of the spheres now have very similar noise levels and patterns. This is because enough of the visible spectrum has been sampled to converge back to the color white. But, it required almost twice the number of samples to achieve this result.
+
+Because of this difference in sampling, it may be useful to override Refraction Quality parameters on any transparent object with dispersion enabled. This way you can be sure that you are sending extra refraction samples only to the objects which require them.
+
+
+<!--
+== Overview ==
+
+:fig:[Image:/images/shade/nested_dielectric_pre.svg]
+    #display: narrow
+    
+    Nested dielectrics solve a problem where you have volumes contained within other volumes that need different physical rendering properties.
+
+    For example, for a glass of cola and ice, you want different Index of Refraction values for the glass, the cola, the ice, and the air bubbles inside.
+    
+    Also, in this example, the fact that the cola geometry intersects the glass will obviously give incorrect results. You don't want the cola to shade inside the glass interior.
+
+:fig:[Image:/images/shade/nested_dielectric_gap.svg]
+    #display: narrow
+    
+    You could try modeling the surfaces in such a way that the volumes of the different geometries don't overlap -- instead their surfaces would be coincident, or have a tiny gap.
+    
+    However, shading coincident surfaces will always shade incorrectly due to precision errors, and a gap will not give physically correct results. Further, this is a tedious and error-prone way to model. It would be much easier to just overlap the surfaces.
+
+:fig:[Image:/images/shade/nested_dielectric.svg]
+    The solution is _nested dielectrics_. You set up _priorities_ on the different shaders, and at render time, wherever multiple shaded surfaces overlap, only the shader(s) with the highest priority contribute.
+    
+    Nested dielectrics act like a cheap boolean operation at render time. Higher priority shaders run _instead of_ lower priority shaders, effectively "scooping out" the geometry's volume where they overlap.
+
+:fig:[Image:/images/shade/nested_dielectric_render.jpg]
+    You would give the bubbles and glass higher priority than the cola. This lets you "scoop out" the glass and bubbles from the cola. You would give the ice higher priority than the bubbles. This lets you scatter bubbles throughout the cola and then override them with the ice wherever they overlap. Again, this means you don't have to worry about preventing bubbles from scattering where ice exists.
+-->
+

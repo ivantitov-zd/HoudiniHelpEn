@@ -1,0 +1,235 @@
+#type: node
+#context: pop
+#internal: collision
+#icon: POP/collision
+
+#tags: collide, attrs
+
+= Collision =
+
+"""Sets attributes on and/or groups particles when they collide with
+geometry."""
+
+This operator performs collision detection between the particles and a
+referenced SOP's geometry.
+
+* Use the __Collision Group__ parameter (on the __Behavior__ tab) to
+  create a group containing the particles that collide. Subsequent nodes
+  in the chain can then act on this group using their __Source Group__
+  parameters.
+
+* This operator can add/set attributes and local variables describing
+  the collision to the particles. You can then use these attributes in
+  [expressions|/expressions]  controlling the
+  particles.
+
+  Use the parameters on the __Attributes__ tab to add attributes that
+  store information about the particle's last collision. With the
+  exception of the `distance` attribute, these attributes are not set
+  unless a collision occurs.
+
+This operator modifies the following attributes: `accel`, `dist`, `hitCd`,
+`hitN`, `hitid`, `hitpos`, `hitposuv`, `hittime`, `hituv`, `numhit`.
+
+The particle state can later be queried using some of the following
+local variables: `$DEAD`, `$SLIDING`, `$STOPPED`, `$STUCK`.
+
+[Include:/shelf/collision#includeme]
+
+TIP:
+    If particles are not bouncing (they are passing straight through
+    the surface you want to collide with), trying increasing the
+    __Collision tolerance__ (on the __Collision__ tab), for example
+    to `0.01`.
+
+== Attribute and local names ==
+
+Attribute and local variable names associated with each parameter.
+
+table>>
+    tr>>
+        th>> Parameter
+        th>> Attribute
+        th>> Local Variable
+    tr>>
+        td>> Add Num Hit Attr
+        td>> numhit
+        td>> $NUMHIT
+    tr>>
+        td>> Add Hit ID Attr
+        td>> hitid
+        td>> $HITID
+    tr>>
+        td>> Add Hit Time Attr
+        td>> hittime
+        td>> $HITTIME
+    tr>>
+        td>> Add Hit Pos Attr
+        td>> hitpos
+        td>> $HTX $HTY $HTZ
+    tr>>
+        td>> Add Hit Pos UV Attr
+        td>> hitposuv
+        td>> $HU $HV
+    tr>>
+        td>> Add Hit Normal Attr
+        td>> hitN
+        td>> $HNX $HNY $HNZ
+    tr>>
+        td>> Add Hit Diffuse Color
+        td>> hitCd
+        td>> $HCR $HCG $HCB
+    tr>>
+        td>> Add Hit Texture UV
+        td>> hituv
+        td>> $HMAPU $HMAPV $HMAPW
+    tr>>
+        td>> Add Distance Attr
+        td>> dist
+        td>> $DIST
+
+@parameters
+    [Include:commonParms#commonMain/]
+
+
+    == Collision ==
+
+        [Include:commonParms#geoSourceParms/]
+
+        Hint:
+            Gives the operator a hint about whether the target geometry
+            is moving. This lets the operator choose more effective
+            algorithms for detecting collisions.
+
+
+            Static geometry:
+                The target geometry does not move or change shape.
+            Translating geometry:
+                The target geometry moves.
+            Deforming geometry (only triangles):
+                The target geometry changes shape. This is only
+                effective for triangle polygon surfaces.
+        Collision Tolerance:
+            #channels: /tolerance
+
+            Distance from geometry at which particle is considered to
+            have collided.
+
+    [Include:commonParms#hitBehaveParms]
+
+
+    == Constraints ==
+
+        Enforce Orientation:
+            Ensures that the normal component of a bounce on successive collisions is
+            consistent with the first bounce in that frame, when multiple collisions occur within a frame.
+
+            Suppose you have set the normal gain on a bounce to be small.
+            This means the particle will tend to bounce parallel to the
+            surface, not away from the surface. Once the particle is
+            traveling parallel to the surface, Houdini could detect
+            another collision, perform a bounce, but because the
+            particle was traveling slightly _away_ from the surface,
+            the particle ends up passing through the geometry when it
+            reflects.
+
+            To prevent this, the __Enforce Orientation__ setting records
+            the orientation of the initial bounce with respect to the
+            normal of the surface, and does not apply the normal gain to
+            any bounces with the "wrong" orientation.
+
+            You would very rarely turn this off. Some conceivable
+            reasons, however, are:
+
+            * To preserve backwards compatibility with a particle system
+              from an older version.
+
+            * In your scene it might be legal for a particle to bounce
+              against both the "inside" and "outside" of a piece of
+              geometry within a single frame. In this case, you would have
+              to turn __Enforce Orientation__ off to allow that.
+
+        Add Hit Test Attribute:
+            Uses an attribute to ensure orientation consistency across
+            all frames.
+
+            The same problem that makes enforcing the orientation within
+            a single frame desirable exists across multiple frames. A
+            legal bounce could occur one frame, and then three frames
+            later the only bounce could be an "illegal" bounce. To
+            detect this, Houdini must keep track of the relative
+            orientation from the first bounce in the earlier frame for
+            each particle.
+
+        Hit Test Attribute:
+            The name of the attribute to use to enforce orientation
+            across frames.
+
+            This attribute should be unique for each Collision POP in
+            the particle simulation which needs to use one, hence the
+            strange default name. Any automatic method of naming this
+            attribute might fail if you have an initial state of a
+            particle system from a different particle network.
+
+        Do Normal Step Correction:
+            It is possible for bouncing particles to leak through the
+            collision geometry. This option adds a corrective step in
+            the collision algorithm which attempts to use the normal of
+            the previous collision to detect and correct leaks.
+
+            Turn this on when particles are leaking through the
+            collision geometry with a velocity mostly normal to the
+            surface.
+
+            __Normal Step Distance__ and __Back Step Distance__ are the
+            maximum distances to use when performing the respective
+            corrective steps. A back step allows the detection of leaks
+            even when the particle velocity is mostly parallel to the
+            collision geometry.
+
+            Increasing the distances will generally tend to reduce the
+            number of leaking particles. There are trade-offs, though:
+            larger distances can cause more stuttering when the
+            corrective step passes through some curvature of the
+            surface.
+
+        Prev Normal Attribute:
+            The name of the attribute to use to store the normal from
+            the previous collision for the normal step correction. This
+            should be unique for each Collision operator in the
+            simulation. This is similar to the __Hit Test Attribute__
+            parameter.
+
+        Normal Step Distance:
+            #channels: /normalstep
+
+            The maximum distance to use when attempting the normal step
+            correction.
+
+        Back Step Distance:
+            #channels: /backstep
+
+            The normal step correction can fail, particularly if the
+            particle has leaked through a sharp corner in polygonal
+            geometry. In that case, it is still possible to detect and
+            correct the leak, but by having the particle step backwards.
+            This parameter is the maximum distance to use when
+            attempting the back step correction.
+
+            This correction is done only if the user has specified a hit
+            test attribute and a non-zero back step distance.
+
+            This correction does not generally work well on surfaces
+            with smooth curvature and can result in particles moving
+            backwards as they bounce.
+
+    [Include:commonParms#hitAttrParms]
+
+@locals
+    [Include:standard_locals]
+
+
+@related
+    - [Node:pop/limit]
+    - [Node:pop/softlimit]
+

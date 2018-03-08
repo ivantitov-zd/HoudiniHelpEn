@@ -1,0 +1,404 @@
+#type: node
+#context: dop
+#internal: popgrains
+#icon: DOP/sandsolver
+
+= POP Grains =
+
+"""A POP node that applies sand grain interaction to particles."""
+
+
+The POP Grains node treats the particles as small spheres and applies
+interaction between them.  This allows for interpenetration prevention,
+cohesion, and even explicit constraints to be enforced.
+
+Unlike [POP Interact|Node:dop/popinteract], which uses forces to prevent particles from penetrating, the POP Grains uses a Position Based Dynamics approach to directly move the particles apart.  This approach allows for a more stable enforcement of the constraints without the sort of explosions that very high forces would induce.
+
+This operator directly modifies the `P` attribute to move the points and the `v` attribute to reflect how they moved.
+
+Particles under control of POP Grains have the `ispbd` attribute set to 1.  This causes them to not perform normal movement update in the [POP Solver|Node:dop/popsolver], as the actual motion update is done in this node.
+
+NOTE:
+    If insufficient substeps or constraint iterations are performed, the solver reacts by under-enforcing constraints.  This results in bouncy or collapsing behavior, as if the corresponding stiffness values were much lower.  Thus, if stiffness is higher than supported, increasing substeps or constraint iterations will change the look and make the simulation stiffer.
+
+    An approximate maximum stiffness value is substeps times constraint iterations.  To increase stiffness beyond this, more substeps or constraint iterations are required.
+
+NOTE:
+    Weights are in the 0 to 1 range.  For the system to be guaranteed stable, the sum of all active weights should be 1. However, in practice, merely keeping each individual weight below one is effective and provides better behavior with fewer substeps.
+
+    Weights over 1 can be used to accelerate convergence, but are likely to cause particles to explode or jitter.
+
+    Controlling individual particle behavior through the weight attributes is faster than through the stiffness attributes, but is not scaled by timesteps nor iterations, so should usually only be done in an all-or-nothing manner.  If not, behavior will change significantly with changing substeps or iterations.
+
+NOTE:
+    Friction is proportional to particle overlap.  Thus smaller particles, with inherently smaller overlap, will have less friction effects.
+
+    This also means if the particle-particle constraint isn't stiff, i.e. overlap is not resolved swiftly, friction will be considerably stronger.
+
+    Increasing constraint iterations can also increase the effective friction.
+
+NOTE:
+    If particles are highly stacked, it can take many iterations to resolve the pile.  Too few iterations will result in the pile "bouncing".  This also prevents the friction from triggering a stable stack.  "Stacking height" in this case refers to how many particles are on top of each other, not the actual physical size of the stack.
+
+@parameters
+    [Include:standard_pop_parms#commonMain/]
+
+    Particle Separation:
+	For the purpose of scaling parameters, this is taken to be the
+	average diameter of all particles.  Normally it can be linked to the
+	particle creation code to provide a central control for scene scale.
+
+	The actual `pscale` attribute on particles trumps this value,
+	this is mostly used as a hint for normalizing things like mass-shock
+	scale.
+
+    Constraint Iterations:
+	How many times to attempt to enforce the constraints in a single
+	substep.  Since all particles are enforced simultaneously, this must be
+	around the diameter of the system - ie, the expected stacking height of
+	the particles.
+
+	In each iteration, particles only inspect their immediate neighbors.
+	Thus, if you have a pile ten particles high, the top particle will
+	only learn about the ground plane after ten iterations, making
+	ten the minimum usable constraint iteration value. In practice
+	doubling this is often required.
+
+    == Behavior ==
+
+    Assume Uniform Radius:
+	The `pscale` attribute is used to determine the radius of each
+	particle.  If all particles have the same radius, faster acceleration
+	structures can be used to find neighbors.
+
+    === Friction ===
+
+    With Colliders:
+	#id: collisionfriction
+
+	Particle-collider friction is scaled by this amount.  A value of 0 will result in the particles not sticking, and a value of 1 will result in the particles trying to match velocity if contacting.
+
+	Scale with the `friction` point attribute.
+
+	NOTE:
+	    This does not respect the friction parameter or friction attributes
+	    on the collision object.
+
+    With Particles:
+	#id: particlefriction
+
+	Particle-particle friction is scaled by this amount.  A value of 0 will result in the particles not sticking, and a value of 1 will result in the particles trying to match velocity if contacting.
+
+	Scale with the `friction` point attribute.
+
+    Accurate Friction:
+	#id: jacobifriction
+
+	If set, friction is applied every iteration of the constraint loop.
+	This makes for a stronger and more accurate friction that is better
+	able to stack grains.
+
+    Static Threshold:
+	#id: static_threshold
+
+	The speed-vs-collision depth ratio at which particles will try to come
+	fully to rest within a constraint iteration.
+
+	Multiply the depth a particle has sunk into a neighboring particle by
+	the speed the particle is going.  If the result is less than this
+	threshold, the particle is brought to rest (relative to the other
+	particle)
+
+    Scale Kinetic:
+	#id: kinetic_scale
+
+	When outside of the static threshold, the relative velocity is
+	canceled proportional to this and the collision depth.  Higher
+	numbers will cause particles to swiftly lose tangential relative
+	motion if overlapping.
+
+    === Internal Collisions ===
+    Weight:
+	#id: replusionweight
+
+	A weighting for how much the particle collision forces are weighted.
+	A value of zero will disable particle collision.
+
+	Scale with the `repulsionweight` point attribute.
+
+	OpenCL does not support the `repulsionweight` attribute.
+
+    Stiffness:
+	#id: repulsionstiffness
+
+	How strongly particles are kept apart.  Higher values result in
+	less bouncy repulsion.
+
+	Scale with the `repulsionstiffness` point attribute.
+
+	OpenCL does not support the `repulsionstiffness` attribute.
+
+    Enable Mass-Shock Scaling:
+	Artificially scales the mass of particles according to their position
+	with respect to gravity.  By making particles higher up lighter,
+	stacks of particles will converge faster and be more stable.
+
+	The Global method will add a `shockmass` attribute which stores
+	the virtual mass of all particles prior to iterating.  It requires
+	a properly set origin to avoid overflow.
+
+	The Local method will compute a relative mass scale on a just-in-time
+	basis.  The extra computation time is often made up for by not having
+	to read the attribute values.  Because of the approximation of
+	the exponential used, the effective shock scaling power is clamped to
+	approximately seven.
+
+    Shock Scaling Power:
+	The amount of scaling to perform.  Higher numbers increase the
+	contrast between successive particles.  A value of 0 will
+	cause no ratio between particles, a value of 1 a 15% ratio
+	between two particles stacked vertically.
+
+	Too high a number makes higher particles extremely light
+	and destabilizes the system.
+
+    Shock Axis:
+	The up-vector used to define a gradient of particle masses.
+
+	Should be in the direction of stacking, so usually is
+	opposite to that of gravity.
+
+    Shock Origin:
+	The rough center of the sand system.  Due to limits of floating point
+	representation, particles too far from this origin will be clamped
+	to min/maximum mass values.  A lower scaling power allows
+	for a larger range.
+
+	The default values give a range of +/-580 particle separations
+	in the shock axis direction.
+
+    === Clumping ===
+
+    Weight:
+	#id: attractionweight
+
+	A weighting for how much the particles will naturally stick together
+	when close.  A value of zero will disable particle clumping.
+
+	Scale with the `attractionweight` point attribute.
+
+    Stiffness:
+	#id: attractionstiffness
+
+	How strongly nearby particles stick to each other.  Higher values
+	result in a less bouncy adhesion.
+
+	Scale with the `attractionstiffness` point attribute.
+
+	OpenCL does not support the `attractionstiffness` attribute.
+
+    === Explicit Constraints ===
+
+    Weight:
+	#id: constraintweight
+
+	If particles are connected by polylines (polygons of two points) they
+	will be forced to maintain the distance specified by the
+	`restlength` attribute on the primitive.
+
+	This controls the weighting given to that constraint, a value of zero will
+	disable the constraint.  Setting this to zero will speed up the simulation as it will not have to copy connectivity information into an attribute every substep.
+
+	Scale, on a per-particle basis (not per constraint!) with the `constraintweight` point attribute.
+
+	OpenCL does not support the `constraintweight` attribute.
+
+    Stiffness:
+	#id: constraintstiffness
+
+	If particles are connected by polylines (polygons of two points) they
+	will be forced to maintain the distance specified by the `restlength` attribute on the primitive.
+
+	This controls the stiffness given to that constraint, higher values will be less bouncy.
+
+	Scale, on a per-particle basis (not per constraint!) with the `constraintstiffness` point attribute.
+
+	OpenCL does not support the `constraintstiffness` attribute.
+
+    Collide Mutually Constrained Particles:
+	If two particles have an explicit constraint between them, this option
+	will allow them to collide.  This is useful if working with breaking
+	constraints as it can ensure there isn't a sudden force when the
+	constraint breaks.  It requires that the initial particles be
+	separated, however, so does not work if packing density is greater than
+	one.
+
+    Enable Rigid Shape Matching:
+	#id: enablerigids
+
+	Connected groups of particles will be identified and constrained
+	to a rigid transform.  This greatly improves the stiffness of
+	rigid components, but involves expensive SOP operations.
+
+	OpenCL does not suppport shape matching.
+
+    Instantaneous Strain:
+	The `strain` primitive attribute is computed fresh every iteration and not allowed to accumulate.
+
+    Strain Decay:
+	The rate at which the `strain` attribute on the primitives of the constraints decays over time.
+
+    Break Constraints:
+	If the strain exceeds the strength of the constraint times the __Break Threshold__, the constraint is removed from the simulation. This allows dynamic tearing of the constraints.  The `strength` primitive attribute on the constraints is used.
+
+    Break Threshold:
+	A scale factor for the amount of strain to break the constraints, which can be applied globally.  In instantaneous mode, it is approximately the ratio of deformation allowed: 0.05 means a 5% deformation from rest length will trigger a break.
+
+	Decreasing particle sizes will decrease bond lengths, and thereby affect the rate of breaking.
+
+    Remove Strands:
+	When simulating a solid with explicit constraints, it can often unravel into chains of particles.  These stop having strong force as they no longer have a rigid connection.  This option will destroy any constraint that is a simple chain constraint.
+
+    === Targets (Pins) ===
+
+    Weight:
+	#id: targetweight
+
+	Particles are constrained to their `targetP` location.  The weight
+	is controlled by this times the `targetweight` attribute, allowing
+	per particle variation.
+
+	NOTE:
+	        `targetP` is not in the original SOPs space when sourcing an object with a transform.
+
+	Scale with the `targetweight` point attribute.
+
+    Stiffness:
+	#id: targetstiffness
+
+	The stiffness with which particles are fixed to their `targetP`
+	attribute.
+
+	NOTE:
+	        `targetP` is not in the original SOPs space when sourcing an object with a transform.
+
+	Scale with the `targetstiffness` point attribute.
+
+	NOTE:
+	    If no `targetstiffness` point attribute is present, it is
+	    treated as zero, ie, no pins will be performed.
+
+    == Solver ==
+
+    Max Neighbors:
+	The maximum number of particles that will be considered when searching for potential collisions over the substep. Capping this is useful to avoid excessive computations, if too many particles are created at one spot.
+
+    Neighbor Query Scale:
+	Potential intersection particles are any within this scaled distance
+	of the average of the two particles `pscale` attribute.  This
+	is an overestimate because usually collisions are not updated
+	during the constraint iterations, so it needs to record not
+	just the currently colliding particles, but those that may
+	start to collide due to the earlier iterations.
+
+	This also effects the range of the attraction force in clumping.
+
+    Max Speed:
+	A speed limit on the resulting velocity.  If a particle had
+	to perform a very large motion to follow the constraint, it
+	gains the velocity that corresponds to that motion.  This can
+	result in explosions if too much energy is imparted, so this
+	can be used to limit the velocity seen next frame.  However, it does
+	not actually control how far the particle will move in a frame, just the reported `v` attribute.
+
+	OpenCL does not support maximum speed constraints.
+
+    Max Acceleration:
+	Caps the change in `v` attribute that can be performed as
+	a result of constraint enforcement.  This caps the amount of
+	energy that can be put into the system by constraints.
+
+    Drift Threshold:
+	If a particle is moving slower than this speed, it is reverted
+	to its previous position.  This avoids slow settling of stacks
+	that might be visually unappealing without actually deactivating
+	the particles.  This is measured as a velocity, so as substeps
+	increase force effects may fall within this threshold.  Particles
+	will then stop responding to forces.
+
+    Velocity Blend:
+	After constraint validation, velocity is defined to be the
+	difference between the new and old points.  Instead, velocity
+	blend can be used to blend this with the old velocity, again
+	minimizing the rate of change and smoothing out the velocity
+	history of the particle.
+
+    Over Relaxation:
+	Constraint averaging can slow down convergence.  By boosting this above
+	one, the collision constraint is increased.  Too high, however, and it
+	can become unstable.
+
+    Use OpenCL:
+	Run the constraint iteration on the configured OpenCL device.
+
+	NOTE:
+	    The OpenCL code path only supports a subset of features,
+	    but in exchange for a faster constraint iteration process.
+
+	NOTE:
+	    The OpenCL code path operates on all PBD particles, not
+	    just the ones in this stream.  (This is only an issue
+	    if you have more than one POP Grains node in your network)
+
+    Update Collisions During Iterations:
+	A single collision per particle is determined, which gives a plane of
+	collision.  During the constraint iteration this is used, even though
+	the particle may run into another collision face during the iteration.
+	This option will recollide the particles for every iteration, at
+	significant cost.
+
+    Update Neighbors During Iterations:
+	Normally the potential colliders of a particle is computed once and
+	reused for the iterations.  This will recompute it each iteration, at
+	considerable cost.
+
+    Final Collision Test:
+	Because the constraint enforcement is only partial, particles may still
+	be passing through objects after the constraint loop.  This performs a
+	final collision pass to prevent any particles from leaking through
+	objects, and is essential for thin surfaces or moving objects.
+
+    Add Impact Data:
+	Enables the addition of Impact data onto the particles.  Normally
+	these are not added to save memory, and particle collision attributes
+	are more easily created by enabling the __Add Hit Attributes__ parameter
+	on the [POP Solver|Node:dop/popsolver] DOP.
+    Enable Collision Feedback:
+	Enables the addition of Feedback impacts onto colliding objects,
+	which are required for two-way interaction.
+    Disable Constraint Averaging:
+	When multiple particles collide at the same time, by default the
+	constraints to seperate them are averaged out.  This is effective
+	in ensuring stability, but does not preserver momentum.  Thus,
+	when combined with internal forces, such as clumping, bunches
+	of particles may accelerate under their own force.  Disabling
+	this averaging will avoid these ghost forces, but require that
+	the Friction With Particles, Internal Weight, and Clumping Weight
+	all be reduced to at least 0.5, and possibly farther for stability.
+
+@inputs
+    [Include:standard_pop_inputs]
+
+@outputs
+    [Include:standard_pop_outputs]
+
+@locals
+    [Include:standard_data_locals]
+
+    [Include:standard_locals]
+
+
+
+@related
+    - [Node:dop/popsolver]
+

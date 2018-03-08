@@ -1,0 +1,127 @@
+= Properties =
+
+"""Properties let you set up flexible and powerful hierarchies of rendering, shading, lighting, and camera parameters."""
+
+== Overview ==
+
+Properties supply options to the renderer, such as camera parameters, light positions and parameters, shader names, and so on.
+
+Many properties are renderer-specific, though some properties that are common to all renderers, such as camera focal length, will be the same for all renderers and automatically translated into the appropriate renderer option by the properties system. Basically, the properties system maintains a list of properties the renderer knows about, and list of properties defined in Houdini, and maps between them.
+
+The new properties-aware [mantra|Node:out/ifd], [RenderMan|Node:out/rib], [Alfred|Node:out/alf], and other [render driver nodes|/nodes/out] use Python scripts at render time to translate the scene data and properties sent from Houdini into [IFD|/rendering/ifd] (for mantra) or [RIB|Node:out/rib]. The combination of property inheritance and scriptability makes the property system extremely flexible.
+
+== Inheritance == (order)
+
+The key feature of properties is _inheritance_. You can properties at any of several levels, and properties at more specific levels override properties at more general levels.
+
+The inheritance order is:
+
+- *Renderer defaults* -- if you don't specify a property, the renderer uses its built-in (or configured) default value.
+- *Output driver*
+- *Camera*
+- *Objects*
+- *Primitives* -- See [per-primitive properties|#perprim] below.
+    
+At each level you can specify properties specific to that level (for example, camera properties on [lights and cameras|/shelf/lightsandcameras]). Any properties you define at higher levels are inherited by lower levels, so you can specify a default [shader|/shade] at the output driver level. Even though the shader definition is meaningless on an [output driver|/nodes/out/], it's inherited as the default by all objects rendered through that driver.
+
+Properties at a lower level override properties at a higher level, so for example you can specify a [surface shader|/shade] on the object, and override it per-primitive.
+
+In practice, inheritance is somewhat limited by the fact that, for convenience, Houdini automatically adds common properties, such as light mask and default shader, to every object created, so every object will override any light mask or default shader you add higher up the chain (such as on the camera or output driver). However, a TD can edit the list of default properties added to new objects. See [advanced uses|#advanced] below.
+
+== Editing, adding or removing properties == (edit)
+
+Technically, properties are spare parameters. You can add them to a node using the [Edit Parameter Interface window|/ref/windows/edit_parameter_interface].
+
+See the section on Inherence above for the different "levels" at which you can add properties. 
+
+# Select the node you want to edit.
+
+# In the [parameter editor|/ref/panes/parms], open the [Icon:BUTTONS/gear] Gear menu and choose __Edit Rendering Parameters__.
+
+See the [Edit Parameter Interface window|/ref/windows/edit_parameter_interface] help for information on how to add and remove properties.
+
+Once you've added render properties you can edit their values in the [parameter editor|/ref/panes/parms].
+
+You can attach them to renderable nodes (such as objects). You can also use a Properties SHOP to hold properties and refer to it from renderable objects.
+
+Houdini decides what default properties to create on new objects. There are usually more properties available than just the defaults. You can add properties, or remove properties to clean up the interface, allow inheritance, or save memory.
+
+== Per-primitive properties == (perprim)
+
+- The [Properties shader|Node:shop/properties] lets you attach arbitrary properties. Houdini will apply the shader's properties to any object _or primitive_ that uses the shader.
+
+- Use the [Material Palette|/ref/panes/materialpalette] to apply [shaders|/shade] per-primitive. The Material node replaces the old Shader surface node.
+
+== Uses ==
+
+The properties system enables many useful and powerful scenarios:
+    
+- Override the object shader at the primitive level.
+
+    - To set properties on primitives, create a Properties SHOP with just the properties you care about, and assign it as to the primitives you want to affect. Other primitive inherit their properties from the object.
+    
+    - Per-primitive shaders and light mask.
+    
+    - Per-primitive displacement bounds! This can be a huge performance boost: only increase the displacement bounds property on highly displaced primitives.
+
+- [Point instancing|/shelf/copytopoints]
+
+    - You can bind properties to points, and when geometry is instanced onto the point, the point's properties are inherited by the instanced geometry.
+    
+    - [Scatter points|/shelf/scatter] that will be instanced as an asteroid field. You can set properties on the individual points to control the look of the instanced geometry.
+    
+    - [Use a procedural shader to instance geometry onto points|/copy/], with properties on the points controlling the operation of the shader.
+
+== Tips ==
+
+- Define properties at the highest level that's practical. The lower the level at which you set things, the more places you'll have to edit when you want to change something.
+
+== Advanced uses == (advanced)
+
+- You can bypass properties (that is, have Houdini pretend the property isn't present on a node) using a flag of the [Cmd:opparm] HScript command.
+
+- The Python scripts responsible for generating IFD/RIB are in `$HFS/Houdini/soho`.
+
+- The dialog scripts in `$HFS/Houdini/soho/parameters` control the list of all available properties, as well as what properties are added to new objects.
+
+    Each file `include`s a `parameters/<<scriptname>>.user.ds` file. If you have such a file in your Houdini path, it will get imported, which gives you the opportunity to override parameter definitions and `define` symbols which control the operation of the parent scripts.
+
+<!--
+- Properties represent settings of the renderer. They may be renderer-specific, but in some cases there will be one property that is automatically translated for different renderers, such as focal length.
+- Inheritance
+    - Renderers see geometry, and a list of lights, and a camera
+    - In H, we have geometry, instancing, light instancing, etc... these get mapped to what the renderer sees.
+    - If you're doing point instancing, you want control over properties attached to the instance.
+    - Inheritance chain for properties:
+        - per primitive
+        - per object
+            - as spare parms on the object
+            - property shop (in alpha)
+            
+            - spare parms override property shop, so you can override a property on something that shares a property shop.
+        - per camera
+        - per output driver (e.g. quality in a test render vs. final render rop)
+        - defaults per renderer
+        
+        - for example, assign surface shader at object level, and then override it at the primitive level.
+        
+- Bypass properties (pretend it's not there)
+    - opparm command flag
+    
+- SOHO defines a list of properties the renderer knows about, and list of properties that are defined in Houdini, and maps between them.
+    - IFD and RIB output
+    - Scripts that define parameter defaults for different renderers
+        - $HH/soho
+        - Edit renderer defaults
+
+- Dialog script file $HH/soho/parameters defines which properties are available as parameters by default. If you have the magic userdefinedparameters.ds file in the path to be included, it will be used.
+-->
+
+@subtopics Properties
+
+:: [mantra]
+:: [obj]
+:: [material]
+:: [viewport]
+:: [vopnet]
+:: [alembic]

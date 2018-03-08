@@ -1,0 +1,641 @@
+= Python |> script locations =
+
+"""Various places in Houdini where you can customize behavior using Python scripting."""
+
+== General tips ==
+
+* If you need to check whether some code ran, the easiest way is to call [Hom:hou.ui#displayMessage]:
+
+    {{{
+    #!python
+    import hou
+    hou.ui.displayMessage("I ran! I ran so far away!")
+    }}}
+    
+    You can also use this to display the values of variables. For example, to see what's in the `kwargs` global variable in an event handler:
+    
+    {{{
+    #!python
+    import hou
+    hou.ui.displayMessage(repr(kwargs))
+    }}}
+
+* You can share code between handlers by putting it in a [module on disk|#disk] and calling it from the handler script. For example, the handler script might just pass the `kwargs` to a common function:
+    
+    {{{
+    #!python
+    import companyutils
+    
+    companyutils.on_created(kwargs)
+    }}}
+
+* Houdini has a very large, powerful (but verbose) set of APIs. Browsing through what's available in the [API reference|hou] will help you discover what's possible with scripting.
+
+* _In general_, Houdini looks for "scripts" (usually callback scripts) on disk under `HOUDINIPATH/scripts/`, while modules you would import are under `HOUDINIPATH/python2.7libs/`. Unfortunately, this is not consistent, so for example Houdini looks for the `pythonrc.py` initialization script in `python2.7libs`.
+
+
+== Startup scripts == (startup)
+#index: document
+
+Houdini will look for these directories/files in the directories specified on the `$HOUDINI_PATH`.
+
+`python2.7libs/pythonrc.py` |
+    Houdini will find any files matching this pattern in the [Houdini path|/basics/config_path] and run them at startup.
+    
+    For example, `$HOUDINI_USER_PREF_DIR/python2.7libs/pythonrc.py` for your personal script, or `$HSITE/houdini14.0/python2.7libs/pythonrc.py` for a studio-wide script.
+
+`scripts/123.py` |
+    Houdini runs this script when it is started _without_ a scene (`.hip`) file.
+    Houdini will only run the _first_ `123.py` script it finds in the path.
+    This is useful for customizing the empty scene, for example if you want to start every scene with a default lighting rig.
+    
+    This is the Python equivalent of the `123.cmd` Hscript file. If `123.cmd` and `123.py` both exist, Houdini will _only_ run `123.py`.
+
+`scripts/456.py` |
+    Houdini runs this script whenever a scene file is loaded (including when Houdini starts up with a scene file).
+    
+    This is the Python equivalent of the `456.cmd` Hscript file.
+
+`scripts/<<category>>/<<nodename>>_<<eventtype>.py` |
+    See [node event scripts|#events] below.
+
+NOTE:
+    You need to restart Houdini to have it recognize new scripts. However, you can change existing scripts without needing to restart Houdini.
+
+
+== Run scripts before and/or after saving the scene (.hip) file ==
+
+Houdini lets you run scripts before and/or after a save. This can be useful to update asset management and source control tools whenever a save occurs.
+
+* Before Houdini saves the scene file, it will run `HOUDINIPATH/scripts/beforescenesave.py` if it exists.
+
+* After Houdini attempts to save the scene file, it will run `HOUDINIPATH/scripts/afterscenesave.py` if it exists.
+
+TIP:
+    These scripts are useful because they're automatically global (they run for any scene file you work on), and they're easy to set up. On the other hand, they're difficult to set up programmatically, and they only relate to saving.
+    
+    The more general/fine-grained way to react to scene file events is to set up a [scene file event handler|#scene_events].
+
+The scripts run in a context containing a global dictionary named `kwargs`. This dictionary contains the following items:
+
+`file` (`str`):
+    The path to the scene file _will be_ saved to. (In `beforescenesave.py`, a file may or may not already exist there).
+
+`autosave` (`bool`):
+    Contains `True` if this save was triggered by the autosave timer. If this is `False`, this is a "regular" save caused by the user.
+
+`success` (`bool`):
+    (`afterscenesave.py` only) Contains `True` if Houdini was able to save to the file.
+
+NOTE:
+    Houdini might not actually be able to save the file at the given path (for example, if the user doesn't have the proper permissions), so the file still may not exist when `afterscenesave.py` runs, or may not contain updated data. You should check `kwargs["success"]` in the script before you assume the file contains the saved data.
+
+The following example automatically "stages" the file for commit in `git` when it's saved: 
+
+{{{
+#!python
+# afterscenesave.py
+import subprocess
+
+# Only run the command if the save succeeded and it's
+# not an autosave
+if kwargs["success"] and not kwargs["autosave"]:
+    # Pass the scene file path to the git command
+    subprocess.call("git", "add", kwargs["file"])
+}}}
+
+
+== Scene file event callbacks == (scene_events)
+
+You can register a callback function that Houdini will call whenever a the scene file changes. Houdini calls the function with one argument. The argument is a [Hom:hou.hipFileEventType] object representing the type of event that occurred.
+
+Instead of subscribing to a specific event, the script will be called for every event, and you need to check the event type to see if it's an event you're interested in. This is usually more convenient for scene events, since you will often share code between reactions to several events.
+
+In the script, you can use the functions in the [Hom:hou.hipFile] module to get information about the current scene file. Each file operation (New file, Open file, Import file, Save) has corresponding "Before" and "After" event types, so you can read the scene file's values before and/or after the change.
+
+For example, to run some code every time a new scene file is loaded:
+
+{{{
+#!python
+def scene_was_loaded(event_type):
+    if event_type == hou.hipFileEventType.AfterLoad:
+        print("The user loaded", hou.hipFile.path())
+}}}
+
+
+== Parameter expressions ==
+
+See [Python parameter expressions|expressions].
+
+
+== Session module == (session)
+
+Houdini keeps a Python module associated with the scene file. You can edit it using __Window > Python source editor__. When the scene file is loaded (or when you edit the source code), the module source code is evaluated and the module is available to other Python code as `hou.session`. This gives you a convenient place to store functions, classes, and objects specific to the scene file, and automatically have them saved and loaded with the scene file.
+
+You can programmatically modify the `hou.session` source code using the [Hom:hou.appendSessionModuleSource] function.
+
+TIP:
+    If you directly modify `hou.session` in Python, for example `hou.session.x = "foo"`, the changes are _not_ saved with the scene file. You must edit the module source code to have the changes saved with the file.
+
+
+== Asset modules == (asset_modules)
+
+Each [digital asset|/assets/] type has a Python module, similar to the scene file's `hou.session` module. You can use this module to store functions, classes, and objects specific to the asset type.
+
+The module source code is stored in a section of the asset named `PythonModule` (on the __Extra files__ tab of the [type properties window|/ref/windows/optype]). You can create this section manually. Houdini will create it automatically if you create a "Python Module" event handler on the __Scripts__ tab.
+
+You can access the module using the [Hom:hou.NodeType#hdaModule] method (if you have a `NodeType` object) or the [Hom:hou.Node#hdaModule] method (if you nave a `Node` object). For example, to call a `myfunc` function on the `myasset` object type:
+
+{{{
+#!python
+hou.nodeType(hou.objNodeTypeCategory(), "myasset").hdaModule().myfunc()
+}}}
+
+Python expressions on nodes inside the asset definition can access the `PythonModule`
+through relative references. For example, a Python parameter expression on a node in the asset's definition subnetwork could use `hou.node("..").hdaModule().foo()`.
+
+If you have so much Python code inside an asset that you want to organize it into multiple modules, you can create other HDA sections to store those modules. For example, you could create a `FooModule` section containing Python code. Then in the main `PythonModule` section, use the following code to import the contents of `FooModule` as `foo`:
+
+{{{
+#!python
+import toolutils
+foo = toolutils.createModuleFromSection('bar', kwargs['type'], 'FooModule')
+}}}
+
+
+== Modules on disk == (disk)
+
+Houdini automatically adds any `$HOUDINI_PATH/pythonX.Xlibs` directories to the Python path, meaning packages and modules inside those directories can be imported in Python code. For example, the module `$HOUDINI_USER_PREF_DIR/python2.7libs/mystuff.py` can be imported in Python code using `import mystuff`.
+
+To make packages and modules in other locations available to python, use the `$PYTHONPATH` environment variable, or modify the `sys.path` list in Python.
+
+
+== Digital asset event handlers == (asset_events)
+
+You can write [Digital asset|/assets/] event handlers in Python. After you create an event handler on the __Scripts__ page of the [type properties window|/ref/windows/optype] (for example "On Created"), set __Edit as__ to "Python".
+
+The event script can access the event parameters in a global dictionary variable called `kwargs`. For example, to get the [Hom:hou.Node] object involved in the event, use `kwargs["node"]`.
+
+See [how to reference embedded files|#access_contents] for information on how to refer to the embedded scripts wherever Houdini expects a filename.
+
+TIP:
+    These handlers let you set up scripts that run when an event happens for a _specific node type_. You can also set up [general asset event handlers|#general_asset_events] which run when _any_ asset or asset library is loaded or unloaded.
+
+
+=== Event types ===
+
+The following events can trigger scripts:
+
+Before First Create (`PreFirstCreate`) |
+    Runs when the _first instance_ of a node type is created in a scene. _This includes when Houdini is creating nodes as it loads a scene file from disk_.
+    
+    For example, if a scene has no geometry objects, when you add one, this would trigger the `PreFirstCreate` handler for the geometry object type. If you then added another geometry object, the event would _not_ trigger.
+    
+    This can be useful for setting up an environment necessary for one or more instances of the asset to work. For example, copying texture maps to required locations, or setting environment variables.
+    
+    * In the script you can check if the node is being created because Houdini is loading a file using the [Hom:hou.hipFile#isLoadingHipFile] function.
+    
+    * The user cannot undo the actions performed in this script. You may want to include corresponding code in a `PostLastDelete` handler (see below) to undo changes made by this script.
+
+On Created (`OnCreated`) |
+    Runs after the user creates a new instance of a node type (_not_ when a scene file loads, see `OnLoaded` below).
+    
+    You can use this, for example, to make changes to a node that Houdini will automatically save (for example, add [spare parameters|/network/spare]).
+
+On Loaded (`OnLoaded`) |
+    Runs after an instance of a node type is created as Houdini loads a scene file from disk (_not_ when a user creates a node in the network editor, see `OnCreated` above). This also runs when pasting nodes from the clipboard.
+    
+    This does _not_ run when loading the node as _part of the contents of another asset_. If you need to do something when a node inside an asset loads, you must put that code in the asset's load handler.
+    
+    This runs on each node _after_ all nodes are loaded, so the script will see the complete scene.
+
+On Updated (`OnUpdated`) |
+    Runs for each instance of an asset when the asset updates because the shared definition changed.
+
+On Deleted (`OnDeleted`) |
+    Runs before an instance of a node type is deleted (while the node still exists). _This includes when Houdini is "unloading" the node_ because the user is starting a new file, opening a file, or quitting.
+    
+    * In the script you can check if the node is being deleted because Houdini is unloading the scene using the [Hom:hou.hipFile#isShuttingDown] function (despite the name, this function returns `True` when Houdini is starting a new file or opening a file as well as when it is quitting).
+    
+    * Unrelated to this event handler, each node instance can have its own individual "deletion script". The user can edit this (HScript command language only) script in the parameter editor using __+(fa-cog) > Edit deletion script__. The `OnDeleted` handler runs _before_ the node's individual "deletion script" if it exists.
+
+After Last Delete (`PostLastDelete`) |
+    Runs after the _last instance_ of a node type is deleted in a scene. _This includes when Houdini is "unloading" the node_ because the user is starting a new file, opening a file, or quitting.
+
+    This can be useful to clean up changes made in a `PreFirstCreate` script (see above).
+
+    * The user cannot undo actions performed in this script.
+    
+    * In the script you can check if the node is being deleted because Houdini is unloading the scene using the [Hom:hou.hipFile#isShuttingDown] function (despite the name, this function returns `True` when Houdini is starting a new file or opening a file as well as when it is quitting).
+
+On Input Changed (`OnInputChanged`) |
+    Runs when an input on a node of this type is connected, disconnected, or switched. The script can use `kwargs["input_index"]` to get the number (starting from 0) of the input that changed.
+
+On Name Changed (`OnNameChanged`) |
+    Runs after the user changes the name of a node of this type. The script can use `kwargs["old_name"]` to get the previous name string.
+    
+    This can be useful, for example, if you are somehow indexing nodes by their names or paths in some external storage, to keep the external index up-to-date.
+
+Sync Node Version (`SyncNodeVersion`) |
+    This is part of the older versioning system, allowing you to write an "upgrade" handler that can automatically convert old versions of a node to the latest version. This system may be useful for small-scale, backwards-compatible changes such as adding new parameters. See [the two types of asset versioning|/assets/versioning_systems] for more information.
+
+    This runs when an asset instance loads and notices the asset's __Version__ field has changed since the scene file was saved. It runs after a node's parameters are loaded and resolved, but before the `OnLoaded` or `OnUpdated` event handlers.
+    
+    The script can get the old and new version strings in `kwargs["old_version"]` and `kwargs["new_version"]`. 
+    
+    The handler then does the work of changing the node (using the reference in `kwargs["node"]`) to match the new version. This means you must update the script every time you update the asset.
+    
+    (You can trigger a node's upgrade script manually using [Hom:hou.Node#syncNodeVersionIfNeeded].)
+
+
+=== Script variables === (node_event_kwargs)
+
+The handler scripts run in an environment with a global `kwargs` dictionary. The following table shows what items are available in the dictionary for the various event types:
+
+Key ||
+    Value ||
+        Events ||
+`node` |
+    A [Hom:hou.Node] reference to the node instance |
+        `OnCreated`, `OnUpdated`, `OnInputChanged`, `OnNameChanged`, `OnDeleted`, `SyncNodeVersion`
+`type` |
+    A [Hom:hou.NodeType] reference to the node type |
+        `OnLoaded`, `PreFirstCreate`, `OnCreated`, `OnUpdated`, `OnInputChanged`, `OnNameChanged`, `OnDeleted`, `PostLastDelete`, `UpgradeLoadedParms`, `PythonModule`
+`old_name` |
+    A string containing the the old name of the HDA instance. |
+        `OnNameChanged`
+`input_index` |
+    The index of the input that was connected/disconnected. |
+        `OnInputChanged`
+`current_version` |
+    The current HDA version string. |
+        `SyncNodeVersion`
+`old_version` |
+    The HDA version string that the node was last saved with. |
+        `SyncNodeVersion`
+
+
+=== Node event handler files === (node_event_files)
+
+You can put event handler scripts in files in the Houdini path instead of/in addition to embedding them in assets. To respond to an event on a digital asset, you probably just want to use the built-in [event handler|#asset_events] support in the [type properties window|/ref/windows/optype]. However, using script files can have the following benefits:
+
+* These on-disk event scripts work for both assets _and built-in node types_.
+
+* You can install "global" event handler files that run for _any_ node type.
+
+Houdini looks for files matching the following patterns:
+
+* Files matching the pattern `HOUDINIPATH/scripts/<<category>>/<<nodename>>_<<event>>.py` (for example, `$HOUDINI_USER_PREF_DIR/scripts/obj/geo_OnCreate.py`) will run when the given event type occurs to a node of the given type.
+
+* Files matching the pattern `HOUDINIPATH/scripts/<<event>>.py` run when the given event type occurs to _any_ node.
+
+NOTE:
+    The script path uses the "directory" form for node categories, not the "table" form. For example, `obj` not `Object`, `sop` not `Sop`, `out` not `Rop`. These different forms are an unfortunate historical inconsistency in Houdini.
+
+An event script file will run in an environment with a built-in `kwargs` global dictionary variable. To get the [Hom:hou.Node] object for the newly created node in the script, `kwargs["node"]`. See [script variables|#node_event_kwargs] above for information on the items available in the dictionary.
+
+NOTE:
+    Houdini will also find files matching `HOUDINIPATH/scripts/<<category>>/<<nodename>>.py` (no event suffix, for example `$HOUDINI_USER_PREF_DIR/scripts/obj/geo.py`). This is a factory node's "creation script", which is (confusingly) not the same as a node's `OnCreated` handler.
+
+    Old documentation or tutorials may refer to this type of a file as a way to run code when a node is created. However, this does not work with digital assets. *You should now use an OnCreated event script instead*. Consider the "creation script" an internal implementation detail subject to change without notice.
+
+
+== Individual node event handlers == (node_instance_events)
+
+You can set up event handlers on _individual node instances_. Unlike [asset events|#asset_events], which trigger when the event happens for _any instance of the asset_, these handlers only run when an event happens to the _specific node_ you set them up on.
+
+See [Hom:hou.Node#addEventCallback] for how to set up an event handler on a node. See [Hom:hou.nodeEventType] for the types of events you can react to.
+
+
+== General asset event handlers == (general_asset_events)
+
+You can set up handlers for changes to _asset libraries_. For example, when an asset is created or deleted, or an asset library is installed or uninstalled.
+
+See [Hom:hou.hda#addEventCallback] for how to set up an asset library event handler. See [Hom:hou.hdaEventType] for the types of events you can react to.
+
+
+== Shelf tool scripts == (tool_script)
+
+You write the script that runs when the user clicks a shelf tool in Python. See [how to write a tool script|tool_script] for more information.
+
+
+== Parameter callback scripts == (parameter_callback_scripts)
+#index: document
+
+You can write Python scripts that are called whenever the value of a parameter on a node changes.
+
+*If the default callback language is [Smallicon:BUTTONS/hscript] HScript, remember to change it to [Smallicon:MISC/python] Python*.
+
+The event script can access the event parameters in a global dictionary variable called `kwargs`. For example, to get the [Hom:hou.Node] object containing the parameter, use `kwargs["node"]`, and to get the [Hom:hou.Parm] object of the parameter, use `kwargs["parm"]`.
+
+TIP:
+    The most convenient way to implement a callback script is to write one line of Python that calls the "real" callback function in your [asset's Python module|/hom/locations#asset_modules] and passes it the `kwargs` dictionary.
+
+    For example, you can make a `my_callback` function in the asset module that takes the dictionary of options and a `hou.Node` object representing the current node instance. Then set the parameter's Python __Callback__ line to call the function from the module using the following:
+
+    {{{
+    #!python
+    hou.pwd().hm().my_callback(kwargs, hou.pwd())
+    }}}
+
+    ([Hom:hou.pwd] returns the node which is currently cooking. [Hom:hou.Node#hm] returns an asset's Python module.)
+
+The following table lists the contents of the `kwargs` dictionary for parameter callbacks:
+
+`parm` |
+    The [Hom:hou.Parm] object whose callback script was invoked.
+    
+`node` |
+    The [Hom:hou.Node] object containing the parameter.
+    
+`parm_name` |
+    The name of the [Hom:hou.Parm].  This value is the same as `kwargs['parm'].name()`.
+    
+`script_parm` |
+    The name of the [Hom:hou.ParmTuple] containing the parameter.  This is the same as `kwargs['parm'].tuple().name()`. This key is `script_parm` instead of something more meaningful for backwards compatibility with Hscript.
+    
+`script_value` |
+    The value of the parameter.  This entry is the same as `kwargs['parm'].eval()`.
+    
+`script_value0`, `script_value1`, ... |
+    The values of the parameter tuple.  These entries are the same as `[p.eval() for p in kwargs['parm'].tuple()]`.
+    
+`script_multiparm_index` |
+    The number of the multiparm, if the parameter is an instance of a multiparm (otherwise `-1`).  Note that the "First Instance" parameter on the multiparm's folder block list determines where to start numbering multiparms. Typically, the first multiparm is numbered 1, the second 2, and so on.
+
+`script_multiparm_nesting` |
+    If this parameter is not an instance of a multiparm, this value is `0`. If it is a multiparm instance but the instance is not contained inside other multiparm instances, the value is `1`.  Otherwise, if the multiparm instance is nested inside one level of multiparm instances it returns
+    the number of nesting levels.
+
+`script_multiparm_index2`, ..., `script_multiparm_indexN` |
+    These values are only available if `script_multiparm_nesting` is 2 or higher.  These values correspond to the multiparm instance numbers of the outer multiparm instances.  For example, if multiparm instance 3 is nested inside instance 5 which is inside instance 4, `script_multiparm_index` will be 3, `script_multiparm_index2` will be 5, and `script_multiparm_index3` will be 4.
+
+
+== Parameter menu scripts == (parameter_menu_scripts)
+#index: document
+
+You can use Python to generate dynamic parameter menus.
+
+TIP:
+    Houdini runs this script whenever the user opens the menu, and when the parameter is evaluated, so make it as simple and fast as possible.
+
+If a Python menu script contains only one line, Houdini evaluates it as a Python expression. If it contains multiple lines, Houdini evaluates it as a function body and you must use `return` to return the list. This behavior is the same as for Python parameter expressions.
+
+The script must return a flat list of strings, where the even items are tokens and the odd items are labels. For example:
+
+{{{
+#!python
+["1", "Light", "50", "Medium", "100", "Heavy"]
+}}}
+
+TIP:
+    You're probably used to working with pairs of values in Python using tuples, like this:
+
+    {{{
+    #!python
+    pairs = [("1", "Light"), ("50", "Medium"), ("100", "Heavy")]
+    }}}
+
+    You can work that way when generating and working with the list, and then convert to the "flat" list Houdini requires at the end using this trick:
+
+    {{{
+    #!python
+    return [item for sublist in pairs for item in sublist]
+    # -> ["1", "Light", "50", "Medium", "100", "Heavy"]
+    }}}
+
+For example, to generate a menu of Object-level digital assets using Python:
+
+{{{
+#!python
+result = []
+for tool in hou.shelves.tools().values():
+    node_type_name = tool.toolMenuOpType(hou.paneTabType.NetworkEditor)
+    if (node_type_name.startswith("Object/") and
+            'Digital Assets' in tool.toolMenuLocations()):
+        result.append(tool.name())
+        result.append(tool.label())
+return result
+}}}
+
+In an asset, you can put the code that generates the menu into a function in the asset's `PythonModule` section (for example, a `generate_menu` function) and call that function in the menu script `hou.pwd().hdaModule().generate_menu()`.
+
+The menu script can access the calling parameter in a global dictionary variable called `kwargs`. For example, to get the [Hom:hou.Node] object containing the parameter, use `kwargs["node"]`, and to get the [Hom:hou.Parm] object of the parameter, use `kwargs["parm"]`.
+
+The following table lists the contents of the `kwargs` dictionary for parameter callbacks:
+
+`parm` |
+    The [Hom:hou.Parm] object whose callback script was invoked.
+    
+`node` |
+    The [Hom:hou.Node] object containing the parameter.
+    
+`script_multiparm_index` |
+    The number of the multiparm, if the parameter is an instance of a multiparm (otherwise `-1`).  Note that the "First Instance" parameter on the multiparm's folder block list determines where to start numbering multiparms. Typically, the first multiparm is numbered 1, the second 2, and so on.
+
+`script_multiparm_nesting` |
+    If this parameter is not an instance of a multiparm, this value is `0`. If it is a multiparm instance but the instance is not contained inside other multiparm instances, the value is `1`.  Otherwise, if the multiparm instance is nested inside one level of multiparm instances it returns
+    the number of nesting levels.
+
+`script_multiparm_index2`, ..., `script_multiparm_indexN` |
+    These values are only available if `script_multiparm_nesting` is 2 or higher.  These values correspond to the multiparm instance numbers of the outer multiparm instances.  For example, if multiparm instance 3 is nested inside instance 5 which is inside instance 4, `script_multiparm_index` will be 3, `script_multiparm_index2` will be 5, and `script_multiparm_index3` will be 4.
+
+
+== Scripting button/icon strip parameters == (button_strip_scripts)
+
+You can create "button strip" and "icon strip" parameters (either [on an asset|/ref/windows/optype] or as [spare parameters|/network/spare]). You can use these to provide a strip of clickable action buttons, or a strip of mutually exclusive options you can select from, or a strip of independent options you can individually turn on or off.
+
+* When you create a strip parameter, you set whether it is "Normal" (mutually exclusive: only one item can be selected at a time) or "Toggle" (each item can be turned on or off individually).
+
+* Reading the value of a "Normal" strip is straightforward. [Hom:hou.Parm#eval] will return the index of the selected item (starting from 0).
+
+    To translate the index into the corresponding token you set up for each item in the menu, you can get the list of tokens from the parameter template and then index into that list:
+    
+    {{{
+    #!python
+    def get_selected_token(parm):
+        # Read which item is currently selected
+        selected = parm.eval()
+        
+        # Get the list of menu tokens from the parameter template
+        tokens = parm.parmTemplate().menuItems()
+        
+        # Return the token corresponding to the selected item
+        return tokens[selected]
+
+    # In a parameter callback script...
+    token = get_selected_token(kwargs["parm"])
+    }}}
+
+* Reading the value of a "Toggle" strip returns a [bit field|Wp:Bit_field]. This is a number where each "bit" in the number's binary representation encodes the on/off state of a button in the strip.
+
+    If you're not a hardcore programmer that probably sounds very technical, but all you need are some utility functions like the ones below to translate a bitfield into a more usable form.
+    
+    {{{
+    #!python
+    # The general form to test if the "bit" at position n is "on"
+    # in a number is:
+    # number & (1 << n)
+    
+    def strip_to_tokens(parm):
+        # Takes a reference to a button/icon strip parameter
+        # instance and returns a list of tokens corresponding
+        # to the buttons that are on
+        
+        bitfield = parm.eval()
+        tokens = parm.parmTemplate().menuItems()
+        return [token for n, token in enumerate(tokens) if bitfield & (1 << n)]
+    
+    def is_n_selected(bitfield, n):
+        # Returns True if the nth position (starting at zero)
+        # is "on" in the bitfield
+        
+        return bitfield & (1 << n)
+    
+    def bitfield_to_list(bitfield, size=32):
+        # Takes a bitfield and returns a list of booleans
+        # (True or False) indicating whether each position
+        # is "on" or "off" in the bitfield.
+        # ("size" is the number of buttons in the strip.)
+        
+        return [bitfield & (1 << n) for n in range(size)]
+    }}}
+
+* Working with the value of a "toggle" strip in an expression would be extremely difficult. If for some reason you need the settings of a toggle strip to drive an expression, a workaround would be give the strip a callback script that sets a simple value on a hidden parameter based on the strip settings. Then reference the hidden parameter in the expression instead of the strip.
+
+* To make a button/icon strip that acts more like a toolbar of action items, make a "Toggle" strip, then give it a callback script that reads which item was turned on, performs some action based on that, _and then immediately turns the option off again_.
+
+    For example:
+
+    {{{
+    import math
+    
+    # A button strip callback strip that makes the buttons act like
+    # action buttons. This script assumes the menu type is set to "Toggle". 
+    
+    # Read which button was turned on
+    parm = kwargs["parm"]
+    bitfield = parm.eval()
+    # Only one item in the bitfield should be selected, so the base-2
+    # log of the bitfield should give us the index of the selected button
+    selected_index = int(math.log(bitfield, 2))
+    
+    # Do something here based on which button was clicked
+    
+    # Clear the selected button. Setting the parameter's bitfield value
+    # to zero turns off every button.
+    parm.set(0)
+    }}}
+
+
+== Key-value parameter button scripts == (keyvalue_button_scripts)
+
+You can use Python to generate a new key-value pair for a key-value parameter when the user clicks a button. This script can present an interface for the user to choose a preset (for example, using [Hom:hou.ui#selectFromList] or [Hom:hou.ui#selectFromTree]). It must return a `(key, value)` tuple.
+
+If the value in the field is one line, it is treated as a Python expression and evaluated. If it has more than one line, it is treated as if it was the body of a function and must use a `return` statement at the end to return a value. This is consistent with other parameter callbacks.
+
+* The script can return return non-string values in the tuple. Houdini will convert them to strings.
+    
+* The script runs in an environment containing a `kwargs` global dictionary variable. `kwargs["node"]` contains a [Hom:hou.Node] for the node. `kwargs["parm"]` contains a [Hom:hou.Parm] reference for the key-value parameter.
+
+* If the user cancels choosing, the script should return empty strings in the tuple `("", "")`.
+
+* We recommend you define a function to handle the callback in the [asset's Python module|/hom/locations#asset_modules].
+
+    For example, you can put this function in the asset's Python module:
+
+    {{{
+    #!python
+    def choose_env_variable():
+        """
+        Lets the user choose an environment variable name and returns
+        the name and value to the key-value parameter.
+        """
+    
+        # Grab the environment variable dictionary from the OS
+        import os
+        names = os.environ.keys()
+        # Use a Houdini UI function to ask the user to choose from the list
+        results = hou.ui.selectFromList(names)
+        if not results:
+            # The user didn't choose anything
+            return ("", "")
+        # We only support choosing one item; if the user picked more than
+        # one item, just use the first
+        chosen_index = results[0]
+        # hou.ui.selectFromList() returns the number of the chosen item;
+        # translate that back into a name
+        chosen_name = names[chosen_index]
+        # Return a tuple of the variable name and the value of that variable
+        return (chosen_name, os.environ[chosen_name])
+    }}}
+    
+    Then you could call it using this in the __Chooser callback__ field:
+    
+    {{{
+    #!python
+    kwargs["node"].hdaModule().choose_env_variable()
+    }}}
+    
+    If the callback function needs the node and/or parameter reference, you can pass them to the function:
+    
+    {{{
+    #!python
+    kwargs["node"].hm().choose_env_variable(kwargs["node"], kwargs["parm"])
+    }}}
+
+* Note that the callback does not _need_ to interactively ask the user to choose something. You could have a button that adds a key-value pair based on current conditions.
+
+    For example, you could put this in the __Chooser callback__ field:
+    
+    {{{
+    #!python
+    (hou.frame(), hou.time())
+    }}}
+
+    When a user clicked the button, this Python expression would evaluate to a tuple containing the current frame number and current time.
+
+
+== Background processes == (background)
+
+You can set up Python code to execute "in the background" while the user is working.
+
+* You can use [Hom:hou.ui#addEventLoopCallback] to set up a function that Houdini calls whenever the UI is not busy.
+
+    The callback function will be called _very often_ (around 20 times a second). The function should be very fast to run so it doesn't slow down the UI.
+
+* You can use a Qt `QTimer` object to schedule code to run in the future. That code can itself set up another `QTimer` if you want some code to execute at a certain interval.
+
+
+== Tips ==
+
+* You can use [Hom:hou.findFile] to search for filenames in the Houdini path.
+
+* To read content from an embedded file inside an asset, use [Hom:hou.HDADefinition#sections] to get a dictionary of section names to `HDASection` objects, then use [Hom:hou.HDASection#contents] to get the section contents.
+
+    For example, to read the contents of an embedded file named `example` in the `my_asset` object:
+
+    {{{
+    #!python
+    objects = hou.nodeTypeCategories()["Object"]
+    my_asset = objects.nodeTypes()["my_asset"]
+    my_asset_def = my_asset.definition()
+    section = my_asset_def.sections()["example"]
+    contents = section.contents()
+    }}}
+    
+    As a shortcut, you can use Houdini's support for reading asset sections as if they were files using an `opdef:` path:
+    
+    {{{
+    #!python
+    content = hou.readFile("opdef:Object/my_asset?example")
+    }}}
+
+* To access Python variables in the global scope from `hou.session`, import `__main__`.  For example, if `x` is a variable in the global scope, you can access it as `__main__.x`.
+
+    You can use this approach to access Python global variables from parameter expressions, HDA Python modules, Python button callbacks, shelf scripts, and so on.
+
+
+@related
+
+- [The Houdini path|/basics/config_path]

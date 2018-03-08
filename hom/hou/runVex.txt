@@ -1,0 +1,59 @@
+= hou.runVex =
+#type: homfunction
+#cppname: hom::runVex
+#group: vex
+
+"""Invoke VEX code, passing in arrays of inputs and receiving arrays of
+outputs."""
+
+:usage: `runVex(vex_file, inputs)` -> `dict` of `str` to values
+
+inputs:
+    A dictionary mapping VEX input names to values.  Each value may be a tuple
+    or a single value; tuples of values become varying inputs and single values
+    become uniform inputs.  If the input value is a tuple, all elements in the
+    tuple must be the same type.
+
+    Values may be single values or tuples of the following types:
+    `int`, `float`, `str`, [Hom:hou.Vector3], [Hom:hou.Vector4],
+    [Hom:hou.Matrix3], or [Hom:hou.Matrix4].
+
+return value:
+    A dictionary mapping VEX output names to values.  Like the inputs
+    dictionary, values will be tuples if the output is varying and single
+    values if it is uniform.
+
+For example, suppose you had the following VEX function and compiled it to the
+file `code.vex` using [vcc|/vex/vcc]:
+{{{
+#!vex
+cvex add(float x=0; float y=0; export float out=0)
+{
+    out = x + y;
+}
+}}}
+
+You could then invoke it from Python using the following:
+{{{
+#!pycon
+>>> hou.runVex("code.vex", {"x":(1.0, 2.0, 3.0), "y":(7.1, 8.1, 9.1)})
+{"out": (8.1, 10.1, 12.1)}
+>>> hou.runVex("code.vex", {"x":(1.0, 2.0, 3.0), "y":0.5})
+{"out": (1.5, 2.5, 3.5)}
+>>> hou.runVex("code.vex", {"x":1.0, "y":0.5})
+{"out": 1.5}
+}}}
+
+The following function shows how you can run VEX on the code created by a VOP
+network node, such as a CVEX VOP:
+{{{
+#!python
+import os
+import tempdir
+
+def runVexFromNode(vop_node, inputs):
+    temp_file_path = tempfile.gettempdir() + "/%s.vex" % vop_node.name()
+    vop_node.saveCompiledCookCodeToFile(temp_file_path)
+    os.unlink(temp_file_path)
+}}}
+

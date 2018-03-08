@@ -1,0 +1,89 @@
+= Volume Rasterize Particles =
+
+#type: node
+#context: sop
+#internal: volumerasterizeparticles
+#icon: SOP/volumerasterizeparticles
+#tags: volumes, merge
+
+"""Converts a point cloud into a volume."""
+
+The Volume Rasterize particles operation takes a cloud of points and fills
+a volume accordingly. If the input volume has more than one named
+primitive, the named volumes will be filled with data from point attributes
+that match the name of the volume. Currently only VDB vector volumes
+support filling from vector point attributes.
+
+The point attributes `pscale` and `density` are used to control the
+generated volume.
+
+This is a highly specialized node designed for filling the volume
+as fast as possible, so a lot of the controls present in [Volume Rasterize
+Points|Node:sop/volumerasterizepoints] are not available.
+
+Filtering is automatically performed to ensure small particles will always
+contribute to the resulting volume.  This means that when you rasterize to a
+particularly low resolution volume, things will seem to fatten.
+
+The `volumefilterstochastic` integer primitive attribute can be used to
+override how points are filtered to voxels. For fields that can't be
+meaningfully averaged together, setting this attribute to a value of 1 on
+that volume primitive will cause only one of the overlapping particles to
+contribute to each voxel, avoiding any averaging. This parameter only
+applies to fields other than density.
+
+NOTE:
+    This does not support rasterizing into tapered volumes.
+
+@parameters
+
+Destination:
+    Which volumes or VDBs in the first input to stamp into.
+    Each volume or VDB and is treated as a "density" target.
+
+Particles:
+    A group of points in the second input to rasterize.
+
+Filter:
+    The filter shape that to use when splatting particles. The default
+    gaussian filter will produce smooth blobs and is useful for larger
+    particles. When the particle size is smaller than the voxel size, a
+    box filter will produce a similar result in less time.
+
+Density Scale:
+    The `density` attribute will be scaled by this.  If there is no
+    `density`, 1 will be used as the reference.
+
+Particle Scale:
+    The `pscale` attribute will be scaled by this.  If there is no
+    `pscale`, 1 will be used as the reference.
+
+Minimum Filter Size:
+    If the particle's radius is much smaller than a voxel, it can appear to
+    pop from grid-location to grid-location as it moves.  This adds an
+    additional blur to particles to ensure they are this fraction of a
+    voxel.  A value of 1 ensures the main-support for each particle is at
+    least a voxel, ensuring that any movement of the particle will
+    correspond to a smooth change in voxel values, at the cost of less
+    sharp boundaries.
+
+Velocity Blur:
+    Enables rasterization of velocity blur. Velocity blurred particles
+    are rasterized by creating multiple point samples along the
+    velocity path and distributing the density of the original point
+    among these samples.
+
+Shutter:
+    The shutter time to use for velocity blur rasterization.
+
+Shutter Offset:
+    The shutter offset to use for velocity blur rasterization.
+
+Blur Samples:
+    The number of motion blur samples to use for velocity blur
+    rasterization. Larger numbers of samples will produce smoother and
+    more accurate results but will take more time to compute.
+
+@related
+
+- [Node:sop/volumerasterizepoints]

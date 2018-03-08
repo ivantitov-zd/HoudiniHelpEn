@@ -1,0 +1,165 @@
+#type: node
+#context: sop
+#internal: spring
+#icon: SOP/spring
+
+#tags: dynamics
+
+= Spring =
+
+"""Simulates the behavior of points as if the edges connecting them were
+springs."""
+
+Spring assigns a mass to each point and simulates the effects of forces
+(gravity, wind, and/or turbulence) on the points. Edges act as springs
+which try to pull the points back to their original position.
+
+You can:
+
+* Keep certain points in the mesh at fixed positions using a  [point
+  group|/model/groups]  in the __Fixed points__ parameter on the
+  __Nodes__ tab.
+
+* Apply directional force (gravity), wind (a directional force with a
+  maximum speed), drag, and turbulence to the points using the
+  parameters on the __Forces__ tab.
+
+* Connect a [Force SOP|Node:sop/force] to the third input to let you
+  attract or repel the points to/from metaball fields.
+
+
+TIP:
+    The greater the drag value, or smaller the mass, the faster the
+    oscillation dies out.
+
+NOTE:
+    The Spring SOP is useful for many situations, but for more
+    sophisticated simulations use rigid body, cloth, or wire
+    [dynamics|/dyno/].
+
+NOTE:
+    The Spring op will use point normals as initial node velocity if
+    point normal attributes exist _and_ there are no point velocity
+    attributes in the incoming data. If you add velocity attributes to
+    the points, the point normals are ignored.
+
+
+@parameters
+
+    == State ==
+
+        StartTime:
+            #channels: /timestart
+
+            Time at which the simulation resets.
+        Preroll Time:
+            #channels: /timepreroll
+
+            Number of initial frames skipped.
+        Time Inc:
+            #channels: /timeinc
+
+            Time per iteration.
+        Accurate Moves:
+            Particles move more accurately.
+        Attractor Use:
+            How the attractor points affect particles
+
+            All points:
+                All points affect each particle
+            Single point per particle:
+                Only one point affects each particle
+
+    == Forces ==
+
+        External Force:
+            #channels: /externalx /externaly /externalz
+
+            Force of gravity on points.
+        Wind:
+            #channels: /windx /windy /windz
+
+            Wind force acting on points.
+        Turbulence:
+            #channels: /turbx /turby /turbz
+
+            Amplitude of turbulence along axes.
+        Turb Period:
+            #channels: /period
+
+            Inverse variance of turbulence over space.
+        Seed:
+            #channels: /seed
+
+            Seed for random turbulence generator.
+
+    == Nodes ==
+
+        Fixed Points:
+            Group of points not to be moved by this operation.
+        Fixed Points go to Source Positions:
+            Fixed Points are put to their positions in the Source.
+        Copy Groups from Source:
+            All Source groups are copied at each frame. Useful if the
+            Fixed Points group contents are animated.
+        Add Mass Attribute:
+            Causes point mass to be calculated.
+        Mass:
+            #channels: /mass
+
+            Relative mass of each point.
+        Add Drag Attribute:
+            Causes drag coefficient to be calculated.
+        Drag:
+            #channels: /drag
+
+            Drag of each point.
+        Spring Behavior:
+            How the springs will behave
+
+            Hooke's Law:
+                Use Hooke's law. Force = displacement x spring
+                constant.
+            Normalize Displacement:
+                Like Hooke's law except displacement is normalized to
+                the original length of the spring. (Behavior used in
+                Houdini 2.5).
+        Spring Constant:
+            #channels: /springk
+
+            Stiffness of the spring
+        Initial Tension:
+            #channels: /tension
+
+            Initial spring tension before deformations.
+
+    == Limits ==
+
+        + Limit Plane, - Limit Plane:
+            #channels: /limitnegz
+
+            Points die or bounce off limit planes on contact. /limitposx
+            ... /limitposz, /limitnegx ...
+        Hit Behavior:
+            Whether particles die or bounce on limit planes.
+        Gain Tangent:
+            #channels: /gaintan
+
+            Energy loss tangent to the collision.
+        Gain Normal:
+            #channels: /gainnorm
+
+            Energy loss perpendicular to the collision.
+@inputs
+    Spring Source:
+        The points to simulate, for example a polygon sphere or mesh.
+    Collision Object:
+        (Optional) Geometry for the points to collide with. When the
+        points hit this geometry, they can stick or bounce. If the
+        collision object is deforming, collision detection may fail,
+        causing some points to leak through the collision geometry.
+    Force:
+        (Optional) A [Force SOP|Node:sop/force], which uses a metaball
+        to create a field which attracts or repels the points.
+
+

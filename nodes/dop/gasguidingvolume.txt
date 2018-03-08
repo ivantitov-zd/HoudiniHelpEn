@@ -1,0 +1,99 @@
+#type: node
+#context: dop
+#internal: gasguidingvolume
+#icon: DOP/gas
+
+= Gas Guiding Volume =
+
+"""Blends a set of SOP volumes into a set of new collision fields for the creation of a guided simulation."""
+
+The Gas Guiding Volume DOP reads in a surface volume, velocity volume, and sink volume from an external SOP to act as a guide for the FLIP simulation. The surface volume is converted into a scalar field and combined with the existing collision field in the FLIP solver. The velocity volume is converted into a vector field and blended with the existing collision velocity field in the FLIP solver. Both fields are used to assign the guiding velocity to the FLIP simulation through the collision fields using the internal solvers.
+
+NOTE:
+    These combined fields are only used in the viscosity and pressure projection solvers; other operations in the [FlIP Solver|Node:dop/flipsolver] use the original collision fields.
+    
+Finally, the sink volume is converted to a scalar field and used to remove FLIP particles inside of this surface. The sink surface is useful for remove particles deep inside the guiding surface field. Maintaining a thin region of fluid along the inside of the guiding surface is useful for allowing particles to flow into the FLIP simulation.
+
+== Tips ==
+
+In order to properly bind this DOP with the [FLIP Solver|Node:dop/flipsolver], it must be attached to the __Volume Velocity__ input. In addition, the collision fields in the __Solver__ folder must be replaced.
+
+For example, __Collision Surface__ should read `guidingcollision` instead of `collision`,
+ __Collision Weights__ should read `guidingweights` instead of `collisionweights`, __Collision Velocity__  should read `guidingvel` instead of `collisionvel`. The __Source Surface__ and __Sink Surface__ fields in the __Solver__ folder can be linked to the __Guiding Surface__ and __Guiding Sink__ fields by the `guidingsurface` and `guidingsink` field names, respectively.
+
+@parameters
+
+Visualize Guiding Surface:
+	Enables a visualizer for the scalar field created by the volume connected to the __Guiding Surface__.
+	
+Guiding Surface:
+    The surface is combined with the existing collision field and used to apply the __Guiding Velocity__ in the __FLIP Solver__ to maintain the desired simulation behavior.
+    
+Guiding Velocity:
+	The fluid at the __Guiding Surface__ will be assigned the __Guiding Velocity__ in the same manner as a collision object. An existing collision object takes priority over any __Guiding Surface__ so the __Guiding Velocity__ will not be applied to the fluid near collisions.
+	
+Guiding Sink:
+	Particles that flow too deep into the __Guiding Surface__ may impact performance. For efficiency, they can be removed by using the __Guiding Sink__ surface. Any particles inside of this surface will be removed (even if this surface is outside of the __Guiding Surface__).
+
+NOTE:
+	The following items in __Volume Fraction Method__ should match match the settings in the __Collisions__ folder in the [FLIP Solver|Node:dop/flipsolver] if there are collisions present.
+
+Volume Fraction Method:
+    The solver uses fractional estimates of collision volumes to increase the accuracy of the pressure solve around curved or sloped surfaces.
+
+	Voxel Face Area:
+        Estimate the fractional collision weight by determining how much of each voxel face is occluded by the collision volume.  This method provides the smoothest handling of sloped objects, but can treat square objects as excessively smooth.
+
+	Supersampling:
+        Estimate the fractional collision weight by sampling the collision volume multiple times for each voxel. This method handles square-shaped collision objects better, but can
+	    introduce some false friction-like forces on sloped surfaces.
+
+	None:
+	    Do not calculate collision weights.
+
+Samples Per Axis:
+    How many samples are taken per axis when the __Volume Fraction Method__ is set to __Collision Supersampling__.  Increasing this value makes for a more accurate estimate, but note that the total number of samples taken is the _cube_ of this number.
+
+Stick on Guide:
+    Causes the fluid's velocity to match the __Guiding Velocity__ when close to a __Guiding Surface__.  See the [Gas Stick On Collision DOP|Node:dop/gasstickoncollision] help for more
+    information.
+    
+Stick Scale:
+    The amount of __Guiding Velocity__ to blend into the fluid's velocity, where a value of 1 indicates fully matching the __Guiding Velocity__.
+
+Max Distance:
+    Specifies the world-space distance within which to apply the effect.
+
+Max Cells:
+    Specifies the maximum number of voxels within which to apply the effect.
+
+Stick Bias:
+    Controls how quickly within the stick distance the effect will reach the full __Stick Scale__. Values closer to 1 will have more effect throughout the stick distance.
+
+Normal Scale:
+    Scale the amount of velocity adjustment in the direction normal to the __Guiding Surface__.
+
+Tangent Scale:
+    Scale the amount of velocity adjustment in the direction tangent to the __Guiding Surface__.
+
+    TIP:
+        Only collision velocity in the normal of the collision surface gets applied in the pressure solve. Increasing the __Tangent Scale__ will encourage the fluid to match the tangential __Guiding Velocity__ as well.
+
+Control Field:
+    Scale the effect by this spatially varying field, which should match the __Guiding Surface__ in resolution.
+
+@inputs
+
+[Include:standard_data_inputs]
+
+@outputs
+
+[Include:standard_data_outputs]
+
+@locals
+
+[Include:standard_data_locals]
+
+[Include:standard_locals]
+
+

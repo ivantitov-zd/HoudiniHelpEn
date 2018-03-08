@@ -1,0 +1,349 @@
+= hou.DopData =
+#type: homclass
+#cppname: HOM_DopData
+#group: dynamics
+
+"""A piece of data stored inside a DOP network's simulation."""
+
+Each DOP network builds a tree of data, and then Houdini examines and updates
+this tree when it runs the simulation.  DOP data elements can be DOP objects,
+geometry, volumes, forces, solvers, etc.  The data is arranged in a tree
+structure, where child nodes are called subdata and are said to be attached
+to their parent nodes.  Under the root of the tree are usually the DOP objects
+and data describing their relationships.
+
+Note that the same piece of data can appear in the tree in multiple locations,
+with different names.  DopData objects thus do not store their name, and the
+name of a piece of data in the tree is instead stored with its parent data(s).
+
+By default, DopData objects store the path within the tree to the data.  As a
+consequence, if the time changes and the solvers within the simulation change
+the contents of the tree of data, the Python DopData object will update to
+refer to the simulation's new state.  If the data path no longer refers to
+valid data, Houdini raises [Hom:hou.ObjectWasDeleted] when you try to access
+the DopData object from Python.
+
+If you do not want the DopData to update with changes to the simulation, you
+can call [Hom:hou.DopData#freeze].  freeze returns another DopData object that
+refers the simulation's state at the current time, and will not change when the
+simulation time changes.
+
+Each piece of data can contain records, and each record stores a list of
+name and value pairs called fields.  Each record has a name, but it's possible
+for multiple records with the same name to exist in the same piece of data.  In
+this case, the record also has an index, and you can think of the records as
+rows of a spreadsheet.
+
+@methods
+
+::`subData(self)` -> dict of `str` to [Hom:hou.DopData]:
+    #cppname: HOM_DopData::subData
+    #replaces: Exp:dopsubdataname, Exp:dopnumsubdata
+    Return a dictionary mapping names to DOP data instances for the subdata
+    attached to this data.
+
+    {{{
+    #!pycon
+    # The following code assumes you have created a box from the shelf and used
+    # Rigid Bodies > RBD Object on the shelf to make it a rigid body.
+    >>> obj = hou.node("/obj/AutoDopNetwork").simulation().objects()[0]
+    >>> obj
+    <hou.DopObject box_object1 id 0>
+    >>> obj.recordTypes()
+    ('Basic', 'Options', 'RelInGroup', 'RelInAffectors')
+    >>> record = obj.record("Options")
+    >>> record.fieldNames()
+    ('name', 'groups', 'affectors', 'affectorids', 'objid')
+    >>> record.field("name")
+    'box_object1'
+
+    >>> obj.subData().keys()
+    ['PhysicalParms', 'ODE_Body', 'Solver', 'Geometry', 'SolverParms', 'ODE_Geometry', 'Forces', 'Position', 'Colliders']
+    >>> obj.findSubData("Forces/Gravity_gravity1")
+    <hou.DopData of type SIM_ForceGravity>
+    >>> obj.findSubData("Forces/Gravity_gravity1").options().field("force")
+    <hou.Vector3 [0, -9.80665, 0]>
+    }}}
+
+::`findSubData(self, data_spec)` -> [Hom:hou.DopData] or `None`:
+    #cppname: HOM_DopData::findSubData
+    #replaces: Exp:dophassubdata
+    Return the DOP data with the given name that is attached to this DOP data,
+    or `None` if no such data exists.  Note that the name may also be a
+    slash-separated path to nested subdata.
+
+    See [Hom:hou.DopData#subData] for an example.
+
+    This method can be approximately implemented as follows:
+    {{{
+    #!python
+    def findSubData(self, data_spec):
+	data = self
+	for name in data_spec.split("/"):
+	    if name not in data.subData():
+		return None
+	    data = data.subData()[name]
+	return data
+    }}}
+
+::`findAllSubData(self, data_spec, recurse=False)` -> dict of `str` to [Hom:hou.DopData]:
+    #cppname: HOM_DopData::findAllSubData
+    Given a pattern, return a dictionary mapping subdata paths to DOP data
+    instances for all the subdatas whose name matches the pattern.  If
+    `recurse` is `True`, all grandchildren subdata will be added to the result.
+
+    {{{
+    #!pycon
+    # The following code assumes you have created a box from the shelf and used
+    # Rigid Bodies > RBD Object on the shelf to make it a rigid body.
+    >>> obj = hou.node("/obj/AutoDopNetwork").simulation().objects()[0]
+    >>> obj.findAllSubData("S*").keys()
+    ['SolverParms', 'Solver']
+    >>> obj.findAllSubData("S*", recurse=True).keys()
+    ['SolverParms', 'Solver/Random', 'SolverParms/ActiveValue', 'Solver']
+    >>> obj.findAllSubData("S*/*", recurse=True).keys()
+    ['SolverParms/ActiveValue', 'Solver/Random']
+    }}}
+
+::`freeze(self)` -> [Hom:hou.DopData]:
+    #cppname: HOM_DopData::freeze
+    Return a frozen version of this DopData.  Frozen versions of the data will
+    not update when the simulation updates.  Instead, they will refer to the
+    state of the simulation at the time they were frozen.
+
+    It is ok to call this method on a DopData object that is already frozen.
+
+::`isFrozen(self)` -> `bool`:
+    #cppname: HOM_DopData::isFrozen
+    Return whether or not this data is frozen.
+
+    See [Hom:hou.DopData#freeze] for more information.
+
+::`path(self)` -> `str`:
+    #cppname: HOM_DopData::path
+    Return the path to this object within the tree of DOP data.  This path
+    includes the DOP object or relationship as the first part of the path.
+
+    Note that the same piece of DOP data can exist in multiple places of
+    the tree.  The path returned is the path stored inside this Python DopData
+    object, since the Python object uses the path to look up the underlying
+    data each time you call a method on it.
+
+    Note that the path is only available for unfrozen objects.  If you call
+    this method on a frozen DopData object it raises [Hom:hou.OperationFailed].
+
+::`selectionPath(self)` -> `str`:
+    #cppname: HOM_DopData::selectionPath
+    For DopData objects returned from a [Hom:hou.SceneViewer#selectDynamics]
+    function call, this will return the a string that contains both the path
+    to the DOP Network that created the data, and the path within the DOP
+    data tree which uniquely identifies this DopData. This string is
+    specifically intended to be passed in the `prior_selection_paths`
+    argument of the [Hom:hou.SceneViewer] selection methods.
+
+::`dataType(self)` -> `str`:
+    #cppname: HOM_DopData::dataType
+    Return a string describing the type of data this object contains.
+
+    {{{
+    #!pycon
+    >>> obj = hou.node("/obj/AutoDopNetwork").simulation().objects()[0]
+    >>> obj.dataType()
+    'SIM_Object'
+    }}}
+
+    See also [Hom:hou.DopData#dataTypeObject].
+
+::`dataTypeObject(self)` -> [Hom:hou.DopDataType] or `None`:
+    #cppname: HOM_DopData::dataTypeObject
+    #status: ni
+    Return the [Hom:hou.DopDataType] object corresponding to this object's
+    data type, or `None` if there is no corresponding [Hom:hou.DopDataType]
+    instance.  Most type names do have a corresponding type object.
+
+    This method can be approximately implemented as follows:
+    {{{
+    #!python
+    def dataTypeObject(self):
+	return hou.dop.findDataType(self.dataType())
+    }}}
+
+    See also [Hom:hou.DopData#dataType].
+
+::`recordTypes(self)` -> `tuple` of `str`:
+    #cppname: HOM_DopData::recordTypes
+    #replaces: Exp:dopnumrecordtypes, Exp:doprecordtypename
+    Return a tuple of strings containing the record types stored inside this
+    DOP data.  Each DOP data contains records named "Basic" and "Options", and
+    some types of DOP data contain additional records.
+
+::`record(self, record_type, record_index=0)` -> [Hom:hou.DopRecord]:
+    #cppname: HOM_DopData::record
+    #replaces: Exp:dopfield
+    Given a record type name return that record, or `None` if no record exists
+    with that name.  If this DOP data contains multiple records with this
+    record type name you can think of each record as a row in a spreadsheet,
+    and `record_index` determines which one is returned.  Use
+    `len(self.records(record_type))` to determine how many records of this type
+    are in this DOP data.
+
+    Use [Hom:hou.DopData#recordTypes] to get a tuple of record types in a DOP
+    data.  See also [Hom:hou.DopData#records] for an example, and see
+    [Hom:hou.DopData#options] for a way to easily access the "Options" record.
+
+::`records(self, record_type)` -> `tuple` of [Hom:hou.DopRecord]:
+    #cppname: HOM_DopData::records
+    #replaces: Exp:dopnumrecords
+    Return a tuple of all the records of this record type.  See also
+    [Hom:hou.DopData#record].
+
+    This example lists the input affectors for a rigid body box that collides
+    with a ground plane:
+    {{{
+    #!pycon
+    >>> obj = hou.node("/obj/AutoDopNetwork").simulation().objects()[-1]
+    >>> obj.records("RelInAffectors")
+    (<hou.DopRecord of type RelInAffectors index 0>, <hou.DopRecord of type RelInAffectors index 1>)
+    >>> [record.field("relname") for record in obj.records("RelInAffectors")]
+    ['merge1', 'staticsolver1_staticsolver1']
+    >>> obj.record("RelInAffectors", 1).field("relname")
+    'staticsolver1_staticsolver1'
+    }}}
+
+::`options(self)` -> [Hom:hou.DopRecord]:
+    #cppname: HOM_DopData::options
+    #replaces: Exp:dopoption, Exp:dopoptions
+    Return the Options record.  This method is a shortcut for
+    `self.record("Options")`.
+
+::`dopNetNode(self)` -> [Hom:hou.Node]:
+    #cppname: HOM_DopData::dopNetNode
+    Return the DOP network node containing this DOP data.
+
+::`simulation(self)` -> [Hom:hou.DopSimulation]:
+    #cppname: HOM_DopData::simulation
+    Return the DOP simulation containing this DOP data.  This method is a
+    shortcut for `self.dopNetNode().simulation()`.
+
+::`creator(self)` -> [Hom:hou.DopNode]:
+    #cppname: HOM_DopData::creator
+    Return the DOP node that created this DOP data inside the DOP network.
+
+::`id(self)` -> `str`:
+    #cppname: HOM_DopData::id
+    Return the globally unique identifier (GUID) for this DOP data.  This
+    method is a shortcut for `self.record("Basic").field("uniqueid")`.
+
+    If you want an object's index, [Hom:hou.DopObject#objid].
+
+    {{{
+    #!pycon
+    >>> obj = hou.node("/obj/AutoDopNetwork").simulation().objects()[0]
+    >>> obj.id()
+    '0xD011E41C-0x000034AE-0x494C12E4-0x000018B9'
+    >>> obj.objid()
+    0
+    }}}
+
+::`save(self, file_path)`:
+    #cppname: HOM_DopData::save
+    #replaces: Cmd:dopsavedata
+    #status: ni
+    Save this DOP data to a file.  You can load in this data using a File Data
+    DOP.
+
+    You might use this method to cache data that takes a long time to generate
+    and is only generated once at the start of a simulation, such as the volume
+    representation of an object for collision detection.  You would then modify
+    your DOP network to use a File Data DOP to read in that data instead of
+    computing it.
+
+    Raises [Hom:hou.OperationFailed] if the file could not be created.
+
+::`createSubData(self, data_name, data_type="SIM_EmptyData", avoid_name_collisions=False)` -> [Hom:hou.DopData]:
+    #cppname: HOM_DopData::createSubData
+    #replaces: Cmd:dopsolveadddata
+    Create subdata under this data with the specified name and type.  You would
+    call this method from a script solver DOP.
+
+    `data_name`:
+	The name of the new data.  Note that this name may contain slashes to
+	create subdata on existing data.
+
+    `data_type`:
+	Either the name of the data type to create or a [Hom:hou.DopDataType]
+	instance.  If you simply want something containing an empty options
+        record, use "SIM_EmptyData".
+
+    `avoid_name_collisions`:
+	If True and data with the specified name exists, Houdini will create
+	a unique name that does not conflict with any existing data.
+
+    Raises [Hom:hou.OperationFailed] if data with this name already exists.  If
+    you want to replace existing data it is up to you to first call
+    [Hom:hou.DopData#removeData].
+
+    Raises [Hom:hou.PermissionError] if called from outside a script solver
+    DOP.
+
+    Use [Hom:hou.DopData#attachSubData] to create a reference to existing data.
+    See [Hom:hou.DopData#copyContentsFrom] for an example of how to create a
+    copy of existing data.
+
+::`attachSubData(self, data, new_data_name, avoid_name_collisions=False)`:
+    #cppname: HOM_DopData::attachSubData
+    #replaces: Cmd:dopsolvecopydata
+    Make existing data become subdata of this data.  Houdini does not create
+    a duplicate of the data.  Instead, the data's parent(s) and this data will
+    both refer to the same instance of subdata.  You would call this method
+    from a script solver DOP.
+
+    `data`:
+	The DopData that will become subdata of this data.
+
+    `new_data_name`:
+	The name of the new subdata.
+
+    `avoid_name_collisions`:
+	If True and data with the specified name exists, Houdini will create
+	a unique name that does not conflict with any existing data.
+
+    Raises [Hom:hou.OperationFailed] if data with this name already exists.  If
+    you want to replace existing data it is up to you to first call
+    [Hom:hou.DopData#removeData].
+
+    Raises [Hom:hou.PermissionError] if called from outside a script solver
+    DOP.
+
+    See [Hom:hou.DopData#copyContentsFrom] for an example of how to create a
+    copy of existing data.
+
+::`removeSubData(self, data_spec)`:
+    #cppname: HOM_DopData::removeSubData
+    #replaces: Cmd:dopsolveremovedata
+    Remove subdata with the given name.  Raises [Hom:hou.PermissionError] if
+    called from outside a script solver DOP.
+
+    Raises [Hom:hou.OperationFailed] if data with that name already exists.
+
+::`copyContentsFrom(self, data)`:
+    #cppname: HOM_DopData::copyContentsFrom
+    #replaces: Cmd:dopsolveadddata
+    Copy the contents of the given DopData into this one, adapting the data
+    if it is of a different type.  You would call this method from a script
+    solver DOP.
+
+    Raises [Hom:hou.PermissionError] if called from outside a script solver
+    DOP.
+
+    Use this method along with [Hom:hou.DopData#createSubData] to copy existing
+    subdata:
+    {{{
+    #!python
+    def copySubData(new_parent_data, data_to_copy, new_data_name, avoid_name_collisions=False):
+	'''Create a copy of data and attach it to other data.'''
+	new_data = new_parent_data.createSubData(new_data_name, data_to_copy.dataType(), avoid_name_collisions)
+	new_data.copyContentsFrom(data_to_copy)
+	return new_data
+    }}}
+

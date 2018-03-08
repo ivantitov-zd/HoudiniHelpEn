@@ -1,0 +1,206 @@
+= Primitives =
+
+== Overview ==
+
+In Houdini, _primitives_ refer to a unit of geometry, lower-level than an [object|/basics/objects] but above [points|points]. Houdini supports several different types of primitives:
+
+* [Polygon face|#polygons]
+* [Packed primitives|packed], [Packed Disk primitives|packed], and [Packed Disk Sequence primitives|packed]
+* [Packed Disk Sequence primitives|#packeddisksequence]
+* [Polygon soup|#polysoup]
+* [Volume|volumes]
+* [Tetrahedron|#solid_matter]
+* [Bezier/NURBS surfaces|#nurbs]
+* Polygon/Bezier/NURBS curves
+* [Metaballs|#metaballs]
+
+There is also a special primitive called a [packed primitive|packed] that represents a lightweight reference to geometry stored somewhere else. This is very useful for [copying/instancing|/copy] and working with heavy geometry. [Alembic files|/io/alembic] are represented in Houdini as packed primitives.
+
+There are also several [quadratic primitive types|#quadratics] that represent geometric figures mathematically rather than as polygonal surfaces. These may be useful as lightweight geometry.
+
+* Null (representing a single point and rotation, sometimes called a "jack").
+* Circle (defined by a single point, rotation, and radius).
+* Sphere/ellipsoid (defined by a single point and radii).
+* Tube/cone (defined by a single point, rotation, radii, and length).
+
+Houdini's [Circle|Node:sop/circle], [Sphere|Node:sop/sphere], and [Tube|Node:sop/tube] have parameters to choose whether they create, for example, a "primitive sphere" or a polygonal sphere.
+
+You can convert most geometry types between each other using the [Convert SOP|Node:sop/convert].
+
+TIP:
+    Press ((MMB)) on a node in a geometry network to see a pop-up showing information about the geometry flowing through the node, including the number/types of primitives.
+
+== Polygons and meshes == (polygons)
+
+#index: document
+
+Polygons are shapes constructed from a series of straight edges. These edges are defined by a series of vertices. Polygons are ideal for dealing with complex topologies that go beyond the four sided nature of meshes and NURBS surfaces.
+
+A _mesh_ is a collection of polygons with guaranteed ordering. It is much more efficient that the equivalent polygons, and unlike most regular polygons you can convert it directly to NURBS. You can also use the [Convert surface node|Node:sop/convert] to convert mesh primitives to regular polygons when you want a nice layout of polygons in rows and columns.
+
+Open/closed:
+    A closed polygon shares its first and last vertex and is flagged internally as "closed". Only closed polygons are shaded.
+
+Planar/non-planar:
+    Planar polygons' vertices lie in the same plane in 3D space. Non-planar polygons have vertices that are not all on a single plane in 3D space.
+
+Convex/concave:
+    A polygon is convex if any vertical or horizontal axis intersects it at most twice. Concave polygons have more complex shapes with "inset" points.
+
+Use the tools on the [Create shelf tab|/shelf/create] to create surfaces, and use the __Primitive type__ pop-up menu on the operation controls toolbar to set the new surface to be created from polygons.
+
+[Image:/images/ui/opbar.png]
+
+Use the tools on the [Polygon shelf tab|/shelf/polygon] to edit and reshape faces and polygonal surfaces.
+
+== Packed primitives == (packed)
+
+See [packed primitives|packed].
+
+== Polygon soup == (polysoup)
+
+#index: document
+
+A polygon soup is a primitive that stores polygons using a compact memory representation and very efficiently stores faces whose primitive attributes are the same. Its in-memory representation allows almost all the memory of a large soup to be shared between nodes operating on the soup as long as the topology does not change (where regular polygons require each node to retain a copy of every polgyon). The sharing also makes memory caches more efficient, meaning many modeling and rendering operations will be faster as well as using less memory.
+
+The more polygons in a soup, the greater the benefit over regular polygons. For simple geometry with few polygons, the management overhead of soups can make them slower than regular polygons, although soups will always use less memory.
+
+You can convert geometry to a polygon soup using the [Polysoup|Node:sop/polysoup] node.
+
+Loading a soup from a file can be much faster than loading regular polygons (for Mantra as well as Houdini). You can load [Alembic files|/io/alembic] as polygon soups. Creating [Grid|Node:sop/grid], [Sphere|Node:sop/sphere], [Tube|Node:sop/tube], and [Torus|Node:sop/torus] shapes is faster when you use the option to create soups.
+
+Along with the shape nodes, you can create soups with [Convert|Node:sop/convert], [Convert Meta|Node:sop/convertmeta], [Convert VDB|Node:sop/convertvdb], [Convert Volume|Node:sop\convertvolume], [Iso Offset|Node:sop/isooffset], [Iso Surface|Node:sop/isosurface], [Point Cloud Iso|Node:sop/pointcloudiso], [Subdivide|Node:sop/subdivide], and [Tetra Surface|Node:sop/tetrasurface] support creating polygon soups. You can use the [Subdivide|Node:sop/subdivide] node to subdivide soups if you choose one of the `OpenSubdiv` methods.
+
+Many (but not all) geometry nodes can operate "natively" on poly soups. You get the benefits of the soup's sharing with operations that modify attributes, such as [Edit|Node:sop/edit], [Transform|Node:sop/xform], [Sculpt|Node:sop/sculpt], [Attribute Transfer|Node:sop/attribtransfer] onto points, point [Group|Node:sop/group], [Attribute Create|Node:sop/attribcreate], [Attribute Wrangle|Node:sop/attribwrangle], [Attribute Copy|Node:sop/attribcopy], computing point normals with [Facet|Node:sop/facet], point [UV Project|Node:sop/uvproject], [Paint|Node:sop/paint], [Partition|Node:sop/partition], point [Connectivity|Node:sop/connectivity], and [Ray|Node:sop/ray], among others.
+
+Some operations modifying vertex or primitive attributes may still work on polygon soups, but may have slightly different meaning than for polygons. For example, each soup is only one primitive, so the polygons in a soup can't have their own primitive attributes. Also, polygon soups often do not have as many vertices as polygon primitives (they merge identical vertices). This means, for example, [UV Project|Node:sop/uvproject] can't compute vertex texture coordinates correctly, and cusping vertex normal isn't supported.
+
+Most operations that change polygon topology, such as [Poly Extrude|Node:sop/polyextrude] and [Poly Split|Node:sop/polysplit], don't support soups, but a few do. For example, the __Convex polygons__ option on the [Divide node|Node:sop/divide] will convex a polygon soup, and will avoid adding any additional vertices, allowing the memory for the vertex attributes to be shared.
+
+For nodes that don't support soups, you _can_ use [Convert|Node:sop/convert] to convert a soup to regular polygons, and then convert the polygons back to a soup using [Polysoup|Node:sop/polysoup]. However, the benefits of polygon soups will usually be overwhelmed by the conversion cost, so in most cases you should just use regular polygons. (If you're doing this type of conversion back and forth in an HDA, you should set the _Unload flag_ on all nodes whose output is polygons, so the SOP cache won't hold onto the polygons longer than necessary.)
+
+See [when to use polygon soups, packed primitives, or regular polygons|#vs] below.
+
+== Polygon soup vs. Packed primitives vs. regular polygons == (vs)
+
+See also [instancing using packed geometry and polygon soups|/copy/packed_and_soups].
+
+Editing |
+    #width: 25%
+    Regular polygons are supported by all operations in Houdini.
+    
+    Polygon soups are supported by many but not all operations in Houdini.
+    
+    The geometry of packed primitives is _not editable or deformable_. However you can transform them and set attributes on the points that represent the packed geometry.
+
+Memory usage |
+    Packed primitives are only loaded into memory as needed. For packed primitives that reference a disk file, they are streamed directly to the graphics card for display and to the renderer for rendering. The ongoing memory usage of a packed primitive can often be zero.
+    
+    Polygon soups have a much more compact memory representation than regular polygons.
+    
+    Regular polygons use the most memory of the three.
+
+Tips |
+    For small pieces of geometry, use regular polygons to avoid the overhead of polygon soups.
+    
+    If you need to use any operations that change topology or are otherwise don't support polygon soups, use regular polygons all the way through -- the cost of converting usually overwhelms any benefit from using soup for only part of a node chain.
+    
+    If you have large geometry you need to edit or deform, use polygon soups.
+    
+    If you only need to display and transform the geometry, store it on disk and use packed primitives.
+
+== Interpreting memory usage ==
+
+You can see how much memory a node is using by pressing ((MMB)) on the node. A pop-up will appear showing various ways of measuring the memory usage of the node:
+
+Memory:
+    The total amount of memory referenced by a particular detail. This memory may be shared with another node (for example, if you're using a polygon soup), so this isn't necessarily how much memory you'll save if you delete this node. It's more a measure of how much stuff is passing through the node.
+
+New:
+    The amount of memory referenced by this node that is not referenced by any of its inputs. This indicates how much memory is used by this node. This number is not reported for nodes without inputs (generators).
+
+Unique:
+    The memory that is only referenced by this node (that is, not referenced by its inputs _or_ outputs). This indicates how much memory you would save if you turned on the Unload flag on this node.
+
+This display has some limitations:
+
+* The memory referenced by packed primitives is not yet counted for performance reasons.
+
+* The SOP cache manager and the [Cache SOP|Node:sop/cache] do not yet track memory usage correctly.
+
+* Pressing ((MMB)) on a subnet (such as a digital asset) only shows the memory used by the subnet itself, not the memory usage of the network inside the subnet.
+
+== Metaballs == (metaballs)
+
+#index: document
+
+Metaballs create an implicit surface computed around a set of points. Metaballs are like spheres centered around points, but when two metaballs are placed near each other their surfaces merge smoothly.
+
+[Image:/images/model/metaballs.png]
+
+Metaballs may be useful for representing blobby or weird surfaces. You can also change how the surface is computed, which may be useful to achieve some effect:
+
+[Image:/images/metaball1.png]
+[Image:/images/metaball2.png]
+[Image:/images/metaball3.png]
+
+== NURBS and Bezier splines == (nurbs)
+
+#index: document
+
+* NURBS is an acronym for Non-Uniform Rational B-Spline. NURBS are smooth curves and surfaces defined by control vertices (CVs). [See the Wikipedia definition|Wp:Non-uniform_rational_B-spline] for more information. The advantage of NURBS is that moving a CV reshapes surrounding curve/surface while maintaining the continuity of the curve/surface. This allows you to "pull and tug" on the CVs of the NURBS curve or surface to generate a desired shape without causing kinks or discontinuities.
+
+    [Image:/images/Figure6.jpg]
+    
+    [Image:/images/Houdini-12-1-20.jpg]
+
+* Bézier curves/surfaces are simpler than NURBS. [See the Wikipedia definition|Wp:Bezier_curves] for more information. Bézier curves allow discontinuities at the knots, making it easier to create corners but harder to create smooth continuous curves/surfaces.
+
+=== Parameterization ===
+
+The shape of a NURBS curve, given a set of CVs, is determined by the relative distance between knots. There are two types of knot parameterizations: _uniform_ and _chord length_.
+
+* In _uniform_ parameterization, knots are spaced evenly.
+
+* In _chord length_ parameterization, the distances between knots are determined by the distances between successive CVs. Uniform parameterization is recommended for regular shapes while chord length is used for free-form shapes. A third type of parameterization, called "centripetal", is similar to chord length and is best suited for sharp curves.
+
+=== Order/degree ===
+
+Spline curves have an [order|Wp:Non-uniform_rational_B-spline#Order], sometimes referred to instead as _degree_, which is one less than the order. The degree determines the potential smoothness of the line. A polyline has degree 1 (or "second order"). A curve with one control point between knots has degree 2 (AKA "third order" or "cubic"). The familiar Bézier curve, with two control points between knots, is degree 3 (AKA "fourth order" or "quadratic").
+
+Houdini supports splines with degrees from 1 to 10. For animation and effects you'll usually find that degree 2 (cubic) splines are sufficiently smooth and well behaved You will seldom need to use other degrees.
+
+[Image:/images/Figure3.jpg]
+
+=== Creating a sharp point in a NURBS curve ===
+
+Sometimes you want to create a sharp corner in a NURBS curve. You can do this in three ways:
+
+* Change the weight of a selected CV via the Curve > Parameters dialog in the Model Editor to something high like 10,000. This gives the CV so much "pull" that it draws the curve almost right through it.
+
+* If you drag the two adjacent CVs of a cubic curve onto a middle CV, it will look like a sharp corner point. This is called raising the _Multiplicity_ of the CV. Maximum CV multiplicity occurs when adjacent "degree" CVs overlap.
+
+* Make "degree" knots identical. When this is done, it is called raising the multiplicity of the knot. You can do this in the Refine sop by choosing the Subdivision option, or in the Model Editor by selecting the Refine state and dividing with the middle mouse button (((MMB))).
+
+== Quadratic primitive shapes == (quadratics)
+
+Houdini supports primitive spheres/ellipsoids, circles/ellipses, and tubes/cones. The shapes are defined by very simple mathematical parameters (for example, by height, and width for an ellipsoid) and a single center-point vertex. They can be moved, rotated, and scaled.
+
+[Image:/images/model_primitives.png]
+
+Quadratic primitives are extremely lightweight, and so can be used for applications such as:
+
+* Showing hundreds of thousands or millions of copies of simple shapes, as in [instancing|/shelf/instance] .
+
+* Stand-in geometry.
+
+* Envelope geometry (for example, for bouncing particles off of).
+
+Many modeling tools will work on quadratic primitives, but the primitives do not have any topology so, for example, operators that act on surface points will not work with quadratic primitives.
+
+@related
+
+- [/basics/objects]
+- [points]
+
+

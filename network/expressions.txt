@@ -1,0 +1,382 @@
+= Parameter expressions =
+
+#bestbet: expression
+
+"""You can enter expressions into a parameter so its value is computed instead of being static or keyframe animated."""
+
+== Overview ==
+
+You can enter short bits of code, like mathematical expressions, in parameters to compute their values using math and variables such as the current frame number, the point number, random numbers, and so on. For example, to make a sphere rise over time without having to manually keyframe it, you could set its Y Position to equal the frame number divided by 5.
+
+=== Languages ===
+
+Houdini lets you write expressions in two different languages: traditional HScript expressions, and Python. In addition, some specific nodes let you write [VEX snippets|/vex/snippets] to control the node behavior.
+
+HScript expressions |
+    The traditional way to write expressions. Uses the [expression functions|/expressions/].
+
+Python |
+    A more powerful but more verbose way to write expressions. Uses the [Houdini Object Model|/hom/] API and any functions built-in to Python.
+
+VEX |
+    A fast, compiled language. Only available in certain parameters on specific nodes.
+
+By default, parameters in Houdini use the traditional HScript expression language explained below. To switch to use Python in a specific parameter, node, or everywhere, see [Python parameter expressions|/hom/expressions].
+
+== HScript expression example ==
+
+# Create a new [Geometry object|Node:obj/geo] and dive inside.
+
+# Create a [Grid node|Node:sop/grid].
+
+# In the [parameter editor|parms], set the Grid node's __Size__ fields to:
+
+    {{{
+    #!hscript
+    $F / 10
+    }}}
+
+    This makes the grid's size relative to the current frame number. Trying playing back the animation using the [playbar|/anim/playbar] at the bottom of the main window.
+
+== String parameters ==
+
+* In *numeric parameters* (such as position, rotation, scale), the text in the parameter is evaluated as an expression.
+
+* In *string parameters* (such as filenames, or the text created by the [Font node|Node:sop/font]), the text in the parameter is treated as text. Variables are expanded, but to use math or expression functions to generate part of the text you must place the expression within backticks. For example:
+    
+    {{{
+    frame`padzero(5, $F)`.pic
+    }}}
+
+
+    ...giving you filenames such as `frame00001.pic`, `frame00002.pic`, and so on.
+
+(See [expressions in filenames|/render/expressions] for more information about using variables and expressions in filename parameters).
+
+== Variables and attributes ==
+
+Your expressions can use variables provided by Houdini:
+
+* *Global variables* such as `$F` (the current frame number) and `$T` (the current time in seconds). See the [list of global variables|#globals] below.
+
+* *Geometry attributes*. In HScript expressions on geometry you can reference the value of an attribute using `@attributename`. For example, you can use `@pscale` to get the value of the `pscale` (point scale) attribute on the current point.
+
+    For vector attributes such as `P` (position), you can use dot notation to grab a component, for example `@P.x`. You can use `.x/.y/.z` or `.1/.2/.3` or `.r/.g/.b`, whichever makes sense for the type of data.
+
+* *Local variables*. Nodes often provide variables that are useful for expressions on nodes of that type. For example, a node that operates over the points in a geometry will have a `@ptnum` variable representing the point number of the current point. The help for a node will list the local variables you can use in expressions on that type of node.
+
+* *Environment variables* such as `$HIP` (the directory containing the scene file) are available to expressions.
+
+== Parameter/channel references ==
+
+In HScript expressions you can reference the value of a parameter on a node using the [Exp:ch] function. This can be useful to make a number on one node follow or be relative to a number on another node.
+
+TIP:
+    You can create your own custom parameters to reference in your expressions. See [spare parameters|spare].
+
+:task: Create a channel reference automatically:
+    # Right-click the source parameter and choose __Copy parameter__.
+    
+    # Right-click the destination parameter and choose __Paste relative reference__.
+    
+        Houdini will enter the proper `ch("")` syntax to make the second parameter reference the value of the first.
+
+:task: Create a channel reference manually:
+    When typing an HScrpt expression, use the [Exp:ch] function to get the value of another parameter.
+    
+    The argument to `ch` is a (possibly relative) path from the current node to the parameter. For example, to get the Z transform of the current node:
+
+    {{{
+    #!hscript
+    ch("tz")
+    }}}
+
+    To get the X transform of the `lamp` object:
+
+    {{{
+    #!hscript
+    ch("/obj/lamp/tx")
+    }}}
+
+    To get the Y rotatation from the `grid1` node in the same network as the current node:
+
+    {{{
+    #!hscript
+    ch("../grid1/ry")
+    }}}
+
+    (To get a string value, use [Exp:chs].)
+
+:task: Find out the internal name of a parameter:
+    To reference a parameter manually, you must know its internal name. You can get this by hovering over the parameter label, or by clicking __+(fa-cog) > Edit parameter interface__ in the parameter editor, clicking the parameter, and looking in the __Name__ field.
+
+== Tips ==
+
+* It's easy to modify geometry in geometry nodes using HScript expressions and local variables in parameters. However, it's much more efficient to modify geometry using a [VEX snippet|/vex/snippets] in a node such as the [Point Wrangle|Node:sop/pointwrangle] or [Attribute Wrangle|Node:sop/attribwrangle].
+
+    #glyph: fa-tachometer
+
+    Future versions of Houdini will probably move toward encouraging use of VEX to modify geometry rather than parameter expressions.
+
+* You can check the value of an expression by choosing __Window > HScript Textport__ and then typing:
+
+    #glyph: fa-terminal
+
+    {{{
+    #!hscript
+    echo `expression`
+    }}}
+
+* Houdini always creates each frame "from scratch" using the "recipe" of the network. Expressions always operate on the values they get from the initial setup of the node, _not_ from the previous frame.
+
+    #glyph: fa-clock-o
+
+    For example, if you set up a [Point geometry node|Node:sop/point] to add a random offset to the Y position of each point in a grid:
+    
+    Position Y ||
+        {{{
+        #!hscript
+        @P.y + rand(@Frame * @ptnum)
+        }}}
+    
+    ...when you play back the animation, the points will jump about randomly, instead of smoothly moving up and down. This is because at each frame the network starts with the flat grid and then applies the random movement to it. The expression does not run on the geometry from the previous frame.
+
+== Quoting in HScript expressions ==
+
+=== Strings ===
+#display: pull left
+
+Text inside single quotes (`'`) is not expanded. Text inside double quotes (`"`) has variables expanded. A double-quoted string is considered one argument.
+
+A backslash character (`\`) escapes the next character. For example, to use double-quotes in a string:
+
+{{{
+"I had a \"great\" time."
+}}}
+
+When a string doesn't require variable expansion, use single quotes to speed up evaluation.
+
+If you have two quoted strings next to each other with no spaces, they are considered a single argument. In this example...
+
+{{{    
+set foo = "Hello world"
+echo '$foo='"$foo"
+$foo=Hello world
+}}}
+
+...the echo command has one argument: `'$foo=Hello world'`.
+            
+=== Embedding ===
+#display: pull left
+
+In the HScript command language, text inside backticks is evaluated as an expression. For example:
+
+{{{
+echo `strlen("$foo")`
+}}}
+
+TIP:
+    Scripting using the HScript command language is deprecated. You should use [Python|/hom/] instead.
+
+The string parser cannot decode nested quotes such as in the following (horribly contrived) example:
+
+{{{
+echo `system("echo `ls`")`
+}}}
+
+...however, it is possible to accomplish this with very careful usage of backquotes (and sometimes multiple backquotes in a row) to protect quote symbols from various levels of evaluation:
+
+{{{
+echo `system('echo \`ls\`')`
+}}}
+
+== HScript global variables == (globals)
+
+TIP:
+    Some global variables have equivalents that start with `@` to match variables available in [VEX snippets|/vex/snippets].
+
+=== Playback ===
+#display: pull left
+
+`$` ||
+    `@` ||
+        Description ||
+
+`$FPS` |
+    |
+        Playback speed in frames per second (as set with the Playbar controls).
+
+`$FSTART` |
+    |
+        Frame number of the first frame of animation (as set with the Playbar controls). $NFRAMES (the number of frames in the animation) = $FEND - $FSTART + 1.
+
+`$FEND` |
+    |
+        Frame number of the last frame of animation (as set with the Playbar controls).
+
+`$F` |
+    |
+        The current frame, (as set with the Playbar controls). This is a very useful variable, especially for rendered picture filename numbering.
+
+`$FF` |
+    `@Frame` |
+        Floating point frame number.
+
+`$NFRAMES` |
+    |
+        Number of frames in the animation. `$NFRAMES = $FEND  - $FSTART + 1`.
+
+`$RFSTART` |
+    |
+        Frame number of the first frame shown in the playbar. The playbar can show a subset of the total number of frames, allowing you to focus on a particular section of a long animation. $RFSTART and $RFEND control the subset of frames shown in the playbar.
+
+`$RFEND` |
+    |
+        Frame number of the last frame shown in the playbar.
+
+`$T` |
+    `@Time` |
+        Current time in seconds. Equals ($F-1)/$FPS
+
+`$TLENGTH` |
+    |
+        Total length of animation in seconds.
+
+`$TSTART` |
+    |
+        Start time of animation in seconds.
+
+`$TEND` |
+    |
+        End time of animation in seconds.
+
+=== General ===
+#display: pull left
+
+`$ACTIVETAKE` |
+    |
+        Contains the name of the current take.
+
+`$E` |
+    |
+        The mathematical constant e (2.71828...).
+    
+`$HFS` |
+    |
+        The directory where Houdini is installed.
+
+`$HH` |
+    |
+        `$HFS/houdini`.
+
+`$HIP` |
+    |
+        The directory containing the current scene file.
+
+`$HIPFILE` |
+    |
+        The full path of the current scene file, including the file extension.
+    
+`$HIPNAME` |
+    |
+        The name of the current scene file without the extension. You can use this to build filenames with different extensions based on the scene name.
+    
+`$HOME` |
+    |
+        Your home directory.
+    
+`$JOB` |
+    |
+        The [project directory|/basics/project].
+
+`$PI` |
+    |
+        The mathematical constant pi (3.1415926...).
+
+=== Channels ===
+#display: pull left
+
+`$OS` |
+    Operator String. Contains the current OP's name.
+
+`$CH` |
+    Current channel name.
+
+`$IV` |
+    In value (value at start of segment).
+
+`$OV` |
+    Out value.
+
+`$IM` |
+    In slope
+
+`$OM` |
+    Out slope
+
+`$IA` |
+    In acceleration
+
+`$OA` |
+    Out acceleration
+
+`$LT` |
+    Local time - not including stretch or offset
+
+`$IT` |
+    Start time of segment
+
+`$OT` |
+    End time of segment
+
+`$LIT` |
+    Local start time of segment
+
+`$LOT` |
+    Local end time of segment
+
+`$PREV_IT` |
+    Previous segment start time
+
+`$NEXT_OT` |
+    Next segment end time
+    
+=== COPs ===
+#display: pull left
+
+`$CSTART` |
+    Start frame of the current COP.
+
+`$CEND` |
+    End frame of the current COP.
+
+`$CFRAMES` |
+    Number of frames for the current COP.
+
+`$CFRAMES_IN` |
+    Number of frames available from the first input COP.
+
+`$CINC` |
+    Gets the global frame increment value.
+
+`$W` |
+    Current image width.
+
+`$H` |
+    Current image height
+    
+== Render nodes ==
+#display: pull left
+
+`$N` |
+    Current frame being rendered.
+
+`$NRENDER` |
+    Number of frames being rendered.
+
+@related
+
+* [Python parameter expressions|/hom/expressions]
+* [Expressions in filenames|/render/expressions]
+* [Spare parameters|spare]
+* [Expression cookbook|/ref/expression_cookbook]

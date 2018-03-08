@@ -1,0 +1,251 @@
+﻿= HQueue Render =
+
+#type: node
+#context: out
+#internal: hq_render
+#icon: SHELF/factory
+#bestbet: hqueue, queue
+
+"""HQueue, or Houdini Queue, is a distributed job scheduling system.
+"""
+
+HQueue, or Houdini Queue, is a distributed job scheduling system.  It consists of an HQueue server and a farm of processing nodes, or clients.  The server accepts job submissions from users and assigns them to available clients.
+
+The HQueue Render output driver submits render jobs to HQueue for distribution on the farm.  The actual rendering is done by the node specified in the __Output Driver__ parameter.  This is typically a [Mantra ROP|Node:out/ifd], but can also be a [Composite ROP|Node:out/comp] or other output driver.
+
+@parameters
+
+Submit Job:
+    Submit a render job to the HQueue system.  If the submission is successful, then a dialog pops-up with the render job's id.  The id can be used to track the job progress on HQueue's web-based user interface.
+
+    NOTE:
+	On your first submission, Houdini uploads all the project files required by your render job.  On subsequent submissions, Houdini only uploads the project files that have been modified since the last submission.
+   
+
+== General ==
+
+Job Name:
+    The name of the job. Set this to <default> or set blank if you want the default job name to be used.
+
+Output Driver:
+    The render node used to generate the output files.  For most cases, this would be a path to a [Mantra ROP|Node:out/ifd].
+
+    NOTE:
+	This parameter does not apply if the __Use Existing IFDs__ option are
+	chosen.
+
+HQueue Server:
+    The machine name and listen port of the HQueue server.
+
+Target HFS:
+    The path to the Houdini distribution that will execute the render on the HQueue farm.  The distribution must be installed in a location that is accessible by every machine on the farm.  You can use the `$HQROOT` and `$HQCLIENTARCH` variables to help specify the folder path (see [HQueue Variables|Node:out/hq_render#hqvariables]).
+
+Job Priority:
+    The job's priority. Jobs with higher priorities are scheduled and processed before jobs with lower priorities. 0 is the lowest priority.
+
+:
+    Render Current HIP File:
+	Choose this option if you want HQueue to render the .hip file that is currently open.  The current .hip file must be in a location that is accessible by every machine on the farm.  Note that any changes that are made to the .hip file while it is rendering on the farm are live.  That is, any changes made will show up in your renders.
+
+    Render Target HIP File:
+	Choose this option if you want HQueue to render another .hip file.  The .hip file must be located somewhere that is accessible by every machine on the farm.
+
+    Copy Project Files to Shared Folder and Render:
+	Choose this option if you want HQueue to render a copy of the currently opened .hip file.  After clicking on the __Render__ button, a file dependency dialog pops-up giving you an opportunity to choose the project files that are needed by the render.  These files are copied to the destination specified by the __Project Path__ parameter.
+
+    Use Existing IFDs:
+	Choose this option if you want Hqueue to use existing IFD files for the render.
+
+Target HIP:
+    When __Render Target HIP File__ is chosen, set this parameter's value to the location of the .hip file to be loaded and rendered on the farm.  The .hip file must be saved somewhere on the shared drive, or any other location that is accessible by every machine on the farm.  You can use the `$HQROOT` variable to help specify the .hip file path (see [HQueue Variables|Node:out/hq_render#hqvariables]).
+
+Project Path:
+    When __Copy Project Files to Shared Folder and Render__ is chosen, set this parameter's value to the location on the shared folder where you want to copy your .hip file and its dependencies to. The location must be accessible by all machines on the farm.  You can use the `$HQROOT` variable to help specify the .hip file path (see [HQueue Variables|Node:out/hq_render#hqvariables]).
+
+IFD Path:
+    When __Use Existing IFDs__ is chosen, set this paramter's value to the path of the IFDs to be used for rendering. The location must be accessible to all locations on the farm.
+
+Start/End/Inc:
+    When __Use Existing IFDs__ is chosen, set these fields to specify the start frame, the end frame, and the frame increment value for the render. The frame increment may not be zero and the start and end frames chosen must correspond to existing files when the IFD Path is expanded with frame numbers.
+
+Automatically Save HIP File:
+    When checked, Houdini automatically saves the current .hip file before submitting a job to HQueue.  This guarantees that the farm renders with the latest changes made to your scene.  This parameter does not apply when __Render Target HIP File__ or __Use Existing IFDs__ is chosen.
+
+Warn If Unsaved Changes in HIP File:
+    When checked, Houdini warns of any unsaved changes in the .hip file when submitting the job to HQueue.  If this parameter is not checked, then Houdini ignores any unsaved changes and automatically submits the job to HQueue.  This parameter does not apply when __Render Target HIP File__ or __Use Existing IFDs__ is chosen.
+
+Report Submitted Job ID:
+    When checked, Houdini shows a message stating the ID of the successfully submitted job. To avoid these messages, uncheck this parameter.
+
+== Email Options ==
+
+Send Status Emails:
+    Enable this parameter if you want status emails for the specified events to be sent out.
+
+NOTE:
+    The following parameters only apply when the __Send Status Emails__ parameter is turned on.
+
+Email Address:
+    The list of emails that will be sent status updates. Use commas to separate the entries.
+
+On Start:
+    Enable this parameter to have emails sent when the job starts being processed by a client.
+
+On Success:
+    Enable this parameter to have emails sent when the job is successfully completed.
+
+On Failure:
+    Enable this parameter to have emails sent when the job has failed, been canceled, or abandoned.
+
+On Pause:
+    Enable this parameter to have emails sent when the job is paused.
+
+On Resume:
+    Enable this parameter to have emails sent when the job is resumed.
+
+On Reschedule:
+    Enable this parameter to have emails sent when a job is rescheduled.
+
+On Priority Change:
+    Enable this parameter to have emails sent when a job's priority is changed.
+
+== Mantra Options ==
+
+Generate IFDs:
+    When checked, a job is submitted to HQueue which writes IFD files to the specified path.  As IFDs are generated, additional jobs are automatically submitted to HQueue which perform the rendering using the IFDs as input.  When unchecked, IFD generation is skipped and hython, instead of Mantra, is used to cook and render each frame.  Having this parameter turned on guarantees that at most 1 HBatch (or greater) license token is used on the farm to process your job.
+
+    This parameter does not apply when the __Use Existing IFDs__ options are chosen or when the __Output Driver__ parameter points to a ROP other than the [Mantra ROP|Node:out/ifd]. 
+
+Assign IFD Job To:
+    Set this parameter if you want HQueue to assign the IFD generation job to a specific client or a member of a specific client group.  This parameter only applies when the __Generate IFDs__ parameter is checked on.
+
+    Same Clients Assigned to Render Jobs:
+	Choose this option if you want HQueue to assign the IFD generation job to the same list of clients that will process the render jobs.  The list is determined by the __Assign To__ parameter under the __Advanced__ tab.
+
+    Listed Clients:
+	Choose this option to specify a list of client machines that HQueue can assign the IFD generation job to. 
+	
+    Clients from Listed Groups:
+	Choose this option to specify a list of client groups.  HQueue will assign the IFD generation job to any machine that is a member of at least one of the listed client groups.
+
+Clients:
+    The list of client machines that HQueue can assign the IFD generation job to.  Use commas to separate the machine names.
+
+    This parameter only applies if __Listed Clients__ is chosen in the __Assign To__ parameter.
+
+Select Clients:
+    Click to pop-up a dialog with a list of client machines registered on the HQueue farm.  Accepting the selection in the dialog automatically populates the __Clients__ parameter with the selected clients.
+
+Client Groups:
+    The list of client groups that HQueue can assign the IFD generation job to.  Use commas to separate the group names.  Specifically, HQueue assigns the IFD generation job to a machine that is a members of at least one of the groups in the list.
+
+    This parameter only applies if __Clients from Listed Groups__ is chosen in the __Assign To__ parameter.
+
+Select Client Groups:
+    Click to pop-up a dialog with a list of client groups registered on the HQueue farm.  Accepting the selection in the dialog automatically populates the __Client Groups__ parameter with the selected groups.
+
+Delete IFDs On Frame Completion:
+    If this box is checked, the IFD for a frame will be deleted when the farm finishes rendering that frame.
+
+    This parameter only applies when __Generate IFDs__ is enabled. It does not apply when the __Use Existing IFDs__ option is chosen.
+
+Allow cross-platform rendering:
+    If this box is checked, the render job submitted using the IFD file would be platform-independent.
+
+    This parameter is default to false, and only applies when __Generate IFDs__ is enabled or __hq_hip_action__ is set to __use_ifd__.
+
+Min. Clients per Frame:
+    The minimum number of client machines that should concurrently render a single frame.  Multi-client rendering is achieved on HQueue using Mantra's -H option (please see [rendering on the network|/render/batch] for more information).  This parameter only applies if the __Output Driver__ parameter is pointing to a [Mantra ROP|Node:out/ifd].
+
+Max. Clients per Frame:
+    The maximum number of client machines that should concurrently render a single frame.  This parameter only applies if the __Output Driver__ parameter is pointing to a [Mantra ROP|Node:out/ifd].
+
+Render Single Tile:
+    Check this box if you only want the single tile specified by the [Mantra ROP|Node:out/ifd]'s __Tile Index__ parameter to be rendered. If tiling is enabled and this is box is not checked, then the tiles are rendered as separate jobs before being stitched together into the final image. This parameter only applies if neither __Use Existing IFDs__ or __Generate IFDs__ are enabled. 
+    
+    NOTE:
+        This has no effect unless the [Mantra output driver|Node:out/ifd] has tiling enabled.
+
+Enable Checkpoints:
+    Check this box to turn on Mantra checkpointing.  If the job fails or is cancelled, then checkpointing enables the job to continue rendering from its last checkpoint if it is rescheduled.
+
+
+== Advanced ==
+
+Assign To:
+    Set this parameter if you want HQueue to assign the render job to a specific list of clients or client groups.  This parameter only applies when rendering to a local HQueue farm.
+
+    Any Client:
+	When this option is selected, HQueue will assign your render jobs to any available machine.
+
+    Listed Clients:
+	Choose this option to specify a list of client machines that HQueue can assign the render jobs to.  When rendering with Mantra, make sure that you list enough clients to meet the requirement set by the __Min. Clients / Frame__ parameter in the __Mantra Options__ tab.
+
+    Clients from Listed Groups:
+	Choose this option to specify a list of client groups.  HQueue will assign the render jobs to any machines that are members of at least one of the listed client groups.
+
+Clients:
+    The list of client machines that HQueue can assign the render jobs to.  Use commas to separate the machine names.
+
+    This parameter only applies if __Listed Clients__ is chosen in the __Assign To__ parameter.
+
+Select Clients:
+    Click to pop-up a dialog with a list of client machines registered on the HQueue farm.  Accepting the selection in the dialog automatically populates the __Clients__ parameter with the selected clients.
+
+Client Groups:
+    The list of client groups that HQueue can assign the render jobs to.  Use commas to separate the group names.  Specifically, HQueue assigns render jobs to only the machines that are members of at least one of the groups in the list.
+
+    This parameter only applies if __Clients from Listed Groups__ is chosen in the __Assign To__ parameter.
+
+Select Client Groups:
+    Click to pop-up a dialog with a list of client groups registered on the HQueue farm.  Accepting the selection in the dialog automatically populates the __Client Groups__ parameter with the selected groups.
+
+Batch All Frames in One Job:
+    Check this parameter if you want to render all of the frames in a single HQueue job.  This is especially useful when rendering with a [Dynamics ROP|Node:out/dop] or a [Geometry ROP|Node:out/geometry] where a cooked frame depends on the cooked results of the previous frames.  RBD, Cloth and Wire simulations, which cannot be divided into slices and distributed across multiple machines, work best with this option turned on.
+
+Frames per Job:
+    The number of frames that are rendered in a single HQueue job.  For each job, HQueue starts Houdini, loads the .hip file, renders the requested number of frames and then quits.  Having more frames per job reduces the amount of overhead spent starting and quitting Houdini.  However, having too many frames per job means less jobs can be distributed across the farm which could potentially lengthen the overall rendering time depending on the number of available client machines.
+
+    The ideal value for this parameter would result in having at most one render job assigned to a machine on the farm.  You can use the following formula as a starting point:
+
+    {{{
+    frames_per_job = ceil(number_of_frames / number_of_machines)
+    }}}
+
+    In most cases, a value of 1 is usually sufficient.
+
+    This parameter only applies if __Batch All Frames in One Job__ is unchecked.
+
+Frame Order:
+    Render Frames in Linear Order:
+	Render the frames in an incremental sequence (i.e. 1, 2, 3, 4).
+
+    Render Frames in Binary Subdivision Order:
+	Render the frames in binary subdivision order.  For example, if the frame range is 1 to 20, then the render sequence of the frames is 1, 20, 11, 6, 16, 4, 9, 14, 18, 3, etc.  The binary subdivision order is useful for when you want to see if the sequence will render correctly early on.
+
+Set Number of CPUs per Job:
+    Check this parameter if you want to set the maximum number of CPUs used for each render job.
+
+CPUs per Job:
+    The maximum number of CPUs that will be used by a render job.  If the number exceeds a client machine's number of CPUs, then the client machine will not be assigned to any render jobs.
+
+Environment:
+    A list of variable names and values that should be defined on the client machine when running the job.  The variables appear as shell environment variables.
+
+Create Directories:
+    A list of output directories that should be created on the farm before any files are rendered out.  For example, if your render generates a shadow map and an image, then you can add `$HIP/shadowmap` and `$HIP/pics` to this list.
+    
+    Note that this parameter does nothing if the output directories already exist.
+
+
+@hqvariables HQueue Variables
+
+    HQueue defines a set of variables which appear in the environment of a running job.  You can use these variables to refer to common file paths, machine settings and server configuration values.
+
+    HQROOT:
+	Evaluates to the root directory of the HQueue shared file system.  The default HQueue installation sets this variable to `/mnt/hq` on Linux systems, `H:/` on Windows systems, and `/Volumes/HQShared` on Mac OSX systems.  Note that the shared file system can be configured to reside in a different location so check with your HQueue administrator for details.
+
+    HQCLIENTARCH:
+	Evaluates to the architecture and operating system of the client machine assigned to execute the render job.  For example, if the HQueue server assigned a job to a Linux, 64-bit machine on the farm, then `$HQCLIENTARCH` is set to `'linux-x86_64'` in the environment.
+
+	This variable is useful for when you want to refer to paths that depend on the client machine's platform.  For example, `/mnt/hq/houdini_distros/hfs.$HQCLIENTARCH` could refer to the Houdini distribution to use for a render job.  Specifically, it tells HQueue to use `/mnt/hq/houdini_distros/hfs.linux-i686` when running the job on	a 32-bit Linux machine, and to use `/mnt/hq/houdini_distros/hfs.linux-x86_64` when running the job on a 64-bit Linux machine.

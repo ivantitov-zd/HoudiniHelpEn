@@ -1,0 +1,175 @@
+﻿= For-each copy tutorial =
+
+
+== Overview ==
+
+When using [Copy to Points|copytopoints], you sometimes need to vary the geometry of each copy. You can do this by using point attributes on the target points to influence copy generation inside a For-Each loop. See [varying copies|copytopoints#foreach] for more information.
+
+:fig:[Image:images/stamping_tutorial/goal.png]
+	In this tutorial, you will create a ball of random stars. To achieve this effect, you will:
+
+	- Create target points with an attribute specifying a star shape.
+	- Copy a procedural star shape onto the points of a sphere in a For-Each loop.
+	- Use [Exp:point] to vary the shape based on the attribute on the target point.
+
+    You can load a file with the completed project from `$HFS/houdini/help/files/vary_per_copy.hip`.
+
+
+== Create the source points ==
+
+# In the shelf, click the __Create__ tab, then ((Ctrl))-click the [Icon:SOP/sphere] __Sphere__ to add a sphere at the origin.
+
+    [Image:images/stamping_tutorial/1_sphere.jpg]
+    
+    ((Ctrl)) clicking the create tools instantly creates the object at the origin. If you click the icon without ((Ctrl)), Houdini waits for you to place the new object.
+
+# In the operator controls toolbar (above the 3D view), set the __Primitive type__ to __Polygon__ and the __Uniform scale__ to `0.6, 0.6, 0.6`.
+
+    [Image:images/stamping_tutorial/2_sphere_poly.jpg]
+
+# In the network editor, click the `sphere_object` node's name and change it to `starball`.
+
+# Double-click the `starball` node to dive into the geometry network.
+
+# Create an [Attribute Create node|Node:sop/attribcreate] and [wire|/network/wire] the `sphere` node into it.
+
+    [Image:images/stamping_tutorial/4_attribcreate.png]
+
+# In the parameter editor for the Attribute Create node:
+
+    * Set the __Name__ to `divisions`.
+    * Set the __Class__ to "Point".
+    * Set the __Type__ to "Integer".
+    * Set the first __Value__ field to the following expression:
+    
+        {{{
+        int(rand($PT) * 6) * 2 + 8
+        }}}
+    
+        This creates a `divisions` attribute on the sphere's points. In the Attribute Create node, `$PT` is the current point number. Using this as the seed for the [Exp:rand] function gives us a different random value on each point.
+    
+        Multiplying the result of `rand()` (which is from 0 to 1) by 6 gives us random numbers from 0 to 5. Then we multiply by 2 to ensure we always have an even number of divisions, from 0 to 10 by 2. The minimum number of points to get a star-like shape is 8, so we add 8 to get numbers from 8 to 18.
+
+TIP:
+    You can use the [Geometry spreadsheet|/ref/panes/geosheet] to see the values of attributes on all points in a node. Right-click a geometry node in the network editor and choose __Spreadsheet__.
+
+
+== Create a procedural star ==
+
+# Still inside the `starball` geometry network, create a [Circle node|Node:sop/circle].
+
+    [Image:images/stamping_tutorial/5_circle.png]
+
+# In the `circle` node's parameter editor, set the __Primitive type__ to __Polygon__ and the __Radius__ to `0.2, 0.2`.
+
+To turn a polygonal circle into a star, we'll create a group containing every other point, and transform them.
+
+# Add a [Group by Range node|Node:sop/grouprange] and wire the `circle` node into it.
+
+    * Set the __Group__ to `even`.
+    * Set the __Group type__ to "Points".
+    * Set the "Range filter" to __Select__ 1 __of__ 2.
+
+# Add a [Transform node|Node:sop/xform] and wire the `grouprange` into it.
+
+    * Set the __Group__ to `even` so we only transform every other point.
+    * Set the __Uniform scale__ to `0.5`.
+
+# Click the [display flag|/network/flags] on the `transform` node.
+
+    [Image:images/stamping_tutorial/6_star.jpg]
+
+    You can select the `circle` node and try different values in the __Divisions__ field to see how they affect the shape of the star.
+
+
+== Copy to points ==
+
+# Create a [Copy to Points|Node:sop/copytopoints] node. Wire the `transform` node (the star shape) into the first input. Wire the `attribcreate` (the sphere points to copy onto) into the second input.
+
+    [Image:images/stamping_tutorial/7_copytopoints.png]
+
+# Click the [display flag|/network/flags] on the `copytopoints` node.
+
+    [Image:images/stamping_tutorial/8_copied_stars.jpg]
+
+    In the viewport, you can see that the node is simply copying the current star geometry unchanged onto each point. Often this is all you need. However, for this exercise we want each star to use the `divisions` attribute we created on the sphere to control the number of divisions in each star. For that, we'll use a For-Each loop.
+
+
+== Add a For-Each loop ==
+
+# Use the ((Tab)) menu to create a [For-Each loop|/model/looping].
+
+    [Image:images/stamping_tutorial/9_foreach.png]
+
+    Houdini automatically creates a pair of `foreach_begin` and `foreach_end` nodes.
+
+# We'll be wiring nodes in between the begin and end nodes, so move them apart in the network editor to create room between them.
+
+# Select the `foreach_begin` node. The __Iteration method__ is set to "By pieces or points". This is what we want: it will process each individual point in the input in a loop.
+
+# Select the `foreach_end` node.
+
+    Unfortunately the default settings for this node are for a certain workflow (looping over pieces, such as from a shatter) different from what we're doing, so we need to change some parameters.
+
+    * Set __Piece elements__ to "Points" to make the block loop over points.
+    * Turn off __Piece attribute__ so it loops over every individual point instead of trying to group pieces by an attribute.
+
+# Wire the output of the `attribcreate` (the points we want to copy to with our added attribute) into the `foreach_begin` node.
+
+    This tells Houdini that we want to loop over the points of the sphere (with our added attribute on the points).
+
+# Create a new Copy to Points node (`copytopoints2`).
+
+    * Wire the output of the `transform` node (the star geometry) into `copytopoints2`'s _first input_.          
+
+    * Wire the output of the `foreach_begin` into `copytopoints2`'s _second input_. This sends each point into the Copy to Points node in a loop.
+    
+    * Wire the output of `copytopoints2` into the `foreach_end` node.
+    
+    [Image:images/stamping_tutorial/11_foreach_copytopoints.png]
+
+# Click the display flag on the `foreach_end`.
+
+    The star is copied onto the points again, but there's a problem: all the stars have the same orientation, instead of using the normals from the sphere!
+    
+    [Image:images/stamping_tutorial/12_wrong_orientation.jpg]
+
+    (Normals are vectors describing the 3D orientation of polygonal faces.)
+
+    This is because the For-Each loop extracts _only_ a point at a time from the input geometry, and the sphere didn't have point normals. So the copy node doesn't have the information needed to orient the copies properly.
+
+# To fix the normals, create a [Normal node|Node:sop/normal] and drop it on the wire between the `sphere` node and the `attribcreate` node. In the Normal node's parameter editor, set __Add normals to__ to "Points".
+
+    [Image:images/stamping_tutorial/8_copied_stars.jpg]
+
+    This creates a normal attribute on the sphere's points. Now the copies are oriented using the point normals from the sphere.
+
+
+== Vary each star ==
+
+At this point we've simply reproduced the output of the original Copy to Points in a more complicated way! But now that we've set up the copy in a loop, we can vary the geometry per-copy.
+
+# Select the `circle` node.
+
+# In the __Divisions__ field, enter the following expression:
+
+    {{{
+    point("../foreach_begin1", 0, "divisions", 0)
+    }}}
+    
+    [Include:copytopoints#point_info]
+
+# Now you're using a point attribute from the point being processed to influence how the network generates the geometry to copy onto the point. Each star shape uses the point attribute we set up on the sphere to determine how many corners each star has.
+
+    [Image:images/stamping_tutorial/goal.png]
+    
+    You're done!
+
+
+== Finished ==
+
+[Anim:images/stamping_tutorial/final.gif]
+
+TIP:
+    The For-Each loop can be slow for large numbers of copies. To speed up copying, you can try wrapping the loop in a [compile block|/model/compile].
+

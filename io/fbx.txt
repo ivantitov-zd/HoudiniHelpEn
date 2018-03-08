@@ -1,0 +1,384 @@
+= Reading and writing Filmbox (FBX) files =
+
+#bestbet: maya
+
+== Overview ==
+
+Filmbox (usually called FBX) is an interchange format for _entire scenes_. It stores a large scope of 3D animation software information, including multiple objects, bones, skinning, lights, and cameras.
+
+Because an FBX file contains an entire scene, it usually maps to multiple objects and [File nodes|Node:sop/file] in the Houdini scene, unlike a pure-geometry format such as `.geo`, where one File node handles the geometry.
+
+Because FBX encompasses many different types of scene data, it can be slightly difficult to import procedurally. However, you can use the File node to import individual object geometry from an FBX file procedurally, and you can use the [Cmd:fbximport] command to incorporate FBX loading into a scripted workflow.
+
+== Importing FBX ==
+
+- Use __File > Import > Filmbox (FBX)__ to import data from an FBX file into the current scene.
+
+    This command will potentially create multiple light objects, camera objects, Geometry container objects containing [File nodes|Node:sop/file], and so on, corresponding to objects in the FBX file.
+    
+    See the [Import FBX window|/ref/windows/import_fbx] for the import options.
+    
+- Inside an object, a [File node|Node:sop/file] can import a single object from an FBX file. Use `filename#<<object_name>>` to specify the object to import.
+
+- The [Cmd:fbximport] HScript command lets you script the equivalent of the __File > Import > Filmbox (FBX)__ menu item.
+
+NOTE:
+    For animated characters, the easiest way to export deforming skin to Houdini is a _vertex cache_. If you save skinned bones, Maya writes out separate weighting data, which Houdini translates into an [Capture Override surface node|Node:sop/captureoverride] that sets the weights. However, because Houdini must fill in the Override node directly (rather than referencing the source file), it _will not_ pick up changes to the source file.
+
+== Exporting FBX ==
+
+- Use __File > Export > Filmbox (FBX)__ to export the current scene to an FBX file.
+
+    The export dialog includes an option to only export a branch of the scene tree, for example `/obj/subnet1`.
+    
+    See the [Export FBX window|/ref/windows/export_fbx] for the export options.
+    
+- To export FBX procedurally, use the [FBX render driver node|Node:out/filmboxfbx].
+
+- The FBX exporter only exports textures if they are visible in the viewport.
+
+== Capabilities ==
+
+=== Geometry ===
+
+table>>
+    tr>> 
+        td>> * Import*
+        td>> * Export *
+
+    tr>> 
+        td>>
+            * Polygons
+            * Triangulated NURBS and Patches
+            * Geometry transformations
+            * Visibility flag
+            * Native NURBS curves and surfaces, including trimmed
+            * Patches (converted to NURBS)
+            * Polylines and Bezier curves
+            * Markers
+
+        td>>
+            * Polygons
+            * Triangulated NURBS and all other primitives
+            * Geometry transformations
+            * Visibility flag
+            * Instances
+            * Nurbs and trimmed NURBS
+            * Open, closed, and periodic NURBS and Bezier curves, polylines
+
+=== Attributes ===
+
+table>>
+    tr>> 
+        td>> * Import*
+        td>> * Export *
+
+    tr>> 
+        td>> 
+            * Normals
+            * Normal map UVs
+            * Bump map UVs
+            * Diffuse & diffuse factor UVs
+            * Emissive & emissive factor UVs
+            * Ambient & ambient factor UVs
+            * Specular & specular factor UVs
+            * Shininess & shininess factor UVs
+            * Transparency & transparency factor UVs
+            * Reflection & reflection factor UVs
+            * Vertex colours
+            * User layer data attributes
+            * User object parameters
+            * Soft and hard edges
+        td>> 
+            * Per-vertex and per-point normals
+            * UVs
+            * Vertex colours
+            * User layer data attributes
+
+
+=== Lights ===
+
+table>>
+    tr>> 
+        td>> * Import*
+        td>> * Export *
+
+    tr>> 
+        td>> 
+            * Type (spot, directional, point)
+            * Position
+            * Rotation
+            * Intensity
+            * Color
+            * Attenuation and its parameters
+            * Cone angle (for spot lights)
+            * Enable/disable switch
+            * Global ambient light
+        td>>
+            * Type (spot, directional, point)
+            * Position
+            * Rotation
+            * Intensity
+            * Color
+            * Attenuation and its parameters
+            * Cone angle (for spot lights)
+            * Enable/disable switch
+            * Ambient lights
+
+=== Cameras ===
+
+table>>
+    tr>> 
+        td>> * Import*
+        td>> * Export *
+
+    tr>> 
+        td>> 
+            * Near/far clip planes
+            * Pixel aspect ratios
+            * Position
+            * Rotations
+            * Window size
+            * Aperture
+            * Focal length
+            * Focus distance
+            * Projection type
+            * Orthogonal zoom
+        td>>
+            * Near/far clip planes
+            * Pixel aspect ratios
+            * Position
+            * Rotations
+            * Aperture
+            * Focal length
+            * Focus distance
+            * Projection type
+            * Orthogonal zoom
+
+=== General ===
+
+table>>
+    tr>> 
+        td>> * Import*
+        td>> * Export *
+
+    tr>> 
+        td>> 
+            * Node look-at targets
+            * Pivots (converted)
+        td>>
+            * Node look-at targets
+
+=== Materials ===
+
+The FBX importer creates either VOP networks or pre-built VEX FBX shader nodes. It supports basic material properties (such as color and textures) for things like specular, diffuse, ambient, emissive, etc., but nothing complex.
+
+table>>
+    tr>> 
+        td>> * Import*
+        td>> * Export *
+
+    tr>> 
+        td>> 
+            * Diffuse and diffuse factor textures
+            * Opacity and opacity factor textures
+            * Reflection and reflection factor textures
+            * Ambient and ambient factor textures
+            * Emissive and emissive factor textures
+            * Shininess textures
+            * Specular and specular factor textures
+            * Normal map textures
+            * Texture wrapping mode
+            * Texture translations, rotations, and scaling
+            * Textures swap U and V flag
+            * Texture blending for all four FBX compositing methods
+            * Material diffuse, ambient, emissive, refection, specular, shininess and opacity factors and colors
+            * Material instancing
+            * Materials, textures, and all their properties supported as both a special VEX FBX Surface Shader and as a VOP Surface network of nodes
+            * Multiple materials per object
+        td>>
+            * Diffuse, ambient, emissive, and specular colors
+            * Shininess
+            * Transparency
+            * Diffuse layered textures
+            * Per-object or per-polygon materials
+
+=== Hierarchy ===
+
+table>>
+    tr>> 
+        td>> * Import*
+        td>> * Export *
+
+    tr>> 
+        td>> 
+            * Basic Shapes
+            * Joint-based skeletons
+            * Bone-based skeletons
+        td>>
+            * Basic Shapes
+            * Skeletons and joints
+
+=== Animation ===
+
+table>>
+    tr>> 
+        td>> * Import*
+        td>> * Export *
+
+    tr>> 
+        td>> 
+            * Translations
+            * Euler rotations
+            * Scaling
+            * Takes
+            * Curve resampling
+            * Constant segments
+            * Linear segments
+            * Bezier and cubic segments
+            * Light color
+            * Light intensity
+            * Light cone angle
+            * Camera focal length
+            * Joint animation (resampled)
+            * Maya-style vertex caches
+            * MAX-style vertex caches
+            * Visibility
+        td>>
+            * Translations
+            * Euler rotations
+            * Scaling
+            * Takes
+            * Curve resampling
+            * Constant segments
+            * Linear segments
+            * Bezier and cubic segments
+            * Maya-style vertex caches
+            * MAX-style vertex caches
+            * Partial curve resampling
+            * Joint animation (resampled)
+            * Light color
+            * Light intensity
+            * Light cone angle
+            * Camera focal length
+            * Camera FOV
+            * Visibility
+
+=== Dynamics ===
+
+table>>
+    tr>> 
+        td>> * Import*
+        td>> * Export *
+
+    tr>> 
+        td>> 
+            Specific settings cannot be imported; however, the baked results can be.
+        td>> 
+            * Particle systems
+            * RBD, cloth, and fluid simulations
+
+=== Skinning and Deformations ===
+
+Houdini supports importing characters as both pre-backed vertex caches, as well as skinned meshes. However, FBX is only really good for relatively simple rigs and IK is not supported.
+
+table>>
+    tr>> 
+        td>> * Import*
+        td>> * Export *
+
+    tr>> 
+        td>> 
+            * Joints and bones skinning
+            * Blend deformers
+            * Blend deformers using a Blend SOP
+            * Cluster deformers
+        td>>
+            * Skinning
+
+== Limitations ==
+
+=== Import ===
+
+- FBX SDK has a bug in it where vertex caches created in Maya as float-type (and not double-type) will be read incorrectly by the SDK. Currently there is a workaround UI option for this issue in Houdini's import dialog.
+
+- Maya doesn't export vertex caches to FBX unless "Export Quick Selection Set as Geometry Cache File(s)" is checked.
+
+- Softimage XSI seems to put picture width and height as horizontal and vertical aspect ratios. This not only gives an incorrect result for window sizes, but also derails the focal length computation badly.
+
+- FBX has a cubic light attenuation fall-off, whereas Houdini does not.
+
+- FBX has a "visibility" flag, whereas Houdini has separate flags for visible in the viewer and visible in the render.
+
+- Cameras and objects with pre-transforms with non xyz-rotation orders may have kinks in their animation curves when imported into Houdini.
+
+- Skinning import is ignored on a Mac because of a bug in the FBX SDK.
+
+The following data is not imported from FBX yet.
+
+table>>
+    tr>>
+        th>>Category
+        th>>Not imported
+    tr>>
+        td>>Attributes
+        td>>
+            - Polygon groups
+    tr>>
+        td>>Lights
+        td>>
+            - Global fog settings
+    tr>>
+        td>>Cameras
+        td>>
+            - Global cameras
+            - Render settings (such as anti-aliasing)
+    tr>>
+        td>>General
+        td>>
+            - Node up targets
+    tr>>
+        td>>Hierarchy
+        td>>
+            - Euler rotation order
+            - Instancing
+    tr>>
+        td>>Animation
+        td>>
+            - Camera FOV
+            - Partial curve resampling
+    tr>>
+        td>>Skinning and deformations
+        td>>
+            - Cluster deformers with an associated shape
+
+=== Export ===
+
+- To properly import anything that uses variable-vertex animated geometry (such as our particle fluids), you have to turn on the __Use FBX framerate in Maya__ checkbox in Maya's FBX importer.
+
+- On FBX import, FBX joints are represented as null nodes with fake bones between them; each bone has an expression for the length and look-at target, so that it always spans the two joints it is related to. On export, our code tries to detect these situations, and if found, converts them to proper joint hierarchies without fake bones.
+
+- Houdini bones are converted to joints on export, since most applications seem to export/import just joints, and not bones, from FBX (it can represent both).
+
+The following data is not exported to FBX yet.
+
+table>>
+    tr>>
+        th>>Category
+        th>>Not exported
+    tr>>
+        td>>Attributes
+        td>>
+            - Spare object parameters
+            - Polygon groups
+    tr>>
+        td>>General
+        td>>
+            - Pivots
+            - Node up targets
+    tr>>
+        td>>Dynamics
+        td>>
+            - Smoke and fire
+
+

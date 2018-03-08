@@ -1,0 +1,154 @@
+﻿= Understanding Houdini dynamics =
+
+== Overview ==
+
+You can use the shelf tools to create very useful and complex simulations without diving into the simulation network. However, if you want to customize the behavior of the simulation, make a simulation run faster, or create new behaviors, you need to understand how Houdini's dynamics system works.
+
+== Objects, data, and solvers ==
+
+Simulations consist of _objects_ and _data_. Objects are merely repositories of data. When you see an object, such as an RBD ball, in your scene, it's because the object has `Geometry` data attached to it, which by convention Houdini draws in the viewer and renders.
+
+The data attached to objects is, in some sense, arbitrary: it can be pretty much anything. There are no constraints on how a piece of data is named or what it contains. But only certain names and types of data are meaningful to _solvers_.
+
+Solvers do the work of calculating how simulated objects (RBD objects, wires, cloth surfaces, fluids, etc.) behave. They look at the data attached to objects (and may attach some of their own) and use it to run the simulation. See [the section on solving|solving] for more information.
+
+When you create a simulation object from the shelf, Houdini creates a high-level object, such as an [RBD object|Node:dop/rbdobject]. You can dive into the RBD object node to see that it's really an [Empty object|Node:dop/emptyobject] with the right data attached -- the data the RBD solver needs to simulate the object.
+
+table class="compact">>
+    tr>>
+        td>>[Image:/images/dynamics/rbdobject_inside1.png]
+        td>>[Image:/images/dynamics/rbdobject_inside2.png]
+        td>>[Image:/images/dynamics/rbdobject_inside3.png]
+    tr>>
+        td class="caption">>High level RBD object
+        td class="caption">>Inside is an empty object with an RBD configure object node.
+        td class="caption">>Inside the RBD configure object node is a bunch of data attachments
+
+(Many dynamics nodes are implemented this way, as [digital assets|/assets], where high-level nodes encapsulate networks that in the end are just attaching data to objects for the solvers to interpret.)
+
+Solvers will use data it knows about and ignore other data. So, you can attach data useful to another solver (such as scalar data), or any arbitrarily named data, to an RBD object and the RBD solver will happily ignore it.
+
+== Details view == (detailsview)
+
+The _details view_ is your window into the underlying objects and data of a simulation. You can [create a new details view pane in a tab|/basics/panes].
+
+The tree on the left side represents the objects in the scene and categories such as relationships, with branches representing the hierarchy of data attached to each object. The right side shows the _fields_ of the data piece selected on the left side and their values.
+
+[Image:/images/ui/details_view.png]
+
+This pane is very useful for examining the structure of the simulation. You can see which data is attached to which at the current frame and with the current display node, names and unique ids of data packets, as well as the values that make up the data.
+
+TIP:
+    The details view updates dynamically as you play the simulation. This is very useful when you want to see how data changes over time, but it slows down playback of the simulation. You can use the arrows on the pane divisions to "collapse" the details view when you don't need it to make simulation playback smoother.
+    
+The details view for dynamics networks also contains the affector matrix for visualizing relationships.
+
+== Data names and data sharing ==
+
+=== Data names ===
+
+Each object and piece of data has a _data name_. Solvers look for data on objects _by name_. For example, the RBD solver will look for a data folder on an object called `Forces`, and use any force data it finds inside to change the object's position.
+
+Since nodes attach data by name, if you tried to use more than one node of the same type, such as two [Fan forces|Node:dop/fan], one would overwrite the data of the other if they both attached data as `Forces/Fan`. So Houdini has the __Unique data name__ option that adds a bit of text to the data name to make it unique.
+
+[Image:/images/dynamics/unique_data_name.png]
+
+For example, in this network:
+
+[Image:/images/dynamics/network_uniquenames.png]
+
+...as long as the two Fan Force nodes have __Unique data name__ on, the RBD Object will have two separate pieces of force data attached to it: `Forces/Fan_fan1` and `Forces/Fan_fan2`. Since the solver uses any force it finds under the `Forces` folder, this works out fine.
+
+You can turn off __Unique data name__ if you really do want one node to override another. The nodes will be evaluated left to right, top to bottom. You can also use the "set" pop-up menu (see below) for more control over how one node overrides another using the same data name.
+
+=== When to set data ===
+
+In a dynamics node that attaches data, each field has a pop-up menu that controls when the values on the right side are set on the input objects.
+
+[Image:/images/dynamics/override_menu.png]
+
+Set initial:
+    Set this value _at the first frame of the simulation_, then let the simulation control the value from that point on.
+    
+Set always:
+    Update this value _at every frame_. Use this setting if you want the value to be constant for every frame, or if the value is animated and so shouldn't be controlled by the simulation.
+    
+Set never:
+    Do not set/change this value, even on the first frame.
+    
+Use default:
+    Use the setting from the __Default operation__ pop-up menu on this node. This is useful for setting/changing the policy for many parameters at once. The "default default" is "Set initial".
+
+=== Data sharing ===
+
+- For each piece of data, Houdini can attach a new _copy_ of the data per object, or _share_ the same piece of data between objects.
+- At each time step, Houdini creates a new copy of every object in the simulation.
+- For each piece of data, Houdini can create a new copy of the data per timestep, or share the same piece of data across timesteps.
+
+The __Data sharing__ option controls sharing of data between objects and across timesteps.
+
+[Image:/images/dynamics/data_sharing.png]
+
+No sharing:
+    Houdini does not share the data between objects, and it creates new copies of the data for each new timestep.
+
+    [Image:/images/dynamics/shared_data_none.png]
+    
+Share data across timestep:
+    Within each timestep, the data is shared by all objects using the same data name, but a new copy of the data is created for each timestep.
+    
+    Use this option for data whose value you know is _not_ dependent on any information about the object it's attached to.
+
+    [Image:/images/dynamics/shared_data_timestep.png]
+    
+Share data across all time:
+    The data is shared by all objects using the same data name, _and_ across all timesteps.
+    
+    Use this option for data whose value you know is _not_ dependent on any information about the object it's attached to _or_ time (that is, it's identical for all objects and constant for the entire length of the simulation). For example, gravity could usually be shared across all time.
+
+    [Image:/images/dynamics/shared_data_alltime.png]
+
+The default is *no sharing* because this gives the most predictable results. However, if you know that data can be shared between objects or across all time safely, you can decrease the amount of memory the simulation uses by using the sharing options. If you there are places where you can share data that would otherwise be copied onto tens of thousands of objects at each timestep, you can potentially decrease the amount of memory used by the simulation noticeably.
+
+== Unique IDs, object ids, and object names == (objectids)
+
+Each object and data item has a _universally unique ID_. This 128-bit number is unique across all simulations on all machines for all time. You can use this value to tell when data packets are being shared and/or recreated at each time step. The unique ID is displayed as a field on objects and data items in the details view.
+
+Each object has an _object ID_. This is a simple integer that uniquely identifies an object _in this simulation_. Unlike the universally unique ID, it is _not_ unique across different simulation networks, computers, simulation runs, etc.
+
+Each object also has an _object name_. Object names are essentially a convenience --- you can set up names so they are easier to remember and recognize than the simple object ID number. Object names are _not_ unique, even within the same simulation: multiple objects can have the same name (this may even be useful in some circumstances).
+
+In object creation nodes (such as [RBD Object|Node:dop/rbdobject] or [Empty object|Node:dop/emptyobject]), the __Object name__ parameter controls the name of the created object. If you also use the __Number of objects__ parameter to create multiple objects at once, you can use the `$OBJ` local variable to append the created object number to the name. For example, if __Object name__ is `brick$OBJ` and __Number of objects__ is 3, Houdini would create objects named `brick0`, `brick1`, `brick2`.
+
+The details view normally shows objects by their names, but you can switch it to show object IDs instead.
+
+== Units ==
+
+table class="compact">>
+    tr>>
+        th>>Measure
+        th>>Unit
+    tr>>
+        td>> Mass
+        td>> kg
+    tr>>
+        td>> Distance
+        td>> m (1 Houdini unit = 1 m)
+    tr>>
+        td>> Velocity
+        td>> m/s
+    tr>>
+        td>> Angular velocity
+        td>> degrees per second
+    tr>>
+        td>> Density
+        td>> kg/m<sup>3</sup>
+    tr>>
+        td>> Force
+        td>> N (newtons)
+
+NOTE:
+    The dynamics engine uses the standard SI units. Because Houdini uses meters (m) and kilograms (kg) as base units, the defaults tend to describe _large, heavy objects_.
+
+
+

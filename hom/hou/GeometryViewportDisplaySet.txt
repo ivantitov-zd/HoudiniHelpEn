@@ -1,0 +1,770 @@
+= hou.GeometryViewportDisplaySet =
+#type: homclass
+#cppname: HOM_GeometryViewportDisplaySet
+#group: view
+
+"""A Display Set represents a group of 3D viewport display options that apply to a particular context of geometry."""
+
+== Overview ==
+
+In Houdini's 3D viewer display options window, you can apply different display options to certain subsets of objects/geometry, for example selected objects, or the displayed SOP. This object represents a set of options that apply to one of these subsets. For example, you can set templated SOPs to display as wireframe:
+
+{{{
+#!python
+# Get a reference to the geometry viewer
+pane = hou.ui.curDesktop().paneTabOfType(hou.paneTabType.SceneViewer)
+
+# Get the display settings
+settings = pane.curViewport().settings()
+
+# Get the GeometryViewportDisplaySet for objects
+tmplset = settings.displaySet(hou.displaySetType.TemplateModel)
+
+# Tell Houdini to show set the shading mode for this subset to wireframe
+tmplset.setShadedMode(hou.glShadingType.Wire)
+}}}
+
+There are several subsets available:
+
+Objects ||
+
+    `hou.displaySetType.SceneObject`:
+        Object nodes which are not selected or ghosted.
+    `hou.displaySetType.SelectedObject`:
+        Object nodes which are selected.
+    `hou.displaySetType.GhostObject`:
+        Object nodes which ghosted, which occurs when they are visible when at the SOP level and "Ghost Other Objects" is the current object mode, but are not the current object.
+
+Geometry ||
+
+    `hou.displaySetType.DisplayModel`:
+        SOP with the display flag. This takes precendence over TemplateModel and CurrentModel, if the SOP has either the template flag set or is selected.
+    `hou.displaySetType.CurrentModel`:
+        SOP that is currently selected. This takes precendence over TemplateModel, if that SOP also has the template flag set.
+    `hou.displaySetType.TemplateModel`:
+        SOP that has a template flag set.
+
+You can set the options in each display set independently of the other sets. You can also [link a subset to another|#setLinkToDisplaySet], so this subset uses the linked set's options.
+
+@methods
+
+::`displaySetType()` -> `hou.displaySetType`:
+    #cppname: HOM_GeometryViewportDisplaySet::displaySetType
+
+    Returns the geometry context this display set represents:
+
+    - `hou.displaySetType.SceneObject` - object nodes which are not
+    selected or ghosted.
+    - `hou.displaySetType.SelectedObject` - object nodes which are selected.
+    - `hou.displaySetType.GhostObject` - object nodes which ghosted, 
+    which occurs when they are visible when at the SOP level and "Ghost Other
+    Objects" is the current object mode, but are not the current object.
+    - `hou.displaySetType.DisplayModel` - SOP with the display flag. This
+    takes precendence over TemplateModel and CurrentModel, if the SOP has
+    either the template flag set or is selected.
+    - `hou.displaySetType.CurrentModel` - SOP that is currently selected. This
+    takes precendence over TemplateModel, if that SOP also has the template
+    flag set.
+    - `hou.displaySetType.TemplateModel` - SOP that has a template flag set.
+
+::`isShowingPointMarkers(self)` -> `bool`:
+    #cppname: HOM_GeometryViewportDisplaySet::isShowingPointMarkers
+
+    Query if point markers are shown (blue dots at points).
+
+::`isShowingPointNumbers(self)` -> `bool`:
+    #cppname: HOM_GeometryViewportDisplaySet::isShowingPointNumbers
+
+    Query if point numbers are shown as text (blue point numbers, one per 
+    point).
+
+::`isShowingPointNormals(self)` -> `bool`:
+    #cppname: HOM_GeometryViewportDisplaySet::isShowingPointNormals
+
+    Query if point normals are shown. 
+
+    If the point normals are blue, the geometry has point normals. If they 
+    are dimmed, the model does not have normals and the normals shown have 
+    been automatically generated for display. If no normals are shown, the 
+    geometry has vertex normals. This query does not check for those 
+    conditions, but just the current setting of the display option.
+
+::`isShowingPointUVs(self)` -> `bool`:
+    #cppname: HOM_GeometryViewportDisplaySet::isShowingPointUVs
+    #replaces: Cmd:viewdispset
+
+    Query if point texture coordinates are being shown, as text: "(u,v)".
+
+::`isShowingPointPositions(self)` -> `bool`:
+    #cppname: HOM_GeometryViewportDisplaySet::isShowingPointPositions
+
+    Query if 3D point positions are being shown, as text: "(x,y,z)".
+
+::`isShowingPointTrails(self)` -> `bool`:
+    #cppname: HOM_GeometryViewportDisplaySet::isShowingPointTrails
+
+    Query if point trails are shown (based on the velocity `v` attribute).
+
+::`isShowingCoincidentPoints(self)` -> `bool`:
+    #cppname: HOM_GeometryViewportDisplaySet::isShowingCoincidentPoints
+
+    Query if coincident point detection is enabled (yellow points and a
+    duplicate count where coincident points are detected).
+
+::`isShowingPrimHulls(self)` -> `bool`:
+    #cppname: HOM_GeometryViewportDisplaySet::isShowingPrimHulls
+ 
+    Query if primitive hulls are shown. Only some primitives have hulls, 
+    such as volumes, NURBS, crowd agents, and bezier curves.
+
+::`isShowingPrimNormals(self)` -> `bool`:
+    #cppname: HOM_GeometryViewportDisplaySet::isShowingPrimNormals
+
+    Query if the primitive face normals are shown. Only polygon-based 
+    primitives have face normals.
+
+::`isShowingPrimNumbers(self)` -> `bool`:
+    #cppname: HOM_GeometryViewportDisplaySet::isShowingPrimNumbers
+
+    Query if primitive numbers are shown. The primitive numbers can be used to
+    specify primitives in primitive groups. The number is shown at the center
+    of the primitive.
+
+::`isShowingPrimBreakpoints(self)` -> `bool`:
+    #cppname: HOM_GeometryViewportDisplaySet::isShowingPrimBreakpoints
+    
+    Query if breakpoints are displayed. Breakpoints are only available on 
+    NURBS and bezier surfaces and curves.
+
+::`isShowingPrimProfiles(self)` -> `bool`:
+    #cppname: HOM_GeometryViewportDisplaySet::isShowingPrimProfiles
+
+    Query if profile curves are shown, on NURBS surfaces only.
+
+::`isShowingPrimProfileNumbers(self)` -> `bool`:
+    #cppname: HOM_GeometryViewportDisplaySet::isShowingPrimProfileNumbers
+
+    Query if profile curve numbers are shown, on NURBS surfaces only. Each
+    profile curve has an index from 0 to #profiles-1.
+
+::`isShowingVertexMarkers(self)` -> `bool`:
+    #cppname: HOM_GeometryViewportDisplaySet::isShowingVertexMarkers
+
+    Query if vertex markers are shown. Vertex markers are inset into their 
+    polygon slightly, for ease of selection and selection display. The markers
+    are small hollow squares. Not all primitive types have vertex markers.
+
+::`isShowingVertexNumbers(self)` -> `bool`:
+    #cppname: HOM_GeometryViewportDisplaySet::isShowingVertexNumbers
+
+    Query if vertex numbers are shown. Each vertex on a polygon or mesh is 
+    numbered 0 to #edges-1. 
+
+::`isShowingVertexNormals(self)` -> `bool`:
+    #cppname: HOM_GeometryViewportDisplaySet::isShowingVertexNormals
+
+    Query if vertex normals are shown. If the geometry does not have vertex 
+    normals, they will not be shown. The base of the vertex normal is inset 
+    slightly into its polygon to make it easier to see which polygon the normal
+    is influencing.
+
+::`isShowingVertexUVs(self)` -> `bool`:
+    #cppname: HOM_GeometryViewportDisplaySet::isShowingVertexTextureCoordinates
+
+    Query if vertex UV texture coordinates are shown. If the geometry does not
+    have vertex texture coordinates, no numbers will appear. The "(u,v)" 
+    display is offset into the polygon to avoid overlapping with other vertex
+    UV coordinates at the same point.
+
+::`isShowingUVBackfaces(self)` -> `bool`:
+    #cppname: HOM_GeometryViewportDisplaySet::isShowingUVBackfaces
+
+    Query if UV Backface highlighting is enabled in the UV view. 
+    Highlight polygons that are facing away, as the texture will appear 
+    backwards on these polygons.
+
+::`isShowingUVOverlap(self)` -> `bool`:
+    #cppname: HOM_GeometryViewportDisplaySet::isShowingUVOverlap
+    #replaces: Cmd:viewdispset
+
+    Query if the UV overlap is shown in the UV texture viewport. UV areas that
+    reuse the same UV coordinates will be highlighted.
+
+::`showPointMarkers(self, on)`:
+    #cppname: HOM_GeometryViewportDisplaySet::showPointMarkers
+    #replaces: Cmd:viewdispset
+
+    Show or hide point markers. 
+
+::`showPointNumbers(self, on)`:
+    #cppname: HOM_GeometryViewportDisplaySet::showPointNumbers
+    #replaces: Cmd:viewdispset
+
+    Show or hide point numbers. 
+
+::`showPointNormals(self, on)`:
+    #cppname: HOM_GeometryViewportDisplaySet::showPointNormals
+    #replaces: Cmd:viewdispset
+
+    Show or hide point normals. 
+
+::`showPointTextureCoordinates(self, on)`:
+    #cppname: HOM_GeometryViewportDisplaySet::showPointTextureCoordinates
+    #replaces: Cmd:viewdispset
+
+    Show or hide point UVs. If the geometry does not have point UVs, nothing
+    will be displayed (ie. no UVs or vertex UVs).
+
+::`showPointPositions(self, on)`:
+    #cppname: HOM_GeometryViewportDisplaySet::showPointPositions
+    #replaces: Cmd:viewdispset
+
+    Show or hide point position text display, drawn by each point.
+
+::`showPointTrails(self, on)`:
+    #cppname: HOM_GeometryViewportDisplaySet::showPointTrails
+    #replaces: Cmd:viewdispset
+
+    Show or hide point trails on all points. Geometry must have a velocity
+    attribute `v`.
+
+::`showCoincidentPoints(self, on)`:
+    #cppname: HOM_GeometryViewportDisplaySet::showCoincidentPoints
+    #replaces: Cmd:viewdispset
+
+    Enable or disable coincident point detection. Orange points markers and a
+    duplicate count are placed where coincident points are detected.
+
+    Coindicent point detection has affects viewport performance more 
+    significantly than other markers. It is best used when zoomed in on an
+    area of the geometry for dense meshes, to avoid false positives.
+    
+    NOTE: 
+        Coindicent point detection has affects viewport performance more 
+        significantly than other markers. It is best used when zoomed in on an
+        area of the geometry for dense meshes, to avoid false positives.
+
+::`showPrimHulls(self, on)`:
+    #cppname: HOM_GeometryViewportDisplaySet::showPrimHulls
+    #replaces: Cmd:viewdispset
+
+    Enable or disable primitive hulls. Only certain primitive types have hulls,
+    such as NURBS, volumes, agents, and bezier curves.
+
+::`showPrimNumbers(self, on)`:
+    #cppname: HOM_GeometryViewportDisplaySet::showPrimNumbers
+    #replaces: Cmd:viewdispset
+
+    Enable or disable the display of primitive numbers, which are shown in
+    the middle of the primitive.
+
+::`showPrimNormals(self, on)`:
+    #cppname: HOM_GeometryViewportDisplaySet::showPrimNormals
+    #replaces: Cmd:viewdispset
+
+    Enable or disable primitive face normals. This shows the face normals of
+    polygons, not the value of a primitive `N` attribute.
+
+::`showPrimBreakpoints(self, on)`:
+    #cppname: HOM_GeometryViewportDisplaySet::showPrimBreakpoints
+    #replaces: Cmd:viewdispset
+
+    Enable or disable breakpoints display. Breakpoints are only available on 
+    NURBS and bezier surfaces and curves, and appear as hollow circles along
+    the isoparms.
+
+::`showPrimProfiles(self, on)`:
+    #cppname: HOM_GeometryViewportDisplaySet::showPrimProfiles
+    #replaces: Cmd:viewdispset
+
+    Enable or disable profile curve display on NURBS surfaces. 
+
+::`showPrimProfileNumbers(self, on)`:
+    #cppname: HOM_GeometryViewportDisplaySet::showPrimProfileNumbers
+    #replaces: Cmd:viewdispset
+
+    Enable or disable profile curve number display on NURBS surfaces. Each
+    profile on a NURBS surface has an index from 0 to #profiles-1.
+
+::`showVertexMarkers(self, on)`:
+    #cppname: HOM_GeometryViewportDisplaySet::showVertexMarkers
+    #replaces: Cmd:viewdispset
+
+    Enable or disable vertex markers. Vertex markers are drawn as small squares
+    inset into its parent polygon slightly.
+
+::`showVertexNumbers(self, on)`:
+    #cppname: HOM_GeometryViewportDisplaySet::showVertexNumbers
+    #replaces: Cmd:viewdispset
+
+    Enable or disable vertex numbers. Vertex numbers are drawn as numbers 
+    inset into its parent polygon slightly, ranging 0 to #edges-1.
+
+::`showVertexNormals(self, on)`:
+    #cppname: HOM_GeometryViewportDisplaySet::showVertexNormals
+    #replaces: Cmd:viewdispset
+
+    Enable or disable vertex normal display. Vertex normals are drawn inset 
+    into its parent polygon slightly. The geometry must have vertex normals
+    to be shown (vertex `N`).
+
+::`showVertexTextureCoordinates(self, on)`:
+    #cppname: HOM_GeometryViewportDisplaySet::showVertexTextureCoordinates
+    #replaces: Cmd:viewdispset
+
+    Enable or disable vertex UV texture display. Vertex UVs are drawn inset 
+    into its parent polygon. The geometry must have vertex texture coordinates
+    to be shown (vertex `uv`).
+
+::`showUVBackfaces(self, on)`:
+    #cppname: HOM_GeometryViewportDisplaySet::showUVBackfaces
+    #replaces: Cmd:viewdispset
+
+    Enable or disable UV backface highlighting in the UV viewport. 
+    Backfacing polygons would have the texture displayed on them backwards, 
+    from the point of view of the  background image in the UV viewport.
+
+::`showUVOverlap(self, on)`:
+    #cppname: HOM_GeometryViewportDisplaySet::showUVOverlap
+    #replaces: Cmd:viewdispset
+
+    Enable or disable highlighting of UV overlap. Areas of the texture that
+    would be share the same UVs are highlighted.
+
+::`setPointMarkerVisibility(self, visibility)`:
+    #cppname: HOM_GeometryViewportDisplaySet::setPointMarkerVisibility
+    #replaces: Cmd:viewdispset
+    
+    Controls how point markers are shown when displayed.
+
+    - `hou.markerVisibility.Always`: All are shown.
+    - `hou.markerVisibility.Selected`: Only markers for selected points are 
+      shown.
+    - `hou.markerVisibility.AroundPointer`: Markers close to the 3D point the
+      mouse cursor is currently over are shown.
+    - `hou.markerVisibility.UnderPointer`: Markers under the mouse cursor are 
+      shown.
+
+::`setPointNumberVisibility(self, visibility)`:
+    #cppname: HOM_GeometryViewportDisplaySet::setPointNumberVisibility
+    #replaces: Cmd:viewdispset
+
+    Controls how point numbers are shown when displayed.
+
+    - `hou.markerVisibility.Always`: All are shown.
+    - `hou.markerVisibility.Selected`: Only numbers for selected points are 
+      shown.
+    - `hou.markerVisibility.AroundPointer`: Numbers close to the 3D point the
+      mouse cursor is currently over are shown.
+    - `hou.markerVisibility.UnderPointer`: Numbers under the mouse cursor are 
+      shown.
+
+::`setPointNormalVisibility(self, visibility)`:
+    #cppname: HOM_GeometryViewportDisplaySet::setPointNormalVisibility
+    #replaces: Cmd:viewdispset
+
+    Controls how point normals are shown when displayed.
+
+    - `hou.markerVisibility.Always`: All are shown.
+    - `hou.markerVisibility.Selected`: Only normals for selected points are 
+      shown.
+    - `hou.markerVisibility.AroundPointer`: Normals close to the 3D point the
+      mouse cursor is currently over are shown.
+    - `hou.markerVisibility.UnderPointer`: Normals under the mouse cursor are 
+      shown.
+
+::`setPointUVVisibility(self, visibility)`:
+    #cppname: HOM_GeometryViewportDisplaySet::setPointUVVisibility
+    #replaces: Cmd:viewdispset
+
+    Controls how point UVs are shown when displayed.
+
+    - `hou.markerVisibility.Always`: All are shown.
+    - `hou.markerVisibility.Selected`: Only UVs for selected points are 
+      shown.
+    - `hou.markerVisibility.AroundPointer`: UVs close to the 3D point the
+      mouse cursor is currently over are shown.
+    - `hou.markerVisibility.UnderPointer`: UVs under the mouse cursor are 
+      shown.
+
+::`setPointPositionVisibility(self, visibility)`:
+    #cppname: HOM_GeometryViewportDisplaySet::setPointPositionVisibility
+    #replaces: Cmd:viewdispset
+
+    Controls how point positions are shown when displayed.
+
+    - `hou.markerVisibility.Always`: All are shown.
+    - `hou.markerVisibility.Selected`: Only positions for selected points are 
+      shown.
+    - `hou.markerVisibility.AroundPointer`: Positions close to the 3D point the
+      mouse cursor is currently over are shown.
+    - `hou.markerVisibility.UnderPointer`: Positions under the mouse cursor are 
+      shown.
+
+::`setPointTrailVisibility(self, visibility)`:
+    #cppname: HOM_GeometryViewportDisplaySet::setPointTrailVisibility
+    #replaces: Cmd:viewdispset
+
+    Controls how point trails are shown when displayed.
+
+    - `hou.markerVisibility.Always`: All are shown.
+    - `hou.markerVisibility.Selected`: Only trails for selected points are 
+      shown.
+    - `hou.markerVisibility.AroundPointer`: Trails close to the 3D point the
+      mouse cursor is currently over are shown.
+    - `hou.markerVisibility.UnderPointer`: Trails under the mouse cursor are 
+      shown.
+
+::`setPrimNumberVisibility(self, visibility)`:
+    #cppname: HOM_GeometryViewportDisplaySet::setPrimNumberVisibility
+    #replaces: Cmd:viewdispset
+
+    Controls how primitive numbers are shown when displayed.
+
+    - `hou.markerVisibility.Always`: All are shown.
+    - `hou.markerVisibility.Selected`: Only numbers for selected primitives are 
+      shown.
+    - `hou.markerVisibility.AroundPointer`: Numbers close to the 3D point the
+      mouse cursor is currently over are shown.
+    - `hou.markerVisibility.UnderPointer`: Numbers under the mouse cursor are 
+      shown.
+
+::`setPrimNormalVisibility(self, visibility)`:
+    #cppname: HOM_GeometryViewportDisplaySet::setPrimNormalVisibility
+    #replaces: Cmd:viewdispset
+
+    Controls how primitive face normals are shown when displayed.
+
+    - `hou.markerVisibility.Always`: All are shown.
+    - `hou.markerVisibility.Selected`: Only normals for selected primitives are 
+      shown.
+    - `hou.markerVisibility.AroundPointer`: Normals close to the 3D point the
+      mouse cursor is currently over are shown.
+    - `hou.markerVisibility.UnderPointer`: Normals under the mouse cursor are 
+      shown.
+
+::`setPrimBreakpointVisibility(self, visibility)`:
+    #cppname: HOM_GeometryViewportDisplaySet::setPrimBreakpointVisibility
+    #replaces: Cmd:viewdispset
+
+   Controls how primitive breakpoints are shown when displayed.
+
+    - `hou.markerVisibility.Always`: All are shown.
+    - `hou.markerVisibility.Selected`: Only breakpoints for selected 
+       primitives are  shown.
+    - `hou.markerVisibility.AroundPointer`: Breakpoints close to the 3D point 
+      the mouse cursor is currently over are shown.
+    - `hou.markerVisibility.UnderPointer`: Breakpoints under the mouse cursor 
+      are shown.
+
+::`setVertexMarkerVisibility(self, visibility)`:
+    #cppname: HOM_GeometryViewportDisplaySet::setVertexMarkerVisibility
+    #replaces: Cmd:viewdispset
+
+   Controls how vertex markers are shown when displayed.
+
+    - `hou.markerVisibility.Always`: All are shown.
+    - `hou.markerVisibility.Selected`: Only markers for selected 
+       vertices are shown.
+    - `hou.markerVisibility.AroundPointer`: Markers close to the 3D point 
+      the mouse cursor is currently over are shown.
+    - `hou.markerVisibility.UnderPointer`: Markers under the mouse cursor 
+      are shown.
+
+::`setVertexNumberVisibility(self, visibility)`:
+    #cppname: HOM_GeometryViewportDisplaySet::setVertexNumberVisibility
+    #replaces: Cmd:viewdispset
+
+   Controls how vertex numbers are shown when displayed.
+
+    - `hou.markerVisibility.Always`: All are shown.
+    - `hou.markerVisibility.Selected`: Only numbers for selected 
+       vertices are shown.
+    - `hou.markerVisibility.AroundPointer`: Numbers close to the 3D point 
+      the mouse cursor is currently over are shown.
+    - `hou.markerVisibility.UnderPointer`: Numbers under the mouse cursor 
+      are shown.
+
+::`setVertexNormalVisibility(self, visibility)`:
+    #cppname: HOM_GeometryViewportDisplaySet::setVertexNormalVisibility
+    #replaces: Cmd:viewdispset
+
+   Controls how vertex normals are shown when displayed.
+
+    - `hou.markerVisibility.Always`: All are shown.
+    - `hou.markerVisibility.Selected`: Only normals for selected 
+       vertices are shown.
+    - `hou.markerVisibility.AroundPointer`: Normals close to the 3D point 
+      the mouse cursor is currently over are shown.
+    - `hou.markerVisibility.UnderPointer`: Normals under the mouse cursor 
+      are shown.
+
+::`setVertexUVVisibility(self, visibility)`:
+    #cppname: HOM_GeometryViewportDisplaySet::setVertexUVVisibility
+    #replaces: Cmd:viewdispset
+
+   Controls how vertex normals are shown when displayed.
+
+    - `hou.markerVisibility.Always`: All are shown.
+    - `hou.markerVisibility.Selected`: Only normals for selected 
+       vertices are shown.
+    - `hou.markerVisibility.AroundPointer`: Normals close to the 3D point 
+      the mouse cursor is currently over are shown.
+    - `hou.markerVisibility.UnderPointer`: Normals under the mouse cursor 
+      are shown.
+
+
+::`pointMarkerVisibility(self)` -> `hou.markerVisibility`:
+    #cppname: HOM_GeometryViewportDisplaySet::pointMarkerVisibility
+
+    Query the visibility setting of point markers.
+
+::`pointNumberVisibility(self)` -> `hou.markerVisibility`:
+    #cppname: HOM_GeometryViewportDisplaySet::pointNumberVisibility
+
+    Query the visibility setting of point numbers.
+
+::`pointNormalVisibility(self)` -> `hou.markerVisibility`:
+    #cppname: HOM_GeometryViewportDisplaySet::pointNormalVisibility
+
+    Query the visibility setting of point normals.
+
+::`pointUVVisibility(self)` -> `hou.markerVisibility`:
+    #cppname: HOM_GeometryViewportDisplaySet::pointUVVisibility
+
+    Query the visibility setting of point UVs.
+
+::`pointPositionVisibility(self)` -> `hou.markerVisibility`:
+    #cppname: HOM_GeometryViewportDisplaySet::pointPositionVisibility
+
+    Query the visibility setting of point UVs.
+
+::`pointTrailVisibility(self)` -> `hou.markerVisibility`:
+    #cppname: HOM_GeometryViewportDisplaySet::pointTrailVisibility
+
+    Query the visibility setting of point trails.
+
+::`primNumberVisibility(self)` -> `hou.markerVisibility`:
+    #cppname: HOM_GeometryViewportDisplaySet::primNumberVisibility
+
+    Query the visibility setting of primitive numbers.
+
+::`primNormalVisibility(self)` -> `hou.markerVisibility`:
+    #cppname: HOM_GeometryViewportDisplaySet::primNormalVisibility
+
+    Query the visibility setting of primitive normals.
+
+::`primBreakpointVisibility(self)` -> `hou.markerVisibility`:
+    #cppname: HOM_GeometryViewportDisplaySet::primBreakpointVisibility
+
+    Query the visibility setting of primitive breakpoints.
+
+::`vertexMarkerVisibility(self)` -> `hou.markerVisibility`:
+    #cppname: HOM_GeometryViewportDisplaySet::vertexMarkerVisibility
+
+    Query the visibility setting of vertex markers.
+
+::`vertexNumberVisibility(self)` -> `hou.markerVisibility`:
+    #cppname: HOM_GeometryViewportDisplaySet::vertexNumberVisibility
+
+    Query the visibility setting of vertex numbers.
+
+::`vertexNormalVisibility(self)` -> `hou.markerVisibility`:
+    #cppname: HOM_GeometryViewportDisplaySet::vertexNormalVisibility
+
+    Query the visibility setting of vertex normals.
+
+::`vertexUVVisibility(self)` -> `hou.markerVisibility`:
+    #cppname: HOM_GeometryViewportDisplaySet::vertexUVVisibility
+
+    Query the visibility setting of vertex UVs.
+
+
+::`shadedMode(self)` -> `hou.glShadingType`:
+    #cppname: HOM_GeometryViewportDisplaySet::shadedMode
+
+    Query the shading mode of the display set (`hou.glShadingType`):
+
+    - `hou.glShadingType.WireBoundingBox`: no geometry, only bounding box outline
+    - `hou.glShadingType.ShadedBoundingBox`: no geometry, solid bounding box
+    - `hou.glShadingType.Wire`: wireframe
+    - `hou.glShadingType.WireGhost`: wireframe with muted hidden lines
+    - `hou.glShadingType.HiddenLineInvisible`: wireframe with hidden lines
+    - `hou.glShadingType.HiddenLineGhost`: wireframe with solid constant faces
+    - `hou.glShadingType.Flat`: shaded with primitive face normals
+    - `hou.glShadingType.FlatWire`: shaded with primitive face normals, outlined polygons
+    - `hou.glShadingType.Smooth`: shaded with point or vertex normals
+    - `hou.glShadingType.SmoothWire`: shaded with point or vertex normals, outlined polygons
+
+::`isShadingModeLocked(self)` -> `bool`:
+    #cppname: HOM_GeometryViewportDisplaySet::isShadingModeLocked
+
+    Query if the shading mode is locked. When locked, changing the shading mode
+    in the viewport will not affect the look of geometry in this display set.
+
+::`isUsingGhostedLook(self)` -> `bool`:
+    #cppname: HOM_GeometryViewportDisplaySet::isUsingGhostedLook
+
+    Query if the display set is ghosted. Ghosted geometry appears transluscent
+    so that geometry behind it can be easily seen.
+
+::`isUsingFadedLook(self)` -> `bool`:
+    #cppname: HOM_GeometryViewportDisplaySet::isUsingFadedLook
+
+    Query if the display set is faded. Faded geometry suppresses the display
+    of geometry color.
+
+::`isUsingXRay(self)` -> `bool`:
+    #cppname: HOM_GeometryViewportDisplaySet::isUsingXRay
+
+    Query if the display set is drawn with XRay. XRay geometry will appear as
+    a faded wireframe behind other geometry that occludes it.
+
+::`isUsingLighting(self)` -> `bool`:
+    #cppname: HOM_GeometryViewportDisplaySet::isUsingLighting
+
+    Query if lighting is used for this display set. When off, the geometry is
+    displayed without any lighting (often much brighter).
+
+::`isShowingBoundaries(self)` -> `hou.boundaryDisplay`:
+    #cppname: HOM_GeometryViewportDisplaySet::isShowingBoundaries
+
+    Query the boundary mode displayed for the display set (`hou.boundaryDisplay`):
+
+    - `hou.boundaryDisplay.Off`: No boundaries are displayed.
+    - `hou.boundaryDisplay.Connect3D`: Boundaries for 3D connectivity are 
+      displayed. Hard edges will be highlighted.
+    - `hou.boundaryDisplay.ConnectUV`: Boundaries for UV connectivity are 
+      displayed. Hard UV edges will be highlighted.
+    - `hou.boundaryDisplay.`: Either 3D or UV connectivity is displayed, 
+      depending on the context of the viewport (a 3D view or a UV view).
+
+::`isToolbarLinked(self)` -> `bool`:
+    #cppname: HOM_GeometryViewportDisplaySet::isToolbarLinked
+
+    Query if the display set is linked to the right viewport toolbar. When 
+    linked, clicking a display option button on this toolbar will affect the
+    corresponding option in this display set.
+
+::`linkedToDisplaySet(self)` -> `hou.displaySetType`:
+    #cppname: HOM_GeometryViewportDisplaySet::linkedToDisplaySet
+
+    A display set can be linked to another display set, so that all of its 
+    options are taken from that linked set rather than its own. This method
+    returns the display set this set is linked to. If it is not linked to 
+    another set, it will return the its own set.
+
+::`isUniqueDisplaySet(self)` -> `bool`:
+    #cppname: HOM_GeometryViewportDisplaySet::isUniqueDisplaySet
+
+    A display set can be linked to another display set, so that all of its 
+    options are taken from that linked set rather than its own. This method
+    returns True if the display set is unique, in that it is not linked to 
+    another display set, and False if the set refers to another display set.
+
+::`setShadedMode(self, shaded_mode)`:
+    #cppname: HOM_GeometryViewportDisplaySet::setShadedMode
+    #replaces: Cmd:viewdispset
+
+    Sets the shading mode for this display set:
+
+    - `hou.glShadingType.WireBoundingBox`: no geometry, only bounding box outline
+    - `hou.glShadingType.ShadedBoundingBox`: no geometry, solid bounding box
+    - `hou.glShadingType.Wire`: wireframe
+    - `hou.glShadingType.WireGhost`: wireframe with muted hidden lines
+    - `hou.glShadingType.HiddenLineInvisible`: wireframe with hidden lines
+    - `hou.glShadingType.HiddenLineGhost`: wireframe with solid constant faces
+    - `hou.glShadingType.Flat`: shaded with primitive face normals
+    - `hou.glShadingType.FlatWire`: shaded with primitive face normals, outlined polygons
+    - `hou.glShadingType.Smooth`: shaded with point or vertex normals
+    - `hou.glShadingType.SmoothWire`: shaded with point or vertex normals, outlined polygons
+
+::`setShadingModeLocked(self, on)`:
+    #cppname: HOM_GeometryViewportDisplaySet::setShadingModeLocked
+    #replaces: Cmd:viewdispset
+
+    Locks the shading mode so that it cannot be changed by the user using the
+    Shading Mode menu in the viewport or the wireframe toggle hotkey. Passing
+    `False` unlocks the display set so that it follows the viewport's shading
+    mode.
+
+::`useGhostedLook(self, on)`:
+    #cppname: HOM_GeometryViewportDisplaySet::useGhostedLook
+    #replaces: Cmd:viewdispset
+
+    Make all geometry in the display set appear ghosted - slightly translucent. 
+    This allows geometry behind the ghosted to seen and de-emphasizes the 
+    ghosted geometry in the viewport. This is normal used to direct focus to 
+    other geometry (displayed SOP within an object, for example).
+
+::`useFadedLook(self, on)`:
+    #cppname: HOM_GeometryViewportDisplaySet::useFadedLook
+    #replaces: Cmd:viewdispset
+
+    Suppress geometry color (Cd attribute, point, primitive, or vertex) on the
+    geometry in the display set.
+
+::`useXRay(self, on)`:
+    #cppname: HOM_GeometryViewportDisplaySet::useXRay
+    #replaces: Cmd:viewdispset
+
+    Draw the geometry in the display set as XRay, which draws the geometry 
+    normally if not occluded, and as a dimmed wireframe where occluded by other
+    geometry.
+
+::`useLighting(self, on)`:
+    #cppname: HOM_GeometryViewportDisplaySet::useLighting
+    #replaces: Cmd:viewdispset
+    
+    Enable lighting for the geometry in the display set. This works in 
+    conjunction with the global lighting mode in the viewport. Both this option
+    and the global lighting mode must be set to a lighting mode in order to 
+    see lighting (ie, enabling Lighting on this display set will not cause it
+    to be lit if the global viewport mode is "No Lighting").
+
+::`setShowingBoundaries(self, view_boundary_mode)`:
+    #cppname: HOM_GeometryViewportDisplaySet::setShowingBoundaries
+    #replaces: Cmd:viewdispset
+
+    Set the boundary highlight mode for the geometry in the display set. This
+    can be either off, 3D connectivity, UV connectivity, or context-based:
+
+    - `hou.boundaryDisplay.Off`: No boundaries are displayed.
+    - `hou.boundaryDisplay.Connect3D`: Boundaries for 3D connectivity are 
+      displayed. Hard edges will be highlighted.
+    - `hou.boundaryDisplay.ConnectUV`: Boundaries for UV connectivity are 
+      displayed. Hard UV edges will be highlighted.
+    - `hou.boundaryDisplay.`: Either 3D or UV connectivity is displayed, 
+      depending on the context of the viewport (a 3D view or a UV view).
+
+::`setToolbarLinked(self, on)`:
+    #cppname: HOM_GeometryViewportDisplaySet::setToolbarLinked
+    #replaces: Cmd:viewdispset
+
+    Link the display set's options to the option toggles in the right viewport 
+    toolbar. When linked, clicking a display option button on this toolbar 
+    will affect the corresponding option in this display set.
+
+::`setLinkToDisplaySet(self, view_display_set)`:
+    #cppname: HOM_GeometryViewportDisplaySet::setLinkToDisplaySet
+    #replaces: Cmd:viewdispset
+
+    Link this display set to the settings of another display set. This 
+    display set's option settings are then ignored, and the other sets
+    are used in their place. Linking a set to itself restores its own settings.
+
+    - `hou.displaySetType.SceneObject`
+    - `hou.displaySetType.SelectedObject`
+    - `hou.displaySetType.GhostObject`
+    - `hou.displaySetType.DisplayModel`
+    - `hou.displaySetType.CurrentModel` 
+    - `hou.displaySetType.TemplateModel`
+   
+::`setUniqueDisplaySet(self, on)`:
+    #cppname: HOM_GeometryViewportDisplaySet::setUniqueDisplaySet
+    #replaces: Cmd:viewdispset 
+
+    When True, remove any link from this display set to another display
+    set. Its own settings will be used. Passing False has no effect; 
+    use `setLinkToDisplaySet` to link this set to another display set.
+

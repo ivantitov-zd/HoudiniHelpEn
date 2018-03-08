@@ -1,0 +1,132 @@
+#type: node
+#context: chop
+#internal: iksolver
+#icon: CHOP/inversekin
+
+= IKSolver =
+
+"""Solves inverse kinematics rotations for bone chains."""
+
+This filter CHOP generates inverse kinematics rotations for bone chains similar
+to the [Node:chop/inversekin] CHOP. The primary difference is that the input
+specification is taken entirely from input channels instead of object paths.
+
+The format of the input channel names are expected to follow the
+`object_name:parameter_name` format where _object_name_ is specified by the new
+__Name__ parameters described below and _parameter_name_ is the name of the
+parameter that the [InverseKin CHOP|Node:chop/inversekin] normally fetches from the object scene. If a
+particular channel is missing from its input, then the default object parameter
+values will be used instead.
+
+There are three inputs.
+    First input:
+	This contains the bone chain parameters that are typically animated.
+	For example, the bone FK rotations and the goal object position.
+    Second input:
+	This contains the bone chain parameters that are typically non-animated
+	such as the bone rest angles.
+    Third input (optional):
+	This contains a single channel to be used for blending. If this input
+	is omitted, then the Blend parameter value is used instead.
+
+== Tips ==
+* The goal and twist affector positions must be relative to the parent space of the first bone. You can do this by enabling __Use Reference Bone Length__ on the [Object CHOP|Node:chop/objectchain].
+
+* If the bone objects you are transforming have a pretransform, then these transforms should be included in the second input. The [Object CHOP|Node:chop/objectchain] can be used to easily produce transforms for the second input.
+    
+* For speed, it is useful to set the second input to only produce channel values at frame 1, since the rest bone chain values are not typically animated.
+
+@parameters
+
+    == Kinematics ==
+
+        Solver Type:
+            Specifies the solver to use to generate the channels.
+
+            Inverse Kinematics:
+                Uses IK solver. The solution is uniquely defined by the
+                end affector position. Constraint parameters are
+                ignored.
+            IK With Constraints:
+                Uses a modified IK solver. The solution depends on the
+                previous solution. Constraint parameters are used to
+                limit the range of motion.
+        Chain Names:
+	    Specifies the _object_name_'s to be used for channels in the Rest
+	    input. The order of the names will be interpreted as the hierarchy
+	    of the object chain. If the value is `*`, then the chain names
+	    will be taken from the second input, in the order in which they
+	    are found.
+
+	    The transform parameter names that are accepted by the Inverse Kinematics
+	    Solver Type are: `xOrd rOrd t[xyz] r[xyz] s[xyz] scale p[xyz]`.
+	    Note that the channel values of `xOrd` and `rOrd` channels are
+	    integers corresponding to index of the regular transform/rotation
+	    order parameter menus.
+
+	    Bone-specific
+	    parameter names accepted are: `R[xyz] length ikdamp`.
+
+	    If an _object_name_ has none of the bone-specific channels, then it
+	    will be treated as non-bone (ie. the length of the previous bone
+	    will not be used).
+
+	    Additional parameter names used by the IK with Constraints Solver Type
+	    are: `begin[xyz]range end[xyz]range [xyz]damp [xyz]rolloff`.
+	Pre-transform Name:
+	    Specifies the token used for pre-transforms of the __Chain Names__.
+	    The full channel name used for the second input will be
+	    the chain name, pre-transform name, and parameter name all
+	    concatenated together in this order.
+        End Affector Name:
+	    Specifies the _object_name_ to be used for the end affector
+	    position channels. The end affector is used as goal for the bone
+	    chain.
+
+	    The parameter names accepted from the Source input are: `t[xyz]`.
+        Twist Affector:
+            For the Inverse Kinematics solver, this specifies the _object_name_
+	    used for twist affector position channels. The twist affector
+	    controls the twist orientation of the solution bone angles.
+
+	    The parameter names accepted from the Source input are: `t[xyz]`.
+        IK Twist:
+            For the Inverse Kinematics solver, this parameter specifies
+            an additional twist angle to be applied to the solution bone
+            angles.
+        IK Dampening:
+            For the Inverse Kinematics solver, this parameter represents
+	    how easily the end bone can be pulled off the end affector as the
+	    bone chain is stretched out.
+        Blend:
+            This option blends between the local bone rotation values (found
+	    in the Source input) and the solved solution. When this value is
+	    `0` it produces the local bone rotation values and when it is `1`,
+	    it produces the solved bone rotation values. If the Blend input
+	    is provided, then the channel value there will be used for blending instead.
+        Straighten Solutions:
+	    When this checkbox is turned on, the bone chain will completely
+	    straighten out in the direction of the goal if the IK goal is
+	    farther away than the length of the bone chain (with a tolerance of
+	    the tracking threshold). If this checkbox is turned off, no
+	    attempt is made to further straighten the IK solution. By default
+	    it is turned off because it is faster.
+        Tracking Threshold Factor:
+            This value specifies the accuracy threshold for Inverse
+            Kinematic solutions. Use smaller values for more accurate
+            solutions at the expense of more computation time. Use
+            larger values to save computation time at the expense of
+            getting less accurate solutions.
+        Clean Rotations:
+            Modifies output rotation values such that they contain values
+	    as close as possible to the rest angle rotations without changing
+	    the solution.
+
+[Include:common#common]
+
+@related
+    - [Node:chop/inversekin]
+    - [Node:chop/object]
+    - [Node:chop/objectchain]
+    - [Node:chop/fetch]
+

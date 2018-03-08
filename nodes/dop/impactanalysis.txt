@@ -1,0 +1,113 @@
+#type: node
+#context: dop
+#internal: impactanalysis
+#icon: DOP/affector
+
+= Impact Analysis =
+
+"""Stores filtered information about impacts on an RBD object."""
+
+This node creates `ImpactAnalysis` geometry sub-data on the RBD object for each physical point of impact.
+
+You can filter impact information based on _time_, impact _strength_, impact _distance_, or the other _object_, preventing the list of impacts from becoming cluttered or filled with useless impacts.
+
+The impact points are useful in surface networks. For example:
+
+* You can use the points as [clustered fluid simulation|/pyro/clustering] source points, so you can raise dust clouds wherever debris hits the ground.
+
+* You can create geometry centered on the points, then use a [Cookie node|Node:sop/cookie] to remove those shapes from the ground geometry, to create craters, divots, bullet holes, or whatever.
+
+== Setup ==
+
+:task:Set up Impact Analysis using the shelf:
+    # Select the RBD object you want to record impacts.
+    
+    # On the __Rigid Bodies__ tab, click [Icon:DOP/affector] RBD Impacts, then press ((Enter)).
+    
+    This will have no visible effect in the viewer. It simply sets up the nodes necessary to record the RBD object's impacts. See below for how to use that information in a surface network.
+
+:task:Add the Impact Analysis node to the network manually:
+    This node is a _solver_. You must apply this solver _after_ the RBD solver so Impact Analysis can see the RBD solver's collision. For example use a [Multiple Solver|Node:dop/multisolver] with the RBD solver as the first green (data) input and this node as the second green input.
+
+	(If there's a conflict with the RBD Solver, try assigning a different __Data Name__.)
+
+:task:Import the impact points into a surface network:
+    # In the surface network, create a [Dop Import|Node:sop/dopimport] node.
+    
+    # Set the __DOP Network__ to the path of the DOP network containing the RBD object (for example, `/obj/AutoDopNetwork`).
+    
+    # Set the __Object Mask__ to the name of the RBD object (for example, `sphere_object1`).
+    
+        To fetch the impact data from multiple objects at once, you can use a pattern here (for example, `impact_object*`).
+    
+    # Set __Import Style__ to "Fetch Geometry from DOP Network".
+    
+    # Set the __Geometry Data Path__ to `ImpactAnalysis`.
+    
+    You may need to turn on [Icon:VIEW/display_points] Points in the display toolbar on the right side of the viewer to see the imported impact points.
+
+:task:Access information about the impact points:
+    Impact points have the following attributes.
+    
+    `P`:
+        Position of the impact.
+    `impacttime`:
+        Time of the impact.
+    `avgposition`:
+        The average position of all unfiltered impact points at the same time sharing the same object.
+    `impulse`:
+        Force of the impact.
+    `v`:
+        Speed of the impact.
+    `avgimpulse`:
+        The average impulse of all unfiltered impact points at the same time sharing the same object.
+    `impactobject`:
+        The DOP object ID of the object being hit.
+    `impactprimnum`:
+        The primitive number of the object being hit. This can be used to identify impacts for individual pieces of an [RBD Packed Object|Node:dop/rbdpackedobject].
+    `parentobject`:
+        The DOP object ID of the object recording the impact.
+    `parentprimnum`:
+        The primitive number of the object recording the impact.
+    `N`:
+        The impact normal.
+    `distance`:
+        Distance from the previous filtered impact point.
+
+    To access fields on the DOP objects that collided, for example to get the mass of the impacted object, you can use the [Exp:dopfield] expression function.
+    
+    {{{
+    #!expr
+    dopfield("/obj/AutoDopNetwork", $impactobject, "Position", "Options", 0, "mass")
+    }}}
+
+@parameters
+
+The parameters let you filter out impact points, for example ignoring all but one impact that happen very close together in space and time.
+
+Display Geometry:
+    Controls if the impact points are displayed in the viewport.
+
+Time Threshold:
+    The minimum amount of time (in seconds) between recorded impact points. Higher values give fewer impact points and bigger gaps in time.
+
+Impact Threshold:
+    The minimum amount of impact force for recorded impact points. Higher values only create points for stronger impacts and ignore weaker impacts.
+
+Distance Threshold:
+    The minimum distance between recorded impact points. Higher values give fewer impact points and bigger gaps in space.
+
+Force Impact Object:
+    Only create impact points for collisions with this DOP object.
+
+@outputs
+
+The input objects are passed through to the output.
+
+@locals
+
+[Include:standard_locals]
+
+@related
+
+- [RBD Object|/shelf/rbdobject]

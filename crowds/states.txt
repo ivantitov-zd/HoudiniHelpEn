@@ -1,0 +1,107 @@
+= Crowd agent states =
+
+"""About agent states, the virtual "mood" of each agent which controls the agent's animation and which behaviors it runs.""" 
+
+== Overview == (oview)
+
+At any given time, every agent is in a certain state, for example "walk", "idle", "attack", or "run_to_goal". The state encapsulates _behavior_ nodes. These nodes affect the agent primitive, such as moving it around or changing its attributes. How the forces inside the state are actually applied to agents in that state depends on [weights|weights].
+
+Houdini animates agents in a given state using an [animation clip|clips] with the same name as the state.
+
+After each state, you can add particle DOP nodes to move agents in the state.
+
+Houdini includes many "steering force" nodes that implement useful crowd behaviors such as "move toward a point" and "follow a path". These are very similar to DOP particle nodes, and in fact you can use particle forces to affect agents as well, although plain particle forces do not have the concept of [weights|weights].
+
+:vimeo: Crowds attract
+    #id: 142306096
+
+:vimeo: Crowds path
+    #id: 122993690
+
+== Add a new state ==
+
+# In the [simulation network|setup#dops], create a new [Crowd State node|Node:dop/crowdstate] and wire it into the `merge_states` node.
+
+# With the state node selected, in the parameter editor, set the __State name__ parameter. This must correspond to the name of an [animation clip|clips]. For example, agents will run the `walk` animation clip while in the `walk` state.
+
+== Adding behavior to a state ==
+
+Create a node to influence the agent behavior (see below) and wire it into the simulation network:
+
+* Put it *between a state node and the merge* to have it apply only in that state.
+* Put it *after the merge (between the merge and the solver)* to have it apply to all agents in all states.
+
+Note that no matter which way you wire it, you can use the __Group__ parameter on a behavior node to limit it to a certain group or groups of agents.
+
+You can have multiple behaviors in a state, multiple behaviors after the merge, and there are also behaviors built into the crowd solver that apply to all agents. The solver combines all the applicable forces using [weights|weights].
+
+== Movement behaviors ==
+
+Houdini includes several useful POP forces created to work with crowds. Nodes of this types have names starting with "POP Steer".
+
+* [POP Steer Align|Node:dop/popsteeralign] makes an agent turn to align with other agents near it or in its field of view.
+* [POP Steer Avoid|Node:dop/popsteeravoid] makes an agent avoid nearby agents.
+* [POP Steer Cohesion|Node:dop/popsteercohesion] makes agents move toward each other.
+* [POP Steer Obstacle|Node:dop/popsteerobstacle] makes agents avoid static objects ([more information|obstacles]).
+* [POP Steer Path|Node:dop/popsteerpath] makes agents follow a path curve.
+* [POP Steer Seek|Node:dop/popsteerseek] makes agents move toward a point.
+* [POP Steer Separate|Node:dop/popsteerseparate] makes agents move away from each other.
+* [POP Steer Wander|Node:dop/popsteerwander] makes agents move around randomly.
+* [POP Steer Custom|Node:dop/popsteercustom] let expert users use a VOP network to calculate a force vector.
+
+These "steering" forces are essentially particle forces with the added concept of a [weights|weights]. You can use them with regular particles by setting their __Output__ parameter to "POP force".
+
+You can also use regular particle simulation forces (for example, the [POP Wind node|Node:dop/popwind]) as behavior nodes. However, because those forces don't have __Weight__ parameters, the solver will add them directly instead of [normalizing them|weights] with other forces.
+
+== Using the Path shelf tool == (path)
+
+# Select the path curve.
+
+# On the __Crowds__ shelf tab, click the [Icon:SHELF/agents_follow_path] Path tool.
+
+This tool creates the [POP Steer Path|Node:dop/popsteerpath] node to make all agents follow the path. If you want only agents in a certain state to follow the path, you need to rewire the POP Steer Path node. See the [simulation network overview|/crowds/setup#dops] and [states and behaviors|/crowds/states].
+
+For more information on path following, see the help for the [POP Steer Path node|Node:dop/popsteerpath].
+
+== Using the Look At shelf tool == (lookat)
+
+This tool simply wires an [Agent Look At DOP|Node:dop/agentlookat] into the current crowd network to make agents look at an object (either in one state or all states).
+
+# Select the object you want agents to look at.
+
+# On the __Crowds__ shelf tab, click the [Icon:CROWDS/agentlookat] Look At tool.
+
+# In the dialog box, enter the name of a state, or enter nothing to have the agents look at the object in all states.
+
+== Default agent behaviors on the solver == (defaults)
+
+The [Crowd Solver node|Node:dop/crowdsolver] has certain optional default behaviors, such as collision avoidance, that may apply to all agents regardless of state.
+
+* The solver constrains agents from turning or moving too fast while reacting to forces, to keep movement looking realistic.
+
+* The solver has optional default behaviors to keep agents from running into each other, and to avoid obstacles.
+
+* The solver has options to make agents "stick" to a terrain object, and to adapt foot bone placement to terrain.
+
+== Changing attributes inside a state == (attributes)
+
+The "steering" behaviors are focussed on applying force to the agent particles to move them around. You can also change attributes on the agent using a [POP Wrangle DOP|Node:dop/popwrangle] as a behavior node.
+
+For example, if you want to change an agent's maximum turn rate when it's in a certain state, use an Attribute Wrangle DOP inside the state with a script such as:
+
+{{{
+#!vex
+f@maxturnrate = 15;
+}}}
+
+== Custom steer force VOP network ==
+
+You can use the [POP Steer Custom DOP|Node:dop/popsteercustom] to define a new steering behavior. It contains a VOP network you can use to add to or change the current force on the agent particle.
+
+VOPs with "Agent" in the title are useful for working with agents.
+
+<!--
+:list:
+    #query: type:node context:vop title:agent
+    #sortedby: title
+-->

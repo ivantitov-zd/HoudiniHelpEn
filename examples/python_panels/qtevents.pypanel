@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pythonPanelDocument>
+  <!-- This file contains definitions of Python interfaces and the
+ interfaces menu.  It should not be hand-edited when it is being
+ used by the application.  Note, that two definitions of the
+ same interface or of the interfaces menu are not allowed
+ in a single file. -->
+  <interface name="EventExample" label="Qt Event Example" icon="SOP_drawcurve">
+    <script><![CDATA[import math
+import os
+import sys
+
+from hutil.Qt import QtCore, QtGui, QtWidgets
+
+panel_path = "%s/houdini/help/examples/python_panels/" % os.environ["HFS"]
+sys.path.append(panel_path)
+
+from examplehelp import ExampleHelpWidget
+
+class QtEventExample(QtWidgets.QWidget):
+    def __init__(self, paneTab):
+        QtWidgets.QWidget.__init__(self)
+        
+        self.paneTab = paneTab
+        
+        # Mouse tracking must be enabled to receive mouse move events
+        self.setMouseTracking(True)
+        
+        self.mouseX = 0
+        self.mouseY = 0
+        self.sizeX = 0
+        self.sizeY = 0
+        self.factor = 100
+
+        self.fullHelpString = """This example demonstrates how Python Panels can listen to Qt events. 
+                The following events are handled:<br><br>
+                  * <b>Resize</b> - Triggered when the widget size changes, e.g. resizing the pane tab.<br>
+                  * <b>MouseMove</b> - Triggered when the cursor moves and `setMouseTracking` is called on the widget.<br>
+                  * <b>Enter</b> and <b>Leave</b> - Triggered when the cursor enters or leaves the widget.<br>
+                  * <b>Paint</b> - Triggered when the widget should redraw.<br><br>
+                In this example, Resize and MouseMove are used to track position and size, and Enter/Leave are used 
+                to track focus state. When Paint is called the position and size are displayed beside the cursor. The 
+                focus state is used to select a background color."""
+        self.smallHelpString = """This example demonstrates how Python Panels can listen to Qt events. 
+                Click <b>Show More</b> for more details...""" 
+        self.helpWidget = ExampleHelpWidget(self.smallHelpString, self.fullHelpString)
+        
+        layout = QtWidgets.QVBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        self.setLayout(layout)
+                
+        layout.addWidget(self.helpWidget, 1, QtCore.Qt.AlignTop)
+       
+    # This method is called immediately before the widget is shown
+    def showEvent(self, event):
+        try:
+            # Try to set the pane tab label for the widget. A try/catch
+            # is needed since the pane tab type may be changed elsewhere
+            pane = self.paneTab
+            pane.setLabel("(Shown) Qt Event Example")
+        except:
+            pass
+        
+    # This method is called after the widget is hidden
+    def hideEvent(self, event):
+        try:
+            # Try to set the pane tab label for the widget. A try/catch
+            # is needed since the pane tab type may be changed elsewhere
+            pane = self.paneTab
+            pane.setLabel("(Hidden) Qt Event Example")
+        except:
+            pass
+            
+    # Called when the widget's dimensions change
+    def resizeEvent(self, event):
+        # Store the new size so it can be drawn to the screen later on
+        self.sizeX = event.size().width()
+        self.sizeY = event.size().height()
+        self.repaint()
+
+    # Called when the mouse cursor moves around inside the widget boundaries
+    def mouseMoveEvent(self, event):
+        # Store mouse coordinates so they can be drawn to the screen 
+        self.mouseX = event.x()
+        self.mouseY = event.y()
+        self.repaint()
+        
+    # Called when the cursor enters the outer bounds of the widget
+    def enterEvent(self, event):
+        # self.factor controls background brightness - 120 is bright
+        self.factor = 100
+        self.repaint()
+        
+    # Called when the cursor leaves the outer bounds of the widget
+    def leaveEvent(self, event):
+        # self.factor controls background brightness - 80 is dark
+        self.factor = 80
+        self.repaint()
+         
+    # Called when the widget needs to repaint its contents
+    def paintEvent(self, event):
+        # Construct a painter from the widget and fill a background color
+        painter = QtGui.QPainter(self)
+        color = QtGui.QColor(self.factor*0.55, self.factor*0.7, self.factor * 0.8)
+        painter.fillRect(0, 0, self.width(), self.height(), color)
+        
+        # If the mouse is inside the widget, render the size and position next to the cursor
+        if self.factor > 80:
+            pos_string = "Mouse Position: [" + str(self.mouseX) + "," + str(self.mouseY) + "]"
+            size_string = "Panel Size: [" + str(self.sizeX) + "," + str(self.sizeY) + "]"
+            painter.drawText(self.mouseX + 20, self.mouseY + 5, pos_string)
+            painter.drawText(self.mouseX + 20, self.mouseY + 18, size_string)
+    
+def onCreateInterface():
+    example = QtEventExample(kwargs['paneTab'])
+    return example
+    
+]]></script>
+  </interface>
+</pythonPanelDocument>

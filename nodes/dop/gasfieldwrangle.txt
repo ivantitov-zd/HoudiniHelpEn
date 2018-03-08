@@ -1,0 +1,186 @@
+#type: node
+#context: dop
+#internal: gasfieldwrangle
+#icon: DOP/gas
+
+#tags: volumes
+
+= Gas Field Wrangle =
+
+"""Runs CVEX on a set of fields."""
+
+This is a very powerful, low-level node that lets experts who are
+familiar with VEX tweak voxel values using code.
+
+This node corresponds to the [Gas Field VOP DOP|Node:dop/gasfieldvop],
+but uses a textual VEX snippet instead of a VOP network.
+
+WARNING:
+    This node requires that you understand the [vex language|/vex].
+    It is very easy to write incorrect code using this node.
+
+This node runs the snippet _on every voxel in the input volume(s)_.
+The snippet can edit the input geometry by changing attributes.
+It can access information from other geometry using attributes and VEX functions.
+
+* Press ((MMB)) on the node to see any error output from the snippet.
+
+* You can use the VEX function `ch` to evaluate parameters.
+  The path is relative to this node (`ch("parm")` will evaluate the parameter `parm` on this node).
+  This evaluation will be done at the current time.
+
+[Include:/nodes/sop/wrangle_syntax]
+
+== Reading and modifying the voxel value == (values)
+
+The current voxel value in a volume is available as `@<<volume_name>>`.
+You can read this variable to get the current value, and assign it to change the value.
+For example, to add `0.1` to the value of every voxel in the float volume `foo`:
+
+{{{
+#!vex
+@foo += 0.1
+}}}
+
+If a volume does not have a name, it will automatically be bound to `@density`.
+
+If you have multiple named volumes in the input, you can write a single snippet
+that modifies the different volumes in different ways, for example:
+
+{{{
+#!vex
+@foo += 0.1
+@bar += 0.2
+@baz += 0.3
+}}}
+
+== VEX variables ==
+
+You can create temporary variables.
+For example, the following code reads an offset location from a point.
+
+{{{
+#!vex
+vector temp = @P;
+temp += {0.1, 0.2, 0.3};
+@density = volumesample(@OpInput1, 0, temp);
+}}}
+
+== Bound Variables ==
+
+A number of variables are bound in the Volume VOP context. 
+Use the `@` prefix syntax to access them.
+
+`ix`, `iy`, `iz`:
+	The integer index of the current voxel.  With VDBs, this can be
+	negative.
+`resx`, `resy`, `resz`:
+	The resolution of the current volume primitive.  For VDBs this
+	is the size of the active voxel region.
+`dPdx`, `dPdy`, `dPdz`:
+	Vectors giving the length and orientation of the x, y, and z edges of
+	the 0th voxel.
+`center`:
+	The center of the volume in SOP space.
+`SimTime`:
+	Current simulation time in seconds.
+`SimFrame`:
+	Current simulation frame.
+`Time`:
+	Current playbar time in seconds.
+`Frame`:
+	Current playbar time in frames.
+`TimeInc`:
+	Time increment between frames, in seconds.
+`OpInput1`, `OpInput2`, `OpInput3`, `OpInput4`:
+	A string that can be used to refer to the corresponding input
+	of this SOP in vex operations that take file parameters.
+
+@parameters
+
+== Code ==
+
+Group:
+    Only run the program on these volumes in the input geometry.
+    Leave this blank to modify all volumes in the input.
+    
+    (See [reading and writing voxel values|#values] above.)
+
+[Include:/nodes/sop/pointwrangle#snippet]
+
+Fields to Write to:
+    Only modify fields if their names match this pattern.
+    The default pattern allows any volume to be modified.
+    You can speed up the node by only listing fields that are _actually_
+    modified by the snippet.
+    
+    For example, in the following snippet, only the `density` field is modified.
+    The `temperature` field is not modified, only read.
+    
+    {{{
+    #!vex
+    @density = @temperature;
+    }}}
+    
+    However, the node will both modify `density` and _copy_ `temperature`, which uses time and memory.
+    To prevent this, you could set this parameter to `density` to prevent the node
+    from copying `temperature`. This requires that you explicitly manage the list of writable fields.
+
+Enforce Prototypes:
+    Automatic binding with the `@` syntax can be convenient, but if your
+    system becomes more complex there is the risk that a typo in an `@` binding
+    will silently just bind a non-existent attribute.
+
+    This option forces all `@` bindings to be explicitly declared as
+    prototypes before use.
+
+== Bindings ==
+
+    Evaluation Node Path:
+	VEX functions like `ch()` usually evaluate with respect to this node.
+	Providing a path here can override where the path search starts
+	from.  This is useful for embedding in a digital asset where you
+	would like the top level digital asset to be the search root.
+
+    Export Parameters:
+	This pattern can be used to override
+	the export option on the VEX shader to avoid writing to 
+	certain volumes.  The pattern matches the VEX parameter, not
+	the bound volume.  The volume will still be bound for
+	reading.
+
+== Inputs ==
+
+Input 1, 2, 3, 4:
+	These control the four virtual inputs accessible inside of VOPs.
+
+	They can be accessed with the OpInput1-4 wires from the VOP, or with
+	the `@OpInput1-4` string parameters when using VEXpressions.
+
+	They can also be accessed numerically as 0-3 with VEX functions
+	that take an input number.
+
+	None:
+	    No geometry is wired to this input.
+	SOP:
+	    The SOP geometry will be cooked prior to running the VEX and
+	    the result wired to this input.
+	DOP Data:
+	    Data in the current simulation to reference.  Specified as
+	    an object/data, for example, `pyro1/vel` to refer to the velocity
+	    field of the `pyro1` object (which will show up as three volume
+	    primitives).
+	Nth Context Geometry:
+	    These refer to the SOPs wired into the parent DOP Network itself.
+
+Use Timestep:
+    Whether to scale the Timescale by the current timestep.  If off,
+    timescale is an absolute time in seconds.
+
+Timescale:
+    An overall scale applied to the actual timestep.
+
+@related
+    - [Node:dop/gasfieldvop]
+
+

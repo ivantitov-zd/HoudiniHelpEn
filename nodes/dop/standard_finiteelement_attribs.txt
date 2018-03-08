@@ -1,0 +1,353 @@
+#type: include
+
+The finite element solver will recognize and use [attributes|/model/attributes] on the simulated geometry. In the DOP network, this simulation geometry is attached to the simulated object as a sim-data with name `Geometry`. When an object is created, then the geometry and all the corresponding attributes are read from the __Initial Geometry__. This includes the standard position and velocity point attributes `P` and `v`.
+
+The finite element solve supports input attributes and output attributes.
+Some attributes, such as the simulation state, are both input and output attributes.
+The input attributes include multiplier attributes for material properties,
+fracture attributes, and attributes for controlling target positions and corresponding hard/soft constraints.
+The output attributes include optional attributes for tet quality, energy densities, FEM node forces, collision info attributes and fracture info attributes.
+
+== Material Property Multiplier Attributes ==
+
+Each of the material properties of a simulated object can be locally modified using multiplier point attributes. As a rule, each of the material properties in the Model tab of an object can be affected by a multiplier attribute. As a rule, the name of the parameter is the name of the attribute. The name of the attribute is the name that is displayed after "Parameter:" when you hover over a parameter with your mouse cursor.
+
+You can locally change the material properties of the object using point attributes.
+For example, you can make some polygons resists stretching and bending more than other polygons.
+These attributes work as multipliers for the parameters in the __Model__ tab:
+The stiffness multiplier is a convenient way to modify the local stiffness for all object types that are recognized by the finite element solver:
+
+table>>
+    tr>>
+        th>> Name
+        th>> Class
+        th>> Type
+        th>> Description
+    tr>>
+        td>> `stiffness`
+        td>> Point
+        td>> Float
+        td>> Multiplier for all types of stiffnesses.
+    tr>>
+        td>> `dampingratio`
+        td>> Point
+        td>> Float
+        td>> Multiplier for all damping ratios.
+    tr>>
+        td>> `massdensity`
+        td>> Point
+        td>> Float
+        td>> Multiplier for all mass densities.
+
+For solid objects, the following multiplier point attributes can be used to modify the local behavior:
+
+table>>
+    tr>>
+        th>> Name
+        th>> Class
+        th>> Type
+        th>> Description
+    tr>>
+        td>> `solidstiffness`
+        td>> Point
+        td>> Float
+        td>> Multiplier for both the shape stiffness and the volume stiffness of a Solid Object.
+    tr>>
+        td>> `solidshapestiffness`
+        td>> Point
+        td>> Float
+        td>> Multiplier for the shape stiffness of a Solid Object.
+    tr>>
+        td>> `solidvolumestiffness`
+        td>> Point
+        td>> Float
+        td>> Multiplier for the volume stiffness of a Solid Object.
+    tr>>
+        td>> `solidmassdensity`
+        td>> Point
+        td>> Float
+        td>> Multiplier for the mass density of a Solid Object.
+
+== Fracturing Control Attributes ==
+
+When you create a simulation with fracturing, it is recommended to specify chunks of tetrahedrons that you want to stay together. Otherwise, the fracturing process may create a very large amount of separate pieces, many of which may consist of single tetrahedrons. For this purpose, you can assign a nonnegative integer to each chunk using the `fracturepart` attribute. In areas where you don't want to specify parts, you can set `fracturepart` to -1, which means that each primitive in that region will become its own part. Real-life materials tend not to be equally strong everywhere. For realistic results, it is recommended to vary the __Fracture Threshold__ locally using the vertex attribute `fracturethreshold`.
+
+table>>
+    tr>>
+        td>> `fracturepart`
+        td>> Primitive
+        td>> Integer
+        td>> Partitions the object into unbreakable parts. Must be either -1 (no part) or a nonnegative number that indicates a part.
+    tr>>
+        td>> `enablefracturing`
+        td>> Point/Vertex
+        td>> Integer
+        td>> Locally enable/disable fracturing for points or vertices.
+    tr>>
+        td>> `fracturethreshold`
+        td>> Point/Vertex
+        td>> Float
+        td>> Multiplier for the object's __Fracture Threshold__.
+
+== Drag Force Control Attributes ==
+
+The behavior of the drag force can be modified locally using the following attributes:
+
+table>>
+    tr>>
+        td>> `normaldrag`
+        td>> Primitive
+        td>> Float
+        td>> Multiplier for the object's __Normal Drag__.
+    tr>>
+        td>> `tangentdrag`
+        td>> Primitive
+        td>> Float
+        td>> Multiplier for the object's __Tangent Drag__.
+               
+== Reference Attributes ==
+
+The attribute `restP` can be used to specify the rest position for all the object points. The attribute `materialP` is similar to the rest position, but it must not be changed during a simulation. Among other things, `materialP` defines the mass and the strength of the internal forces that act within the simulation geometry. The attribute `materialP` can be thought of as an initial rest position.
+table>>
+    tr>>
+        th>> Name
+        th>> Class
+        th>> Type
+        th>> Description
+    tr>>
+        td>> `materialP`
+        td>> Point
+        td>> Vector
+        td>> Material position of each point.
+    tr>>
+        td>> `restP`
+        td>> Point
+        td>> Vector
+        td>> Rest position of each point.
+	
+The attribute `baseP` can be used to specify a generic base position for all the object points. This attribute's values must not be changed during a simulation. When the user does not specify `baseP`, the solver creates this point attribute based on the point positions on the creation frame. This attribute is used as a fallback; whenever the user does not specify `materialP`, the attribute `baseP` is read instead. In the same way, `baseP` is used as a fallback for when no `restP` or `targetP` attributes are provided. Finally, `baseP` is used to bind the simulated and the embedded geometry, in the embedded workflow (e.g., a T-pose). This embedded binding looks at the `baseP` position attribute on both the simulated geometry and the embedded geometry. If no `baseP` attribute is provided by the user on the embedded geometry, the solver creates the `baseP` attribute on the embedded geometry based on the position `P` at the creation frame.  
+    tr>>
+        td>> `baseP`
+        td>> Point
+        td>> Vector
+        td>> base position of each point
+
+The attribute `initialpid` stores the initial point index for each point. This is the point index at the creation time of the object. This attribute is created only when fracturing is enabled on both the object and the solver. The finite element solver uses this attribute for the options __Import Rest Geometry__ and __Import Target Geometry__ to transfer animated positions and velocities in SOPs to the current fractured topology in the simulated object.
+ 
+table>>
+    tr>>
+        th>> Name
+        th>> Class
+        th>> Type
+        th>> Description
+    tr>>
+        td>> `initialpid`
+        td>> Point
+        td>> Integer
+        td>> Initial point index for each point.
+		
+== Target Attributes ==
+
+Target attributes can be used to make a simulated object partially follow a target animation. The attribute `targetP` can be used to specify a target position for each object point. When you use the __Import Target Geometry__ option on the simulated object, the `targetP` will be set automatically every frame. Alternatively, you can create and modify these attributes yourself, using a [Multi Solver|Node:dop/multisolver] and a [SOP Solver|Node:dop/sopsolver]. The target positions and velocities allow the user to mix animation and simulation in a very stable way (assuming the __Target Strength__ and __Target Damping__ parameters have been set on the object). You can set the __Target Strength__ and __Target Damping__ parameters on the object to express how strongly the object should match the target position and velocity, respectively. This is a way to create soft constraints. You can use the `pintoanimation` to create hard constraints that make the simulated points follow `targetP` exactly.
+        
+table>>
+    tr>>
+        th>> Name
+        th>> Class
+        th>> Type
+        th>> Description
+    tr>>
+        td>> `targetP`
+        td>> Point or Vertex
+        td>> Vector
+        td>> Target position of each point.
+    tr>>
+        td>> `targetstrength`
+        td>> Point
+        td>> Float
+        td>> Multiplier for the object's __Target Strength__. If this attribute is missing, a multiplier of 1 is used at all points.
+    tr>>
+        td>> `targetdamping`
+        td>> Point
+        td>> Float
+        td>> Multiplier for the object's __Target Damping__. If this attribute is missing, a multiplier of 1 is used at all points.
+    tr>>
+        td>> `pintoanimation`
+        td>> Point
+        td>> Int
+        td>> When 1, the point is hard constrained to the target animation (e.g., `targetP`). When zero, the point is unconstrained.
+ 
+
+== State Attributes ==
+
+Below is a list of attributes that are maintained internally by the solver. Each of these attributes is written to at the end of each solve and read from at the start of the next solve. You should not modify any of these attributes yourself. When you do, the solver is likely to become unstable and you will get bad results. However, you can inspect the values in these attributes in your network for visualization or for the creation of secondary effects.
+
+At each frame, the finite element solver computes a new physical state for each simulated object. The physical state of the object is represented by the point attributes `P` and `v`, representing the position and velocity, respectively. The solver's integration scheme maintains additional attributes `a` for acceleration and `j` for jerk.
+
+The point attributes `P`, `v`, `a`, and `j` store the current integration state of the object. These attributes should not be modified during the simulation because the finite element solver will become unstable and produce low-quality results.
+
+table>>
+    tr>>
+        th>> Name
+        th>> Class
+        th>> Type
+        th>> Description
+    tr>>
+        td>> `P`
+        td>> Point
+        td>> Vector
+        td>> Do not modify! Current position of each object point.
+    tr>>
+        td>> `v`
+        td>> Point
+        td>> Vector
+        td>> Do not modify! Current velocity of each object point.
+   tr>>
+        td>> `accel`
+        td>> Point
+        td>> Vector
+        td>> Do not modify! Current acceleration of each object point.
+   tr>>
+        td>> `jerk`
+        td>> Point
+        td>> Vector
+        td>> Do not modify! Current jerk of each object point.
+
+The solver itself maintains the attribute `restPprevious`, which should not be modified outside the solver.
+
+table>>
+    tr>>
+        th>> Name
+        th>> Class
+        th>> Type
+        th>> Description
+     tr>>
+        td>> `restPprevious`
+        td>> Point or Vertex
+        td>> Vector
+        td>> Do not modify! Previous rest positions maintained by the solver.
+
+== Embedded Geometry Attributes ==
+
+These attributes are created on the Embedded Geometry of the Solid Object.
+The `parent` attribute is maintained by the embedding code itself, and
+should not be modified.
+The `baseP` point attribute can be provided on the Embedded Geometry by the user to control the binding between the simulated geometry and the embedded geometrylignment.
+If no `baseP` is provided, it will be copied from the point positions stored in `P` at the creation frame.
+The alignment happens relative to the `baseP` point attribute on the simulated geometry. If the simulated geometry has a `materialP` vertex or point attribute, then this attribute takes precedence, allowing control per vertex, rather than per point, if necessary.
+When you want to ensure that embedded geometry ends up on the desired side of a fracture between simulated geometry, you can use the combination of vertex attributes `baseP` on the embedded geometry and `restP` on the simulated geometry.
+This allows you to line up the embedded geometry with the separate parts in the simulated geometry, for example using the [Exploded View SOP|Node:sop/explodedview].
+The `fracturepart` attribute allows you to make sure that the embedded geometry follows the right parts when it gets fractured. When both the simulated and the embedded geometry have the `fracturepart` attribute, the finite element solver will parent embedded geometry to simulated geometry that has the same fracture part.
+
+table>>
+    tr>>
+        th>> Name
+        th>> Class
+        th>> Type
+        th>> Description
+    tr>>
+        td>> `parent`
+        td>> Primitive
+        td>> Float
+        td>> The index of a parent primitive in the simulated geometry.
+    tr>>
+        td>> `baseP`
+        td>> Point
+        td>> Float
+        td>> Base positions used for alignment with simulated mesh.
+    tr>>
+        td>> `fracturepart`
+        td>> Point or Vertex
+        td>> Float
+        td>> Optional user-specified fracture part ID.
+    tr>>
+        td>> `P`
+        td>> Point
+        td>> Float
+        td>> Positions that correspond to the deformed state.
+    tr>>
+        td>> `v`
+        td>> Point
+        td>> Float
+        td>> Velocities that correspond to the deformed state.
+    tr>>
+        td>> `N`
+        td>> Point or Vertex
+        td>> Float
+        td>> Normals that correspond to the deformed state.
+
+== Optional Output Attributes ==
+
+These are attributes that are optionally generated by the solver, when the generation is enabled on the simulated object. These attributes can be useful for visualization, for example, using the Finite Element Visualization SOP. Additionally, these attributes may be used to create secondary effects, for example, particles flying off in regions where fracturing occurs. The optional output attributes are also expected by the Finite Element Visualization SOP.
+
+The following attribute is generated when __Create Quality Attributes__ is turned on:
+
+table>>
+    tr>>
+        th>> Name
+        th>> Class
+        th>> Type
+        th>> Description
+    tr>>
+        td>> `quality`
+        td>> Primitive
+        td>> Float
+        td>> A quality between 0 (worst) and 1 (best)
+
+Finite element simulation tendis to be sensitive to the quality of the incoming primitives. Low quality primitives may slow down, destabilize or lock a finite element simulation. Low quality primitives are best avoided by using the Solid Embed as a tool to create your tet mesh.
+
+The solver generates energy-density attributes for each object that has __Create Energy Attributes__ turned on. The material property settings in the Model tab and the corresponding multiplier attributes result in potential energy, energy dissipation and kinetic energy.
+For each of these three contributions, local densities are computed within the solver. These densities and quantities derived from them are used to determine the motion and behavior of the objects that are solved by the finite element solver.
+
+table>>
+    tr>>
+        th>> Name
+        th>> Class
+        th>> Type
+        th>> Description
+    tr>>
+        td>> `potentialdensity`
+        td>> Point
+        td>> Float
+        td>> The local density of deformation energy
+    tr>>
+        td>> `dissipationdensity`
+        td>> Point
+        td>> Float
+        td>> The local density of the rate of energy loss
+    tr>>
+        td>> `kineticdensity`
+        td>> Point
+        td>> Float
+        td>> The local density of the kinetic energy
+
+The potentialdensity attribute is directly affected by the stiffness parameters in the Model tab. The kineticdensity is proportional to the mass density that is specified for the object. The dissipationdensity is related to the damping settings.
+
+If __Create Fracture Attributes__ is enabled on the simulated object, then the 'fracturecount' point attribute is created.
+The point attribute `fracturecount` maintains for each point, the number of times that the point has been involved in a fracture. So any point with a nonzero value of `fracturecount` has been involved fracturing.
+
+table>>
+    tr>>
+        th>> Name
+        th>> Class
+        th>> Type
+        th>> Description
+    tr>>
+        td>> `fracturecount`
+        td>> Point
+        td>> Integer
+        td>> The number of times a point was fractured during the simulation
+
+
+
+ 
+
+
+
+
+
+
+
+
+    
+ 

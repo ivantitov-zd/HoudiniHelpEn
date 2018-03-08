@@ -1,0 +1,125 @@
+= HOM Cookbook |> Python SOPs =
+
+== Overview ==
+
+You can create geometry node (SOP) assets that are [defined by a Python script|../pythonsop] instead of a subnetwork of nodes (__File > New operator type__, click __Python type__, set __Network type__ to "Geometry"). This example defines a Python SOP that copies its input, creates a Cd (diffuse color) point attribute, and assigns each point a color based on the distance to a position.
+
+== Color Falloff ==
+
+# Open `$HFS/houdini/help/files/hom_cookbook/color_falloff.hip`.
+
+# Click the [Icon:TOOLS/handles] Handles tool.
+
+# Move the location handle around and change the __Falloff__ parameter to see how they affect the coloring.
+
+# Right-click the `color_falloff1` node and choose __Type properties__ to open the asset's [type properties window|/ref/window/optype].
+
+* We created __Position__ and __Falloff__ parameters in the __Parameters__ tab, just as we would for a normal asset.
+
+* In the __Handles__ tab we bound a translate handle to the `pos` parameter.
+
+* The __Code__ tab contains the Python code implementing the node's logic.
+
+{{{
+#!python
+# When an instance of this Python SOP cooks, Houdini will have set hou.pwd()
+# to the Python SOP instance.  Access the hou.Geometry object for this SOP.
+# Since we're calling from hou.SopNode.geometry from a Python SOP
+# implementation, we'll have write access to the geometry.
+geo = hou.pwd().geometry()
+
+# Create the "Cd" point attribute value, giving it a default value of white
+# (1, 1, 1), and store the returned hou.Attrib object.
+cd = geo.addAttrib(hou.attribType.Point, "Cd", (1.0, 1.0, 1.0))
+
+# Evaluate the pos parm tuple, and create a hou.Vector3 out of it so we can
+# later do vector subtraction.  Also evaluate the falloff value.
+pos = hou.Vector3(hou.parmTuple("pos").eval())
+falloff = max(hou.ch("falloff"), 0.0001)
+
+for point in geo.points():
+    # Compute the distance from this point to the position parameter, divide
+    # the distance by the falloff value, and clamp it to be between 0 and 1.
+    distance = (point.position() - pos).length()
+    value = min(distance / falloff, 1.0)
+
+    # Create a color object, and set the hue and value of the color based on
+    # the normalized distance.
+    color = hou.Color()
+    color.setHSV((value * 256, 1.0, value))
+
+    # Extract the RGB values from the color object and store them in this
+    # point's Cd attribute value.
+    point.setAttribValue(cd, color.rgb())
+}}}
+
+== Color quills ==
+
+This Python SOP copies its input, assigns a rainbow of colors to the input surface, and evenly distributes polylines normal to the surface, creating the appearance of "quills" on the surface.
+
+# Open `$HFS/houdini/help/files/hom_cookbook/surface_wires.hip`.
+
+# Right-click the `surface_wires1` node inside `grid_object1` and choose __Type properties__ to open the asset's [type properties window|/ref/window/optype].
+
+* We created parameters for the number of divisions and length in the __Parameters__ tab, just as we would for a normal asset.
+
+* The __Code__ tab contains the Python code implementing the node's logic.
+
+{{{
+#!python
+
+# When an instance of this Python SOP cooks, Houdini will have set hou.pwd()
+# to the Python SOP instance.  Access the hou.Geometry object for this SOP.
+# Since we're calling from hou.SopNode.geometry from a Python SOP
+# implementation, we'll have write access to the geometry.
+geo = hou.pwd().geometry()
+
+# Create a Cd (color) point attribute.
+color_attrib = geo.addAttrib(hou.attribType.Point, "Cd", (1.0, 1.0, 1.0))
+
+# Assign each point a unique hue value, with constant saturation and value.
+num_points = len(geo.iterPoints())
+color = hou.Color()
+for point in geo.points():
+    fraction = float(point.number()) / num_points
+    color.setHSV(((fraction * 255), 1, 1))
+    # The attribute stores RGB values, so ask for the color in RGB format.
+    point.setAttribValue(color_attrib, color.rgb())
+
+# This sop requires that the first primitive is a surface.
+surf = None
+if len(geo.iterPrims()) != 0:
+    surf = geo.iterPrims()[0]
+if not isinstance(surf, hou.Surface):
+    raise hou.Error("The first primitive must be a surface")
+
+# Evaluate the surface at uniformly distributed positions.  For each
+# point we evaluate, create a line facing outwards from the surface,
+# and give it the color at the surface.
+u_divisions = hou.evalParm("u_divisions")
+v_divisions = hou.evalParm("v_divisions")
+wire_length = hou.evalParm("wire_length")
+for u_index in range(u_divisions + 1):
+    u = float(u_index) / u_divisions
+    for v_index in range(v_divisions + 1):
+        v = float(v_index) / v_divisions
+
+        # Compute the position of the surface, and add the normal
+        # vector (scaled by 2) to define the two points of the line.
+        pos0 = surf.positionAt(u, v)
+        pos1 = pos0 + surf.normalAt(u, v) * wire_length
+
+        # Compute the color of the polygon and create it.  It will
+        # be open, since it's a line.
+        color = surf.attribValueAt(color_attrib, u, v)
+        poly = geo.createPolygon()
+        poly.setIsClosed(False)
+
+        # Create the points, set their position and color, and
+        # add them to the polygon.
+        for pos in pos0, pos1:
+            point = geo.createPoint()
+            point.setPosition(pos)
+            point.setAttribValue(color_attrib, color)
+            poly.addVertex(point)
+}}}

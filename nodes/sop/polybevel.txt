@@ -1,0 +1,173 @@
+= PolyBevel =
+
+#type: node
+#context: sop
+#internal: polybevel
+#icon: SOP/polybevel
+#version: 2.0
+#tags: reshape, polygons, model, fillet, boxup
+
+"""Creates straight, rounded, or custom fillets along edges and corners."""
+
+== Overview ==
+
+PolyBevel creates polygonal fillet surfaces between selected edges, with great control over the shape of the fillet. The node can handle very complex inputs, and is smart about ignoring non-contributing edges and not making heavy changes to the input topology.
+
+[Image:/images/nodes/sop/polybevel_eg.png]
+
+== How to ==
+
+# Select the edges or faces you want to bevel.
+
+    [Image:/images/nodes/sop/polybevel_select.png]
+
+# On the __Polygon__ tab, click the [Icon:SOP/polybevel] PolyBevel tool. Beveled edges are highlighted in bright green.
+
+    [Image:/images/nodes/sop/polybevel_zero.png]
+
+# Edit the offset distance text box or use ((MOUSE_WHEEL)) to change the size of the bevel.
+
+    [Image:/images/nodes/sop/polybevel_flat.png]
+    
+# Use the __Fillet shape__ and __Divisions__ parameters to control the shape of the fillet surfaces.
+
+    [Image:/images/nodes/sop/polybevel_round.png]
+
+== Tips ==
+
+* The __Corner faces__ and __Edge faces__ parameters let you put different types of polygons created by this tool into groups. You can enter the same group name in both parameters to pull all polygons into the same group.
+    
+@parameters
+
+Group:
+    The edges to bevel. Unshared edges, edges shared by three or more polygons,  or edges shared by two polygons with inconsisten orientation are excluded. 
+
+Ignore Flat Edges: 
+    Don't try to bevel edges in flat areas (edges where the angle between the faces is less than __Flatness angle__).
+
+Flatness Angle:
+    When __Ignore Flat Edges__ is on, the node considers adjacent surfaces with a smaller angle than this value (in degrees) to be flat. 
+
+~~~ Offsetting ~~~
+
+Offset Mode:
+    How the tool measures the bevel size. "Distance" measures from the cut-back to the original corner. "Width" measures across the bevel.
+    
+    [Image:/images/nodes/sop/polybevel_distance.svg]
+
+Offset:
+    The size of the bevel, in Houdini units.
+
+Offset Scale:
+    A *vertex* attribute to scale the offset amount per-edge. You can use the [Crease node|Node:sop/crease] to create the vertex attribute. Negative and zero values are ignored. Positive values are multiplied by the calculated offset amount. 
+    
+    For example, before applying PolyBevel, you could use Crease nodes to select different edges and set different `offscale` vertex attribute values to them. Then apply PolyBevel and turn on this option.
+    
+    [Image:/images/nodes/sop/polybevel_offsetscale.png]
+
+Point Scale:
+    A *point* attribute to scale the corner mesh at each point. You can use the [Point node|Node:sop/point] to create the point attribute.
+
+~~~ Fillet ~~~
+
+Fillet Shape:
+    Controls how the node builds the fillet surfaces between the bevelled edges.
+
+    None: 
+        Cut the surfaces back but don't generate fillet surfaces between them.
+        
+        [Image:/images/nodes/sop/polybevel_shape_none.png]
+
+    Solid:
+         Create a fillet the follows the lines of the adjacent surfaces. This can be useful to sharpen viewport shading along the beveled edges.
+         
+         [Image:/images/nodes/sop/polybevel_shape_solid.png]
+         
+         (If __Divisions__ is _even_, the fillet will be chamfered, since the node will have no middle division to use for the corner.)
+    
+    Crease:
+        Like "Solid", but creates corner meshes. This is useful for sharpening edges on subdivided surfaces.
+    
+        [Image:/images/nodes/sop/polybevel_crease_edges.png]
+    
+    Chamfer: 
+        Create a flat fillet across the adjacent surfaces.
+        
+        [Image:/images/nodes/sop/polybevel_shape_chamfer.png]
+
+    Round:
+        Create a rounded fillet between the adjacent surfaces. Make sure to increase the number of divisions to see the rounding.
+        
+        [Image:/images/nodes/sop/polybevel_shape_round.png]
+    
+    Ramp:
+        Control the fillet profile with a ramp parameter.
+    
+        [Image:/images/nodes/sop/polybevel_shape_ramp.png]
+    
+    Curve from second input:
+        Wire a curve into this node's second input and select this option to use the curve to control the fillet profile.
+        
+        Unlike using the ramp, using a curve lets you create profiles with overhangs.
+        
+        The node will automatically fit the curve to a plane and scale it so the orientation of the curve doesn't matter.
+
+Divisions:
+    Number of rows in the fillet surfaces.
+    
+    :col:
+        [Image:/images/nodes/sop/polybevel_divs1.png]
+        [Image:/images/nodes/sop/polybevel_divs2.png]
+    :col:
+        [Image:/images/nodes/sop/polybevel_divs3.png]
+        [Image:/images/nodes/sop/polybevel_divs4.png]
+
+Sampling:
+    When __Fillet Shape__ is "Ramp" or "Curve from second input", this parameter controls how the node spaces divisions across the fillet.
+    
+    Uniform: 
+        Evenly spaced divisions.
+        
+    Adaptive:
+        Attempts to put more divisions in areas of high curvature and fewer divisions in flat areas. 
+        
+    Control Points:
+        Ignores the __Divisions__ parameter and puts a division at the location of each control point in the ramp/curve.
+
+Profile Ramp:
+    Controls the shape of the fillet surface when __Shape__ is "Ramp". A value of `0.5` corresponds to where a chamfered fillet would be.
+
+Profile Scale:
+    When __Fillet Shape__ is "Ramp" or "Curve from second input", this parameter increases or decreases the height differences from the ramp/curve.
+
+~~~ Vertext splitting ~~~
+
+These parameters control when the node inserts new edges along the offset boundary before creating the fillet.
+
+Allow Vertex Splits:
+    When this is off, the node will not insert new edges along the boundary, except in rare cases where the fillet will not work otherwise. If you turn this on, the node may be able to create a better fillet at the expense of complicating the topology.
+
+Split Miterable Joints:
+    When this is off, the node tries not to insert new edges at "simple folded joints" (see below) even when __Allow vertex splits__ is on. If you turn this on, the node may be able to create a better fillet at the expense of complicating the topology.
+
+    A "simple folded joint" is where two consecutive bevelled edges have exactly one non-flat edge between them.
+    
+    [Image:/images/nodes/sop/polybevel_simplefold.svg]
+
+Split Over All Incident Edges:
+    Generate a new offset edge between _any_ pair of incindent non-bevel edges, regardless of whether they lie flat to the surface. When off, the node only creates new offset edges for _non-flat_ edges. 
+
+~~~ Output groups ~~~
+
+Corner Faces:
+    Collects the polygons used in corner fillets in a primitive group with the provided name.
+    
+Edge Faces:
+    Collects the polygons used in edge fillets in a primitive group with the provided name.
+
+@related
+    - [Node:sop/extrude]
+    - [Node:sop/polyextrude]
+    - [Node:sop/subdivide]
+    - [Node:sop/divide]
+

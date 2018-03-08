@@ -1,0 +1,347 @@
+= Agent =
+
+#type: node
+#context: sop
+#internal: agent
+#icon: CROWDS/agent
+#tags: crowds, agents
+
+"""Creates agent primitives."""
+
+This node is used to create agent primitives for a crowd of characters. To get
+the definition of the agents, this can either be from files previously baked
+from an [Node:out/agent] output node, or directly from a character rig in the
+scene.
+
+An agent primitive contains references to:
+
+* a Rig -- The transform hierarchy of the agent.
+* a Shape Library -- The geometry for the agent.
+* Layers -- An assignment of the geometry from the Shape Library to a transform in the rig.
+* Clips -- Animation used by the the agent.
+
+TIP:
+    If the render gets clipped due to bounding boxes in crowds, try creating a collision layer by turning on the __Generate Collision Layer__ parameter.
+
+@parameters
+
+Group:
+    The points in the input geometry to use as agent positions.
+
+Agent Name:
+    Base name of the agent. For each created agent, the
+    `name` primitive attribute is set to this name with a `_<<number>>`
+    suffix. When __Allow Attributes to Override__ is on, this is
+    replaced by any `agentname` string attributes on the input points.
+
+    The value of this parameter can be referenced via the `$AGENT` local
+    variable.
+
+Current Layer:
+    Name of the layer to use.
+    When __Allow Attributes to Override__ is enabled, this is replaced by any
+    `currentlayer` string attributes on the input points.
+
+Current Clip:
+    Name of the animation clip the agents will be running.
+    When __Allow Attributes to Override__ is enabled, this is replaced by any
+    `currentclip` string attributes on the input points. By default, this
+    parameter is empty, which means to use the first available clip in the
+    agent definition.
+
+Clip Offset:
+    Time into the current clip to begin playing at (in seconds).
+    When __Allow Attributes to Override__ is enabled, and the input points
+    contain the `clipoffset` float attribute, then those values are added
+    to this parameter value for each agent.
+
+Apply Clip Locomotion:
+    If enabled, apply the `__locomotion__` transform from the agent rig so that
+    you can easily previsualize locomotive clips.
+
+Allow Attributes to Override:
+    Replace the values of __Current Layer__, __Current Clip__, and
+    __Clip Offset__ with values from equivalent point attributes, if present.
+
+Keep Primitives:
+    Normally, primitives are deleted for the points that agents are created on.
+    If this is enabled, then the primitives will not be deleted.
+
+Input:
+    Specify the source to create agents from. See below for details on the
+    parameters for each of these input sources.
+
+    Scene:
+	Get the information directly from an actual character subnetwork/asset
+	in the scene. Getting information from the scene is useful for testing,
+	but is much slower than using baked out character data. See
+	[how to bake out agent clips|/crowds/clips].
+
+    Disk:
+	Load the agent rig/clips from disk (previously baked out using
+	the [Agent render node|Node:out/agent]).
+
+    FBX:
+	Get the information from an FBX file containing a character.
+
+Reload:
+    #id: reload
+    Reloads the agent definition.
+
+== Input: Scene ==
+
+Object Subnet:
+    #id: objsubnet
+    
+    Path to the object subnetwork containing the character rig.
+
+Locomotion Node:
+    #id: locomotionnode
+    
+    The object inside the __Object Subnet__ that controls the
+    locomotion of the character (the node in the character rig that has
+    translation channels that move it forward in space). When
+    __Convert to In-Place Animation__, Houdini uses this to remove the
+    translation from the character animation to keep the character in place.
+    (The [crowd solver node|Node:dop/crowdsolver] assumes that the agent
+    animation is in-place since it will be attached to a moving particle.)
+
+    The locomotion animation is placed in a separate transform in the rig named
+    `__locomotion__`. If this parameter is empty, then `__locomotion__` will
+    use the Object Subnet.
+
+Locomotion Orient:
+    #id: locomotionlookat
+    
+    If this parameter and __Locomotion Node__ are specified, the generated
+    `__locomotion__` transform will also contain rotational information using
+    the vector from the __Locomotion Node__ to the __Locomotion Orient__ node.
+    This parameter has no effect if __Locomotion Node__ is empty.
+
+Project Positions on Dominant Axis:
+    #id: projectondominantaxis
+
+    When creating the animation of the __Locomotion Node__, project the positions along the dominant axis of motion in the XZ plane.
+    If the clip will be used as an in-place clip with the [crowd solver|Node:dop/crowdsolver], enabling this option can help to maintain hip swaying in the motion.
+
+Use Pivot from First Frame:
+    #id: firstframepivot
+
+    When creating the animation of the __Locomotion Node__, calculate the positions to be relative to the origin.
+    If this option is disabled (the default), then the positions will be relative to where it was on the first frame.
+
+Convert to Polygon Soups:
+    #id: converttopolysoups
+    
+    Combine polygon primitives into [polygon soup primitives|Node:sop/polysoup] when creating the shape library.
+    This can reduce memory usage, particularly when rendering with Mantra.
+
+Layer Name:
+    #id: layername
+    
+    The default layer for the agent, created using the display flags of the
+    objects.  Every agent must have at least one layer.
+
+Bounds Scale:
+    #id: layerboundsscale
+    
+    Specifies a scale for the bounding box of each shape in the default layer.
+    See the [Agent Primitive help page|/crowds/agents#boundingbox] for more information on how an agent's bounding box is computed.
+
+Generate Collision Layer:
+    #id: generatecollision
+    
+    Generate a collision layer from geometry containing capture/deform weights.
+    This generates capture region primitives and assigns them to the
+    corresponding bones in the rig.
+
+Collision Layer Name:
+    #id: collisionname
+    
+    When __Generate Collision Layer__ is on, the name of the collision layer.
+
+Clip Name:
+    #id: clipname
+    
+    Name of the baked out clip (agent animation).
+    The animation is taken from the current scene.
+
+Additional Channels:
+    #id: choppath
+
+    Adds channels from the specified CHOP node to the agent's clip.
+
+Frame Range:
+    Whether to use the scene's global frame range
+    or the __Start/end/inc__ parameters.
+
+Start/End/Inc:
+    When __Frame Range__ is "Specific", the start frame, end frame, and frame
+    increment to bake out.
+    
+    All values may be decimal (for example, start on frame 1.5).
+
+Shift Clip to Frame 1:
+    #id: shiftstart
+
+    Shift output clips from the specified frame range to start at frame 1.
+
+Convert to In-Place Animation:
+    #id: inplace
+    
+    Convert a moving character animation to an in-place clip, by subtracting
+    the positions of the __Locomotion Node__ (relative to the origin or where
+    it was on the first frame depending on __Use Pivot from First Frame__
+    parameter).
+
+Minimal Nodes:
+    #id: minimalnodes
+    
+    Only bake objects whose display flags are on. If you turn this off, _all_
+    nodes in the object subnet are baked into the animation clip.
+
+== Input: Disk ==
+
+Cache Directory:
+    The parent directory of agent definition files. This parameter is
+    provided for convenience so that its value can be referenced via the
+    `$CACHEDIR` local variable in the other filename parameters.
+
+Rig:
+    Specifies the path to the [agent's rig file|/crowds/agents#rig].
+
+Agent Layers:
+    Filename pattern of the [agent layer files|/crowds/agents#layer] to load.
+    The `${LAYER}` local variable is used as a `*` placeholder here so that all matching files are loaded for only each particular agent.
+
+Shape Library:
+    Specifies the path to the [agent's shape library|/crowds/agents#shapelib].
+
+Clips:
+    Filename pattern of the [animation clips|/crowds/agents#clip] to load.
+    The `${CLIP}` local variable is used as a `*` placeholder here so that all matching files are loaded for only each particular agent.
+    The actual name of the clip is inferred from the string matched by `${CLIP}`, or the full filename without the extension if `${CLIP}` is not used.
+
+Transform Groups:
+    Filename pattern of the [transform group files|/crowds/agents#xformgroups] to load.
+    The `${TRANSFORM_GROUP}` local variable is used as a `*` placeholder here so that all matching files are loaded for only each particular agent.
+
+Keep External References:
+    Specifies whether the agent primitives should reference the agent
+    definition files on disk. If enabled, saving agents to a geometry file will
+    only store references to the agent definition files, instead of embedding
+    the agent definition in the `.bgeo` or `.geo` file (which produces a
+    self-contained, but larger, geometry file).
+
+== Input: FBX ==
+
+FBX File:
+    #id: fbxfile
+    Filename of the FBX file to generate agents from.
+
+Convert Units:
+    #id: convertunits
+    Specifies whether to convert to Houdini units when importing the FBX file.
+
+Minimal Nodes:
+    Only bake objects whose display flags are on. If you turn this off, _all_
+    nodes in the object subnet are baked into the animation clip.
+
+Load as Polygon Soups:
+    #id: loadaspolysoups
+
+    Create [polygon soup primitives|Node:sop/polysoup] instead of polygon primitives when loading geometry from the FBX file.
+    This can reduce memory usage, particularly when rendering with Mantra.
+
+Layer Name:
+    The default layer for the agent, created using the display flags of the
+    objects.  Every agent must have at least one layer.
+
+Generate Collision Layer:
+    Generate a collision layer from geometry containing capture/deform weights.
+    This generates capture region primitives and assigns them to the
+    corresponding bones in the rig.
+
+Collision Layer Name:
+    When __Generate Collision Layer__ is on, the name of the collision layer.
+
+Override Sample Rate:
+    #id: fbxoverridesamplerate
+
+    Specifies whether to use the value of the __Sample Rate__ parameter instead of the sample rate stored in the FBX file.
+    This is useful if the application that exported the original FBX file did not set the sample rate correctly.
+
+Sample Rate:
+    #id: fbxsamplerate
+
+    Sample rate to use for the clip when __Override Sample Rate__ is enabled.
+
+Convert to In-Place Animation:
+    Convert a moving character animation to an in-place clip, by subtracting
+    the positions of the __Locomotion Node__ (relative to the origin or where
+    it was on the first frame depending on __Use Pivot from First Frame__
+    parameter).
+
+Clip Name:
+    #id: fbxclipname
+    Specifies the names of the animation clip(s). A clip is created for each take in the FBX file.
+    The `${FBX_TAKE_NAME}` and `${FBX_TAKE_INDEX}` local variables can be used to generate clip names based on the take name and index from the FBX file.
+
+Locomotion Node:
+    #id: fbxlocomotionnode
+    The object inside the __Object Subnet__ that controls the
+    locomotion of the character (the node in the character rig that has
+    translation channels that move it forward in space). When
+    __Convert to In-Place Animation__, Houdini uses this to remove the
+    translation from the character animation to keep the character in place.
+    (The [crowd solver node|Node:dop/crowdsolver] assumes that the agent
+    animation is in-place since it will be attached to a moving particle.)
+
+    The locomotion animation is placed in a separate transform in the rig named
+    `__locomotion__`. If this parameter is empty, then `__locomotion__` will
+    use the Object Subnet.
+
+Locomotion Orient:
+    #id: fbxlocomotionlookat
+    If this parameter and __Locomotion Node__ are specified, the generated
+    `__locomotion__` transform will also contain rotational information using
+    the vector from the __Locomotion Node__ to the __Locomotion Orient__ node.
+    This parameter has no effect if __Locomotion Node__ is empty.
+
+@inputs
+
+Points to spawn agents:
+    If given, the input points are used to spawn the agents. These points
+    may contain specific attributes that are used to control properties of
+    the created agents, allowing for multiple agent definitions to be used
+    via the `$AGENT` local variable.
+
+@locals
+
+AGENT:
+    The name of agent. The value either comes from the `agentname` string
+    attribute on the input points when __Allow Attributes to Override__ is
+    enabled, or from the value of the __Agent Name__ parameter.
+
+CACHEDIR:
+    A local variable provided for convenience so that the value of the __Cache
+    Directory__ parameter can be easily referenced.
+
+LAYER:
+    Used as a wildcard in the __Agent Layers__ parameter for specifying the layer files to load.
+
+CLIP:
+    Used as a wildcard in the __Clips__ parameter for specifying the clip files to load.
+
+TRANSFORM_GROUP:
+    Used as a wildcard in the __Transform Groups__ parameter for specifying the transform group files to load.
+
+FBX_TAKE_NAME:
+    Contains the name of the current take in the FBX file when evaluating the __Clip Name__ parameter and __Input__ is __FBX__.
+
+FBX_TAKE_INDEX:
+    Contains the index of the current take in the FBX file when evaluating the __Clip Name__ parameter and __Input__ is __FBX__.
+
+@related
+
+- [Node:out/agent]

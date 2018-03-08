@@ -1,0 +1,657 @@
+= Define a compositing node (COP) using Python =
+
+== How to ==
+
+# Choose __File > New operator type__.
+
+# Set the __Operator style__ to `Python`, then set __Network type__ to __Compositing Filter__ or __Compositing Generator__.
+
+# Use the __Save to library__ option to set an OTL library file to save the new node type into.
+
+# Click __Accept__.
+
+    The [type properties window|/ref/windows/optype] appears.
+
+# Use the [options in the type properties window|/ref/windows/optype] to define the interface for your new node type.
+
+# Click the __Code__ tab to view and edit the Python code that defines the COP's behavior.
+
+TIP:
+    If you need to edit the code after closing the type properties window,
+    right-click an instance of the node and choose __Type properties__.
+
+== Writing COP Filters ==
+
+A Python COP filter produces new image data based on image data from one or
+more input nodes.  Each node in COPs stores a number of image planes, and
+each plane is cooked separately.  Every COP has a `C` (color) and an `A`
+(alpha) plane, but a cop may create more planes.  Image planes in COPs are
+cooked on demand, so some planes may not cook unless the viewer or an output
+COP asks for those planes.
+
+Writing a COP node type using Python is different than writing, say, a SOP or
+Object node type in Python.  While Python SOPs and Objects evaluate the Python
+code in the __Code__ tab whenever the node cooks, Python COPs instead call
+specially-named functions defined in the __Code__ tab.
+
+When writing a Python COP filter, provide definitions of the following
+functions in the __Code__ tab:
+
+`output_planes_to_cook(cop_node)`:
+    This function is required.  It must return a sequence of strings containing
+    the names of the image planes that this COP cooks.
+
+    Planes that are not listed in the result but are present in the first
+    input COP node will be passed through unmodified.  All COPs have both
+    `C` and `A` planes, so if one or both of these planes are not listed in
+    the result they will be passed through from the first input.
+
+    Planes that are listed in the result but are not in the input node will
+    be created.  Note that these special planes will not cook until they are
+    needed, such as when they are displayed in the viewer.
+
+`required_input_planes(cop_node, output_plane)`:
+    This function is required for COP filters.  It must return a sequence of
+    strings identifying the input numbers and the plane names required in order
+    for this node to cook.  The return sequence must have an even number of
+    strings, with the even elements containing the input numbers and the odd
+    elements containing the plane names.
+
+    For example, this function could return `("0", "C", "0", "A", "1", "C")`
+    to indicate that planes `C` and `A` are required from the first input
+    and plane `C` is needed from the second input.
+
+`cook(cop_node, plane, resolution)`:
+    This function is required.  It is called multiple times, once for each
+    plane cooked by this node.
+
+    `plane` is the name of the plane being cooked.  `resolution` is a sequence
+    of two integers specifying the resolution of the planes in this node.
+
+    To get the contents of a plane in an input node, call
+    [Hom:hou.CopNode#allPixels] or [Hom:hou.CopNode#allPixelsAsString].  The
+    former returns a sequence of floats, while the latter is faster and
+    returns a binary string containing the image data in the requested format.
+
+    If you call `allPixels` or `allPixelsAsString` on an input and plane that
+    was not returned by your `required_input_planes` function, Houdini will
+    raise a [Hom:hou.OperationFailed] exception.
+
+    After computing the pixel data for the plane, call
+    [Hom:hou.CopNode#setPixelsOfCookingPlane] or
+    [Hom:hou.CopNode#setPixelsOfCookingPlaneFromString].
+
+`resolution(cop_node)`:
+    You only need to implement this function if your COP changes the image
+    resolution.  By default, your COP will use the resolution of its first
+    input.
+
+    This function must return a sequence of two integers for the width and
+    height of the image.  Note that the resolution of the image cannot vary
+    with time.  COPs requires that all frames in an image sequence have the
+    same resolution.
+
+`depth(cop_node, plane)`:
+    You only need to implement this function if you want to change the image
+    depth of an existing plane or you want the depth of a new plane to be
+    something other than 32-bit float.  By default, your COP will not change
+    plane depths and any planes it creates will be 32-bit float.
+
+    This function must return a [Hom:hou.imageDepth] enumerated value to
+    indicate the depth for the given plane to cook.
+
+`frame_range(cop_node)`:
+    You only need to implement this function if your COP changes the frame
+    range information.  By default, your COP will use the frame range of its
+    first input.
+
+    This function may return `None` to indicate that it produces a still
+    image.  Otherwise, it must return a tuple of two integers indicating the
+    start frame and number of frames.
+
+`remap_frame(cop_node, frame)`:
+    You only need to implement this function if your COP modifies timing
+    information.  Given a frame number in this node's frame range, this
+    function returns the corresponding frame number in the input node's frame
+    range.  This function lets you shift, scale, and warp the timing
+    information.
+
+    If you implement this function, be sure to also implement `frame_range`
+    to return the correct range.
+
+Notes:
+- When calling `allPixels\[AsString\]` or
+  `setPixelsOfCookingPlane\[FromString\]`, scanlines are ordered with the
+  bottom scanline first.
+- You must pass in the correct data size to `setPixelsOfCookingPlane*`, or
+  Houdini will raise a [Hom:hou.OperationFailed] exception.  This function
+  can accept interleaved data or set the red, green, and blue components in
+  three separate calls.  See [Hom:hou.CopNode#setPixelsOfCookingPlane] for
+  more information.
+- `allPixels` returns each component (e.g. red, green, blue, alpha, etc.) in
+  each pixel of the input image planes as a 32-bit float value, regardless of
+  the bit depth the input cop uses to store the data.  For example, if the
+  input cop stores the "C" plane as an 8-bit unsigned value for the red
+  component, another 8-bit value for the green, and another for the blue,
+  asking for the "C" plane of the input using `allPixels` will return a 32-bit
+  float red component, a 32-bit float blue, and so on.
+- `allPixelsAsString` can return each component in each pixel of an input image
+  plane in any of the image depths supported by the compositor: 8-bit integer,
+  16-bit integer, 32-bit integer, 16-bit float, or 32-bit float.  To request
+  a particular bit depth, set the depth parameter to a [Hom:hou.imageDepth]
+  enumerated value.  If the depth parameter is not specified, the image depth
+  will be the same as the plane being cooked by the COP.
+- If your cop says that it cooks a plane by listing it in the return value
+  from `output_planes_to_cook` but does not call `setPixelsOfCookingPlane*`
+  from the `cook` function, Houdini will fill all the pixels of the missing
+  component(s) with zeros.
+- Python COPs only allow you to get and set pixels in the frame, not in the
+  full canvas area.  In COPs, the frame is the visible region of the plane and
+  corresponds to the image's resolution.  However, a node can store additional
+  pixels outside the frame, and the region of all possible pixels is called the
+  canvas.  For example, if you use a transform cop to move the pixels off to
+  the right of the frame, then use another transform cop to move pixels back
+  left, the original pixels will appear in the frame.  The reason is that the
+  first transform cop's canvas extends beyond the frame, so it can cook the
+  pixels outside the frame when the second transform cop asks for them.
+  To make Python COPs simpler, their canvas is always the same size as the
+  frame, and they can only ask for input data that lies within the input's
+  frame.
+- You cannot access pixel data from a cop that is not an input to your node.
+  In other words, do not call `allPixels*` on a COP node that is not an input
+  to your Python COP.
+- If your Python COP has multiple inputs and there may be gaps in the
+  connected inputs, use the [Hom:hou.Node#inputConnectors] method.  For example,
+  if your COP has a maximum of 2 inputs but a minimum of 0, it is possible
+  for the first input to be disconnected and the second to be connected.  If
+  you call [Hom:hou.Node#inputs] it will return only one entry.  The following
+  code lets you access an input even when there are gaps:
+  {{{
+  #!python
+  input_connections = cop_node.inputConnectors()[input_index]
+  if len(input_connections) == 0:
+      input_node = None
+  else:
+      input_node = input_connection[0].inputNode()
+  }}}
+
+== Writing COP Generators ==
+
+The difference between a generator and a filter is simply the minimum number of
+inputs.  The same Python COP node type can act as both a filter and a
+generator.  For this section, a generator is simply a COP node without an
+input and with a minimum number of inputs of zero.
+
+Python COP generators usually override the `output_planes_to_cook`,
+`resolution`, `depth`, and `cook` methods.
+
+If Python COP generators do not override `resolution`, the resolution will
+be 1x1.  If they do not override `frame_range`, they will generate a still
+image.  If they do not return the "C" and "A" planes from
+`output_planes_to_cook`, Houdini will still call `cook` with those plane names.
+
+By default, planes created by Python COP generators are always 32-bit float.
+However, by providing a `depth` function you can make them return any of the
+image depths supported by the compositor.
+
+== Example COP Nodes ==
+
+This Python COP generator produces a constant color and can take an optional
+input.  When an input is connected, the resolution parameter is ignored and it
+uses the resolution of the input.
+
+{{{
+#!python
+def output_planes_to_cook(cop_node):
+    return ("C", "A")
+
+def required_input_planes(cop_node, output_plane):
+    return ()
+
+def resolution(cop_node):
+    # If we don't have an input, use the value of the resolution parameter.
+    if len(cop_node.inputs()) == 0:
+        return cop_node.parmTuple("resolution").eval()
+
+    # Use the resolution of the first connected input.
+    input_cop = cop_node.inputs()[0]
+    return (input_cop.xRes(), input_cop.yRes())
+
+def cook(cop_node, plane, resolution):
+    num_pixels = resolution[0] * resolution[1]
+    rgba = cop_node.parmTuple("color").eval()
+    pixel = (rgba[3:] if plane == "A" else rgba[:3])
+    cop_node.setPixelsOfCookingPlane(pixel * num_pixels)
+}}}
+
+The following Python COP filter does not process any image data, but instead
+shifts the input sequence by the specified number of frames and then stretches
+the timing by the specified scale factor.  It assumes the node has the
+following parameters:
+
+frameshift:
+    the number of frames to shift the input sequence
+framescale:
+    the scale factor to apply to the number of frames
+
+{{{
+#!python
+import math
+
+def frame_range(cop_node):
+    input_cop = cop_node.inputs()[0]
+    if input_cop.isSingleImage():
+        return None
+
+    start_frame = int(input_cop.sequenceStartFrame() + cop_node.evalParm("frameshift"))
+    length_in_frames = int(math.floor(
+        input_cop.sequenceFrameLength() * cop_node.evalParm("framescale")))
+    return (start_frame, length_in_frames)
+
+def remap_frame(cop_node, frame):
+    """Return the frame number in the input required to cook the given frame
+    in this node.
+    """
+    input_cop = cop_node.inputs()[0]
+    input_start_frame = input_cop.sequenceStartFrame()
+    frame_scale = cop_node.evalParm("framescale")
+    frame_shift = cop_node.evalParm("frameshift")
+
+    original_index_in_input = frame - input_start_frame
+    remapped_frame_in_input = ((original_index_in_input / frame_scale) +
+        input_start_frame - frame_shift)
+    return remapped_frame_in_input
+
+def output_planes_to_cook(cop_node):
+    # By returning that no planes are cooked, they will be passed through
+    # from the input.
+    return ()
+
+def cook(cop_node, plane, resolution):
+    pass
+}}}
+
+For a more complicated example that uses the
+[numpy|http://numpy.sourceforge.net] module (included with Houdini)
+to composite the same foreground
+image in multiple locations over a background, see the
+[Multi Stamp Python COP|/hom/cookbook/multi_stamp] example from the
+[HOM cookbook|/hom/cookbook].
+
+== Processing Pixel Data Efficiently ==
+
+Python's overhead when constructing a list or tuple of many floats can be slow.
+So, when possible, it is better to use [Hom:hou.CopNode#allPixelsAsString]
+instead of [Hom:hou.CopNode#allPixels]. Using Python's
+[array|http://docs.python.org/library/array.html] module, you can efficiently
+convert the string data into a sequence of 32-bit floats, as illustrated by the
+following code:
+
+{{{
+#!python
+import array
+str_data = input_cop_node.allPixelsAsString("C")
+float_data = array.array("f", str_data)
+}}}
+
+Similarly, it is more efficient to call
+[Hom:hou.CopNode#setPixelsOfCookingPlaneFromString] instead of calling
+[Hom:hou.CopNode#setPixelsOfCookingPlane] with a list or tuple of floats.
+While you could convert from an array into a string by calling
+`float_data.tostring()`, `setPixelsOfCookingPlaneFromString` can accept
+the array object directly:
+
+{{{
+#!python
+cop_node.setPixelsOfCookingPlaneFromString(float_data)
+}}}
+
+Houdini includes the [numpy|http://numpy.scipy.org/] library. You can
+use it to reinterpret the contents of a binary string as a sequence of
+32-bit floats, without having to construct a new copy of the data:
+
+{{{
+#!python
+import numpy
+str_data = input_cop_node.allPixelsAsString("C")
+read_only_float_data = numpy.frombuffer(str_data, dtype=numpy.float32)
+}}}
+
+String data that has been reinterpreted as float data is read-only.  If you
+want to make a copy of the data to modify it, though, simply call `copy()`
+on it:
+
+{{{
+#!python
+writable_float_data = read_only_float_data.copy()
+}}}
+
+To convert the numpy array into a string, you could write
+`str(writable_float_data.data)`.  However, you can pass the numpy array
+directly into `setPixelsOfCookingPlaneFromString`:
+
+{{{
+#!python
+cop_node.setPixelsOfCookingPlaneFromString(writable_float_data)
+}}}
+
+Processing one pixel at a time inside a Python loop can be slow. `numpy`'s
+arrays provide efficient ways to operate on multiple pixels without requiring
+Python's looping constructs.  The following example implements a node that
+brightens the pixels in an image.  It assumes the COP has a float parameter
+named `bright`.
+
+{{{
+#!python
+import numpy
+
+def output_planes_to_cook(cop_node):
+    return ("C",)
+
+def required_input_planes(cop_node, output_plane):
+    if output_plane == "C":
+        return ("0", "C")
+    return ()
+
+def cook(cop_node, plane, resolution):
+    input_cop = cop_node.inputs()[0]
+
+    # Grab the pixels from the corresponding plane in the input, then build
+    # a numpy array from the data.
+    pixels = numpy.frombuffer(
+        input_cop.allPixelsAsString(plane), dtype=numpy.float32).reshape(
+        resolution[1], resolution[0], 3).copy()
+
+    # Use numpy to scale all values by the brightness.
+    pixels *= cop_node.evalParm("bright")
+
+    # Store the contents of the numpy array back into the pixel data.
+    cop_node.setPixelsOfCookingPlaneFromString(pixels.data)
+}}}
+
+== Writing Part of the COP in C++ == (using_cpp)
+
+Houdini's [inlinecpp|extendingwithcpp] module lets you easily write a portion
+of your COP in C++.
+
+If you construct an `array.array` object containing the image data from an
+input plane, you can pass the address of the array's underlying buffer into a
+C++ function and modify the contents of the array with C++ code.  The
+`buffer_info` method of array objects will return an `(address, length)` tuple
+for the underlying buffer, and you can pass the address into an inlinecpp C++
+function expecting a `float *`.
+
+The following example also brightens the pixels in an image, using C++
+code instead of the numpy module.  It assumes the COP has a float parameter
+named `bright`.
+
+{{{
+#!python
+import array
+import inlinecpp
+
+def output_planes_to_cook(cop_node):
+    return ("C",)
+
+def required_input_planes(cop_node, output_plane):
+    if output_plane == "C":
+        return ("0", "C")
+    return ()
+
+def cook(cop_node, plane, resolution):
+    input_cop = cop_node.inputs()[0]
+    color_pixels = array.array("f", input_cop.allPixelsAsString(plane))
+
+    cpp_lib = inlinecpp.createLibrary("py_brighten_cop", function_sources=["""
+    void brighten(float *color_pixels, int num_pixels, float amount)
+    {
+        for (int i=0; i<num_pixels; ++i)
+        {
+            color_pixels[0] *= amount;
+            color_pixels[1] *= amount;
+            color_pixels[2] *= amount;
+            color_pixels += 3;
+        }
+    }
+    """])
+    cpp_lib.brighten(
+	color_pixels.buffer_info()[0], resolution[0] * resolution[1],
+	cop_node.evalParm("bright"))
+
+    cop_node.setPixelsOfCookingPlaneFromString(color_pixels)
+}}}
+
+To get the address of the data of a `numpy` array, simply call `.ctypes.data`
+on the `numpy` array.  To use `numpy` instead of the `array` module in the above
+example, create the `numpy` array with:
+
+{{{
+#!python
+color_pixels = numpy.array(input_cop.allPixelsAsString("C", dtype=numpy.float32))
+}}}
+
+and call the C++ function with:
+
+{{{
+#!python
+cpp_lib.brighten(color_pixels.ctypes.data, cop_node.evalParm("bright"),
+    resolution[0] * resolution[1])
+}}}
+
+== Accessing Non-Interleaved Pixel Data == (non_interleaved_data)
+
+Note that the examples presented here use interleaved data (the color data is
+stored as a sequence of `RGBRGBRGB...`).  However some algorithms are easier
+to write using non-interleaved data (`RRR...`, `GGG...`, `BBB...`), and it
+is possible to ask the input cop for data in this format and to set the cooked
+data using this format.
+
+The following example brightens the pixels of the input plane by operating on
+one component at a time:
+
+{{{
+#!python
+import array
+import inlinecpp
+
+def output_planes_to_cook(cop_node):
+    return ("C",)
+
+def required_input_planes(cop_node, output_plane):
+    if output_plane == "C":
+        return ("0", "C")
+    return ()
+
+def cook(cop_node, plane, resolution):
+    input_cop = cop_node.inputs()[0]
+    component_values_dict = dict(
+        (component, array.array(
+            "f", input_cop.allPixelsAsString(plane, component)))
+        for component in input_cop.components(plane))
+
+    cpp_lib = inlinecpp.createLibrary("py_brighten_cop", function_sources=["""
+    void brighten(float *component_values, int num_pixels, float amount)
+    {
+        for (int i=0; i<num_pixels; ++i)
+            component_values[i] *= amount;
+    }
+    """])
+
+    for component, component_values in component_values_dict.items():
+        cpp_lib.brighten(
+            component_values.buffer_info()[0], resolution[0] * resolution[1],
+	    cop_node.evalParm("bright"))
+        cop_node.setPixelsOfCookingPlaneFromString(component_values, component)
+}}}
+
+== Working With Different Image Depths == (different_image_depths)
+
+The following simple example COP converts all input image planes to the
+format specified in a menu parameter.  It assumes the menu parameter is
+named "depth" and that it has the values "Int8", "Int16", "Int32", "Float16",
+or "Float32".  (Note that Houdini already provides a convert COP to convert
+the image depth.)
+
+{{{
+#!python
+import inlinecpp
+
+def output_planes_to_cook(cop_node):
+    return cop_node.inputs()[0].planes()
+
+def required_input_planes(cop_node, output_plane):
+    return ("0", output_plane)
+
+def depth(cop_node, plane):
+    return getattr(hou.imageDepth, cop_node.parm("depth").evalAsString())
+
+def cook(cop_node, plane, resolution):
+    # If we don't specify a particular depth when calling allPixelsAsString,
+    # it will convert the input plane depth into the depth of the cooking
+    # plane (which is determined by the return value from the depth function
+    # above).
+    input_cop = cop_node.inputs()[0]
+    pixels = input_cop.allPixelsAsString(plane)
+    cop_node.setPixelsOfCookingPlaneFromString(pixels)
+}}}
+
+The following example illustrates how to preserve the depth of input planes.
+Each input plane is converted to 32-bit float point data while the Python COP
+processes it, and the result is converted back into the depth of the input
+plane.
+
+{{{
+#!python
+import numpy
+
+def input_cop(cop_node):
+    return cop_node.inputs()[0]
+
+def output_planes_to_cook(cop_node):
+    input_planes = input_cop(cop_node).planes()
+    return [plane for plane in cop_node.evalParm("planes").split()
+        if plane in input_planes]
+
+def required_input_planes(cop_node, output_plane):
+    return ("0", output_plane)
+
+def depth(cop_node, plane):
+    return input_cop(cop_node).depth(plane)
+
+def cook(cop_node, plane, resolution):
+    input = input_cop(cop_node)
+    pixels = numpy.frombuffer(
+        input.allPixelsAsString(plane, depth=hou.imageData.Float32),
+        dtype=numpy.float32)
+
+    # Perform some operation here to modify the contents of pixels.
+
+    cop_node.setPixelsOfCookingPlaneFromString(
+	pixels, depth=hou.imageData.Float32)
+}}}
+
+The following table lists the array format specifiers corresponding to
+the different image depths supported in COPs:
+
+Houdini enum value ||
+	array module format string ||
+		`numpy` module format constant ||
+			`numpy` module format string ||
+
+[Hom:hou.imageDepth#Int8] |
+	`"B"` |
+		`numpy.uint8` |
+			`"u1"`
+
+[Hom:hou.imageDepth#Int16] |
+	`"H"` |
+		`numpy.uint16` |
+			`"u2"`
+
+[Hom:hou.imageDepth#Int32] |
+	`"I"` |
+		`numpy.uint32` |
+			`"u4"`
+
+[Hom:hou.imageDepth#Float16] |
+	_NA_ |
+		`numpy.float16` |
+			`"f2"` (numpy 1.5.1+)
+
+[Hom:hou.imageDepth#Float32] |
+	`"f"` |
+		`numpy.float32` |
+			`"f4"`
+
+The following example illustrates how to create a `numpy` array of the input
+plane in its native format, for manipulation with `numpy`:
+
+{{{
+#!python
+import numpy
+
+def input_cop(cop_node):
+    return cop_node.inputs()[0]
+
+def output_planes_to_cook(cop_node):
+    input_planes = input_cop(cop_node).planes()
+    return [plane for plane in cop_node.evalParm("planes").split()
+        if plane in input_planes]
+
+def required_input_planes(cop_node, output_plane):
+    return ("0", output_plane)
+
+def depth(cop_node, plane):
+    return input_cop(cop_node).depth(plane)
+
+depths_to_numpy_types = {
+    hou.imageDepth.Int8: numpy.uint8,
+    hou.imageDepth.Int16: numpy.uint16,
+    hou.imageDepth.Int32: numpy.uint32,
+    hou.imageDepth.Float16: numpy.float16,
+    hou.imageDepth.Float32: numpy.float32
+}
+
+def cook(cop_node, plane, resolution):
+    input = input_cop(cop_node)
+    pixels = numpy.frombuffer(
+        input.allPixelsAsString(plane),
+        dtype=depths_to_numpy_types[input.depth(plane)]).copy()
+
+    # Perform some operation here to modify the contents of pixels.
+
+    cop_node.setPixelsOfCookingPlaneFromString(pixels)
+}}}
+
+== COP Errors and Warnings == (errors_and_warnings)
+
+If your Python COP node generates an exception, the node will turn red with an
+error and you can view the stack trace of the error by middle-clicking on it.
+
+If you would like to generate an error message to the user that doesn't contain
+a Python stack trace, raise a [Hom:hou.NodeError] exception.  For example,
+running
+
+{{{
+#!python
+raise hou.NodeError("Invalid parameter settings")
+}}}
+
+will turn the node red with an error message of `"Invalid parameter settings"`.
+Similarly, you can add node warnings by raising instances of
+[Hom:hou.NodeWarning].
+
+== Special Function Names Used by COPs == (special_function_names)
+
+For reference, here are the functions with special meaning:
+
+- `output_planes_to_cook(cop_node)`
+- `required_input_planes(cop_node, output_plane)`
+- `cook(cop_node, plane, resolution)`
+- `remap_frame(cop_node, frame)`
+- `frame_range(cop_node)`
+- `resolution(cop_node)`
+- `output_planes_to_cook(cop_node)`
+- `depth(cop_node, plane)`
+- `frame_range(cop_node)`
+

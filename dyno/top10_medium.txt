@@ -1,0 +1,140 @@
+= Top ten intermediate things about dynamics =
+
+== Objects, data, and solvers ==
+
+Simulations consist of _objects_ and _data_. Objects are merely repositories of data. When you see an object, such as an RBD ball, in your scene, it's because the object has `Geometry` data attached to it, which by convention Houdini draws in the viewer and renders.
+
+The data attached to objects is, in some sense, arbitrary: it can be pretty much anything. There are no constraints on how a piece of data is named or what it contains. But only certain names and types of data are meaningful to _solvers_.
+
+Solvers do the work of calculating how simulated objects (RBD objects, wires, cloth surfaces, fluids, etc.) behave. They look at the data attached to objects (and may attach some of their own) and use it to run the simulation.
+
+When you create a simulation object from the shelf, Houdini creates a high-level object, such as an [RBD object|Node:dop/rbdobject]. You can dive into the RBD object node to see that it's really an [Empty object|Node:dop/emptyobject] with the right data attached -- the data the RBD solver needs to simulate the object.
+
+table class="compact">>
+    tr>>
+        td>>[Image:/images/dynamics/rbdobject_inside1.png]
+        td>>[Image:/images/dynamics/rbdobject_inside2.png]
+        td>>[Image:/images/dynamics/rbdobject_inside3.png]
+    tr>>
+        td class="caption">>High level RBD object
+        td class="caption">>Inside is an empty object with an RBD configure object node.
+        td class="caption">>Inside the RBD configure object node is a bunch of data attachments
+
+(Many dynamics nodes are implemented this way, as [digital assets|/assets/index], where high-level nodes encapsulate networks that in the end are just attaching data to objects for the solvers to interpret.)
+
+Solvers will use data it knows about and ignore other data. So, you can attach data useful to another solver (such as scalar data), or any arbitrarily named data, to an RBD object and the RBD solver will happily ignore it.
+
+== Solvers take objects and data and modify them ==
+
+Solvers do the work of calculating how simulated objects (RBD objects, wires, cloth surfaces, fluids, etc.) behave. They look at the data attached to objects (and may attach some of their own) and use it to run the simulation. For example, the RBD solver will look at the physical data, such as density, and forces, such as gravity, attached to an object to determine where to move it (updating its _position data_). If an object doesn't have a solver attached to it, it won't do anything when the simulation runs.
+
+(OK, that's not exactly true... if you really wanted to, you could use expressions in the data fields that are meaningful to the viewer, such as `Position`, to make simulated objects move without a solver. But it wouldn't be nearly as much fun!)
+
+The solver that should control an object is attached as another piece of data on the object. Different types of simulated objects can affect each other (for example, RBD objects displacing smoke). Objects cannot be controlled by multiple solvers, but you _can_ attach a solver that itself uses multiple solvers, such as a [Blend solver|Node:dop/blendsolver]. See below for more information on combining solvers.
+
+NOTE:
+    When you use the [shelf tools|/shelf] to create simulation objects, they will attach solvers for you. If you're working in the network, you will need to create your own solver nodes and attach them to your objects.
+
+Houdini cooks dynamics simulations in a two step process:
+
+# Process the network to establish objects and data attachments.
+# Run solvers on the processed data tree.
+
+== Green and gray connections ==
+
+Dynamics nodes have two types of inputs:
+
+- *Gray* inputs are "objects plus data". The connections pass through or modify objects by adding data to them.
+
+- *Green* inputs are "data". These represent pieces of data that will eventually be attached to an object or objects using an Apply Data node.
+
+Nodes that attach data usually accept either a gray input (an object or objects to attach the data to), or green inputs (an accumulation of data packets to add to). The type of input connection you make to the node (gray or green) changes the output to the same type.
+
+For example, a simple network consists of an _object creation node_, _forces_, and a _solver_.
+
+[Image:/images/dynamics/network_simple.png]
+
+This might be called an "inline" or "object-centric" style, where the RBD object passes through the gravity node, which adds `Force` data to it, and then to the RBD Solver node, which adds `Solver` data to it. This is equivalent to this network:
+
+[Image:/images/dynamics/network_applydata.png]
+
+In this "data-centric" layout, pure `Force` and `Solver` data outputs from the Gravity and RBD Solver nodes are attached to the RBD Object using an Apply Data node.
+
+Note that data nodes attach their piece of data applies to _all nodes above them in the network_.
+
+[Image:/images/dynamics/network_merge.png]
+
+In the network above, the Gravity and RBD Solver nodes will attach `Force` and `Solver` data to all three RBD Objects, because the objects are above the gravity and solver nodes in the network. Use Merge nodes and connection branching to control which data gets attached to which objects. It's especially important to make sure that each object only gets one solver attached. 
+
+== How to refer to objects and data ==
+
+<!--
+        TBD.
+-->
+
+For more information see [DOPs input and output|io].
+
+<!--
+        == Forces start working at frame 2 ==
+        
+        TBD.
+-->
+
+== When a simulation is finalized, cache the geometry to disk ==
+
+See [caching simulated geometry to disk|cache].
+
+== Set initial vs. set always ==
+
+In a dynamics node that attaches data, each field has a pop-up menu that controls when the values on the right side are set on the input objects.
+
+[Image:/images/dynamics/override_menu.png]
+
+The default is "Set initial", which sets/imports the data at the first frame of the simulation.
+
+If you are importing values or geometry from outside DOPs where what is being imported changes (or may change) depending on the frame (for example deforming geometry or values referenced from other networks that use a time-dependent expression), you should change the menu for any parameters that need the updated value to "Set always".
+
+Using "Set always" is _quite a bit slower_, since it must constantly rewrite the data tree, so you shouldn't turn it on unless you really need it, and turn it on for as few parameters as possible.
+
+Set initial:
+    Set this value _at the first frame of the simulation_, then let the simulation control the value from that point on.
+    
+Set always:
+    Update this value _at every frame_. Use this setting if you want the value to be constant for every frame, or if the value is animated and so shouldn't be controlled by the simulation.
+    
+Set never:
+    Do not set/change this value, even on the first frame.
+    
+Use default:
+    Use the setting from the __Default operation__ pop-up menu on this node. This is useful for setting/changing the policy for many parameters at once. The "default default" is "Set initial".
+
+== Solve order and simultaneous solving ==
+
+Houdini sorts out the objects in the scene based on relationships to determine the order in which to solve them. For one-way relationships, affectors are solved before the affected objects. Wherever a mutual relationship exists, or wherever a hierarchical group of relationships creates a loop, all relationships in that group must be solved _simultaneously_.
+
+Simultaneous solving is really pseudo-simultaneous... because computers are sequential they can't work with truly simultaneous events, so Houdini tries to work out a close approximation through an iterative process:
+
+# Apply forces to objects in the order --- left to right, top to bottom (in the network).
+# Look for collisions.
+# If anything collided, feed the collision forces back into the objects. For static objects this feedback step is optimized out.
+# Repeat until no collisions or __Max feedback loops__ is reached.
+
+    The __Max feedback loops__ parameter on the DOP Network containing the simulation limits the number of collision feedback loops Houdini will run, to speed up the simulation and prevent infinite loops.
+
+The best order for solving RBD simulations is to evaluate the heavy objects first, before the light objects. When wiring nodes manually, you can try to wire heavy objects to the left of light objects in Merge nodes. When creating networks automatically, Houdini will assume that particles (solved by the particle solver) are light, and try to wire them to the right of other objects. If you're simulating heavy particles, you may want to change the wiring order.
+
+== Utility solvers ==
+
+Houdini includes several utility solvers for setting up more advanced networks.
+
+* [Multiple solver|Node:dop/multisolver] runs multiple solvers in order on the same objects.
+
+* [Blend solver|Node:dop/blendsolver] runs multiple solvers and blends between their effects, based on blend factor data on each object. Use the [Blend Factor node|Node:dop/blendfactor] to attach blend factor data to each object. 
+
+* [Switch solver|Node:dop/switchsolver] routes objects to different solvers based on a piece of switch data on each object. Use the [Switch Value node|Node:dop/switchvalue] to attach switch data to each object.
+
+    The switch solver is similar to the [Switch|Node:dop/switch] node, but where the Switch node operates during the data attachment step (and so can affect which data gets attached to which objects), the Switch Solver runs in the solve step (and so can see all data attached to all objects).
+
+* [Script solver|Node:dop/scriptsolver] runs a script that can potentially change data, update positions, etc. Several HScript commands, expression functions, and HOM classes exist to enable writing scripts to modify dynamics simulations. 
+
+* [Copy data solver|Node:dop/copysolver]

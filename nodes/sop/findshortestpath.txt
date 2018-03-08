@@ -1,0 +1,166 @@
+= Find Shortest Path =
+
+#type: node
+#context: sop
+#internal: findshortestpath
+#icon: SOP/findshortestpath
+#tags: crowds, tech, games
+
+"""Finds the shortest paths from start points to end points, following the edges of a surface."""
+
+== Overview ==
+
+This node finds the shortest paths through edges of the input surface geometry, between all pairs of start and end points, creating polygon curves along those paths.
+
+There are many options for specifying path costs other than just the length of the path, for example, costs for visiting certain points.  If a pair of start and end points cannot be joined by a path, or if the cost would be infinite, no polygon is created for that pair.
+
+Also, if a second input is supplied, the __Start Points__ and __End Points__ parameters refer to points in the second input. The paths will start and end at the points in the first input (Surface Geometry), that are closest to the specified points in the second input.  For example, this allows you to provide a single line segment into the second input and move it around interactively, specifying 0 as the start point and 1 as the end point.
+
+@parameters
+
+Start Points:
+    The points, often just one, from which to start the paths to the end points.  If a second input is supplied, this refers to points in the second input, and the paths will start at the points in the first input that are closest to the specified points in the second input.
+    
+End Points:
+    The points, often just one, at which the paths from the start points are to end.  If a second input is supplied, this refers to points in the second input, and the paths will end at the points in the first input that are closest to the specified points in the second input.
+    
+Adjacency Array Attribute:
+    If enabled, this specifies a point attribute that indicates to add directed edges from each point to the points whose numbers are in the array.  In this case, __Point Cost Attribute__ can optionally be an array attribute whose entries correspond with costs added to these edges, in addition to any other costs.
+
+== Output ==
+    
+Output Paths:
+    If enabled, the paths found will be output as polygon curves.  If disabled, the paths will not be output, and __Keep Original Geometry__ will always be enabled.
+
+From any start to any end:
+    A single, lowest-cost path between any pair of start and end points will be output, if any path exists.
+
+From each start to any end:
+    For each start point, the lowest-cost path from that point to any end point will be output, if any path exists.
+
+From any start to each end:
+    For each end point, the lowest-cost path to that point from any start point will be output, if any path exists.
+
+From each start to each end:
+    For each start point, and for each end point, the lowest-cost path from that start point to that end point will be output, if any path exists.
+
+From each start to corresponding end:
+    For each start point, the lowest-cost path will be output from that start point to the end point corresponding with it in the specified order of start points and end points, if any path exists.  The number of end points must be equal to the number of start points.
+    
+Keep Original Geometry:
+    If enabled, the surface geometry will be output.  If __Output Paths__ is also enabled, the paths will share the points with the surface geometry.  If __Output Paths__ is disabled, this will always be enabled.
+    
+Cost Attribute:
+    If given, a point attribute with the specified name will be created, indicating the accumulated cost at each point.  If __Keep Original Geometry__ is also enabled, the cost for reaching all points will be output, including for points not in paths being output.  In that case, if multiple start points are specified, the minimum cost of reaching each point from any start point will be output, regardless of the option selected in the __Output Paths__ dropdown menu.  If any point is unreachable from the specified start points, this attribute will have a negative value for that point.  If multiple start points are specified and one of the two __From each start...__ options is selected, this attribute will contain tuples of size equal to the number of start points, to output the minimum costs of paths from each start point, in the order given in the __Start Points__ field.  If __Adjacency Array Attribute__ is enabled, this can optionally be an array attribute whose entries correspond with costs added to the directed edges specified by the adjacency attribute, in addition to any other costs.
+    
+Previous Point Number Attribute:
+    #id: outputprevptnum
+    
+    If given, a point attribute with the specified name will be created, indicating the surface geometry point number that each output point was first reached via.  This provides a path representation that is easier to use in VEX than the output path polygon representation.
+    
+Point Number Attribute:
+    If given, a point attribute with the specified name will be created, indicating the surface geometry point number that corresponds with each output point.  This information provides a mapping back to the surface geometry, useful for the case where __Keep Original Geometry__ is disabled.
+    
+Paths Group:
+    If given, a primitive group with the specified name will be created, and the path polygon curves will be added to it.  This can be useful for distinguishing surface geometry from the output paths.
+    
+Start Point Attribute:
+    If given, a primitive attribute with the specified name will be created, indicating the input start point that corresponds with each output path.  If __Keep Original Geometry__ is enabled, this attribute will have value -1 for primitives that are not output paths.
+    
+End Point Attribute:
+    If given, a primitive attribute with the specified name will be created, indicating the input end point that corresponds with each output path.  If __Keep Original Geometry__ is enabled, this attribute will have value -1 for primitives that are not output paths.
+    
+Path Cost Attribute:
+    If given, a primitive attribute with the specified name will be created, indicating the cost of each output path.  If __Keep Original Geometry__ is enabled, this attribute will have a negative value for primitives that are not output paths.
+        
+== Path Costs ==
+    
+Max Search Path Cost:
+    If enabled, no paths with cost higher than this will be considered valid.  This can help cut short the search for paths if higher cost paths are not relevant.
+    
+Point Cost Attribute:
+    If given, the specified point attribute on the surface geometry will be added to the cost of a path visiting each node.
+    
+Primitive Cost Attribute:
+    If given, the specified primitive attribute on the surface geometry will be added to the cost of a path passing along an edge of the primitive.  When multiple primitives share the same edge, the primitive with lowest number is used.  If a primitive is in the __Directed Primitives__ group, it will only be considered if the edge is in the correct direction within the primitive.
+    
+Omit Distance from Cost:
+    If enabled, the length of an edge will not be included in the cost of the edge.  This can be useful if an edge cost that is not directly dependent on the length is desired, which can be specified in the __Custom Edge Cost__ parameter.
+    
+Consider Turning Costs:
+    This is disabled by default, and the cost of an edge can only depend on the points on that edge.  However, when this is enabled, a slower approach is used that allows the cost of an edge to also depend on the previous edge.  This enables the costs to depend on, for example, turning angles.
+    
+Angular Cost Attribute:
+    If given, the specified point attribute on the surface geometry will be multiplied by the angle turned at each point in a path and the result will be added to the cost of the path.  This can only be used if Consider Turning Costs is enabled.
+    
+Custom Edge Cost:
+    This provides the option to specify a custom edge cost, either as a constant cost added to all edges, or as an expression, allowing for a very broad range of costs.  For example, you could penalize edges with steep slopes.  If __Consider Turning Costs__ is enabled, the expression can refer to the point visited previous to the edge.  See below for a list of available local variables.
+    
+Enable Primitive Variables in Custom Cost:
+    If enabled, the expressions in __Custom Edge Cost__ and __Override Heuristic__ can refer to the primitive of the edge being considered.  If __Consider Turning Costs__ is enabled, these expressions can refer to the primitive visited previous to the edge.  See below for a list of available local variables.
+    
+Override Heuristic:
+    In the cases where paths are only to be found to one end point, a heuristic underestimate of the minimum cost of traveling from the current point to the end point is used to guide the search.  In some cases, a better underestimate is known, which can sometimes greatly speed up searching, and can be specified here.
+        
+== Surface Constraints ==
+    
+Surface Primitives:
+    Paths are only allowed to pass through the edges of these primitives.  If this field is left empty, paths will be able to pass through the edges of any primitives.
+    
+Directed Primitives:
+    If enabled, the edges of the specified primitives will be considered "directed", meaning that paths will only be able to pass through such an edge in the direction it appears in the primitive, unless the edge occurs in another primitive.  This is useful for specifying transitions that can only go one-way, for example, jumping down but not up, using polygon curves in the desired direction.  The __Custom Edge Cost__ can also be used to make an edge cost more in one direction than in the other.
+    
+Edges to Avoid:
+    If enabled, these edges will not be used in any paths.
+
+@locals
+
+Both the __Custom Edge Cost__ and __Override Heuristic__ parameters allow for expressions using the following local variables.
+
+PTSTART:
+    The number of the current start point.  If there are multiple start points and the __Output Paths__ option is either disabled or set to search for paths from any start point, this will not be available.
+    
+PT0:
+    The number of the point at the tail of the edge previous to the edge being considered.  If `$PT` is the start point, there is no previous point, so this is -1.  This is only available if __Consider Turning Costs__ is enabled.
+    
+PT:
+    The number of the point at the tail of the edge being considered, i.e. the point that was most recently added to the current search path.
+    
+PT2:
+    The number of the point at the head of the edge being considered, i.e. the point that is being considered for addition to the current search path.
+    
+PTEND:
+    The number of the unique end point.  If there are multiple end points, this will not be available.
+    
+PR0:
+    The lowest number of a primitive sharing the edge previous to the edge being considered, i.e. the edge that was most recently added to the current search path.  If `$PT` is the start point, there is no previous point, so this is -1.  This is only available if __Consider Turning Costs__ and __Enable Primitive Variables in Custom Cost__ are enabled.  If __Directed Primitives__ is enabled, a primitive in the directed group is only considered to share edges that are traversed in the direction in which they appear in the primitive.
+    
+PR:
+    The lowest number of a primitive sharing the edge being considered for addition to the current search path.  This is only available if __Enable Primitive Variables in Custom Cost__ is enabled.  If __Directed Primitives__ is enabled, a primitive in the directed group is only considered to share edges that are traversed in the direction in which they appear in the primitive.
+    
+LEN0:
+    The length of the edge previous to the edge being considered.  If `$PT` is the start point, there is no previous point, so this is 0.  This is only available if __Consider Turning Costs__ is enabled.
+    
+LEN:
+    The length of the edge being considered.
+    
+TXSTART, TYSTART, TZSTART:
+    The coordinates of the current start point.  If there are multiple start points and the __Output Paths__ option is either disabled or set to search for paths from any start point, these will not be available.
+    
+TX0, TY0, TZ0:
+    The coordinates of the point at the tail of the edge previous to the edge being considered.  If `$PT` is the start point, there is no previous point, so these are equal to the start coordinates.  This is only available if __Consider Turning Costs__ is enabled.
+    
+TX, TY, TZ:
+    The coordinates of the point at the tail of the edge being considered, i.e. the point that was most recently added to the current search path.
+    
+TX2, TY2, TZ2:
+    The coordinates of the point at the head of the edge being considered, i.e. the point that is being considered for addition to the current search path.
+    
+TXEND, TYEND, TZEND:
+    The coordinates of the unique end point.  If there are multiple end points, these will not be available.
+
+@related
+
+- [Node:sop/polywire]
+- [Node:sop/line]
+- [Node:sop/add]

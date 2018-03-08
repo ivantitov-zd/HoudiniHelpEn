@@ -1,0 +1,80 @@
+= Using spare parameters =
+
+"""How to add extra parameters to an individual node."""
+
+== Overview ==
+
+Houdini lets you add your own custom _spare parameters_ to an individual node's user interface. You can then use the value of the spare parameters in expressions. This lets you set up an interface that lets you tweak parts of an expression without having to hand-edit numbers.
+
+(Spare parameters only exist on a single node. If you want to create a new type of node that lets you create multiple nodes with the same customized user interface, you want a [digital asset|/assets/].)
+
+
+== Example ==
+
+For example, you might have a [Point geometry node|Node:sop/point] that randomly jitters point positions up and down in Y using the expression:
+
+Position Y ||
+    #width: 20%
+    `@P.y + (rand(@ptnum) - 0.5)`
+
+(Where `@P.y` is the current point's position in Y, [Exp:rand] returns a number between 0 and 1, `@ptnum` is the current point's number used as a random seed, and `0.5` is subtracted to change the random range from `-0.5` to `+0.5`.)
+
+You could add a multiplier to change the scale of the jitter:
+
+Position Y ||
+    #width: 20%
+    `@P.y + (rand(@ptnum) - 0.5) * 5`
+
+...but if you want to play with the multiplier, it's tedious to hand-edit the number in the expression. What you want is a parameter on the node that modifies the multiplier value in the expression.
+
+You can change the expression to reference a parameter using the [Exp:ch] function:
+
+Position Y ||
+    #width: 20%
+    `@P.y + (rand(@ptnum) - 0.5) * ch('jitter_scale')`
+
+...and add a spare parameter named `jitter_scale`. Then you can use the parameter interface to set the scale interactively using a slider.
+
+(See the [expression cookbook|/ref/expression_cookbook] for more information on writing expressions.)
+
+== How to ==
+
+# In the node's parameter editor, click __+(fa-cog) > Edit parameter interface__.
+
+# In the __Create Parameters__ list, drag a parameter type over to the __Existing parameters__ list and drop it where you want it to go in the interface.
+
+    For example, to add a floating point parameter under the __Group__ field, drag __Float__ from the left pane and drop it under __Group__ in the __Existing parameters__ list.
+
+# Under __Parameter description__, set the options for the new parameters:
+
+    * Set the __Name__ to an internal name for the parameter. This is the value you will use in `ch("name")` function calls. It must not contain spaces, and can't be the same as the name of any other parameters on the node.
+
+    * Set the __Label__. This will be the label for the parameter in the user interface.
+
+# Use [Exp:ch] in other parameters to reference the value of the new parameter (or [Exp:chs] for string parameters).
+
+    For example, in an expression you can reference the value of the `jitter_scale` parameter on the same node using:
+    
+    {{{
+    #!hscript
+    ch('jitter_scale')
+    }}}
+
+
+== VEX snippets ==
+
+Some nodes, such as the [Attribute Wrangle geometry node|Node:sop/attribwrangle] let you write short VEX scripts to modify the node's behavior. You can use parameter references in these snippets and automatically add the corresponding spare parameters.
+
+# In a VEX snippet, use the [Vex:chi], [Vex:chf], [Vex:chv], or [Vex:chs] functions wherever you want parameters.
+
+    For example:
+    
+    {{{
+    #!vex
+    @P.x += (random(@ptnum) - 0.5) * chf("scale");
+    }}}
+
+# Click the [Icon:BUTTONS/create_parm_from_ch] Create Parameters button.
+
+    Houdini finds any channel references in the snippet that don't have corresponding parameters and creates parameters for them automatically.
+    The parameters appear in the editor below the snippet.

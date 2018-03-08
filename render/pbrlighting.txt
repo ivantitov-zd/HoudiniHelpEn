@@ -1,0 +1,61 @@
+= PBR Lighting =
+
+"""How the Physically Based Rendering engine in mantra uses VEX to compute lighting."""
+
+Mantra's PBR engine uses functions written in [VEX|/vex/] to compute lighting. The default implementations for these functions are in `$HFS/houdini/vex/Surface`, but you can replace them with your own implementations.
+
+
+== pbrlighting() == (lighting)
+
+Mantra's PBR engine calls `pbrlighting()` to compute lighting.
+
+`pbrlighting()` first computes the possible light paths to evaluate by calling `pbr_bounce_mask()`.  This is where bounce limits are used to prune ray trees.
+
+If direct lighting is requested, the `pbrlighting()` function then iterates over all light sources, computing the direct illumination by calling `pbr_direct_lighting()` (see [below|#direct]).
+
+`pbrlighting()` will also evaluate indirect illumination if needed by
+calling `_pbr_pathtrace()` (see [below|#trace]).
+
+After the function computes direct and indirect illumination, it combines them and stores the values in light exports.
+
+After this, the special case of shadow-matte evaluation is computed.
+
+
+== pbr_direct_lighting() == (direct)
+
+This function seems fairly straight-forward at first glance: it iterates over the light sources, calling `lt->illuminate()` to compute the amount of illumination from the light source.
+
+However, the `lt->illuminate()` function is a bit opaque since it's implemented as a method on an opaque struct. Currently, the `illuminate()` method is hard-coded to the `mislighting()`
+shader (`$HFS/houdini/vex/Surface/mislighting.vfl`).
+
+The `mislighting()` shader does both light-centric and
+surface-centric sampling of the light source.  The balance between
+light-centric and surface-centric is normally determined automatically
+by inspecting the BSDF on the surface.  However, you can also use the
+[Mantra:vm_misbias] property to manually tweak the sampling.
+
+Light centric sampling will sample the light source and send rays to the surface.  It does this by calling [Vex:sample_light] which generates sample points on the light source.  Internally, the `sample_light()` function looks at the shader defined by the `light:samplershader` property in mantra.  This shader is typically defined automatically by the SOHO light wrangler (`$HH/soho/wranglers/HoudiniLightIFD.py`).  Currently this parameter cannot be overridden using a Houdini parameter, and will either be `sampler_pclight()` or `sampler_geometry()` function (found in `$HH/vex/Light`).
+
+`sample_pclight()` is used to sample point clouds bound to the light.
+The wrangler ensures the `pcfile` is set properly.
+
+`sampler_geometry()` calls [Vex:sample_geometry].  This
+function uses internal structures in mantra to evaluate a point on the
+geometry of the light source.  `sample_geometry()` for light sources is
+handled differently for 3 broad categories of lights: Point Lights,
+Environment lights and Distant/Sun lights.  For geometry objects,
+sample_geometry() evaluates the rendered geometry to determine shading
+positions.
+
+
+== _pbr_pathtrace() == (trace)
+
+This function computes indirect illumination, using various parameters to do variance anti-aliasing. It sends rays based on evaluation of the BSDF for the surface being shaded.  The function propagates through the scene,
+integrating the illumination into the final results.
+
+For each shading sample, the valid light paths are computed using `pbr_bounce_mask` (as in `pbrlighting()`, see [above|#lighting]).  If direct lighting is required, it's computed by calling `pbr_direct_lighting()`.
+
+When sending a ray, the shader calls [Vex:sample_bsdf] to compute the ray information for the light path to evaluate, and then calls [Vex:trace] to send the ray.  If required, the ray is then propagated from the hit position.
+
+If the ray doesn't hit any geometry for indirect illumination, [Vex:resolvemissedray] is called, which looks at the mantra setting for how to resolve missed rays.
+

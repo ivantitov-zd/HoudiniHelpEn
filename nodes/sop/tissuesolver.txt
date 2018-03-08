@@ -1,0 +1,434 @@
+#type: node
+#context: obj
+#internal: tissuesolver
+#icon: SOP/solver
+
+
+= Tissue Solver =
+
+"""Collects muscles, anatomical bone models, and skin objects and places them into a single dynamics simulation."""
+
+The Tissue Solver SOP combines muscle objects and anatomical bone models, envelopes them in a soft body tissue, and performs a physically based FEM simulation.  
+Tissue and muscles are simulated bilaterally, meaning that tissue will affect muscles, and muscles will affect tissue.  Anatomical bones are not affected by either tissue or muscles, however, tissue are muscles are affected by bones.
+
+The Tissue Solver SOP is usually added to your network automatically when the Tissue System shelf tool is invoked.  A tissue system is designed to collect muscles, franken muscles, skin, and bones, apply simulation properties, and ultimately feed all these components into the Tissue Solver SOP.
+
+For viewport based tool interaction help see: [Icon:OBJ/muscle][Tissue System|/shelf/muscle_tissuesimulate].
+
+         
+@parameters
+	
+== Physical ==
+
+These parameters control the simulation properties assigned to the tissue.
+
+Tissue is simulated in Houdini as a hybrid solid soft body object.  This means it is constructed with a solid interior as well as a polygonal skin surface layer. The skin layer is treated as a thin layer of solid matter near the surface with its own material characteristics independent from the rest of the solid material properties.  Since the skin layer is constructed as a polygonal surface, effects like skin "wrinkling" are made possible.
+
+==== Skin Layer ====
+
+Shape Stiffness:
+    This determines how strongly the skin polygons resist local deformation in directions tangent to the skin surface.
+    
+Bend Stiffness:
+    This determines how strongly the skin polygons resist local deformation in directions normal to the skin surface.
+    
+Damping Ratio:
+    This unitless parameter controls how quickly the skin polygons stop deforming.
+
+Mass Density:
+    This is the density of mass per volume for the skin polygons.
+
+Thickness:
+    This specifies the volume per surface area for the skin polygons.
+    
+==== Connective Tissue Layer ====
+
+Shape Stiffness:
+    This determines how strongly the solid tets resist local changes in shape.
+    
+Volume Stiffness:
+    This determines how strongly the solid tets resist local changes in volume.
+    
+Damping Ratio:
+    This unitless parameter controls how quickly the solid tets stop deforming.
+    
+Mass Density:
+    This is the density of mass per volume for the solid tets.
+    
+== Tissue ==
+
+These parameters control how the tissue geometry is constructed, how it is animated, and how it handles collisions.
+
+==== Solid Embedding ====
+
+Once internalized, the input skin geometry is converted to a solid object for simulating.
+
+
+=== Stashed Tissue ===
+
+Once a tetrahedral mesh is constructed, it may be convenient to save a cached copy of the generated mesh to avoid having to recompute the geometry whenever this node is initialized.
+
+Stash Tissue:
+    This button will store an internal cached copy of the tetrahedralized tissue data.  The solidification parameters are disabled when a stash exists.
+    
+Clear Stash:
+    Delete the stashed data, and re-enable the solidification parameters.
+    
+=== Make Solid ===
+These parameters control how to internalize the skin polygons as a solid tetrahedral mesh.
+
+Base Size:
+    If enabled, this option sets the size of the model in the input. This enables the modification of the model without changing the relative scale of the generated tets. If disabled, the base size of the model is determined automatically as the diameter. In this mode, the sizes of generated tets are independent of the global scale of the model. All sizing parameters below as scaled using the manually set or automatically computed base size.
+
+Max Tet Scale:
+    This parameter controls the maximum size of individual generated tets. This value is relative to the __Base Size__. The higher this parameter is set, the larger the tetrahedra on the interior of the tet mesh are allowed to be (less interior detail).
+
+Min Triangle Scale:
+    This parameter controls the minimum size of the triangles on the surface of the mesh. This value is relative to the __Base Size__. The higher this parameter is set, the larger the triangles on the tet mesh boundary will be (less surface detail).
+
+Local Scaling:
+    Selects the method to control sizes of tetrahedra on the surface of the resulting tetrahedralization. Interior tetrahedra are sized based on sizes interpolated from the surface.
+    
+Enlarge to Cover Input Mesh:
+    Automatically increase the volume of the tetrahedral mesh to ensure all original points lie within the new volume.
+    
+==== Skin Animation ====
+
+The Tissue Solver assumes that your character skin has been animated using the [Bone Capture/Deform|/nodes/sop/capture] workflow.  These parameters are used to adjust the relationship between your animated character skin and your simulated tissue.
+
+Target Strength:
+    The strength density of the distributed soft-constraint force that attracts the simulated tissue to the animated positions obtained from the skin. 
+
+Target Damping:
+    The damping density applied to the Target Strength.
+
+Override Skeleton Root Path:
+    If enabled, the capture root path found on the skin detail attribute: `pCaptSkelRoot` will be replaced with the path specified below.  Use this override in situations where the location of this Tissue Solver SOP relative to the deforming bones is different from that of the skin relative to the deforming bones.
+    
+Skeleton Root Path:
+    This path is used to override the skeleton root path baked into the skin geometry.  This path should point to the root location where the deforming bones can be found.
+
+==== Collisions ====
+
+These parameters affect collisions with respect to the tissue only.
+
+Enable Tissue Collisions:
+    Enables or disables all collisions with the tissue surface.
+    
+Enable Skin Self Collisions:
+    Enables or disables collision detection of the tissue surface with itself.  Disabling this feature in simulations where self-collisions are improbable will provide a efficiency boost to the calculations.
+    
+Collision Radius:
+    The distance from the tissue surface at which collisions are detected.
+
+== Muscles ==
+    
+These parameters control how incoming muscles are handled.
+    
+Typically, muscles input into the Tissue Solver will be obtained directly from either Muscle or Franken Muscle assets.  Muscles are then simulated along with the tissue and anatomical bones inside the Tissue Solver.
+    
+NOTE:
+    Even though muscles and franken muscles have the ability to preview their dynamic properties using the built-in dynamics solver local to those assets, the Tissue Solver will do its own muscle simulation using the dynamics properties found on the muscle assets.  The Tissue Solver will ignore the muscle preview dynamics.
+    
+    However, if you are displaying both preview dynamics and tissue solver dynamics in the viewport at the same time, Houdini will need to run each simulation independently.  It is advisable to turn off the display of muscles, or disable the dynamics preview whenever a Tissue Solver simulation is being run.
+    
+The Tissue Solver can also support muscle geometry coming from other sources without performing additional simulation on them.  In this case, the incoming geometry is treated as deforming static geometry in the solver.  This means that the dynamics interaction with these objects will be unilateral. Muscles will affect tissue, but tissue will not affect muscles.
+
+
+Use Prebaked Muscles:
+    Treat the incoming muscle geometry as deforming static geometry in the dynamics solver.
+    When enabled, no additional simulation is performed on the muscles.
+    
+Enable Muscle Collisions:
+    Enable or disable the detection of collisions with muscles.
+    
+Shape Stiffness Multiplier:
+    Adjust the solid stiffness of the Shape of the muscle.  Muscles and franken muscles have inherent shape stiffness.  This parameter acts as a multiplier on the incoming values for the stiffness. 
+
+Volume Stiffness Multiplier:
+    Adjust the solid stiffness of the Volume of the muscle.  Muscles and franken muscles have inherent volume stiffness.  This parameter acts as a multiplier on the incoming values for the stiffness. 
+    
+    
+==== Attachment Strength ====
+
+Tissue is constrained to muscles using an attachment strength that can be controlled with the __Tissue to Muscle Slack__ parameter.
+
+Tissue to Muscle Slack:
+    The amount of freedom that tissue has to move away from its constrained position relative to a muscle.  Larger values mean that the tissue can distance itself more from a constraining muscle, while values closer to zero will strengthen the bond between muscles and tissue.
+    
+Prebaked Muscle Mass Density:
+    When using Prebaked Muscles, this is the mass density value used in the calculations to compute the attachment strength.
+    
+Make Prebaked Muscles Solid:
+    If the input muscle geometry is constructed of surface polygons only, then enabling this toggle will perform a [Solid Embed|Node:sop/solidembed] operation ensuring the muscles are represented as tetrahedral meshes in the dynamics solver.
+    
+==== Prebaked Muscles Solid Embedding ====
+
+These parameters control how incoming polygonal surfaces will be converted to tetrahedral solids.
+    
+
+Base Size:
+    If enabled, this option sets the size of the model in the input. This enables the modification of the model without changing the relative scale of the generated tets. If disabled, the base size of the model is determined automatically as the diameter. In this mode, the sizes of generated tets are independent of the global scale of the model. All sizing parameters below as scaled using the manually set or automatically computed base size.
+
+Max Tet Scale:
+    This parameter controls the maximum size of individual generated tets. This value is relative to the __Base Size__. The higher this parameter is set, the larger the tetrahedra on the interior of the tet mesh are allowed to be (less interior detail).
+
+Min Triangle Scale:
+    This parameter controls the minimum size of the triangles on the surface of the mesh. This value is relative to the __Base Size__. The higher this parameter is set, the larger the triangles on the tet mesh boundary will be (less surface detail).
+
+Local Scaling:
+    Selects the method to control sizes of tetrahedra on the surface of the resulting tetrahedralization. Interior tetrahedra are sized based on sizes interpolated from the surface.
+
+Enlarge to Cover Input Mesh:
+    Automatically increase the volume of the tetrahedral mesh to ensure all original points lie within the new volume.
+
+    
+== Bones ==
+
+These parameters control how incoming anatomical bones are handled.
+
+Anatomical Bones in the Houdini Muscle System refer to any geometry objects that are inserted into a tissue mass that do not exhibit muscle characteristics.  While they are not entirely passive, during simulation, they will not be affected by any of the dynamic effects of the surrounding tissue or muscles.  They are treated as deforming static geometry objects that produce collisions and they act as a constraint source that the tissue is attached to.  
+
+==== Solid Embedding ====
+
+The incoming geometry can be either polygonal surfaces or tetrahedral solids, however, once internalized, the Tissue Solver will convert any polygonal surfaces to tetrahedral solids via a [Solid Embed SOP|Node:sop/solidembed].
+
+Make Bones Solid:
+    If the input anatomical bones geometry is already constructed of a tetrahedral mesh, then this toggle can be left OFF.  Otherwise, activating this toggle will enable the solid embedding parameters below.
+
+Base Size:
+    If enabled, this option sets the size of the model in the input. This enables the modification of the model without changing the relative scale of the generated tets. If disabled, the base size of the model is determined automatically as the diameter. In this mode, the sizes of generated tets are independent of the global scale of the model. All sizing parameters below as scaled using the manually set or automatically computed base size.
+
+Max Tet Scale:
+    This parameter controls the maximum size of individual generated tets. This value is relative to the __Base Size__. The higher this parameter is set, the larger the tetrahedra on the interior of the tet mesh are allowed to be (less interior detail).
+
+Min Triangle Scale:
+    This parameter controls the minimum size of the triangles on the surface of the mesh. This value is relative to the __Base Size__. The higher this parameter is set, the larger the triangles on the tet mesh boundary will be (less surface detail).
+
+Local Scaling:
+    Selects the method to control sizes of tetrahedra on the surface of the resulting tetrahedralization. Interior tetrahedra are sized based on sizes interpolated from the surface.
+    
+Enlarge to Cover Input Mesh:
+    Automatically increase the volume of the tetrahedral mesh to ensure all original points lie within the new volume.
+
+==== Bone Animation ====
+
+Incoming bone geometry can be animated either using the [Bone Capture/Deform|/nodes/sop/capture] workflow or as an animated sequence of geometry objects with no inherent capture attributes.
+
+Bone Animation from Capture Weights:
+    If your anatomical bone geometry is animated with the [Bone Capture/Deform|/nodes/sop/capture] workflow, then use this toggle to import the capture weighting from your bone geometry and apply it to the tetrahedralized solid representation of the model.
+    When this toggle is OFF, the incoming geometry is used as a [Point Deform|Node:sop/pointdeform] control hull to deform the solid representation of your bone model.  
+    
+Radius:
+    The maximum distance (in Houdini units) away from each point to look for points in the deforming point cloud. A simple Elendt metaball weighting is then applied based on the relative distance.
+
+Minimum Points:
+    If fewer points than this are found, the search radius is increased to find at least this number of points. This will cause discontinuities in final mesh, but is often preferable to having points being orphaned.
+
+Maximum Points:
+    Provides an upper bound to the number of points that any particular point can be weighted by. Speeds up application and reduces memory use, but will create discontinuities if hit.
+
+    
+==== Collisions ====
+
+These parameters affect collisions with respect to the anatomical bones only.
+
+Enable Bone Collisions:
+    Enables or disables all collisions with the bones.
+    
+Collision Detection:
+    Use either a volume representation or a surface representation of the bones when attempting to detect collisions.
+    
+    NOTE:
+        It is advisable to use surface collisions in situations where anatomical bones are animated.  Volume based collisions can create temporal discontinuities when bone geometry is deforming over time.
+        
+Collision Radius:
+    The distance from the bones at which collisions are detected.
+    
+    TIP:
+        The __Collision Radius__ can be visualized using the toggle found on the __Guides__ tab of this node.
+
+Division Size:
+    Enabled when using volume based collisions.  This parameter specifies the uniform division size of the voxel grid when building the volume representation of your bone geometry.
+
+==== Attachment Strength ====
+
+Tissue is constrained to bones using an attachment strength that can be controlled with the __Tissue to Bone Slack__ parameter.
+
+Tissue to Bone Slack:
+    The amount of freedom that tissue has to move away from its constrained position relative to a bone.  Larger values mean that the tissue can distance itself more from a constraining bone, while values closer to zero will strengthen the bond between bones and tissue.
+    
+Bone Mass Density:
+    This parameter is the mass density used in the calculations to compute the attachment strength that tissue has with bones.
+    
+    
+== Collisions ==
+
+These collision parameters apply to tissue collisions with external objects. These collisions are not to be confused with the "internal" collisions that occur between muscles and anatomical bones, or bones with the tissue interior, etc.
+
+When enabled, external collisions will be detected by both tissue and muscles.  Anatomical bone geometry will not respond to external collisions due to the way the bone animation is treated as hard-constrained motion, and not as motion caused by the dynamics simulation.
+
+Use External Collider:
+    Enabling this toggle will enable the parameters below to specify a collision source for the tissue.
+    
+Collider:
+    This path specifies the SOP geometry that will collide with the simulation.
+    
+Primitive Group:
+    Optional primitive group to use as a sub-set of the collider geometry.
+    
+Use Deforming Geometry:
+    Use this toggle to optimize the collision detection if your external collision source does not move or change shape over time.
+    
+Collision Detection:
+    Use either a volume representation or a surface representation of the external collider when attempting to detect collisions.
+    
+    NOTE:
+        It is advisable to use surface collisions in situations where the collider is animated.  Volume based collisions can create temporal discontinuities when the collider is deforming over time.
+        
+Collision Radius:
+    The distance from the collision source at which collisions are detected.
+
+    
+    
+== Simulation ==
+
+These parameters control the general properties dynamics simulation.
+
+Reset Simulation:
+    Clears the simulation cache.
+    
+Start Frame:
+    The initial frame of the simulation.
+    
+Substeps:
+    The number of substeps the DOP simulation should perform every frame.  Increasing the number of substeps will improve the accuracy of the dynamics simulation at an increased compute cost.
+    
+    TIP:
+        Simulations with rapidly moving objects may benefit from increased substeps.
+        
+Collision Passes:
+    The maximum number of collision detection and resolution passes used in the solver.
+    
+Integrator Type:
+     Selects the integrator type used by the solver.  The ABE2 integrator retains more energy, producing a more lively response.  While the BE1 integrator has a more constrained damping response.  The look of the two integrator types will converge as you increase substeps.
+
+Cache Simulation:
+    Enables the simulation cache. For very large simulations, turning this option off is the best way to guarantee the smallest possible memory footprint.
+
+Allow Caching To Disk:
+    If the maximum size of the cache in memory is reached, the DOP Network can either delete old cache entries to make room for new entries, or old entries can be saved to disk. If this option is on, the old cache entries are saved to disk and will be reloaded from disk if needed. This mode will be slower than simply throwing away the old cache entries, but it ensures that the entire simulation history is always available regardless of the in-memory cache size.
+
+Cache Memory (MB):
+    Specifies how much memory in megabytes can be consumed by the cache for this simulation. Once this limit is exceeded, old cache entries are either deleted or saved to disk to make more room, depending on the value of the Allow Caching To Disk parameter value above.
+    
+Gravity:
+    The amount of gravity force to apply to a unit-massed object.
+    
+    TIP:
+        If your units are meters, seconds, and kilograms, -9.81 is a good value for Earth’s gravity.
+        If your units are feet, seconds, and pounds, -32 is a good value for Earth’s gravity.
+
+        
+== Output ==
+
+The Output parameters allow you to tailor the output of the Tissue Solver by filtering the various geometry objects produced by the solver.
+
+==== Solve ====
+
+These parameters determine which of the input objects to include as part of the dynamics simulation.  Disabling any of the items in this parameter block will cause the solver to disregard them completely.
+
+Include Connective Tissue:
+    Enables tissue in the simulation.
+    
+Include Muscles:
+    Enables muscles in the simulation.
+    
+Include Bones:
+    Enables the bones in the simulation.
+    
+Include Embedded Geometry:
+    Enables the inclusion of a higher resolution skin geometry that will be embedded within, and deformed by the tissue.
+    
+Embedded Geometry:
+    This path specifies the SOP node to include as embedded geometry.
+    
+
+==== Output ====
+
+These parameters will allow you to filter out items after they have been solved. Any items enabled in this parameter block will be included in the output geometry from this Tissue Solver node.
+
+Connective Tissue:
+    Enabling this toggle will include the simulated tissue (tetrahedral mesh) in the output.
+    
+Solved Muscles:
+    Enabling this toggle will include the simulated muscles (tetrahedral meshes) in the output.
+
+Solved Bones:
+    Enabling this toggle will include the bones (tetrahedral meshes) in the output as they were used by the solver.
+    
+Solved Surface Triangles:
+    Enabling this toggle will include the surface triangles formed on the outer boundary of the tissue. 
+    
+Embedded Geometry:
+    Enabling this toggle will include the embedded geometry in the output.
+
+==== Primitive Groups ====
+
+These parameters allow a convenient location to create primitive groups from the items included in the output.
+
+Connective Tissue:
+    The primitive group name assigned to the output tissue tetrahedrons.
+
+Muscles:
+    The primitive group name assigned to the output muscle tetrahedrons.
+
+Bones:
+    The primitive group name assigned to the output bone tetrahedrons.
+
+Surface Triangles:
+    The primitive group name assigned to the output surface polygons.
+
+Embedded Geometry:
+    The primitive group name assigned to the output embedded geometry.
+
+
+== Guides ==
+
+The Guides parameters are used to control the visibility of a few helpful guide objects within the Tissue Solver.
+
+Bone Collision Radius:
+    Enables a spherical radius visualizer around each of the points of the input anatomical bones.
+    
+    NOTE:
+        The default Bone __Collision Radius__ is 0.0.
+
+Tissue Collision Radius:
+    Enables a spherical radius visualizer around each of the points of the input tissue surface.
+
+
+@inputs
+
+First:
+	Skin Surface Geometry in its static undeformed state.  Once internalized, this skin surface will be converted to a solid using a [Solid Embed SOP|Node:sop/solidembed].  
+	If your skin has been animated via the [Bone Capture/Deform workflow|/character/muscles], then this input should be the capture-weighted surface, prior to being animated via the Deform SOP.  Since the output of this HDA is generated by a dynamics solver, any incoming animation will be replaced by the simulation.  
+	However, it is worth noting that once the surface is converted to a solid inside this HDA, the capture-weighted skin can be used to impart weighting to the solid.  This can allow for animated points to to be used as target constraints or pin constraints for the simulation
+
+Second:
+	Animated Muscles and anchor region constraints.  Muscles and Franken Muscles are constrained to corresponding anchor regions by looking up shared common muscle_id attributes. Muscles will be constrained to anchor regions that have matching muscle ID's.  Tissue is constrained to muscles using an attachment strength that can be controlled with the __Tissue to Muscle Slack__ parameter.
+
+Third:
+	Muscles (only) in their static undeformed state (Capture Pose).  This input provides the Tissue Solver with the muscle geometry in a static state positioned relative to the skin geometry in its static state.  If this input is not wired, the animated muscles are cooked at the Tissue Solver's __Start Frame__ and used as the static pose instead. 
+    
+    NOTE:
+        The Static Muscles input should not include anchor regions.
+        Static muscles should not intersect with static bones.  If the initial placement of the Bones and Muscles inter-penetrate, this will cause an error in the Tissue Solver and should be rectified before the simulation can be run.
+
+Fourth:
+	Animated Anatomical Bones. This geometry is incorporated into the simulation as both deforming collision geometry and a constraint goal for tissue.  Tissue is constrained to bones using an attachment strength that can be controlled with the __Tissue to Bone Slack__ parameter.
+
+Fifth:
+	Static Anatomical Bones.  This input provides the Tissue Solver with the bone geometry in a static state positioned relative to the skin geometry in its static state.  If this input is not wired, the Animated Anatomical Bones are cooked at the Tissue Solver's __Start Frame__ and used as the static pose instead. 
+    
+    NOTE:
+        Bones and muscles should not intersect in their initial static pose.

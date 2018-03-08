@@ -1,0 +1,203 @@
+#type: node
+#context: dop
+#internal: popsolver
+#icon: DOP/popsolver
+
+= POP Solver =
+
+"""A POP solver updates particles according to their velocities and forces."""
+
+POP Solver is a solver designed to update particles for one timestep.
+
+It is intended that its green inputs have wired into them POP microsolvers to control the particles and accumulate forces.
+
+It integrates using the following forces:
+
+`targetv`, `airresist`:
+        This pair describes a local drag frame for each particles.
+`force`: 
+        Specifies a magnitude of force affecting each particle.
+`targetw`, `spinresist`:
+        This pair describes a spin-drag frame.  The target w is in world space.
+`torque`:
+        Specifies the world-space torque to apply to the particle.
+        
+For more information see [Particle Collisions|/dopparticles/collisions].
+
+@parameters
+
+== Substeps ==
+
+Min Substeps:
+    The POP solver will always enforce this minimum number of substeps.
+
+    This should only rarely need to be changed.
+Max Substeps:
+    The POP solver will not break the simulation down in to more
+    substeps than this value.
+
+CFL Condition:
+    The CFL condition is a factor used to automatically determine what
+    size substep the scene requires. The idea is to control the distance
+    that a particle can travel in a given substep.
+
+    For example, when this parameter is set to 0.5, the solver will set
+    the length of each substep such that no particle travels more than
+    50% of the size of the smallest particle in a substep.
+
+Quantize to Max Substeps:
+    Alway use substeps that divide up the frame by __Max Substeps__.  For example,
+    if __Max Substeps__ is set to 4, but the __CFL Condition__ only requires 3 substeps,
+    the solver will take frame steps of 0.25, 0.5, and 0.25.  This option can be useful for
+    re-using input geometry that has been cached to file at increments of 1/__Max Substeps__.
+
+Timescale:
+    An overall scale applied to the actual timestep. This parameter can be animated.
+
+== Update ==
+
+Use Implicit Drag:
+    The drag described by `targetv` and `airresist` can be turned into an explicit force.  This will result in particles not coming to a stop, but instead bouncing around the desired dragged location.  Alternatively, you can turn on implicit drag and a more accurate damping will be done that stops the particles.
+
+    This will also affect how `targetw` and `spinresist` are integrated.
+
+Drag Exponent:
+    The force of drag will be proportional to the difference between the target velocity and the particles velocity.  This difference can be linear (drag exponent of 1) or quadratic (drag exponent of 2) or something in between.
+
+    A value of two is a more realistic drag model which more quickly slows down extreme velocity differences and has less of an effect on small velocity differences.
+
+    This affects the angular velocity drag as well.
+
+Age Particles:
+    #id: doage
+    The `age` attribute will be updated for each time step and the particles flagged for deletion if they exceed their `life` attribute.
+
+External Forces:
+    This controls whether external DOP forces will be added to the force model prior to integrating velocities.
+
+Integrate Velocity:
+    The `v` attribute will be updated according to `targetv`, `airresist`, and `force`.  The `w` attribute will be updated by the `targetw`, `spinresist`, and `torque` if this is turned on.
+
+Use Mass:
+    Controls if the `mass` attribute will affect how forces are added to the velocity.  If use mass is set, the forces will be divided by the mass to get the acceleration of each particle.
+
+Integrate Positions:
+    The particles will be moved according to their velocity.  They will also be re-oriented according to their angular velocity.
+
+
+Reap Particles:
+    #id: doreapparticles
+    All particles with the `dead` attribute set to 1 will be deleted.
+
+Reap At Frame End:
+    Dead particles will be removed after all solving is complete.  In this mode, you will not see any particles with a `dead` value of 1. Otherwise, they will be deleted before the Pre-solve.  Leaving them in the geometry allows one to tween dying particles to their final location.
+
+== Collision Behavior =
+
+Enable Collision Detection:
+	Determines if any collision detection is done at all by the POP Solver.
+	If mixing with another system, such as Bullet, you may wish to still
+	use some of the integration options of the POP Solver (such as force)
+	without including the collision component.
+
+Add Hit Attributes:
+	If you wish to do more than just bounce off other DOP collision
+	objects, you can add hit attributes to inspect how the
+	bounce occurred, and perform secondary animations using the result.
+
+	The `hitnum` attribute is often most useful to detect if particles
+	just collided.  You can either directly apply additional rules
+	here, or use the POP Collision Behavior to layer more effects on top.
+
+	NOTE:
+	    When computing hit attributes, all eligibly objects are collided
+	    with.  The `ispbd`, `stopped`, and `collisionignore` flags are
+	    ignored.  The `sliding` flag *is* used.
+    
+Group to Affect:
+	While attributes are added to all particles that collide, the
+	following collision behaviors will only apply to the particles
+	in this group.  For example, if you wish particles to die after their
+	first bounce, use `@hittotal>1`.  
+
+	NOTE:
+	    This group is evaluated after collision detection is performed, so
+	    `hittotal` will already include the current hit.
+
+Create Group:
+	All particles that just hit, ie, `@hitnum>0`, will be added to this
+	group.
+Preserve Group:
+	If the group isn't preserved, it is cleared out first so the only particles in the group will be those that just hit. If it is preserved, the group will accumulate all particles that ever hit.
+Color Hits:
+	Particles that are just hit will have their `Cd` attribute set to this value.  This is useful for quick visualization of hits.
+Compute Hit Total:
+	Adds to the integer `hittotal` attribute any hits that occurred due to this collision detection.
+Move to Hit:
+	Often if you want to trigger an effect off a particle's collision, such as birthing more particles, you want the particle at its hit location, not where it ended up at the
+	end of the frame.  This will move the particle back to its hit location.  This consists of `@P = v@hitpos;`.
+Response:
+	Controls what happens to particles that collide.
+	
+	Unchanged:
+	    Particles will continue to behave as they are already defined.
+	    This will usually cause them to bounce.
+
+	Die:
+	    Particles that hit will set the `dead` attribute to 1, causing them to be deleted during the reaping pass.
+	Stop:
+	    This sets the `stopped` attribute to 1.  Particles that stop will no longer integrate their velocity, position, orientation, or angular velocity.  They can still be moved directly. For example, by the [Look At POP|Node:dop/poplookat] in instantaneous mode.
+
+	    These particles will no longer collide.
+	Stick:
+	    Particles that hit will have the `stuck` attribute set to 1.  The `pospath`, `posprim`, and `posuv` attributes will be setup to point to the hit location, causing the integrator to keep moving the particles to their stuck location every frame.  Usually you also want to turn on __Move to Hit__ with this.
+	Slide:
+	    Particles that hit will have the `sliding` attribute set to 1.  The `pospath`, `posprim`, and `posuv` attributes will be setup to point to the hit location, causing the integrator to try to slide the particles along the surface.
+	    
+	    TIP:
+	        You can also use the __Cling__ attribute on the [POP Property|Node:dop/popproperty] node to set how much the particles will cling to the object they are sliding on.
+
+	    NOTE:
+	        Once the particles are in a sliding state, they will no longer collide with other objects.
+Add Impact Data:
+	    Enables the addition of Impact data onto the particles.  Normally
+	    these are not added to save memory, and particle collision attributes
+	    are more easily created by enabling the __Add Hit Attributes__ parameter.
+Enable Collision Feedback:
+	    Enables the addition of Feedback impacts onto colliding objects,
+	    which are required for two-way interaction.
+
+== Sleeping ==
+
+Enable Auto Sleep:
+    Particles that remain near-stationary for sufficient time will be
+    put to sleep by setting their `stopped` attribute to `1`.
+
+Start Asleep:
+    On the first frame all particles will be marked asleep.
+
+Velocity Threshold:
+    How slowly particles need to be moving before they are eligible
+    for sleeping.  The amount of time they remain below this speed
+    is accumulated in the `deactivation_time` attribute.  If they
+    exceed this speed, the `deactivation_time` is reset to zero.
+
+Sleep Delay:
+    How many seconds particles need to remain at or below the
+    velocity threshold before they are put to sleep.  See the
+    [Wake Up POP|Node:dop/popwakeup] for methods to wake the 
+    particles back up again.
+
+Sleeping Color:
+    Particles that are asleep will be colored this color.  
+    
+    NOTE:
+        Awake particles will be left with their current color, so this will not cause particles that became awake to be recolored unless you have another [Color POP|Node:dop/popcolor] active.
+
+== Bindings ==
+
+    [Include:standard_pop_parms#bindingsParms/]
+
+== Distribution ==
+
+    [Include:standard_distribution]

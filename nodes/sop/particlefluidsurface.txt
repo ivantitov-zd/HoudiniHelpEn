@@ -1,0 +1,370 @@
+= Particle Fluid Surface =
+
+#type: node
+#context: sop
+#internal: particlefluidsurface
+#version: 2.0
+#icon: SOP/particlefluidsurface
+#tags: fluid, surface
+
+"""Generates a surface around the particles from a particle fluid simulation."""
+
+Connect point geometry from a [particle fluid simulation|/fluid/] to this node's first input. The node will generate a surface from the outermost points.
+
+(You can surface any points, not just points from a particle fluid sim, as long as the points have a `pscale` attribute. This attribute specifies the virtual radius of each particle in Houdini units.)
+
+
+== Deleting surface area from inside other volumes/objects == (subtract)
+
+You can optionally subtract geometry from the generated surface before it is converted to polygons. For example, you can prevent the node from generating polygons outside the fluid's container object, or within objects the fluid is colliding with.
+
+# Connect the volumes/geometry you want to subtract from the surface to this node's _second_ input ("Collision objects and volumes").
+
+# In the parameter editor, click the __Regions__ tab and turn on __Subtract collision volumes__.
+
+
+== Masking filters == (mask)
+
+You can apply filters such as _smoothing_ to the surface using the controls on the [Filtering tab|#filtering].
+
+To mask the effect of a filter with a fog volume:
+
+# Connect the mask volume to this node's _third_ input ("Mask volumes").
+
+# On the __Filtering__ tab, turn on the filter using the checkbox to the left.
+
+# Turn on the __Mask__ checkbox to the right of the filter.
+
+# In the mask controls below the filters, turn on __Mask input__.
+
+    :box:
+        #id: mask_input_field
+        
+        The field next to __Mask input__ lets you specify a group within the input. If you leave it blank, this node will use all geometry in the input. Or you can specify a specific volume by name using group syntax, for example `@name=mask`.
+
+
+== Previewing part of the input ==
+
+The __Use bounding box__ parameter on the __Regions__ tab lets you limit the surfacing to a subset of the input geometry. You can use this to get faster feedback by only surfacing a small "preview" area while you're tweaking parameters, and then 
+
+# Before you set up the bounding box, click the __Surfacing__ tab and set __Convert to__ to "Particles and Compressed Fluid Surface". This displays an approximation of the fluid, so moving the bounding box will be fast (the node won't try to resurface every time you move the bounding box).
+
+# Click the __Regions__ tab, turn on __Use bounding box__.
+
+# With the node still selected, press ((Enter)) in the viewer to show the node's handles.
+
+    NOTE:
+        The default values for the bounding box are very large (50x50x50). You might need to zoom out a long way in the viewer, or set the __Size__ parameter under __Use bounding box__ smaller, to see the handles.
+
+# Use the bounding box handles to position and size the bounding box, or use the __Size__ and __Center__ parameters under __Use bounding box__, to frame a small subset of the total fluid.
+
+# Click the __Surfacing__ tab and set __Convert to__ back to one of the surface-generating options ("Surface VDB", "Surface polygons", or "Surface polygon soup") to preview the generated surface within the bounding box.
+
+When you want to see the effect of the current parameters on the entire input geometry, just turn off __Use bounding box__ on the __Regions__ tab.
+
+
+== Tips ==
+
+* If viewing the __Compressed Fluid Surface__ you'll see the fastest playback with __Transfer Attributes__, __Subtract Collision Volumes__, and __Closed Boundaries__ turned off.
+
+* If the particle geometry coming into this node has been packed using the [Fluid Compress|Node:sop/fluidcompress] or [Pack Points|Node:sop/packpoints] nodes (as in a fluid simulation created from the shelf), the network will include a node reading the packed particles back from disk.
+
+    In this case, make sure the [File|Node:sop/file] or [File Cache|Node:sop/file] reading the particles has __Delay Load Geometry__ on. With this option, the node won't actually read particles from disk until they're needed for surfacing. This can save load time if when you're clipping to a bounding box or only previewing the Compressed Fluid Surface points with __Transfer Attributes__ disabled.
+
+* For very slow moving viscous fluids, the default surfacing settings can lead to some "flickering" in the resulting mesh. To minimize any flickering, try any of the following:
+    
+    * Turn off __Reseed Particles__ on the [FLIP Solver|node:dop/flipsolver] to avoid introducing new particles during the simulation.
+      
+    * If using the __Average Position__ surfacing method, turn on __Limit Refinement__ and leave the iterations at 0 or switch to the __Spherical__ method. In either case you will probably need additional smoothing on the __Filtering__ tab, using the __Dilate__, __Smooth__, and __Erode__ parameters.
+
+    * Disable adaptive polygon meshing by setting __Adaptivity__ to 0. This setting will create a heavier mesh, but the mesh will be more consistent over time and avoid variations in the normals from changing polygonization.
+
+* If the source points are from a [Fluid Compress node|Node:sop/fluidcompress], this node will use the `surface` and `vel` VDBs to fill in missing depth and velocity data in deeper parts of the fluid.
+
+
+@parameters
+
+== Surfacing ==
+
+Method:
+    The surfacing method used to create the initial VDB signed-distance field from the particles.
+
+    Average Position:
+        Uses the [VDB From Particle Fluid|Node:sop/vdbfromparticlefluid] node to create a surface from the average position of the particles.  This option creates a smoother initial surface and has options to create a smoother surface between nearby particles.  It can be more expensive than the __Spherical__ method however.
+
+    Spherical:
+        Uses the [VDB From Particles|Node:sop/vdbfromparticles] SOP to simply create sphere volumes around each particle and merge them to create the surface. This creates a very lumpy surface that will usually require smoothing, however it is faster than the "Average position". This may also be useful just to create an interesting-looking surface for non-realistic applications.
+
+Particle Separation:
+    The distance between two particles in the fluid simulation. This parameter
+    should generally reference the same parameter on the [FLIP Object|Node:dop/flipobject] of the fluid simulation that created the particles.
+
+[Include:vdbfromparticlefluid#voxelscale]
+
+[Include:vdbfromparticlefluid#influencescale]
+
+[Include:vdbfromparticlefluid#dropletscale]
+
+[Include:vdbfromparticlefluid#limitrefinement]
+
+Preserve Bubbles:
+    Bubbles that are entirely submerged in the fluid could be lost while resampling the surface SDF. This option preserves bubbles in the generated surface by using a different sampling method. This option adds additional computation time and should only be activated when it is necessary to preserve internal geometry.
+
+Union Compressed Fluid Surface:
+    If the input fluid was compressed with the [Fluid Compress|Node:sop/fluidcompress] SOP, use the compressed surface fluid VDB to fill in the deeper parts of the fluid below the particle detail.
+
+Erosion Scale:
+    When __Union compressed fluid surface__ is on, this erodes the surface field to the compressed fluid's particle bandwidth. If seams between the field and the particles are visible, you can decrease this value to remove them.
+
+
+~~~ Output ~~~
+
+Convert To:
+    Specifies the output of the surfacing operation.  The first three options are intended mostly for previews.
+
+    Particles:
+        Outputs the input particles, unpacked and with any [region filters|#regions] applied. You can use this to get a sense of the extent of (uncompressed) particle fluids.
+
+    Particles and Compressed Fluid Surface:
+        If the input fluid was compressed with the [Fluid Compress|Node:sop/fluidcompress] SOP, this outputs the input particles (in in "Particles" above) _and_ the eroded compressed fluid surface. You can use this to preview FLIP simulations, since you can get a sense of the particle surface detail and the compressed surface underneath.
+    
+    Compressed Fluid Surface:
+        If the input fluid was compressed with the [Fluid Compress|Node:sop/fluidcompress] SOP, this outputs _only_ the compressed surface. This field is the representation of the liquid within the [FLIP Solver|Node:dop/flipsolver] along with point velocities taken from the simulation. You can use this as a preview of the final surface.
+        
+        If __Transfer Attributes__ is disabled and the input to this node is a file with __Delay Load Geometry__ enabled, then packed particles will never be loaded from disk with this option, making it useful as a quick preview.
+
+    Surface VDB:
+        Outputs a raw VDB after surfacing and filtering, but without conversion to polygons. This can be useful if you need a fog volume for another operation.
+
+    Surface Polygons:
+        Outputs the final surface as polygons.
+
+    Surface Polygon Soup:
+        Outputs the final surface as a [polygon soup|/model/primitives#polysoup].
+
+Isovalue:
+    Create the surface where the computed surface volume equals this value. The default (0) creates the surface at the boundary between "any volume" and "no volume". You can increase this value to expand the surface.
+
+Adaptivity:
+    How much tolerance to allow when generating the surface. Higher values given fewer, larger polygons with a less precise match. Lower values give a denser mesh with a more precise match.
+
+Transfer Attributes:
+    Copies the attributes in this list from the input points onto the generated surface.
+
+Attribute Radius:
+    For the attributes listed in __Transfer attributes__, this is the radius used for smoothing the sampled attribute values, as a multiplier on __Particle Separation__.  Higher values will smooth out the attribute values more.
+
+Attribute Samples:
+    For the attributes listed in __Transfer attributes__, this is the number of points to sample when transferring particle attributes to the mesh.  More samples give smoother attribute values, especially for velocities and motion blur if rendering with [Geometry Velocity Blur|Node:obj/geo#geometry_velocity_blur].
+
+Visualize:
+    Choose "Velocity" or "Vorticity" to visualize the values as surface colors in the viewer.
+
+
+== Filtering == (filtering)
+
+You will often need filtering to smooth the raw surface generated from particles, especially when the __Method__ is "Spherical".
+
+Filtering is often required to further smooth the raw surface generated from the particles, particularly when the surfacing __Method__ is set to __Spherical__.  Enabling the __Dilate__ and __Erode__ filters will blend together nearby particles, closing gaps in the surface, which can be further smoothed with the various __Smooth__ operations.  Setting __Final Smooth__ to __Gaussian__ will yield very smooth flat surfaces, for example in a tank before a splash.  However, it may also blur out any fine detail in the splash area.  To correct this problem enable the __Mask__ parameter on __Final Smoothing__ and create a smoothing mask in areas of low velocity and / or viscosity, so only the slow-moving, less turbulent parts of the liquid will be smoothed.
+
+Dilate:
+    Expand the surface outward by the specified number of voxels.  This filter will apply only to masked areas if its __Mask__ parameter is enabled.
+
+Smooth:
+    Smooth the surface using the specified filter for the number of iterations.  This filter is applied after any dilation and will apply only to masked areas if its __Mask__ parameter is enabled.
+
+Erode:
+    Reduce the surface inward by the specified number of voxels.  This filter is applied after any smoothing and will apply only to masked areas if its __Mask__ parameter is enabled.
+
+Final Smooth:
+    Smooth the surface again using the specified filter for the number of iterations.  This filter is applied after any erosion and will apply only to masked areas if its __Mask__ parameter is enabled.
+
+
+~~~ Mask ~~~
+
+See [how to mask filters|#mask] above.
+
+Velocity Range:
+    Generate a filter mask from the fluid velocity, where surface areas with velocity below the minimum speed get full filtering, while areas above the maximum speed get none.
+
+Vorticity Range:
+    Generate a filter mask from the fluid vorticity, where surface areas with vorticity below the minimum speed get full filtering, while areas above the maximum vorticity get none.
+
+Collision Offset:
+    #id: colmaskoffset
+    
+    Generate a filter mask within the specified world-space offset of any collision objects or volumes connected to the second input.
+
+Mask Input:
+    Use volumes in the geometry connected to this node's third input ("Mask volumes") to mask the filters.
+    
+    [Include:#mask_input_field]
+
+Combine Operation:
+    If you specify multiple mask fields (for example, turning on __Velocity range__ and __Vorticity range__, or specifying multiple mask volumes in the __Mask input__ field), the node uses this operation to combine them.
+
+Mask Smooth:
+    Smooth the combined filter mask before using it to mask any surface filtering.
+    *Note* this parameter is for _smoothing the mask volume_. It is not about _masking the smooth filter_.
+
+Limit Bandwidth:
+    Restrict the mask to allow filtering only within the specified voxel bandwidth from the original raw surface generated from the particles.
+
+Visualize Mask:
+    Visualize the amount of masking as surface colors in the viewer.
+
+    The parameters above will be enabled if __Visualize Mask__ is on, so it can be quicker to modify the masking parameters while visualized, but before being applied to any of the above filters with their __Mask__ parameter.
+
+
+== Regions == (regions)
+
+The controls on this tab let you limit the surfacing to a bounding box, exclude surfacing inside geometry, and/or only surface the area visible to the camera.
+
+Region Voxel Scale:
+    This node represents the regions internally as VDB volumes, with a base resolution of __Particle Separation__ multiplied by __Voxel Scale__. This is a multiplier on the scale of the voxels in the region volumes. Increasing the scale makes the regions faster to compute but makes clipping less precise. Lowering the scale is slower but more precise. Do not decrease this value below 1.
+
+
+~~~ Collisions ~~~
+
+Subtract Collision Volumes:
+    #id: docollisions
+    
+    When this option is enabled, the node does not generate surface inside geometry or volumes from this node's _second_ input ("Collision objects and volumes").
+
+Collision Offset:
+    #id: collisionoffset
+    
+    Expand the subtracted area beyond the input geometry by this many Houdini units.
+
+
+~~~ Bounding Box ~~~
+
+Use Bounding Box:
+    Only generate the surface inside a bounding box.
+    
+    When this parameter is on, you can use the [Icon:TOOLS/handles] Handles tool in the viewer to size and position the bounding box.
+
+Size:
+    The size of the bounding box.
+
+Center:
+    The center of the bounding box.
+
+Close Boundaries:
+    Create walls at the boundaries of the box to enclose the surface. When this is off, the node simply clips the surface at the boundaries and leaves the surface open.
+
+
+~~~ Flattening ~~~
+
+These parameters are available when __Use bounding box__ is on. They are useful for flattening the edges of a simulated fluid surface box, to make it easy to match the edges of the simulated fluid with a surrounding ocean surface. The flattening is smoothly tapered from full flattening at the edges inward to the __Flatten distance__ from the edges.
+
+[Image:/images/nodes/sop/fluid_surface_flatten.svg]
+
+Flatten Geometry:
+    Flatten the edges of the surface to make it easy to match the edges of the simulated fluid with a surrounding ocean surface. This operation works best with a mesh that is already fairly close to flat. It can generate overlapping polygons if the fluid has splashes and waves at the boundaries. Turn on __Rebuild SDF__ to help ensure smooth surfaces around the edges.
+
+Rebuild SDF:
+    Rebuild the VDB signed-distance field after flattening, which can remove artifacts from flattening splashes around the boundary and provide a smoother final mesh.
+
+    None:
+        Do not rebuild the SDF.
+
+    Full Resolution:
+        Use full resolution when converting back and forth between polygons and VDBs during flattening.  This setting gives the most accurate results but can be very expensive with very high-resolution meshes.
+
+    Adaptive:
+        Use the top-level __Adaptivity__ parameter when converting back and forth between polygons and VDBs during flattening.  This setting is less accurate than __Full Resolution__, but can be significantly less expensive in time and memory.
+
+Output Flattened Attribute:
+    Output a `flattened` point attribute on the polygonal geometry that indicates how far the point lies within the __Flatten Distance__ to the boundary, normalized from zero to one.  This attribute can be used to scale procedural displacement shading to apply only on the flattened part of the fluid.
+
+Suppress Near Collisions:
+    Do not flatten the fluid near any collision geometry or volumes (see [Subtract collision volumes|#docollisions] above).  This option helps avoid flattening the bottom of a fluid when there is a collision object representing the bottom of the fluid domain, such as a riverbed.
+
+Collision Bandwidth:
+    The distance from any collision input at which to suppress flattening if __Suppress Near Collisions__ is enabled, specified as multiples of the __Particle Separation__.
+
+Plane:
+    The plane across which to flatten.
+
+Shape:
+    The shape of the tapering from the edges. "Rectangle" gives you a dilating rectangle with corners, "Circle" gives you a dilating circle.
+
+    [Image:/images/nodes/sop/flatten_rectangle_circle.svg]
+
+Water Level:
+    The "resting" ocean level to flatten to at the edges.
+
+Max Height:
+    The surface is smoothly scaled down from this maximum height at __Flatten distance__ from the edges, to the __Water level__ at the edges.
+
+Flatten Distance:
+    The fluid will be flattened to this distance within the flattening region with a smooth falloff.
+
+Pad Bounds:
+    Extend the flattening plane this far outside the bounding box. This padding will affect both polygonal and volume outputs.  For large scale extension of the mesh, use the __Extrude Polygons__ option.
+
+Extrude Polygons:
+    Extrude the polygons at the edge of the mesh outwards to create a large plane with the liquid surface in the middle. This can be useful to generate a large, flat ocean surface with the simulated surface in the middle, and then apply ocean displacements to the entire thing. This is only available when __Closed boundaries__ is off and __Pad bounds__ is on.
+
+    TIP:
+        If the resulting extruded geometry is not completely flat, increase the __Pad Bounds__.
+
+    None:
+        Do not extrude.
+
+    Planar:
+        Do a single extrusion along the plane.  This method is faster but results in triangles along the diagonal directions.
+
+    Along Each Axis:
+        Perform separate extrusions along each axis, which is more expensive but results in quads along the diagonal directions.
+
+Extrude Distance:
+    The distance to extrude the mesh boundary polygons in all horizontal directions.
+
+Extrude Division:
+    The number of polygonal divisions in the extruded geometry.
+
+
+~~~ Camera ~~~
+
+Camera:
+    Clip the fluid surface to the specified camera's frustum.
+    
+    If the points are from a packed geometry and the node loading the points has __Delay load geometry__ turned on, only the visible particles will be loaded from disk.
+
+Z Near:
+    The distance from the camera to start the clip region.
+
+Z Far:
+    The distance from the camera to stop the clip region.
+
+Use Camera's Window:
+    If set, use the camera's window scale, offset, and crop parameters in addition to the following __Window X/Y__ settings.
+
+Window X/Y:
+    The min/max portions of the camera's view to fill with the clip region.  This allows you to add padding to ensure good boundary conditions or focus into a key area of the scene.
+
+Close Boundaries:
+    Create closed walls at the boundaries of the frustum. Otherwise the surface will be clipped at the boundaries.
+
+
+@inputs
+
+Particles and Volumes:
+    Particle geometry for surface generation and optional volumes.
+
+Collision Objects and Volumes:
+    Geometry and SDF volumes to subtract from the fluid surface.
+
+Mask Volumes:
+    Fog volumes to be used as a mask to surface filtering.
+
+
+@related
+
+- [Node:dop/flipobject]
+- [Node:dop/flipsolver]
+- [Node:sop/vdbfromparticlefluid]
+- [Node:sop/vdbfromparticles]
+- [Node:sop/fluidcompress]

@@ -1,0 +1,41 @@
+= Crowd animation clips =
+
+"""How to associate animation with agents in certain states."""
+
+== Overview == (oview)
+
+Clips are bits of animation that an agent replays when in a certain _state_. Houdini will look for an animation clip with the same name as the state and apply it to any agents in that state.
+
+Even while agents are running pre-made animation, the simulation can add procedural changes on top, for [terrain adaptation|terrain], "[look at|Node:dop/agentlookat]", and so on. You can also transition from animation to [ragdoll simulation|ragdoll].
+
+Houdini requires that you "bake out" the animation to files on disk for performance. Each time you add or change a clip, you should go to this node and re-save the animations to disk.
+
+== How it works ==
+
+The [Agent render node|Node:out/agent] "renders" a piece of character animation out to files on disk containing the animated geometry and character skeleton data. The render node associates the files with the combination of the name of the agent and the name of the clip. The [Crowd Source nodes|Node:sop/crowdsource] in the [agent geometry network|setup#geo] associates [agent primitives|agents] with a set of clips through the agent name. An agent in a certain state will loop an animation clip with the same name as the state.
+
+The render node writes the files to, and the crowd nodes read the files from, a _cache directory_. The default cache directory is `${HIP}/agents/`, which stores the clips in an `agents` subdirectory next to the scene file. If you change the cache directory, you need to also change it in any [Crowd Source nodes|Node:sop/crowdsource] in the [agent geometry network|setup#geo] that load the clips. (If you do this, you might want to use channel references between the nodes to make sure they stay synchronized.)
+
+== Adding an animation clip ==
+
+The crowd system assumes characters are contained in an asset or subnetwork.
+
+# Load and select the character node (asset or subnet) containing the animation you want to bake out.
+
+# In the __Crowds__ shelf, click [Icon:SHELF/bake_character] Bake Agent. This creates a `agent_bake` render subnet at the object level if it doesn't already exist, creates a new [Agent render node|Node:out/agent] inside for this clip, and selects it.
+
+# In the parameter editor, set the __Agent name__ to the name of the character this animation is for (for example, `knight`). Set the __Clip name__ to a name of the clip (for example, `charge`).
+
+== Re-baking animation after changes ==
+
+# Select the character baking render subnetwork. In the parameter editor, click __Render__ to render all the character baking nodes inside. (If this is very slow, you can go into the render subnetwork and individually render the node only for the characters that have changed.)
+
+# After you bake out any new clips, select the any [Crowd Source nodes|Node:sop/crowdsource] that use the character in the [crowd geometry network|setup]. In the parameter editor, click then __Source__ tab, then click __Reload__.
+
+== Tips and notes ==
+
+* The [Crowd Solver|Node:dop/crowdsolver] in the simulation network has controls for how the solver re-times animation to better match agent movement.
+
+@related
+
+- [transitions]

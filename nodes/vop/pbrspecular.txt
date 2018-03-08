@@ -1,0 +1,104 @@
+= PBR Specular =
+
+#type: node
+#context: vop
+#internal: pbrspecular
+
+"""Produce a normalized reflection bsdf."""
+
+This node will produce a normalized (reflectivity of 1) reflection bsdf.
+Shaders using this bsdf should adjust the reflectivity by multiplying the
+component by an intensity parameter.
+
+@parameters
+
+Specular Model:
+    #id: model
+
+    The mathematical model used to simulate glossy reflections. For each viewing angle and surface normal, the model defines from which directions and at what intensity light is reflected. This is what shapes specular highlights and reflections in general.
+
+    The overall glossiness, and with it the size of highlights, is controlled by __Roughness__. The available models simulate the effects caused by __Roughness__ with varying degrees of physical accuracy, with GGX currently being the most accurate.
+
+    The chosen model has no effect when __Roughness__ is `0`, since this causes light to be reflected from a single direction at full intensity, making the model irrelevant.
+
+    See __Roughness__ for more information.
+
+    _The figure below shows the result produced by various specular models across a range of roughness values._
+
+    _Note how rough surfaces look more natural with the GGX model because the interaction of light with the rough surface is modeled more accurately._
+
+    [Image:/images/nodes/vop/spec_model.png]
+
+Component Label:
+    #id: label
+
+    Specifies a label for the BSDF component. This can be used to export
+    contributions from this component to a separate image plane.
+
+Roughness:
+    #id: rough
+
+    This is a measure of how bumpy a surface is at the microscopic level. The most obvious effect is that reflections become glossier as __Roughness__ increases. At a value of `0`, the surface is perfectly smooth and produces perfect mirror reflections. A value of `1` simulates a very rough surface, which results in very blurry reflections, similar to diffuse reflection.
+
+    In more accurate __Specular Models__ like `GGX`, reflections on rough surfaces are also darkened at grazing angles. This is due to Masking-Shadowing effects, where parts of the surface are hidden from view and/or not reached by light due to microscopic grooves and spikes in the surface. Note that this is simulated using a simplified mathematical model, rather than using actual additional geometry.
+
+    The visual change when transitioning from `0` to `1` is close to linear.
+
+    [Image:/images/nodes/vop/pbrspecular_rough_dielectric.png]
+
+    [Image:/images/nodes/vop/pbrspecular_rough_metallic.png]
+
+Anisotropy:
+    #id: aniso
+    [Include:/nodes/vop/standard_shading_parms#aniso]
+
+    [Image:/images/nodes/vop/pbrspecular_aniso.png]
+
+    [Include:/nodes/vop/standard_shading_parms#aniso_notes]
+
+Anisotropy Direction:
+    #id: anisodir
+    [Include:/nodes/vop/standard_shading_parms#anisodir]
+
+Masking:
+    Enables the geometric masking term of the __GGX Specular Model__, see __Roughness__ for a detailed explanation.
+
+Reflectance:
+    Controls the reflectance of surfaces facing the viewer. In other words, when a point on a surface has a normal pointing straight at the viewer, it has this reflectivity. This is often called __F0__, for reflectance at `0°` from the viewer.
+
+    Surfaces facing `90°` degrees away from the viewer, as seen at the edges of rounded objects, are always 100% reflective.
+
+    At high __Roughness__ values, the effect discribed above is diffused, because it is applied at the microfacet level within the __GGX__ model. See __Roughness__ for a more detailed explanation.
+
+@inputs
+
+nN:
+    The normalized surface normal. When not connected, the global __N__ is used instead.
+
+nI:
+    The normalized viewing direction. When not connected, the global __I__ is used instead.
+
+utan:
+    #id: utan
+    The main surface tangent. This is used to compute the direction of anisotropy, __anisodir__ is relative to the orientation of this vector.
+
+    Must be normalized and tangential to the shaded surface.
+
+    TIP:
+	The [Compute Tangents VOP|Node:vop/computetan] offers various methods of computing suitable surface tangents.
+
+vtan:
+    #id: vtan
+    The surface bitangent. Must be normalized and perpendicular to both __baseN__ and __utan__.
+
+    TIP:
+	The [Compute Tangents VOP|Node:vop/computetan] offers various methods of computing suitable surface tangents.
+
+@outputs
+
+f:
+    The reflection BSDF.
+
+@related
+
+    - [Node:vop/pbrdiffuse]

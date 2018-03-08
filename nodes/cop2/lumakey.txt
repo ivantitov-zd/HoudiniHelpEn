@@ -1,0 +1,89 @@
+#type: node
+#context: cop2
+#internal: lumakey
+#icon: COP2/lumakey
+
+= Lumakey =
+
+"""Keys the image based on luminance (or similar function)."""
+
+This operation keys the image based on luminance (or similar function).
+It has a lower and upper bound, which may be both active at once. A
+pixel is keyed if it lies between the lower and upper bounds. If either
+bound is disabled, the pixel only needs to satisfy the other bound
+constraint (either be less than the Maximum Luminance, or greater than
+the Minimum).
+
+The key is done on one of the input planes, and applied to all scoped
+planes. One of many luminance functions is applied to the input pixels,
+and the luminance value is compared to the bounds. The output plane is
+then multiplied by the computed key value.
+
+A rolloff area may be used to soften the transition across the bound.
+An interpolation function is used to ramp down to black. The rolloff
+area begins at the Min or Max Luminance, and ends at a value greater
+than the Max Luminance or less than the Minimum Luminance, at a distance
+determined by the Rolloff parameter.
+
+For sharp bound cutoffs, Super Sampling is used to antialias the edges.
+Multiple bilinear samples are run through the keyer to determine the
+final key value. To perform no supersampling, set Super Sample to 1.
+Super Sampling increases cook time exponentially, so while a value of 3
+samples 9 subpixels, 8 samples 64. It is wise to keep the value of the
+Super Sample parameter under 5 unless you need extremely high quality
+edges.
+
+[Include:coppixelparms#coppixeldescription/]
+
+[Include:copmaskparms#copmaskdescription/]
+
+
+@parameters
+
+    == LumaKey ==
+
+        Min Luminance:
+            #channels: /minval
+
+            If on, this sets the lower limit for the key.
+        Max Luminance:
+            #channels: /maxval
+
+            If on, this sets the upper limit for the key.
+        Discard Keyed Region:
+            If on, the keyed region is discarded.
+        Rolloff Region:
+            #channels: /rolloff
+
+            The size of the rolloff region, in case a sharp edge is not
+            wanted. This extends the keyed range by the rolloff size
+            with a soft function.
+        Rolloff Function:
+            Specifies the rolloff function of the rolloff region.
+        Luminance Function:
+            Specifies how to prep the color to key off.
+        Supersample:
+            #channels: /subsample
+
+            The number of subpixels sampled per pixel in one direction
+            (2 samples 4 pixels, 3 samples 9 pixels). More subsamples
+            produce finer edges, at the cost of performance.
+        Key Plane:
+            Specifies the plane to key. All scoped planes will be masked
+            based on the result of the lumakey on this plane.
+        Add Alpha if Missing:
+            If no alpha plane exists in the input, add it and fill it with the
+            keying mask.
+    [Include:copmaskparms#copmaskparms/]
+
+    [Include:coppixelparms#coppixelparms/]
+
+@locals
+    [Include:coplocalvars]
+
+
+@related
+    - [Node:cop2/chromakey]
+    - [Node:cop2/colorreplace]
+    - [Node:cop2/limit]
+

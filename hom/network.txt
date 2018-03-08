@@ -1,0 +1,504 @@
+= Extending the network editor =
+
+Almost all user interactions with the network editor are handled by python
+code defined in `$HFS/houdini/python2.7libs`, in a collection of modules
+with names that start with `nodegraph`. Every user action and various
+application generated events are sent to this python code for processing.
+
+The basic organization of the code is that all events are passed to the
+current context module (`nodegraph.py` by default), to a function named
+`handleEvent()`. It is possible to change the current context by calling
+[Hom:hou.NetworkEditor#pushEventContext]. This method is free to do whatever
+it wants with the event. The approach used in `nodegraph.py` is to pass this
+event to a python coroutine, which uses a yield statement inside a loop to
+effectively pause execution of the routine until the next event arrives. The
+use of a coroutine in this way allows the code to easily maintain state from
+one event to the next without using global variables. The use of the yield
+statement also lets the code be written as a simple loop, where the arrival of
+each event automatically resumes the code where it left off.
+
+Within the event handling loop in the coroutine, certain special events (like
+hitting Escape, or events indicating the user has switched networks) are
+handled directly in the loop. User events (like pressing a button on the
+mouse) are sent to a function called `createEventHandler`. The purpose of this
+function is to identify the start of a user operation (such as connecting two
+nodes together, or moving a node), usually (but not necessarily) indicated by
+a keyboard event or a mouse button press. When a user operation is started,
+this function will return an `EventHandler` object (defined in
+`nodegraphbase.py`). Future events are sent directly to this event handler
+object's `handleEvent()` method, which, like `createEventHandler`, also
+returns an `EventHandler` object. If the user operation is completed (often
+because the user releases the mouse button that started the operation),
+`handleEvent` will return `None`, and the next user event will call
+`createEventHandler` to look for the start of another user operation. If the
+user operation is still ongoing (often indicated by an event like a mouse
+drag), this method will return `self`, so that it continues to receive events.
+Or in some cases a different `EventHandler` object may be returned, indicating
+that the user operation has become more specialized, or morphed into a
+different operation. Whatever the reason, this new `EventHandler` will start
+receiving events as they come in.
+
+== Event types ==
+
+Each event sent to the `handleEvent` function will be one of the event types
+defined in the `$HFS/houdini/python2.7libs/canvaseventtypes.py` module.
+
+`InitializationEvent`:
+    Sent once to each network editor when it is first created in the Houdini
+    interface.
+
+    `editor`:
+	The [Hom:hou.NetworkEditor] receiving the event.
+
+    `eventtype`:
+	A string describing the event. `initialization` is the only value that
+	appears in this class.
+
+`ContextEvent`:
+    Sent when the network editor changes to a different network
+    location (such as moving from `/obj` to `/obj/geo1`).
+
+    `editor`:
+	The [Hom:hou.NetworkEditor] receiving the event.
+
+    `eventtype`:
+	A string describing the event. `context` is the only value that
+	appears in this class.
+
+    `oldcontext`:
+	A string containing the full path to the previous network.
+
+    `context`:
+	A string containing the full path to the new network.
+
+`ContextClearEvent`:
+    Sent when the user clears the currently loaded hip file
+    either by starting a new file or loading a different hip file. Gives the
+    network editor a chance to clear any data that is specific to the hip file.
+
+    `editor`:
+	The [Hom:hou.NetworkEditor] receiving the event.
+
+    `eventtype`:
+	A string describing the event. `contextclear` is the only value that
+	appears in this class.
+
+    `context`:
+	A string containing the full path to the current network.
+
+`MouseEvent`:
+    Sent when the user moves the mouse, presses or releases a mouse
+    button, moves the scroll wheel, or double clicks a mouse button.
+
+    `editor`:
+	The [Hom:hou.NetworkEditor] receiving the event.
+
+    `eventtype`:
+	A string describing the event.
+
+	`mouseenter`:
+	    The mouse cursor entered the network editor pane.
+
+	`mousemove`:
+	    The mouse cursor moved within the network editor pane.
+
+	`mouseexit`:
+	    The mouse cursor left the network editor pane.
+
+	`mousedown`:
+	    A mouse button was pressed.
+
+	`mousedrag`:
+	    The mouse cursor moved while the button is still pressed.
+
+	`mouseup`:
+	    The mouse button was released.
+
+	`doubleclick`:
+	    The mouse button was double clicked. This event will always follow
+	    a mouse down, mouse up, and another mouse down event. A second
+	    mouse up event will follow when the mouse button is released the
+	    second time.
+
+	`mousewheel`:
+	    The mouse wheel was turned.
+
+    `mousepos`:
+	A [Hom:hou.Vector2] object holding the current position of the mouse
+	cursor in screen coordinates.
+
+    `mousestartpos`:
+	If a mouse button is currently pressed, this is a [Hom.hou.Vector2]
+	object holding the position of the mouse when the mouse button was
+	pressed.
+
+    `mousestate`:
+	A `MouseState` object indicating the current state of the mouse
+	buttons.
+
+    `dragging`:
+	A `bool` value which will be `True` if a mouse button is pressed, and
+	with the button pressed the mouse has moved far enough that the user
+	can be assumed to be performing a drag operation. This value should
+	remain `False` if the user presses a mouse button, and accidentally
+	moves the mouse by a few pixels (a common problem with tablet input).
+
+    `modifierstate`:
+	A `ModifierState` object indicating the current state of the keyboard
+	modifier keys.
+
+    `located`:
+	A `NetworkComponent` object that describes the user interface gadget
+	under the mouse.
+
+    `selected`:
+	If a mouse button is currently pressed, this is a `NetworkComponent`
+	object that describes the user interface gadget under the mouse when
+	the mouse button was pressed.
+
+    `wheelvalue`:
+	An integer that will be zero unless this is a `mousewheel` event, in
+	which case this value will indicate the magnitude and direction of the
+	mouse wheel movement.
+
+`KeyboardEvent`:
+    Sent when the user hits a key on the keyboard. It is also
+    possible to register certain keys to generate separate key up and key down
+    events instead of key hit events, which is necessary to implement volatile
+    states.
+
+    `editor`:
+	The [Hom:hou.NetworkEditor] receiving the event.
+
+    `eventtype`:
+	A string describing the event.
+
+	`keyhit`:
+	    A key has been pressed on the keyboard. If the key is held down
+	    long enough, a series of key hit events may be generated based on
+	    your configured key repeat rate.
+
+	`menukeyhit`:
+	    A menu item was selected, where the menu item has an
+	    associated hotkey symbol (even if no hotkey is assigned). This is
+	    how the network editor handles events from the menu at the top of
+	    the pane.
+
+	`parentkeyhit`:
+	    A special case of hitting a key or a menu item on the
+	    network editor pane when the pane is in List Mode. This means the
+	    network itself is not visible, but the key is still given the
+	    chance to be processed by the network editor code.
+
+	`keydown`:
+	    A key registered as a volatile key using
+	    [Hom:hou.NetworkEditor#setVolatileKeys] has been pressed.
+
+	`keyup`:
+	    A key registered as a volatile key using
+	    [Hom:hou.NetworkEditor#setVolatileKeys] has been released.
+
+    `key`:
+	A string indicating the key that was pressed. This string may be a
+	description of the key itself (`Shift+H` or `Ctrl+T`) if the event is
+	generated by pressing an actual key on the keyboard. It may instead be
+	a hotkey symbol (`h.pane.wsheet.jump`) if this event was generated by
+	selecting a menu item. The `nodegraphdisplay.setKeyPrompt()` function
+	is useful for testing keys against hotkey symbols (as well as prompting
+	the user with text at the bottom of the pane indicating what key was
+	hit).
+
+    `modifierstate`:
+	A `ModifierState` object indicating the current state of the keyboard
+	modifier keys.
+
+    `located`:
+	A `NetworkComponent` object that describes the user interface gadget
+	under the mouse when the key is pressed.
+
+    `mousepos`:
+	A [Hom:hou.Vector2] object holding the current position of the mouse
+	cursor in screen coordinates.
+
+    `mousestate`:
+	A `MouseState` object indicating the current state of the mouse
+	buttons.
+
+`TimerEvent`:
+    Sent when the time interval elapses following a call to
+    [Hom:hou.NetworkEditor#scheduleTimerEvent].
+
+    `editor`:
+	The [Hom:hou.NetworkEditor] receiving the event.
+
+    `eventtype`:
+	A string describing the event. `timer` is the only value that
+	appears in this class.
+
+    `timerid`:
+	The unique integer identifier for the timer returned by the
+	[Hom:hou.NetworkEditor#scheduleTimerEvent] call that started the timer.
+
+`ValueEvent`:
+    Sent when the user finishes editing an input field brought up
+    in the network editor through a call to
+    [Hom:hou.NetworkEditor#openNameEditor],
+    [Hom:hou.NetworkEditor#openCommentEditor], or
+    [Hom:hou.NetworkEditor#openNoteEditor].
+
+    `editor`:
+	The [Hom:hou.NetworkEditor] receiving the event.
+
+    `eventtype`:
+	A string describing the event. `editvalue` is the only value that
+	appears in this class.
+
+    `valueid`:
+	The unique integer identifier for the input field returned by the
+	call that opened it.
+
+    `value`:
+	The final string value in the input field.
+
+`ModalUIEvent`:
+    Sent when a Houdini UI gadget (generally the Tab menu) is
+    opened or closed over the network editor.
+
+    `editor`:
+	The [Hom:hou.NetworkEditor] receiving the event.
+
+    `eventtype`:
+	A string describing the event.
+
+	`startmodalui`:
+	    The menu has just opened.
+
+	`endmodalui`:
+	    The menu has closed.
+
+    `interfacename`:
+	The name of the interface gadget that is opened or closed. Currently
+	the only value will be `TabMenu`.
+
+== Helper classes ==
+
+Several of the events defined above make use of helper classes for describing
+interface components under the mouse, or the current state of mouse buttons.
+These classes are also defined in
+`$HFS/houdini/python2.7libs/canvaseventtypes.py`.
+
+`MouseState`:
+    Describes the state of all mouse buttons.
+
+    `lmb`:
+	A `bool` value set to `True` if the left mouse button is pressed.
+
+    `mmb`:
+	A `bool` value set to `True` if the middle mouse button is pressed.
+
+    `rmb`:
+	A `bool` value set to `True` if the right mouse button is pressed.
+
+`ModifierState`:
+    Describes the state of all modifier keys on the keyboard.
+
+    `alt`:
+	A `bool` value set to `True` if one of the `Alt` keys is pressed.
+
+    `ctrl`:
+	A `bool` value set to `True` if one of the `Ctrl` keys is pressed.
+
+    `shift`:
+	A `bool` value set to `True` if one of the `Shift` keys is pressed.
+
+`NetworkComponent`:
+    Describes a UI element that appears in the network editor pane.
+
+    `item`:
+	The [Hom:hou.NetworkItem] of which the UI element is a part. This may
+	be a [Hom:hou.Node], [Hom:hou.NodeConnection], or any other
+	[Hom:hou.NetworkItem] subclass.
+
+    `name`:
+	A string describing the specific UI element. The available values
+	depend on the type of object in the `item` field.
+
+    `index`:
+	An integer that further refines the UI element. For example, if the
+	`item` is a [Hom:hou.Node], and the `name` is `input` (indicating an
+	input connector), the `index` will indicate which input connector.
+
+== Coordinate spaces ==
+
+There are two coordinates systems used by the network editor. One is the
+“network” coordinates. This is the native coordinate system of a network. In
+this system, node tiles are generally about one unit wide.
+[Hom:hou.Node#position] returns the location of the lower left corner of the
+node in network coordinates.
+
+The other coordinate system is the screen coordinate system. In this system,
+`(0, 0)` is the lower left corner of the network editor pane, and one unit is
+one pixel.
+
+Almost all methods and data that don't have “screen” or “mouse” in their name
+are expressed in network coordinates. And there are methods on
+[Hom:hou.NetworkEditor] to translate from one to the other. So
+[Hom:hou.NetworkEditor#posToScreen] converts a position in network coordinates
+into the equivalent position in screen coordinates.
+[Hom:hou.NetworkEditor#visibleBounds] returns the visible area of the network
+editor in network coordinates, and [Hom:hou.NetworkEditor#screenBounds]
+returns the bounds in screen coordinates. When you pan around the network
+editor, your screen bounds are unchanged, but your visible bounds will change.
+
+== Intercepting events globally ==
+
+The first opportunity for customizing the behavior of the network editor is
+provided by the `createEventHandler` function. Before even looking at the
+event, the event will be sent to `nodegraphhooks.createEventHandler()`. The
+default implementation of this function returns a value indicating that the
+events should be processed normally. However you can create a new
+`nodegraphhooks` module in your python path such that it is found before the
+one in `$HFS/houdini/python2.7libs`. You then have the opportunity to
+intercept any event, as long as there is no user operation in progress (if an
+`EventHandler` is already active, you do not have the chance to intercept those
+events).
+
+This function is passed an event object, and a `pending_actions` parameter
+which can generally be ignored. It must return a tuple consisting of a
+`EventHandler` object or `None`, followed by a `bool` value indicating whether
+the event was handled.  In the case of events like keyboard key presses, where
+the user operation is completed by the single event, you will return `(None,True)` to indicate that there is no `EventHandler` set up, but that further processing of the event should not occur.
+
+In addition to custom handling of hotkeys, another common use for hooking
+would be to modify the behavior of certain operations (such as dragging nodes
+with certain modifier keys to do something other than simply moving the
+nodes). In this case you want most of the node behaviors to remain intact, but
+you want to customize the user operation under certain circumstances. The best
+way to accomplish this is by creating a subclass of one of the many
+`EventHandler` subclasses that already exist in the network editor control
+modules. Within the `handleEvent` method of the subclass, most events can
+defer to the base class, but specific events can be intercepted to change the
+behavior as desired.
+
+== Intercepting events for an HDA ==
+
+You may also define a `createEventHandler` function inside the `PythonModule`
+of an HDA. This function takes the same parameters and returns the same values
+as the global hook function, but is only called when the event from the user
+is a mouse event on some part of a node tile for an instance of your HDA. This
+allows you to provide specialized behaviors when interacting with your HDA
+(such as customizing the double click event to dive to a specific location
+within the node). Because the `PythonModule` is part of the HDA definition,
+these custom behaviors will show up anywhere that you install the HDA without
+having to modify the global hook function.
+
+== Examples ==
+
+The following code will modify the behavior of the hotkey for diving into a
+node so that it dives into the node under the mouse instead of the current
+node. This code should be placed in
+`$HOUDINI_USER_PREF_DIR/python2.7libs/nodegraphhooks.py`:
+
+{{{
+#!python
+import hou
+from canvaseventtypes import *
+import nodegraphdisplay as display
+import nodegraphview as view
+
+def createEventHandler(uievent, pending_actions):
+    if isinstance(uievent, KeyboardEvent) and \
+       uievent.eventtype == 'keyhit':
+        # This is a key hit event. Check for the 'dive in' key.
+        editor = uievent.editor
+        key = uievent.key
+        eventtype = uievent.eventtype
+        if display.setKeyPrompt(editor, key, 'h.pane.wsheet.jump', eventtype):
+            # Find the node under the mouse.
+            pos = uievent.mousepos
+            items = editor.networkItemsInBox(pos, pos, for_select = True)
+            for (item, name, index) in items:
+                if isinstance(item, hou.Node) and item.isNetwork():
+                    view.diveIntoNode(editor, item)
+                    break
+            # We handled this event, but don't need to return an event handler
+            # because this is a one-off event. We don't care what happens next.
+            return None, True
+
+    return None, False
+}}}
+
+The following code will intercept the ((Ctrl + Shift + H)) key to set the network
+editor to a fixed zoom level, with the current node positioned under the
+mouse.  This code should be placed in
+`$HOUDINI_USER_PREF_DIR/python2.7libs/nodegraphhooks.py`:
+
+{{{
+#!python
+from canvaseventtypes import *
+
+def createEventHandler(uievent, pending_actions):
+    if isinstance(uievent, KeyboardEvent) and \
+       uievent.eventtype == 'keyhit' and \
+       uievent.key == 'Ctrl+Shift+H':
+        # Get the current bounds.
+        screenbounds = uievent.editor.screenBounds()
+        bounds = uievent.editor.visibleBounds()
+        # Figure out how much we need to scale the current bounds to get to
+        # a zoom level of 100 pixels per network editor unit.
+        currentzoom = screenbounds.size().x() / bounds.size().x()
+        desiredzoom = 100.0
+        scale = currentzoom / desiredzoom
+
+        # Get the current node.
+        currentnode = uievent.editor.currentNode()
+        if currentnode is not None:
+            mousepos = uievent.mousepos
+            mousepos = uievent.editor.posFromScreen(mousepos)
+            noderect = uievent.editor.itemRect(currentnode)
+            # Do the zoom centered at the mouse position.
+            zoomcenter = mousepos
+            bounds.translate(-zoomcenter)
+            bounds.scale((scale, scale))
+            bounds.translate(zoomcenter)
+            # Move the view so the current node is under the mouse.
+            bounds.translate(noderect.center() - mousepos)
+            # Set the new bounds.
+            uievent.editor.setVisibleBounds(bounds)
+
+        # We handled this event, but don't need to return an event handler
+        # because this is a one-off event. We don't care what happens next.
+        return None, True
+
+    return None, False
+}}}
+
+The following code demonstrates the creation of an `EventHandler` subclass to
+override the behavior of a double click event on a node. Instead of diving
+into the node, it does nothing. This is unlikely to be a desirable change as a
+global hook, but might be useful as part of a `PythonModule` in a specific
+HDA:
+
+{{{
+#!python
+import hou
+import nodegraph
+from canvaseventtypes import *
+
+class NoDiveNodeMouseHandler(nodegraph.NodeMouseHandler):
+    def handleEvent(self, uievent, pending_actions):
+        if isinstance(uievent, MouseEvent) and \
+           uievent.eventtype == 'doubleclick':
+            return None
+
+        return nodegraph.NodeMouseHandler.handleEvent(
+	    self, uievent, pending_actions)
+
+def createEventHandler(uievent, pending_actions):
+    if isinstance(uievent, MouseEvent) and \
+       uievent.eventtype == 'mousedown' and \
+       isinstance(uievent.selected.item, hou.Node):
+        return NoDiveNodeMouseHandler(uievent), True
+
+    return None, False
+}}}

@@ -1,0 +1,174 @@
+= Volumes =
+
+#bestbet: volume
+
+== Overview ==
+
+Volumes allow you to store values for "voxels" (three dimensional pixels) in a space. This allows you to represent phenomena such as clouds, smoke, fire, as well as store simulation metadata such as velocity fields (store a velocity at each voxel, and use the velocity values to move (advect) other geometry), collision fields (store the 3D "hittable area" of an object as a sign distance field), and others. 
+
+Houdini supports two types of volume primitive at the geometry level, alongside other primitives such as polygons and NURBS surfaces. The two volume types are adapted for different uses, but Houdini's tools attempt to work on them both generically where possible.
+
+TIP:
+    To surface nodes that operate on points (for example, the [VOP SOP|Node:sop/vopsop], volumes appear to be a single point at the center of the volume. You may need to use a volume-specific node to operate on the actual volume (for example, the [Volume VOP SOP|Node:sop/volumevop]).
+
+See also [rendering volumes|/render/volumes]
+
+== Standard Houdini volumes ==
+
+A standard Houdini volume is a box with a position, size, and orientation, subdivided into a 3D grid of _voxels_, with a value stored in each voxel. This type is used in modeling (SOPs) and simulation (DOPs).
+
+Different types of volumes store different types of information in the voxels:
+
+Scalar field (density):
+    Stores a single numeric value at each point. This is useful to represent smoke, where the value at each point represents the density of the smoke at that location.
+    
+Sign distance field (SDF):
+    Used to represent fluids. Stores a number at each point representing the distance to the fluid's surface, with the sign of the number (positive or negative) indicating whether the point is inside or outside the fluid.
+
+Vector field:
+    Stores a vector at each point. This is actually represented using three scalar fields (for example `Cd.r`, `Cd.g`, `Cd.b`) but Houdini knows to treat them as a single volume.
+    
+    A common use for this type of a field is a _velocity field_ for a gas simulation, which each point's vector value represents the direction/velocity of the gas at that position.
+    
+    (You can use the [VDB Vector Merge node|Node:sop/vdbvectormerge] to combine three scalar VDB fields into a single vector VDB.)
+
+== OpenVDB volumes ==
+
+An [OpenVDB|http://www.openvdb.org/] volume uses the OpenVDB library to represent a sparse volume very efficiently.
+A VDB volume uses essentially no memory for "empty" voxels (technically, voxels equal to the "background value").
+This volume type is useful for modeling sparse volumes such as clouds and wispy smoke.
+
+Because of the way this volume type is represented in memory, it does not require that you specify a box containing the volume; it can extend infinitely. 
+Despite this, a VDB does define a 3D grid of voxels over the whole space.
+
+OpenVDB volumes were added to Houdini in version 12.5.
+
+You can write OpenVDB volumes to `bgeo` files and load them at render time using the [Mantra delayed load procedural|Node:shop/vm_geo_file], just as with standard Houdini volumes/geometry. You can render standard Houdini volumes and OpenVDB volumes together and they will mix properly.
+
+[Surface nodes|/nodes/sop/] with "VDB" in their title operate on VDB volumes. You can convert geometry to VDB volumes using the [VDB from polygons|Node:sop/vdbfrompolygons] and [VDB from particles|Node:sop/vdbfromparticles] nodes. You can create an empty VDB volume using the [VDB node|Node:sop/vdb]. Other "VDB" nodes let you edit VDB volumes.
+
+Many SOPs that operate on standard Houdini volumes also work with VDB volumes. The node help will indicate if a volume node doesn't work with VDB volumes.
+
+[VEX functions|/vex/functions/], [HOM functions|/hom/], and [Hscript commands|/commands] that operate on standard Houdini volumes should work with VDB volumes as well.
+
+NOTE:
+    You cannot currently use VDB primitives in simulations.
+
+== Specifying volumes in group fields == (group)
+
+In a node that operates on a volume, you may have multiple volumes in the input geometry and want to select which volume a node will affect, using the node's __Group__ parameter.
+
+If you have a volume primitive named `density` in the geometry, that is not a group. It's just a primitive that has a `name` attribute set to `density`. You can't type `density` in a group field to select it.
+
+Instead, *to select a single volume by name* in the __Group__ parameter, use the attribute matching syntax `@name=<<name>>` (for example, `@name=density`).
+
+== Working with volumes in geometry networks ==
+
+TIP:
+    When you create volumes in SOPs, remember to fill in the __Name__ parameter with a name describing the purpose of the volume (e.g. `density` for smoke density). This will make it easier to work with volumes in SOPs and DOPs.
+
+:task:See the outlines of standard volume containers in the view:
+    Turn on display of hulls (click the [Icon:VIEW/display_hulls] Display Hulls icon in the display toolbar on the right side of the viewer pane).
+    
+    You can also view the outline of volumes in [Icon:VIEW/wireframe] wireframe mode.
+    
+    See [how to change the view|/basics/view] for more information.
+
+:task:Create a standard volume from existing geometry:
+    * The [Fluid Source SOP|Node:sop/fluidsource] is designed to create source volumes for [pyro effects|/pyro/pyro], however you can use it to create "hollow" volumes from all kinds of geometry, including flat surfaces and point clouds.
+
+    * The [IsoOffset SOP|Node:sop/isooffset] can create a "solid" volume from an airtight surface. Use the __Output type__ parameter to choose a volume type, and the __Uniform Sampling Divs__ to set the resolution.
+
+:task:Create a VDB volume from existing geometry:
+    Use the [VDB from polygons|Node:sop/vdbfrompolygons] or [VDB from particles|Node:sop/vdbfromparticles] node.
+
+:task:Create an empty or uniform volume primitive:
+    * For standard volumes, use the [Volume SOP|Node:sop/volume]. The input to the Volume SOP allows you to specify the size of the volume container as the bounding box of the incoming geometry.
+    
+    * From VDB volumes, use the [VDB SOP|Node:sop/vdb].
+    
+    TIP:
+        The [Volume SOP|Node:sop/volume] and [VDB SOP|Node:sop/vdb] can create a volume based on the position and field of view of a camera. This lets you limit the volume to the visible area of the scene for efficiency.
+
+:task:Create a volume from an implicit function:
+    Use the [Iso Surface SOP|Node:sop/iso] and turn on __Build Volume__.
+    
+    You can enter an expression in the __Implicit function__ field to define the value of the volume at each voxel. For example, to create a uniform volume, enter `1`. To create a sphere shape, enter `1-($X*$X + $Y*$Y + $Z*$Z)`.
+
+:task:Edit the values in a volume:
+    * The [Volume Mix SOP|Node:sop/volumemix] lets you edit the voxel values using an expression. Set the __Mix method__ to "User" and set the __Value__ to an expression where `$V` represents the current value at each voxel and the result is the new value.
+    
+    * The [Volume VOP SOP|Node:sop/volumevop] lets you edit the voxel values using a [VOP network|/nodes/vop] ([SOP context|/vex/contexts/sop]).
+    
+    * You can also use the [Volume Mix SOP|Node:sop/volumemix] to combine multiple volume primitives.
+    
+    * The [Volume Blur|Node:sop/volumeblur], [Volume Feather|Node:sop/volumefeather], [Volume From Attribute|Node:sop/volumefromattrib], and [Volume Ramp|Node:sop/volumeramp] SOPs let you edit volumes in various ways.
+
+:task:Convert between standard volumes and VDB volumes:
+    Use the [Convert VDB SOP|Node:sop/convertvdb].
+
+:task:Create geometry from a standard volume:
+    * The [Convert Volume SOP|Node:sop/convertvolume] will create a surface from the volume along isovalues.
+
+    * The [Volume Surface SOP|Node:sop/volumesurface] creates a triangular polygon surface by growing a surface from a random point inside the volume outward.
+    
+        This method creates nice meshes but will only surface one component of a disconnected volume, and can fail to create a surface for some inputs. This node will fuse topological handle holes (for example, the handle on a coffee mug).
+    
+    * The [Convert SOP|Node:sop/convert] also does volume to poly conversion, however the Convert Volume SOP's interface is more focused on volumes.
+
+:task:Create geometry from a VDB volume:
+    Use the [Convert VDB SOP|Node:sop/convertvdb].
+
+:task:Get the bounding box of the actual volume inside a container:
+    Use the [Scatter SOP|Node:sop/scatter] to scatter points inside the volume, then wire the points to a [Bound SOP|Node:sop/bound].
+
+:task:Use volumes to edit other geometry:
+    The [Volume analysis|Node:sop/volumeanalysis], [Volume Bound|Node:sop/volumebound], and [Volume Break|Node:sop/volumebreak] SOPs let you create other geometry from volumes in various ways.
+
+:task:Use a volume primitive in nodes that take a volume file:
+    Some nodes, such as the [Volume Sample from File VOP|Node:vop/volumesamplefile], use volume files. You can grab "live" data from a SOP instead of from a file using the `op:` syntax, e.g. `op:/obj/geo1/volume1`.
+
+:task:Import data from a fluid or gas simulation as a volume     primitive:
+    See [how to import and export simulation data|/dyno/io].
+
+:task:Shade and render volumes:
+    See [volumetric rendering|/render/volumes].
+
+== Merging volumes ==
+
+* If you merge two volume primitives with the regular [Merge SOP|Node:sop/merge], the output contains multiple separate volume primitives (see [how to refer to individual volume primitives|#group] below).
+
+* If you use the [Volume Merge SOP|Node:sop/volumemerge] or [Volume Mix SOP|Node:sop/volumemix], all volumes in the second input are merged into the volume in the first input.
+
+When using Volume Merge/Volume Mix, it's a good idea to connect an empty volume (created using the [Volume SOP|Node:sop/volume]) (of the size and resolution you want) to the first input, and then connect all the volumes you want to merge together into the second input (using a [Merge SOP|Node:sop/merge]).
+
+To set the size of the empty volume you are merging into to the combined size of the volume you're merging, wire the Merge node (with the volumes to merge) into the Volume SOP's input (which sets the empty volume's size using the bounding box of the input geometry) as well as the second input of the Volume Merge/Mix node:
+
+[Image:images/merge_volumes_network.png]
+
+TIP:
+    You can change the resolution of a volume by merging it into an empty volume created at the new resolution.
+
+The __Merge/Mix Method__ parameter on the Volume Merge/Volume Mix nodes controls how the values in the two volumes are combined.
+
+* To simply overlay two volumes, you will usually want to use "Maximum". Using "Add" with normalized (0-1) volumes will give you values greater than 1.
+
+* You can set the Volume Mix node's __Mix Method__ to "Difference" to carve the shape of one volume out of another.
+
+== Special effects ==
+
+* You can use volume nodes to edit surface geometry by converting the geometry to a volume, editing it, and converting back to a surface. This is an excellent technique for smoothly merging solid models. It also lets you use powerful tools such as the [Volume VOP|Node:sop/volumevop] and [Volume Wrangle|Node:sop/volumewrangle] surface nodes to edit solid geometry with total programmatic control.
+
+    # Convert the geometry to a volume using the [IsoOffset node|Node:sop/isooffset].
+    
+    # Use the volume editing nodes to edit the volume.
+    
+    # Convert the volume back to a surface using the [Convert Volume node|Node:sop/convertvolume].
+    
+* The [Attribute From Volume surface node|Node:sop/attribfromvolume] lets you copy values from a volume onto nearby geometry. This is useful for special effects such as coloring objects as they move through a cloud.
+
+@related
+
+* [/render/volumes]
+
+        

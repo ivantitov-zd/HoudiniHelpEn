@@ -1,0 +1,157 @@
+= hou.DopObject =
+#type: homclass
+#cppname: HOM_DopObject
+#superclass: hou.DopData
+#group: dynamics
+
+"""A type of DOP data that contains an object in the simulation."""
+
+This object might be a rigid body, a fluid, cloth, etc.  The type and
+properties of the DOP object are determined by the subdata attached to the
+object.
+
+@methods
+
+::`name(self)` -> `str`:
+    #cppname: HOM_DopObject::name
+    #replaces: Exp:dopnodeobjs
+    Return the name of this DOP object.
+
+::`matches(self, pattern)` -> `bool`:
+    #cppname: HOM_DopObject::matches
+    Return whether or not this object's name matches a pattern.  `*` will
+    match any number of characters and `?` will match any single character.
+    The pattern string contains only one pattern, so spaces in the pattern
+    will be compared against the object name.
+
+    {{{
+    #!pycon
+    >>> obj = hou.node("/obj/AutoDopNetwork").simulation().objects()[0]
+    >>> obj.name()
+    'box_object1'
+    >>> obj.matches("box*")
+    True
+    >>> obj.matches("c*")
+    False
+    >>> obj.matches("box* b*")
+    False
+    >>> obj.matches("b?x_object1")
+    True
+    }}}
+
+::`objid(self)` -> `int`:
+    #cppname: HOM_DopObject::objid
+    Return the index of this object in the output from
+    [Hom:hou.DopSimulation#objects].  This method is a shortcut for
+    `self.options().field("objid")`.
+
+    See [Hom:hou.DopData#id] for an example.
+
+    Some fields in DOP records store an objid to refer to other objects.
+    The following function looks up an object by objid:
+    {{{
+    #!python
+    def findObjectByObjid(dopnet_node, objid):
+        return dopnet_node.simulation().objects()[objid]
+    }}}
+
+::`areObjectsAffectors(self, object_sequence)`:
+    #cppname: HOM_DopObject::areObjectsAffectors
+    #replaces: Exp:dopobjectsareaffectors
+    #status: ni
+    Given a sequence of DOP objects, return whether or not all of those objects
+    are affectors of this object.
+
+::`velocityAtPosition(self, position, use_point_velocity=True, use_volume_velocity=False)` -> [Hom:hou.Vector4]:
+    #cppname: HOM_DopObject::velocityAtPosition
+    #replaces: Exp:dopvelatpos
+    #status: ni
+    Given a [Hom:hou.Vector3] position, return the velocity at that position
+    in the simulation.  This method accounts for the velocity and angular
+    velocity store in the object's "Position" data.
+
+    `use_volume_velocity`:
+        Whether or not the velocity is affected by the volumetric
+        representation of the geometry.
+
+    `use_point_velocity`:
+        Whether or not the velocity is affected by the velocity attribute
+        on the object's geometry.  When used, Houdini adds this velocity to
+        the velocity in the Position data.
+
+    If both `use_volume_velocity` and `use_point_velocity` are set then
+    the volume velocity is used.
+
+::`transform(self, include_geometry_transform=True)` -> [Hom:hou.Matrix4]:
+    #cppname: HOM_DopObject::transform
+    #replaces: Exp:doptransform
+    Return the transformation matrix for this object.  If
+    `include_geometry_transform` is `False`, the result is determined only by
+    the object's Position data.  Otherwise, it is the transform in the
+    object's Geometry data, followed by the position transform.
+
+    For simple DopData types, this method can be approximately implemented as
+    follows:
+    {{{
+    #!python
+    def transform(self, include_geometry_transform=True):
+	result = hou.hmath.identityTransform()
+
+	geometry = self.findSubData("Geometry")
+	if include_geometry_transform and geometry is not None:
+	    result *= geometry.record("Transform").field("transform")
+
+	# Retrieve the position.  If there is Geometry data, use its
+	# positionpath field to get the SIM_Position subdata.  If not, look
+	# for data named Position.
+	position = None
+	if geometry is not None:
+	    position = geometry.findSubData(
+		geometry.options().field("positionpath"))
+	if position is None:
+	    position = self.findSubData("Position")
+
+	# If we found position data, build a transformation from the pivot,
+	# rotation quaternion, and translate.
+	if position is not None:
+	    options = position.options()
+	    rotation = hou.Matrix4(options.field("orient").extractRotationMatrix3())
+	    result *= (hou.hmath.buildTranslate(-options.field("p")) *
+		rotation *
+		hou.hmath.buildTranslate(options.field("p")) *
+		hou.hmath.buildTranslate(options.field("t")))
+
+	return result
+    }}}
+
+::`geometry(self, name="Geometry")` -> [Hom:hou.Geometry] or `None`:
+    #cppname: HOM_DopObject::geometry
+    If this DOP object has SIM_Geometry subdata with the given name, return
+    its corresponding read-only [Hom:hou.Geometry] object.  Otherwise, this
+    method returns `None`.
+
+::`editableGeometry(self, name="Geometry")` -> hou.EditableDopGeometryGuard or `None`:
+    #cppname: HOM_DopObject::editableGeometry
+    If this method is called from a Python solver DOP and it has SIM_Geometry
+    (or SIM_GeometryCopy) subdata with the given name, it returns a Python
+    guard object that can be used with the `"with"` statement to access and
+    modify the corresponding [Hom:hou.Geometry] object.
+
+    In Python 2.5, the `with` statement is not enabled by default.  To enable
+    it, you need to add the following line at the beginning of your
+    script/module:
+    {{{
+    #!python
+    from __future__ import with_statement
+    }}}
+
+    For example, the following code in a Python solver DOP will add a point
+    at the origin of the geometry:
+    {{{
+    #!python
+    with dop_object.editableGeometry() as geo:
+        geo.createPoint()
+    }}}
+
+    Raises [Hom:hou.PermissionError] if not called from a Python solver DOP.
+

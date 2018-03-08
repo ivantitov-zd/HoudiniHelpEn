@@ -1,0 +1,107 @@
+= Point Wrangle =
+
+#type: node
+#context: sop
+#internal: pointwrangle
+#icon: SOP/pointwrangle
+#tags: points, attrs, core, tech
+
+"""Runs a VEX snippet to modify point attributes, including position."""
+
+== Overview ==
+
+This is a very powerful, low-level node that lets experts who are
+familiar with VEX tweak point attributes using code.
+
+This node corresponds to the [VOP SOP|Node:sop/vopsop],
+but uses a textual VEX snippet instead of a VOP network.
+
+WARNING:
+    This node requires that you understand the [vex language|/vex/].
+    It is very easy to write incorrect code using this node.
+
+This node _runs the snippet on every point_ in the input geometry.
+The snippet can edit the input geometry by changing attributes.
+It can access information from other geometry using attributes and VEX functions.
+
+* Press ((MMB)) on the node to see any error output from the snippet.
+
+* You can use the VEX function `ch` to evaluate parameters.
+  The path is relative to this node (`ch("parm")` will evaluate the parameter `parm` on this node).
+  This evaluation will be done at the current time.
+
+* Unlike the [Point SOP|Node:sop/point], this does not use local variables.
+  Further, all backtick expressions and `$F` variables will be evaluated at frame 1,
+  not the current time.
+  Use `Frame`, `Time`, or `TimeInc` instead.
+
+== Context ==
+
+This node runs the VEX snippet in the *SOP context*.
+
+[Include:wrangle_syntax]
+
+== VEX variables ==
+
+You can create temporary VEX variables.
+Normal VEX variables do not have a `@` prefix.
+For example, the following code swaps `P` and `Cd`.
+
+{{{
+#!vex
+vector temp = @P;
+@P = @Cd;
+@Cd = temp;
+}}}
+
+== Global Variables ==
+
+The VEX `sop` context provides several global variables you can access,
+such as `P`, that correspond to attributes.
+While you can access these directly, we recommend you use the `@` prefix
+for clarity.
+
+The following global variables do not correspond to attributes
+and may be useful in snippets.
+
+`Npt`:
+    Total number of points.
+`Time`:
+    Current time in seconds.
+`Frame`:
+    Current time in frames.
+`TimeInc`:
+    Time increment between frames, in seconds.
+`OpInput1`, `OpInput2`, `OpInput3`, `OpInput4`:
+    A string that can be used to refer to the corresponding input
+    of this SOP in vex operations that take file parameters.
+
+@parameters
+
+Point group:
+    A subset of points in the input geometry to run the program on.
+    Leave this blank to affect all points in the input.
+
+VEXpression:
+    #id: snippet
+
+    A snippet of VEX code that will manipulate the point attributes.
+    You can use `@<<variable_name>>` syntax to access geometry attributes.
+
+Attributes to Create:
+    #id: exportlist
+
+    Only create attributes if their names match this pattern.
+    The default pattern allows any attribute to be created.
+    
+    You can restrict the created attributes by replacing the `*` with a list of allowed names.
+    Global attributes, such as `Cd`, `v`, and `id`, will be created even if they are not in this list.
+
+@related
+
+- [Node:sop/attribwrangle]
+- [Node:sop/volumewrangle]
+- [Node:sop/attribvop]
+- [Node:sop/point]
+- [Node:sop/vopsop]
+

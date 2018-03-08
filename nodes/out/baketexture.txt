@@ -1,0 +1,201 @@
+= Bake Texture =
+
+#type: node
+#context: out
+#internal: baketexture
+#icon: ROP/mantra
+
+"""Generates a texture map from one or more objects' rendered appearance."""
+
+== Overview ==
+
+It can be useful to generate a texture from the rendered appearance of a model.
+
+* As a performance "cheat", you can bake the fully rendered appearance of a model into a texture, and then use the texture instead of running the actual shaders. When you can get away with it (where it's not noticeable that the object's appearance doesn't change), this can give a large speedup, especially for large numbers of identical objects with complex shaders.
+
+    This is especially useful when you [bake a texture from a high-resolution model and apply it to a low-resolution model|#xfer], possibly in combination with other resolution "tricks" such as subdivision surfaces.
+
+* You can capture the rendered appearance of a model as the starting point for a hand-painted texture map.
+
+This node renders one or more objects as flat texture maps.
+
+
+== UDIM and Ptex ==
+
+This node can generate UDIM unwrapped texture images, or [Ptex|/shade/ptex] texture maps, using the __UV unwrapping method__ parameter.
+
+* For UDIM textures, the node will use the `uv` attribute on the model to lay out the baked output.
+
+    The node will replace the string `%(UDIM)d` in the output filename with the UDIM index.
+
+* [Ptex|/shade/ptex] generates a separate texture for each face and saves all the textures and the model topology together in a single archive. Since Ptex texture tiles must map to quadrilaterals, Mantra assumes the geometry will render as a subdivision surface. This node creates Ptex tiles for each polygon using the subdivision rules (3 faces for a triangle, 1 for a quad, 5 for a pentagon, 6 for a hexagon, and so on).
+
+
+== Baking high-res object onto low-res object == (xfer)
+
+When you specify the objects to render in the __UV render objects__, you can optionally render the appearance of one object into the UV space of another object. This is useful for baking the look of high-res geometry and complex shaders, and then applying them to a much lower-resolution object.
+
+By default, baking will use the surface normal of the lower-resolution object for projection. This may be undesired in areas where there are normal discontinuities. For such cases, you may optionally specify __UV cage object__ which is a dupicate of of __UV object__ whose vertices are manually pushed out slightly. The __UV cage object__ will then be used to map points toward __UV object__ as the new projection direction.
+
+
+== Object pattern matching ==
+
+You can use the __UV render objects__ parameter to specify multiple objects to render. You can also use wildcards in the __UV render objects__ sub-parameters to match multiple objects in one go.
+
+When you have one pattern in the __UV object__ path, and a corresponding `*` wildcard in the __Output picture__ filename, the node will replace the `*` in the filename with the match from the object path.
+
+For example, if the __UV object__ path is `/obj/*`, and the __Output picture__ filename is `$HIP/textures/*.rat`, then the node will render `/obj/apple` as `$HIP/textures/apple.rat`, `/obj/bear` as `$HIP/textures/bear.rat`, and so on.
+
+Note that the pattern in the __UV object__ path can be something other than a `*`. For example, if you have the objects `/obj/ball1`, `/obj/ball2`, and `/obj/ball3`, you could use a path of `/obj/ball[1-3]` and an output filename like `$HIP/textures/*.rat`.
+
+
+== Tips and notes ==
+
+* As with a regular render, you can output multiple image planes as textures. For example shading position, direct lighting, indirect lighting, and so on.
+
+* Mantra unwraps the model using a lens shader (see `$HH/CVex/uvlens.vfl`). Mantra only supports lens shaders in ray-tracing and PBR ray-tracing.
+
+* The lens shader raises the "camera" very slightly above the surface, to account for precision errors in calculating the surface position. This means it's very important to have correct surface normals on the model. If the model's normals are reversed for some reason, you can un-reverse them on this node using the __Reverse normals__ parameter.
+
+*  The [Vex:uvunwrap] function the lens shader uses correctly accounts for subdivided surfaces and displacement shaders when calculating the surface positions.
+
+* When __Extract Format__ does not support floating point data (such as `TGA`, `PNG` or `JPG`), the output values of `Tangent-Space Normal (Nt)` and `Shading Normal (N)` planes will be automatically remapped from -1~1 to 0~1.
+
+* Writing out UDIM tiles for __Extra Image Planes__ with __Different File__ option is currently unsupported.
+
+
+@parameters
+
+This is a version of the regular [Mantra render node|Node:out/ifd] which is configured with parameters to allow for easy baking of texture maps for objects. See the [help for the render node|Node:out/ifd] for more general help.
+
+
+Texture Format:
+    Choose "UDIM" to generate regular UV images, or "Ptex" to generate Ptex images.
+
+Resolution:
+    The size of the output texture image. This is ignored for Ptex textures.
+
+Minimum Map Resolution:
+    For Ptex, the texture size to use for the smallest faces in each object, from `4` to `1024` pixels.
+
+Maximum Map Resolution:
+    For Ptex, the maximum possible texture size to use, from `4` to `1024` pixels. This is a clamp on the per-face value calculated by multiplying the __Minimum map resolution__ by the __Map resolution scale__.
+
+Map Resolution Scale:
+    For Ptex, this node calculates the size of each texture by scaling the __Minimum map resolution__ based on the relative size of each face. The smallest faces will get the __Minimum map resolution__. With a scale of `1.0`, faces 2x larger than the smallest will get 2x larger textures. If you set the scale to `0.0`, _all_ faces will get the minimum resolution.
+
+UV Render Objects:
+    For each object you want to render, click the [Smallicon:BUTTONS/add] Add button and enter the path of the object in __UV Object__, and the texture filename in __Output picture__. You can do [simple pattern expansion|#patterns] in the path and filename.
+    
+    * To take the rendered appearance of a high resolution object and bake it into the texture space of the __UV object__, enter the path of the __High res object__.
+
+    * To bake using the projection direction from a cage object, enter the path of __UV cage object__. 
+    
+    The output picture field accepts a few special codes:
+    
+    * When __Texture unwrapping method__ is "UDIM", you can use `%(UDIM)d` in the filename, and the node will replace it with the UDIM index to render out multiple files.
+
+    * If you enter `%(CHANNEL)s` as part of the filename, the node will replace it with the channel name.
+
+    NOTE:
+	__Output picture__ must be a floating point image format that supports multi-channel images for __UDIM Post Process__ and __Extract image planes__ to work correctly. It is strongly recommended to leave it in .rat format, and use __Extract image planes__ to extract the channels into a different format.
+
+
+== Images ==
+
+=== Main ===
+
+You can use the controls on the __Output__ tab to rename the channels in the output filenames.
+
+* [IncludeProp:vm_bake_normalizep]
+* [IncludeProp:vm_extractimageplanes]
+* [IncludeProp:vm_extractremoveintermediate]
+
+* [IncludeProp:vm_quickplane_Nt]
+* [IncludeProp:vm_quickplane_Ds]
+* [IncludeProp:vm_quickplane_Vd]
+* [IncludeProp:vm_quickplane_Vdt]
+* [IncludeProp:vm_quickplane_Oc]
+* [IncludeProp:vm_quickplane_Cv]
+* [IncludeProp:vm_quickplane_Th]
+* [IncludeProp:vm_quickplane_Cu]
+
+* [IncludeProp:vm_quickplane_P]
+* [IncludeProp:vm_quickplane_N]
+* [IncludeProp:vm_quickplane_basecolor]
+* [IncludeProp:vm_quickplane_diffcolor]
+* [IncludeProp:vm_quickplane_speccolor]
+* [IncludeProp:vm_quickplane_emitcolor]
+* [IncludeProp:vm_quickplane_ssscolor]
+* [IncludeProp:vm_quickplane_metallic]
+* [IncludeProp:vm_quickplane_specrough]
+
+* [IncludeProp:vm_numaux]
+
+
+
+=== Output ===
+
+The controls on this tab let you optionally remap channel names to new strings in the output filenames. Turning on export of a channel on the __Main__ sub-tab enables the corresponding renaming field on this sub-tab.
+
+[IncludeProp:vm_extractseparator]
+
+
+== Baking ==
+
+* [IncludeProp:vm_bake_skipcf]
+* [IncludeProp:vm_bake_layerexport]
+* [IncludeProp:vm_bake_samples]
+* [IncludeProp:vm_bake_usemikkt]
+* [IncludeProp:vm_bake_normalsfaceforward]
+* [IncludeProp:vm_bake_tangentnormalflipx]
+* [IncludeProp:vm_bake_tangentnormalflipy]
+* [IncludeProp:vm_bake_tangentnormalincludedisp]
+* [IncludeProp:vm_bake_occlusionbias]
+* [IncludeProp:vm_bake_cavitydistance]
+* [IncludeProp:vm_bake_cavitybias]
+* [IncludeProp:vm_bake_curvatureocc]
+* [IncludeProp:vm_bake_curvaturesdist]
+* [IncludeProp:vm_bake_curvaturescale]
+* [IncludeProp:vm_bake_curvaturebias]
+
+
+== Unwrapping ==
+
+* [IncludeProp:vm_uv_unwrap_method]
+* [IncludeProp:vm_uv_ray_bias]
+* [IncludeProp:vm_uv_ray_maxdist]
+* [IncludeProp:vm_uv_flip_normal]
+* [IncludeProp:vm_uvpostprocess]
+* [IncludeProp:vm_uvborderpixels]
+* [IncludeProp:vm_ptexwraporient]
+* [IncludeProp:vm_uvlightpaths]
+* [IncludeProp:vm_ptexscaleattr]
+* [IncludeProp:vm_ptexrelativescale]
+
+== Rendering ==
+
+=== Sampling ===
+
+* [IncludeProp:vm_samples]
+* [IncludeProp:vm_dorayvariance]
+* [IncludeProp:vm_minraysamples]
+* [IncludeProp:vm_volumesteprate]
+* [IncludeProp:vm_volumeshadowsteprate]
+* [IncludeProp:vm_transparent]
+* [IncludeProp:vm_transparentsamples]
+* [IncludeProp:vm_samplelock]
+* [IncludeProp:vm_randomseed]
+* [IncludeProp:vm_imageblur]
+
+
+== Advanced ==
+
+    * [Include:ifd#objects_tab]
+    * [Include:ifd#scripts_tab]
+    * [Include:ifd#driver_tab]
+    
+
+@related
+
+- [Mantra|Node:out/ifd]

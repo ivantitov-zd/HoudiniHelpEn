@@ -1,0 +1,112 @@
+= Motion blur =
+
+#flow: mug
+
+Many of the parameters related to Motion Blur can be found under the Rendering Tab.
+When using a real-world camera, rapidly moving objects can appear blurry or “streaky”. This is because the object changes position while the camera’s shutter is open, allowing its image to be smeared across the negative as it is exposed. This effect is exaggerated the longer the shutter is allowed to remain open.
+
+Enabling the Allow Motion Blur toggle on the Mantra node will attempt to replicate the effect of photographic motion blur in your renders. Many of the parameters which control motion blur are designed to replicate the settings on a real world camera, however there are several controls which are meant as optimizations for rendering purposes and have no direct correlation to real world settings.
+
+== Camera shutter time ==
+
+On the camera object, there is a sampling tab which contains parameters related to shutter speed as well as depth of field. In the case of Motion Blur, the relevant parameter is Shutter Time.
+
+The shutter time refers to the portion of a frame the shutter is actually open. On a physical camera, this if often referred to as Shutter Speed.
+
+A value of 0 for the shutter time would mean that there is no motion blur at all, as the shutter is only “Open” for an instant. A value of 1 on the other hand would mean that the shutter is open for the entire length of the frame.
+
+[Image:/images/render/mug/blur/ShutterTime.jpg]
+
+In the above example the sphere is rotating a full 360 degrees over the course of a single frame. You can see how the length of the “motion trail” or “blur” changes based on the shutter time. In most cases, the default value of .5 is appropriate for animated sequences and a good match for real world settings.
+
+Keep in mind that this parameter controls the amount of time within a single frame, that the shutter is open. It does not refer to how long an individual frame is. To adjust the frame rate, change the Frames Per Second parameter in the Global Animation Options.
+
+== Render settings ==
+
+On the Mantra node, turn on __Allow motion blur__ on the __Rendering__ tab. This will reveal three additional parameters: __Xform time samples__, __Geo time samples__, and __Shutter offset__.
+
+=== Xform time samples ===
+
+This parameter controls the number of transformation motion blur samples. Unlike a physical camera, mantra will only sample the motion of an object a specific number of times while the virtual camera shutter is open. This allows mantra to optimize the rendering of objects whose path through space over the span of a frame is relatively simple. A setting of 2 is generally enough to properly represent a motion path.
+
+[Image:/images/render/mug/blur/XFormSampleSimple.jpg]
+
+However for objects whose path is complex over the course of a single frame, it will become necessary to increase the number of times Mantra samples the transformation.
+
+[Image:/images/render/mug/blur/XFormSampleComplex.jpg]
+
+In the above example, it requires 40 Xform Time samples in order to correctly render the complex motion that occurs within one frame. This amount of motion in subframe motion is very unusual and only used as a demonstration.
+
+Keep in mind that Transformation Blur refers to objects being transformed at the object level and does not include deforming objects. For deformation motion blur, see Geo Time Samples.
+
+=== Geo time samples ===
+
+This parameter controls the number of deformation motion blur samples. Unlike Transform Time Samples, this refers to an object whose geometry is changing frame to frame (Although the topology of the geometry must remain the same). This may refer to simple transformations at the Geometry Level, but may also include a character or object which changes shape rapidly over the course of a frame.
+
+[Image:/images/render/mug/blur/GeoTimeSamplesSimple.jpg]
+
+As with Xform Time Samples, objects whose deformations are quite complex within a single frame will require a higher number of Geo Time Samples.
+
+[Image:/images/render/mug/blur/GeoTimeSamples.jpg]
+
+Unlike Xform Time Samples, increasing the number of Geo Time Samples *can have an impact* on the amount of memory Mantra uses. For each additional Sample, Mantra must retain a copy of the geometry in memory while it samples across the shutter time. For this reason, when optimizing your renders, it is a good idea to find the minimum number of Geo Time Samples necessary to create a smooth motion trail.
+
+=== Shutter offset ===
+
+:fig:[Image:/images/render/mug/blur/ShutterOffset.jpg]
+	This parameter controls which segment of time will be considered when generating motion blur. A value of 1 will use the current position of the object and the position of the object on the next frame as the time interval to use for motion blur. A value of -1 will use the position of the object on the previous frame and the current position of the object as the time. A value of 0 will generate an interval which lasts halfway through the previous frame and half way into the next frame.
+
+Adjusting this parameter is usually unnecessary unless you are attempting to match motion- blur which has been generated outside of Mantra. A photographic background plate, for instance.
+
+=== Allow Image Motion Blur ===
+
+Occasionally, when motion blur is going to be added to an image as a post-process or for other compositing operations, it is necessary to calculate the motion blur but not include it in the final rendered image. In these cases, Allow Image Motion Blur should be disabled.
+
+This means that the blurred positions necessary for Motion Blur can be exported as a custom Motion Vector Image Plane from within a shader using the GetBlurP() function without the small overhead of doing the actual shading in the render.
+
+=== Motion Factor ===
+
+This parameter is on the __Dicing__ tab.
+
+Fast moving objects which have significant amounts of motion blur are rendered with the same sampling quality as slow moving or static objects. However, in cases where objects are very blurry, small details are usually lost. In these cases, it is a useful optimization to reduce the shading quality on those objects which are moving quickly since the loss in detail is hidden in the motion blur.
+
+Increasing the Motion Factor will dynamically reduce the shading quality of an object based on the rate of motion. This optimization is primarily useful for objects which are refined at render time like subdivision surfaces or objects with displacement-based shading.
+
+[Image:/images/render/mug/blur/MotionFactorSimple.jpg]
+
+In the above example, you can see that the motion factor does not have a large impact on the quality of the final render.
+
+However, sometimes too much detail can be lost, especially in cases where much of the surface detail is generated by the shader. Objects whose shape is derived through significant amounts of displacement, for example.
+
+[Image:/images/render/mug/blur/MotionFactorComplex.jpg]
+
+In these cases, the Motion Factor value must be adjusted carefully to retain a believable amount of surface detail.
+
+NOTE:
+    The exact motion factor used will depend on the degree of motion in your scene. For more information, see [Motion factor|/props/mantra] on the mantra rendering properties page.
+
+== Velocity Based Motion Blur ==
+
+In some cases it can be preferable to use a velocity attribute (`v`) on your geometry to calculate Motion Blur rather than using the Geo Time Samples parameter. To enable this capability, you must turn on the “geometry velocity blur” toggle under the sampling tab on the Object itself.
+
+If your geometry changes topology frame-to-frame, Mantra will not be able to interpolate the geometry to correctly calculate Motion Blur. In these cases, a “v” attribute can be calculated which is consistent even while the underlying geometry is changing. The surface of a fluid simulation is a good example of this. In this case, and other types of simulation data, the velocity will be calculated by the Solvers involved to give accurate results at render time.
+
+Another useful case for Velocity Based Motion Blur is when you have large amounts of geometry whose animation is derived from Geometry level transformations or deformations. In these cases, increasing Geo Time Samples is not recommended because Mantra will have to store multiple copies of the geometry in memory. Instead, using Velocity Based Motion Blur is more efficient and uses less memory.
+
+It is important to remember that Velocity Based Motion blur does not support multi-segment motion blur. This means that sub-frame motion is not recognized and only the velocity attribute on the current frame will be used to generate the Motion Blur.
+
+== Object Specific Sampling ==
+
+Since all of the objects in your scene can be moving at different rates or have drastically different amounts of sub-frame motion, it can be useful to sample specific objects at different rates than others. This can be especially important for deforming objects which may require high Geo Time Samples - isolating the most important objects can reduce memory overhead.
+
+Add the following properties ([how?|/props/]) to your object:
+
+* [Xform Time Samples|Mantra:xform_motionsamples]
+* [Geo Time Samples|Mantra:geo_motionsamples]
+* [Shutter Offset|Mantra:shutteroffset]
+* [Motion Factor|Mantra:vm_motionfactor]
+
+Enabling Motion blur is a global setting on the Mantra node and can’t be set per object, however, reducing Xform and Geo Time samples to a value of 1 will essentially disable motion blur for those objects.
+
+Keep in mind that the motion of the Camera can also contribute to motion blur and can also have its own sampling rates applied.
+

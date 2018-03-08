@@ -1,0 +1,262 @@
+#type: include
+
+== Image filtering options ==
+
+Examples of specifying filter parameters:
+
+{{{
+#!vex
+colormap(map, u, v, "smode", "decal", "tmode", "repeat", "border", {.1,1,1});
+colormap(map, u, v, "mode", "clamp", "width", 1.3);
+colormap(map, u, v, "filter", "gauss", "width", 1.3, "mode", "repeat");
+}}}
+
+If the texture is a deep `.rat` file, you can use the `"channel"` keyword argument
+to specify a channel in the file:
+
+{{{
+string channelname = "N";
+cf = colormap(map, u, v, "channel", channelname);
+}}}
+
+:varg:wrap:
+    #type: string
+    #default: "repeat"
+    
+    `repeat` or `periodic` :
+        The image map will repeat outside the range 0 to 1.
+        Basically, the integer component of the texture
+        coordinate is ignored. This is the default.
+    `clamp` or `edge` or `streak` :
+        The texture coordinates will be clamped to the range 0
+        to 1. This causes evaluations outside the range to
+        evaluate to the color at the closest edge of the image
+        (the border pixels are streaked outside the range).
+    `black` or `decal` or `color` :
+        Coordinates outside the range 0 to 1 will evaluate to
+        the border color (rather than a color in the image). The
+        border color is black (i.e. 0) by default.
+
+:varg:uwrap:
+    #type: string
+    
+    (AKA `swrap`)
+    Specifies the behavior when the u coordinate is outside
+    the range 0 to 1. The values are the same as with `wrap`.
+
+:varg:vwrap:
+    #type: string
+    
+    (AKA `twrap`)
+    Specifies the behavior when the v coordinate is outside
+    the range 0 to 1. The values are the same as with `wrap`.
+
+:varg:border:
+    #type: float|vector|vector4
+    #default: 0
+    
+    Specifies the border color when Black/Decal/Color wrapping
+    is used.
+
+:varg:channel:
+    Specifies the color channel for textures that have multiple color
+    planes (for example, `diffuse_indirect` or `N`).
+    For ptex images, this specifies the index of the first channel
+    (for example, `0` or `4`).
+    
+:varg:blur:
+    #type: float
+    
+    Blurs in x and y directions. Blur is measured as a percentage
+    of the image size - so a blur of 0.1 will blur 10% of the image
+    width.  Use `xblur` and `yblur` if you need different blur
+    amounts in either dimension.
+
+:varg:xblur:
+    (AKA `ublur`, `sblur`)
+    Blur amount in the x image direction.
+    
+:varg:yblur:
+    (AKA `vblur`, `tblur`)
+    Blur amount in the y image direction.
+    
+:varg:pixelblur:
+    #type: float
+    
+    Blurs the texture by a floating point number of pixels.
+    
+    {{{
+    #!vex
+    Cf = texture("map.rat", ss, tt, "pixelblur", 2.0);
+    }}}
+
+:varg:xpixelblur:
+    #type: float
+    
+    Blurs the texture by a floating point number of pixels in the X direction.
+
+:varg:ypixelblur:
+    #type: float
+    
+    Blurs the texture by a floating point number of pixels in the Y direction.
+    
+:varg:filter:
+    #type: string
+    #default: "box"
+    
+    Specifies the type of anti-aliasing filter to be used for
+    evaluation. The following argument should be a string
+    specifying one of:
+
+    `point`:
+        Point sampling (i.e. no filtering)
+    `box`:
+        Box filter (default)
+    `gauss`:
+        Gaussian filter
+    `bartlett`:
+        Bartlett/Triangular filter
+    `sinc`:
+        Sinc sharpening filter
+    `hanning`:
+        Hanning filter
+    `blackman`:
+        Blackman filter
+    `catrom`:
+        Catmull-Rom filter
+
+:varg:xfilter:
+    #type: string
+    
+    (AKA `ufilter`, `sfilter`)
+    Specifies the filter for the X direction. The filters are
+    the same as with `filter`.
+
+:varg:yfilter:
+    #type: string
+    
+    (AKA `vfilter`, `tfilter`)
+    Specifies the filter for the Y direction. The filters are
+    the same as with `filter`.
+
+:varg:width:
+    #type: float
+    #default: 1.0
+    
+    Filter width in both X and Y directions.
+
+:varg:xwidth:
+    #type: float
+    
+    (AKA `uwidth`, `swidth`)
+    Filter width in the X direction.
+
+:varg:ywidth:
+    #type: float
+    
+    (AKA `vwidth`, `twidth`)
+    Filter width in the Y direction.
+
+:varg:zwidth:
+    #type: float
+    
+    Filter width in the Z direction (for shadow maps).
+    This is measured in world space units, unlike the other width arguments.
+
+:varg:extrapolate:
+    #type: int
+    
+    whether to use derivative extrapolation
+    when computing anti-aliasing information. Extrapolation of
+    derivatives is on by default. The argument should be either 0 or
+    1.
+
+:varg:lerp:
+    #type: int
+
+    Specifies whether RAT files should interpolate between
+    different MIP levels. By default, this is turned off. Turning
+    interpolation on will help remove discontinuities when different
+    MIP levels of a .rat file are accessed. However, the results of
+    texture evaluation will be slightly softer (i.e. blurrier) and
+    will take more time.
+
+    There are three possible values for this argument.
+    
+    `0` :
+        Disable MIP map interpolation (fastest).
+    `1` :
+        Approximate MIP map interpolation (fast).
+    `2` :
+        High Quality MIP map interpolation (slower but highest quality).
+
+:varg:depthinterp:
+    #type: string
+
+    Specifies the depth interpolation mode for deep shadow maps,
+    to control the opacity value that will be returned when the
+    map is sampled between two z-records.
+    
+    The argument must be a string.
+
+    `discrete` :
+        (default) Return the first z-record before the sample
+        point.
+    `linear` :
+        Linearly interpolate the opacities of the z-records
+        before and after the sample point.
+        
+    See [deep shadow maps|/render/shadows] for more on 
+    the difference between the two modes.
+
+:varg:beerlambert:
+    #type: int
+    
+    When evaluating volumetric deep shadow maps, this will enable Beer-Lambert
+    interpolation of opacity.  Beer-Lambert is more a accurate but more
+    expensive form of interpolation.
+
+    The argument should be either 0 or 1.
+
+:varg:srccolorspace:
+    #type: string
+    
+    Specifies the color space in which the texture is stored.
+    When texture values are accessed, they will be translated from
+    this space into linear space for rendering if needed.
+
+    `auto` :
+        (default) Determine the source color space based on the
+        file.  Currently, this will assume sRGB color space for
+        8-bit textures and linear for all other textures.
+    `linear` :
+        Transform to linear space.  This currently only affects
+        8-bit textures, since all others are assumed to be already
+        in linear space.  Use this option to force linear
+        interpretation of textures used for bump or displacement
+        maps.
+
+:varg:face:
+    When using a Ptex texture map, the `face` argument is used to
+    specify the face for ptexture lookup.
+
+:varg:ptexorient:
+    #type: int
+    
+    When using Ptex textures, the implicit texture coordinates on
+    polygons are used as the interpolants for texture lookup (combined
+    with the `face`).  However, different software may have different
+    beliefs about winding and orientation.  This keyword argument
+    allows you to control the interpretation of orientation for Houdini
+    polygons.  The `ptexorient` expects an integer argument which is
+    composed of a bit-field
+
+        - bit 0x01: Complement the `s` coordinate
+        - bit 0x02: Complement the `t` coordinate
+        - bit 0x04: Swap the `s` and `t` coordinates
+
+    For example, a value of 6 (0x4|0x2) is equivalent to calling
+    `texture(map, 1-t, s)` instead of `texture(map, s, t)`.
+
+    The default `ptexorient` is 0, which works correctly with the
+    examples found at [http://ptex.us].

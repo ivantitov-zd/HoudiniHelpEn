@@ -1,0 +1,2118 @@
+= hou.Geometry =
+#type: homclass
+#cppname: HOM_Geometry
+#group: geo
+
+"""A Geometry object contains the points and primitives that define a 3D
+geometric shape.  For example, each SOP node in Houdini generates a single
+Geometry object."""
+
+If you ask a SOP for its geometry via [Hom:hou.SopNode#geometry], you'll get
+a read-only reference to it.  If the SOP recooks, the corresponding Geometry
+object will update to the SOP's new geometry.  If the SOP is deleted, accessing
+the Geometry object will raise a [Hom:hou.ObjectWasDeleted] exception.  If
+you call methods that try to modify the geometry, they will raise a
+[Hom:hou.GeometryPermissionError] exception.
+
+If you do not want the geometry to update when the SOP recooks, you can call
+[Hom:hou.Geometry#freeze].  freeze returns another Geometry object that will
+not change when the SOP recooks.  Accessing frozen Geometry is slightly faster,
+since Houdini does not need to look up the SOP node for each access, so you
+may want to use frozen geometry for speed-crucial operations.
+
+If you're writing a SOP using Python, you will have read-write access to
+the geometry, and it will be frozen.  To create a Python-defined SOP,
+select __File > New Operator Type...__ and place the Python code in the
+__Code__ tab.
+
+Finally, you can allocate a new frozen geometry with read-write access by
+creating an instance of [Hom:hou.Geometry].
+
+
+@methods
+
+
+== Attributes ==
+
+::`findPointAttrib(self, name)` -> [Hom:hou.Attrib] or `None`:
+    #cppname: HOM_Geometry::findPointAttrib
+    #replaces: Exp:haspointattrib
+    Look up a point attribute by name.  Returns the corresponding
+    [Hom:hou.Attrib] object, or None if no attribute exists with that name.
+
+    Note that the point position attribute is named `P` and is 3 floats in
+    size.  Also, the point weight attribute is named `Pw` and is 1 float in
+    size.  These attributes always exist in HOM, even though they are not
+    listed by Houdini's UI.
+
+    See [Hom:hou.Point#attribValue] for an example.
+
+::`findPrimAttrib(self, name)` -> [Hom:hou.Attrib] or `None`:
+    #cppname: HOM_Geometry::findPrimAttrib
+    #replaces: Exp:hasprimattrib
+    Look up a primitive attribute by name.  Returns the corresponding
+    [Hom:hou.Attrib] object, or None if no attribute exists with that name.
+
+::`findVertexAttrib(self, name)` -> [Hom:hou.Attrib] or `None`:
+    #cppname: HOM_Geometry::findVertexAttrib
+    #replaces: Exp:hasvertexattrib
+    Look up a vertex attribute by name.  Returns the corresponding
+    [Hom:hou.Attrib] object, or None if no attribute exists with that name.
+
+::`findGlobalAttrib(self, name)` -> [Hom:hou.Attrib] or `None`:
+    #cppname: HOM_Geometry::findGlobalAttrib
+    #replaces: Exp:hasdetailattrib
+    Look up a global (a.k.a. detail) attribute by name.  Returns the
+    corresponding [Hom:hou.Attrib] object, or None if no attribute exists with
+    that name.
+
+::`pointAttribs(self)` -> `tuple` of [Hom:hou.Attrib]:
+    #cppname: HOM_Geometry::pointAttribs
+    Return a tuple of all the point attributes.
+
+    Note that the point position attribute is named `P` and is 3 floats in
+    size.  Also, the point weight attribute is named `Pw` and is 1 float in
+    size.  These attributes always exist in HOM, even though they are not
+    listed by Houdini's UI.
+
+::`primAttribs(self)` -> `tuple` of [Hom:hou.Attrib]:
+    #cppname: HOM_Geometry::primAttribs
+    Return a tuple of all the primitive attributes.
+
+::`vertexAttribs(self)` -> `tuple` of [Hom:hou.Attrib]:
+    #cppname: HOM_Geometry::vertexAttribs
+    Return a tuple of all the vertex attributes.
+
+::`globalAttribs(self)` -> `tuple` of [Hom:hou.Attrib]:
+    #cppname: HOM_Geometry::globalAttribs
+    Return a tuple of all the global (a.k.a. detail) attributes.
+
+::`addAttrib(self, type, name, default_value, transform_as_normal=False, create_local_variable=True)` -> [Hom:hou.Attrib]:
+    #cppname: HOM_Geometry::addAttrib
+    Create a new point, primitive, vertex, or global (a.k.a. detail) attribute.
+    Returns a [Hom:hou.Attrib] object describing the newly created attribute.
+    You would typically call this method from the code of a Python-defined
+    SOP.
+
+    type:
+        A [Hom:hou.attribType] value to specify if the new attribute should be
+        a point, primitive, vertex, or global attribute.
+    name:
+        The new attribute's name.  Each attribute in the geometry must have
+        a unique name.
+    default_value:
+        The default value for this attribute.  When an attribute is created,
+        all existing elements (e.g. primitives or points) will store this
+        value.  As well, elements that you add later will also use this value.
+
+        This value also determines the attribute's data type, and may be one
+        of the following:
+        - an integer
+        - a float
+        - a string
+        - an integer sequence
+        - a float sequence
+
+        If the default value is a sequence of integers or floats, the sequence
+        size will determine the attribute's size.  Otherwise, the attribute's
+        size is 1.
+
+        String attributes do not support a default value and use this value
+        solely for type determination.
+    transform_as_normal:
+        This parameter may only be set to `True` when the default value is a
+        sequence of 3 floats.  For such attributes, Houdini will not modify the
+        attribute values when it transforms (translates, rotates, etc.) the
+        geometry.  If you want to the attribute to be transformed as a vector
+        (such as a normal vector) when Houdini transforms the geometry, set
+        this parameter to `True`.
+    create_local_variable:
+        If `True`, Houdini will create a local variable for this attribute
+        that may be used in parameter expressions.  The name of the local
+        variable is the attribute's name, all in upper case.  The mapping from
+        attribute names to local variables is stored in a special global
+        attribute named `"varmap"`.
+
+    Raises [Hom:hou.GeometryPermissionError] if this geometry is not modifiable.
+
+    Raises [Hom:hou.OperationFailed] if an attribute with this name already
+    exists.  If you are familiar with the C++ Houdini Development Kit (HDK),
+    you know that Houdini can support attributes with the same name but with
+    different types.  However, many SOPs do not let you distinguish between
+    attributes that have the same name, and multiple attributes with the same
+    name are discouraged.  For this reason, you cannot create them with this
+    method.
+
+    Raises [Hom:hou.OperationFailed] if transform_as_normal is `True` and the
+    default value is not a sequence of 3 floats.
+
+    {{{
+    #!python
+    # Create an integer point attribute of size 1 named "population", and
+    # create 5 points with attribute values 0, 5, 10, 15, and 20.  This code
+    # will work from inside a Python SOP, but not from the Python shell.
+    geo = hou.pwd().geometry()
+    population_attrib = geo.addAttrib(hou.attribType.Point, "population", 0)
+    for i in range(5):
+        point = geo.createPoint()
+        point.setPosition((i, 0, 0))
+        point.setAttribValue(population_attrib, i * 5)
+    }}}
+
+    The following example shows how to copy an existing attribute:
+    {{{
+    #!python
+    def copyAttrib(attrib, new_name):
+        return attrib.geometry().addAttrib(
+            attrib.type(), new_name, attrib.defaultValue(), attrib.isTransformedAsNormal())
+    }}}
+
+    If `create_local_variable` is `True`, this function performs the equivalent
+    of the following code:
+    {{{
+    #!python
+    def addLocalVariable(geo, attrib_name):
+        '''Create a geometry attribute and add a local variable for it.'''
+        # The variable mappings are stored in the varmap attribute's string
+        # table.  This table is different than varmap's current value, which
+        # simply refers to an entry in that table.  So, to ensure an entry
+        # exists in the table, we simply set varmap's value.
+        map_value = "%s -> %s" % (attrib_name, attrib_name.upper())
+        if geo.findGlobalAttrib("varmap") is None:
+            geo.addAttrib(hou.attribType.Global, "varmap", "")
+        geo.setGlobalAttribValue("varmap", map_value)
+    }}}
+
+    See also:
+    - [Hom:hou.Prim#setAttribValue]
+    - [Hom:hou.Point#setAttribValue]
+    - [Hom:hou.Prim#setAttribValue]
+    - [Hom:hou.Geometry#setGlobalAttribValue]
+
+::`addArrayAttrib(self, type, name, data_type, tuple_size=1)` -> [Hom:hou.Attrib]:
+    #cppname: HOM_Geometry::addArrayAttrib
+    Create a new point, primitive, vertex, or global (a.k.a. detail) array 
+    attribute. Returns a [Hom:hou.Attrib] object describing the newly created 
+    attribute. You would typically call this method from the code of a 
+    Python-defined SOP.
+
+    type:
+        A [Hom:hou.attribType] value to specify if the new attribute should be
+        a point, primitive, vertex, or global attribute.
+    name:
+        The new attribute's name.  Each attribute in the geometry must have
+        a unique name.
+    data_type:
+        A [Hom:hou.attribData] value to specify if the new attribute should be
+        an int, float, or string attribute.
+    tuple_size:
+        The new attribute's tuple size.
+
+    Raises [Hom:hou.GeometryPermissionError] if this geometry is not modifiable.
+
+    Raises [Hom:hou.OperationFailed] if an attribute with this name already
+    exists.  If you are familiar with the C++ Houdini Development Kit (HDK),
+    you know that Houdini can support attributes with the same name but with
+    different types.  However, many SOPs do not let you distinguish between
+    attributes that have the same name, and multiple attributes with the same
+    name are discouraged.  For this reason, you cannot create them with this
+    method.
+
+::`attribValue(self, name_or_attrib)` -> `int`, `float`, `str`, or `tuple`:
+    #cppname: HOM_Geometry::attribValue
+    #replaces: Exp:detail, Exp:detailattribsize, Exp:details
+    Return the global (a.k.a. detail) attribute value for a particular
+    attribute.  The attribute may be specified by name or by [Hom:hou.Attrib]
+    object.
+
+    Raises [Hom:hou.OperationFailed] if no attribute exists with this name.
+
+::`floatAttribValue(self, name_or_attrib)` -> `float`:
+    #cppname: HOM_Geometry::floatAttribValue
+    Return the global (a.k.a. detail) attribute value for a particular floating
+    point attribute.  The attribute may be specified by name or by
+    [Hom:hou.Attrib] object.
+
+    Raises [Hom:hou.OperationFailed] if no attribute exists with this name
+    or the attribute is not a float of size 1.
+
+    In most cases, you'll just use [Hom:hou.Geometry#attribValue] to access
+    attribute values.  Houdini uses this method internally to implement
+    attribValue.
+
+::`floatListAttribValue(self, name_or_attrib)` -> `tuple` of `float`:
+    #cppname: HOM_Geometry::floatListAttribValue
+    Return the global (a.k.a. detail) attribute value for a particular floating
+    point attribute.  The attribute may be specified by name or by
+    [Hom:hou.Attrib] object.  The return value is a list of floats.
+
+    It is valid to call this method when the attribute's size is 1.  In this
+    case, a list with one element is returned.
+
+    See also:
+    - [Hom:hou.Geometry#attribValue]
+
+::`intAttribValue(self, name_or_attrib)` -> `int`:
+    #cppname: HOM_Geometry::intAttribValue
+    Return the global (a.k.a. detail) attribute value for a particular integer
+    attribute of size 1.  The attribute may be specified by name or by
+    [Hom:hou.Attrib] object.  See [Hom:hou.Geometry#floatAttribValue] for more
+    information.
+
+::`intListAttribValue(self, name_or_attrib)` -> `tuple` of `int`:
+    #cppname: HOM_Geometry::intListAttribValue
+    Return the global (a.k.a. detail) attribute value for a particular integer
+    attribute.  The attribute may be specified by name or by [Hom:hou.Attrib]
+    object.  The return value is a list of ints.  See
+    [Hom:hou.Geometry#floatListAttribValue] for more information.
+
+::`stringAttribValue(self, name_or_attrib)` -> `str`:
+    #cppname: HOM_Geometry::stringAttribValue
+    Return the global (a.k.a. detail) attribute value for a particular string
+    attribute.  The attribute may be specified by name or by [Hom:hou.Attrib]
+    object.  See [Hom:hou.Geometry#floatAttribValue] for more information.
+
+::`stringListAttribValue(self, name_or_attrib)` -> `tuple` of `int`:
+    #cppname: HOM_Geometry::stringListAttribValue
+    Return the global (a.k.a. detail) attribute value for a particular string
+    attribute.  The attribute may be specified by name or by [Hom:hou.Attrib]
+    object.  The return value is a list of strings.  See
+    [Hom:hou.Geometry#floatListAttribValue] for more information.
+
+::`setGlobalAttribValue(self, name_or_attrib, attrib_value)`:
+    #cppname: HOM_Geometry::setGlobalAttribValue
+    Set a global (a.k.a. detail) attribute value.  The attribute may be
+    specified by name or by [Hom:hou.Attrib] object.  You would typically call
+    this method from the code of a Python-defined SOP.
+
+    Raises [Hom:hou.OperationFailed] if no attribute exists with this name
+    or if the attribute's data type does not match the value passed in.
+    If the attribute's size is more than 1, the attribute value must be a
+    sequence of integers/floats, and the size of the sequence must match the
+    attribute's size.
+
+    Raises [Hom:hou.GeometryPermissionError] if this geometry is not modifiable.
+
+    {{{
+    #!python
+    # This code will work from inside a Python SOP, but not from the Python
+    # shell.
+    geo = hou.pwd().geometry()
+    geo.addAttrib(hou.attribType.Global, "author", "")
+    geo.addAttrib(hou.attribType.Global, "version", (0, 0, 0))
+    geo.setGlobalAttribValue("author", "Joe")
+    geo.setGlobalAttribValue("version", (1, 0, 7))
+    }}}
+
+    See also:
+    - [Hom:hou.Geometry#attribValue]
+    - [Hom:hou.Point#setAttribValue]
+    - [Hom:hou.Prim#setAttribValue]
+    - [Hom:hou.Vertex#setAttribValue]
+
+::`attribType(self)` -> [Hom:hou.attribType] enum value:
+    #cppname: HOM_Geometry::attribType
+    Return the enumerated value [Hom:hou.attribType#Global].  Points,
+    primitives, vertices, and geometry support the same set of methods for
+    querying their attributes, and this method is one of them.
+
+    See also:
+    - [Hom:hou.Prim#attribType]
+    - [Hom:hou.Point#attribType]
+    - [Hom:hou.Vertex#attribType]
+
+::`renamePointAttrib(self, old_name, new_name)`:
+    #cppname: HOM_Geometry::renamePointAttrib
+    Rename the point attribute with the specified old name to the new name.
+    This method is typically called from within a Python-defined SOP when the
+    SOP's geometry is writable.
+
+    Raises `GeometryPermissionError` if called on a read-only geometry. 
+    Raises `TypeError` if `old_name` or `new_name` is None.
+    Raises `OperationFailed` if no such point attribute with the old name
+    exists.
+    Raises `OperationFailed` if a point attribute with the new name already
+    exists.
+
+::`renamePrimAttrib(self, old_name, new_name)`:
+    #cppname: HOM_Geometry::renamePrimAttrib
+    Rename the primitive attribute with the specified old name to the new name.
+    This method is typically called from within a Python-defined SOP when the
+    SOP's geometry is writable.
+
+    Raises `GeometryPermissionError` if called on a read-only geometry. 
+    Raises `TypeError` if `old_name` or `new_name` is None.
+    Raises `OperationFailed` if no such primitive attribute with the old name
+    exists.
+    Raises `OperationFailed` if a primitive attribute with the new name already
+    exists.
+
+::`renameVertexAttrib(self, old_name, new_name)`:
+    #cppname: HOM_Geometry::renameVertexAttrib
+    Rename the vertex attribute with the specified old name to the new name.
+    This method is typically called from within a Python-defined SOP when the
+    SOP's geometry is writable.
+
+    Raises `GeometryPermissionError` if called on a read-only geometry. 
+    Raises `TypeError` if `old_name` or `new_name` is None.
+    Raises `OperationFailed` if no such vertex attribute with the old name
+    exists.
+    Raises `OperationFailed` if a vertex attribute with the new name already
+    exists.
+
+::`renameGlobalAttrib(self, old_name, new_name)`:
+    #cppname: HOM_Geometry::renameGlobalAttrib
+    Rename the global attribute with the specified old name to the new name.
+    This method is typically called from within a Python-defined SOP when the
+    SOP's geometry is writable.
+
+    Raises `GeometryPermissionError` if called on a read-only geometry. 
+    Raises `TypeError` if `old_name` or `new_name` is None.
+    Raises `OperationFailed` if no such global attribute with the old name
+    exists.
+    Raises `OperationFailed` if a global attribute with the new name already
+    exists.
+
+
+== Intrinsics ==
+
+::`intrinsicValue(self, intrinsic_name)` -> `int`, `float`, `str`, or `tuple`:
+    #cppname: HOM_Geometry::intrinsicValue
+    Gets the value of an "intrinsic", often computed, value of the geometry,
+    such as `memoryusage`, `pointcount`, `pointattributes`, and so on. Raises
+    `OperationFailed` if the given intrinsic name does not exist.
+    
+    You can also view these values in the user interface using the
+    [geometry spreadsheet|/ref/panes/geosheet].
+    
+    In Houdini, some primitives have "intrinsic" values which can't be accessed
+    directly through the attribute interface. Most intrinsic values are
+    computed, such as `measuredarea`, however a few are writeable with the
+    [setIntrinsicValue method|#setIntrinsicValue]. For example, sphere
+    primitives have a transform matrix as part of their definition.
+    
+    You can get a list of the available intrinsic value names with the
+    [intrinsicNames method|#intrinsicNames]. Different geometry types will have
+    different intrinsic values available.
+
+::`intrinsicNames(self)` -> `tuple` of `str`:
+    #cppname: HOM_Geometry::intrinsicNames
+    Returns a tuple of strings representing the intrinsic values available for
+    this geometry. Different geometry types will have different intrinsic values
+    available. You can then get or set the value using
+    [intrinsicValue|#intrinsicValue] and/or [setIntrinsicValue|#setIntrinsicValue].
+
+    See the [intrinsicValue method|#intrinsicValue] for more information.
+
+::`intrinsicValueDict(self)` -> `dict` of `str` to `value`
+    #cppname: HOM_Geometry::intrinsicValueDict
+    Returns a dictionary mapping intrinsic names to their values.
+
+::`setIntrinsicValue(self, intrinsic_name, value)`:
+    #cppname: HOM_Geometry::setIntrinsicValue
+    Some "intrinsic" values can be modified. For example, you change the
+    internal size and rotation (transform) of a sphere primitive by passing a 16
+    float tuple representing the transform to `setIntrinsicValue`. Raises
+    `Error` if the intrinsic is not writeable or does not accept the passed
+    value, or if the given intrinsic name does not exist.
+
+    NOTE:
+        Modifying the geometry directly will lock the geometry's parent node.
+    
+    See the [intrinsicValue method|#intrinsicValue] for more information.
+
+::`intrinsicReadOnly(self, intrinsic_name)` -> `bool`:
+    #cppname: HOM_Prim::intrinsicReadOnly
+    #status: nd
+    Returns whether the intrinsic is read-only or can be modified with
+    `setIntrinsicValue()`
+ 
+::`intrinsicSize(self, intrinsic_name)` -> `int`:
+    #cppname: HOM_Prim::intrinsicSize
+    #status: nd
+    Returns the intrinsic value tuple size.
+
+
+== Averages ==
+
+::`averagePointAttribValue(self, attrib_name, index)`:
+    #cppname: HOM_Geometry::averagePointAttribValue
+    #replaces: Exp:pointavg
+    #status: ni
+
+::`averagePointAttribValueByType(self, attrib_type, index)`:
+    #cppname: HOM_Geometry::averagePointAttribValueByType
+    #replaces: Exp:pointavg
+    #status: ni
+
+::`averagePrimAttribValue(self, attrib_name, index)`:
+    #cppname: HOM_Geometry::averagePrimAttribValue
+    #status: ni
+
+::`averagePrimAttribValueByType(self, attrib_type, index)`:
+    #cppname: HOM_Geometry::averagePrimAttribValueByType
+    #status: ni
+
+::`averageVertexAttribValue(self, attrib_name, index)`:
+    #cppname: HOM_Geometry::averageVertexAttribValue
+    #status: ni
+
+::`averageVertexAttribValueByType(self, attrib_type, index)`:
+    #cppname: HOM_Geometry::averageVertexAttribValueByType
+    #status: ni
+
+::`pointBoundingBox(self, pointpattern)` -> [Hom:hou.BoundingBox]:
+    #cppname: HOM_Geometry::pointBoundingBox
+    #replaces: Exp:bbox
+    Return an axis-aligned 3D bounding box that is sized and positioned 
+    to include the points specified by the point pattern.  If the pattern
+    is blank, all points will be included.
+
+    Some primitives, such as spheres, extend beyond their points. This
+    extension will not be included.
+
+::`primBoundingBox(self, primpattern)` -> [Hom:hou.BoundingBox]:
+    #cppname: HOM_Geometry::primBoundingBox
+    #replaces: Exp:bbox
+    Return an axis-aligned 3D bounding box that is sized and positioned 
+    to include the primitives specified by the primitive pattern.  If the
+    pattern is blank, all primitives will be included.
+
+    Some primitives, such as spheres, extend beyond their points. This
+    extension will be included.
+
+::`boundingBox(self)` -> [Hom:hou.BoundingBox]:
+    #cppname: HOM_Geometry::boundingBox
+    #replaces: Exp:bbox
+    Return an axis-aligned 3D bounding box that is sized and positioned to be
+    large enough to hold this geometry.
+
+::`centroid(self)` -> [Hom:hou.Vector3]:
+    #cppname: HOM_Geometry::centroid
+    #replaces: Exp:centroid
+    #status: ni
+
+::`averageMinDistance(self, local_transform, geometry, geometry_transform)` -> `float`:
+    #cppname: HOM_Geometry::averageMinDistance
+    Return the average over all points in <<geometry>> of the minimum
+    distance to the point set of <<self>>
+
+    local_transform:
+        A transform to be applied to all points in this geometry.
+    geometry:
+        The geometry to find distances from.
+    geometry_transform:
+        A transform to be applied to all points in <<geometry>>.
+
+    Raises [Hom:hou.OperationFailed] if <<geometry>> has no vertices.
+
+    {{{
+    #!python
+    query_geometry = query_node.geometry()
+    queried_geometry = queried_node.geometry()
+
+    # Return the average over all points in <queried_geometry> of the minimum
+    # distance to the point set of <query_geometry>
+    query_geometry.averageMinDistance(
+        query_node.worldTransform(),
+        queried_geometry,
+        queried_node.worldTransform())
+    }}}
+
+::`averageEdgeLength(self)` -> `float`:
+    #cppname: HOM_Geometry::averageEdgeLength
+    Return the average edge length of the mesh.
+
+    Raises [Hom:hou.OperationFailed] if mesh does not contain any edges.
+
+    {{{
+    #!python
+    # Return the average edge length.
+    geo.averageEdgeLength()
+    }}}
+
+
+== Creation ==
+
+::`createPoint(self)` -> [Hom:hou.Point]:
+    #cppname: HOM_Geometry::createPoint
+    Create a new point located at (0, 0, 0) and return the corresponding
+    [Hom:hou.Point] object.  You would typically call this method from the code
+    of a Python-defined SOP.
+
+    If the geometry contains point attributes, the new point receives the
+    default values for those attributes.
+
+    Raises [Hom:hou.GeometryPermissionError] if this geometry is not modifiable.
+
+    See [Hom:hou.Geometry#addAttrib], [Hom:hou.Geometry#createPolygon], and
+    [Hom:hou.Face#addVertex] for examples.
+
+::`createPoints(self, point_positions)` -> `tuple` of [Hom:hou.Point]:
+    #cppname: HOM_Geometry::createPoints
+    Create a set of points located at the specified positions and return
+    a tuple of the new [Hom:hou.Point] objects.  You would typically call this
+    method from the code of a Python-defined SOP.
+
+    `point_positions` can be either a tuple of [Hom:hou.Vector3] objects or a
+    tuple of 3-tuple floating point numbers.  For example, if `point_positions`
+    is `((0, 1, 2), (1, 2, 3))` then this method will create 2 points with one
+    positioned at (0, 1, 2) and the other at (1, 2, 3).
+
+    If the geometry contains point attributes, the new points receive the
+    default values for those attributes.
+
+    Raises [Hom:hou.GeometryPermissionError] if this geometry is not modifiable.
+    Raises [Hom:hou.InvalidSize] if one of the specified point positions does
+    not contain 3 values (for x, y, z).
+
+    See [Hom:hou.Geometry#addAttrib], [Hom:hou.Geometry#createPolygons], and
+    [Hom:hou.Face#addVertex] for examples.
+
+::`createPolygon(self)` -> [Hom:hou.Polygon]:
+    #cppname: HOM_Geometry::createPolygon
+    Create a new polygon and return the corresponding [Hom:hou.Polygon]
+    object.  You would typically call this method from the code of a
+    Python-defined SOP.
+
+    The newly created polygon has no vertices.  Use [Hom:hou.Face#addVertex]
+    to add them.  The polygon is also closed (see [Hom:hou.Face#isClosed]
+    for more information).
+
+    If the geometry contains primitive attributes, the new polygon receives the
+    default values for those attributes.
+
+    Raises [Hom:hou.GeometryPermissionError] if this geometry is not modifiable.
+
+    {{{
+    #!python
+    geo = hou.pwd().geometry()
+    poly = geo.createPolygon()
+    for position in (0,0,0), (1,0,0), (0,1,0):
+        point = geo.createPoint()
+        point.setPosition(position)
+        poly.addVertex(point)
+    }}}
+
+    See [Hom:hou.Face#addVertex] for a slightly more complicated example.
+
+::`createPolygons(self, points)` -> `tuple` of [Hom:hou.Polygon]:
+    #cppname: HOM_Geometry::createPolygons
+    Create a set of polygons with the specified points as vertices and return
+    a tuple of the new [Hom:hou.Polygon] objects.  You would typically call
+    this method from the code of a Python-defined SOP.
+
+    `points` can be either a tuple of tuples of [Hom:hou.Point] objects
+    or a tuple of tuples of integers representing the point numbers.  For
+    example, if `points` is `((0, 1, 2), (3, 4, 5, 6))` then this method will
+    create 2 polygons with one having points 0, 1 and 2 as its vertices and the
+    other one having points 3, 4, 5 and 6 as its vertices.
+
+    The created polygons are closed (see [Hom:hou.Face#isClosed] for more
+    information).
+
+    If the geometry contains primitive attributes, then the new polygons
+    receive the default values for those attributes.
+
+    Raises [Hom:hou.GeometryPermissionError] if this geometry is not modifiable.
+    Raises [Hom:hou.InvalidSize] if one of the specified point tuples does not
+    contain at least 3 elements.  Raises [Hom:hou.InvalidInput] if one of the
+    point numbers or [Hom:hou.Point] objects do not exist in the geometry.
+
+    Example:
+    {{{
+    #!python
+    # Create 6 points in the geometry.
+    geo = hou.pwd().geometry()
+    point_positions = (
+	(1, 0, 0), (0, 1, 0), (0, 0, 1),
+	(1, 1, 0), (1, 0, 1), (0, 1, 1),
+    )
+    points = geo.createPoints(point_positions)
+
+    # Create 2 polygons.
+    # The first polygon uses the first 3 points in the geometry as its vertices.
+    # The second polygon uses the last 3 points in the geometry as its vertices.
+    polygons = geo.createPolygons(
+	((points[0], points[1], points[2]), (points[3], points[4], points[5])))
+    }}}
+
+::`createTetrahedron(self)` -> [Hom:hou.Prim]:
+    #cppname: HOM_Geometry::createTetrahedron
+    Create a new tetrahedron and return the corresponding [Hom:hou.Prim]
+    object.  You would typically call this method from the code of a
+    Python-defined SOP.
+
+    The newly created tetrahedron has four vertices and new points
+    have been allocated for them.  To build a tetrahedron out of existin
+    points, use [Hom.hou.Geometry#createTetrahedronInPlace]
+
+    Raises [Hom:hou.GeometryPermissionError] if this geometry is not modifiable.
+
+::`createTetrahedronInPlace(self, p0, p1, p2, p3)` -> [Hom:hou.Prim]:
+    #cppname: HOM_Geometry::createTetrahedronInPlace
+    Create a new tetrahedron and return the corresponding [Hom:hou.Prim]
+    object.  You would typically call this method from the code of a
+    Python-defined SOP.
+
+    The newly created tetrahedron has four vertices and uses the points
+    that have been passed into it.
+
+    Raises [Hom:hou.GeometryPermissionError] if this geometry is not modifiable.
+
+::`createNURBSCurve(self, num_vertices=4, is_closed=False, order=4)` -> [Hom:hou.Face]:
+    #cppname: HOM_Geometry::createNURBSCurve
+    Create a new NURBS with the specified number of vertices and return it.
+    You would typically call this method from the code of a Python-defined SOP.
+
+    num_vertices:
+        The number of verticies in the curve.  A new point is added to the
+        geometry for each vertex, and this point is located at the origin until
+        you change its position.  You can also add more vertices with
+        [Hom:hou.Face#addVertex].
+
+        The minimum number of vertices for a NURBS curve is identical to its
+        order. So for the default order of 4, the curve must have a minimum of
+        4 vertices. If you specify too few vertices, this method raises
+        [Hom:hou.OperationFailed].
+        
+    is_closed:
+        Controls if the curve is open or closed; see [Hom:hou.Face#isClosed]
+        for more information.  If not specified, the resulting curve is open.
+        This behavior is different from [Hom:hou.Geometry#createPolygon],
+        where the new polygon is closed.  You can also open or close it with
+        [Hom:hou.Face#setIsClosed].
+        
+    order:
+       Specifies the curve's order. The default order is 4, corresponding to
+       a cubic NURBS curve. An order of 2, the lowest order, will give a curve
+       with linear segments.
+
+    If the geometry contains primitive attributes, the new curve receives the
+    default values for those attributes.
+
+    {{{
+    #!python
+    # This code will work from inside a Python SOP, but not from the Python
+    # shell.
+    geo = hou.pwd().geometry()
+    curve = geo.createNURBSCurve(10)
+    i = 0
+    for vertex in curve.vertices():
+        vertex.point().setPosition((i, i % 3, 0))
+        i = i + 1
+    }}}
+
+    Raises [Hom:hou.GeometryPermissionError] if this geometry is not modifiable.
+
+    See also:
+    - [Hom:hou.Prim#vertices]
+    - [Hom:hou.Point#setPosition]
+
+::`createBezierCurve(self, num_vertices=4, is_closed=False, order=4)` -> [Hom:hou.Face]:
+    #cppname: HOM_Geometry::createBezierCurve
+    Create a new Bezier curve with the specified number of vertices and
+    return it.  You would typically call this method from the code of a
+    Python-defined SOP.
+
+    num_vertices:
+        The number of verticies in the curve.  A new point is added to the
+        geometry for each vertex, and this point is located at the origin until
+        you change its position.  You can also add more vertices with
+        [Hom:hou.Face#addVertex].
+
+    is_closed:
+        Controls if the curve is open or closed; see [Hom:hou.Face#isClosed]
+        for more information.  If not specified, the resulting curve is open.
+        This behavior is different from [Hom:hou.Geometry#createPolygon],
+        where the new polygon is closed. 
+        
+    order:
+       Specifies the curve's order. The default order is 4, corresponding to
+       a cubic Bezier curve. An order of 2, the lowest order, will give a curve
+       with linear segments.
+
+    An open Bezier curve must have `(order - 1) * n + 1` vertices for some
+    integer `n>=1` (so valid values for order 4 curves are 4, 7, 10, etc.).  
+    A closed Bezier curve must have `(order - 1) * n` vertices (e.g. 3, 6, 9, etc. 
+    for order 4 curve). This restriction does not apply to curves of order 2, however. 
+    
+    As a consequence, you cannot use [Hom:hou.Face#setIsClosed] on non-linear 
+    Bezier curves, since the number of vertices would need to change.
+
+    See [Hom:hou.Geometry#createNURBSCurve] for more information.
+
+::`createNURBSSurface(self, rows, cols, is_closed_in_u=False, is_closed_in_v=False)` -> [Hom:hou.Surface]:
+    #cppname: HOM_Geometry::createNURBSSurface
+    Create a NURBS surface in the XY plane centered at the origin with size
+    (1, 1) and return it.  You would typically call this method from the code
+    of a Python-defined SOP.
+
+    rows, cols:
+        Determines the size of the 2D array of vertices defining the control
+        points of the surface. The number of cols and rows in each direction,
+        must be equal to or larger than the U and V orders, respectively.
+
+    is_closed_in_u, is_closed_in_v:
+        Controls if the surface is open or closed in each of the U and V 
+        directionss; see [Hom:hou.Surface#isClosedInU] for more information.  
+        If not specified, the default behavior is to build an open surface.
+
+    order_u, order_v:
+       Specifies the surface's order in each of the U and V directionss. 
+       The default order for both is 4, corresponding to a cubic NURBS surface. 
+       An order of 2, the lowest order, will give a surface with linear segments,
+       essentially a mesh.
+
+    If the geometry contains primitive attributes, the new surface receives the
+    default values for those attributes.
+
+    You can move or resize the surface using [Hom:hou.Geometry#transformPrims].
+
+    Raises [Hom:hou.GeometryPermissionError] if this geometry is not modifiable.
+
+    Raises [Hom:hou.OperationFailed] if the number of rows and/or columns
+    is invalid.
+
+    {{{
+    #!python
+    # This code will work from inside a Python SOP, but not from the Python
+    # shell.
+    geo = hou.pwd().geometry()
+
+    # Create a surface with a 10x10 grid of vertices.
+    surf = geo.createNURBSSurface(10, 10)
+
+    # Initially, the center is at (0, 0, 0), size is (1, 1, 1), on the XY
+    # plane.  Scale to (20, 10) and rotate into the XZ plane.
+    geo.transformPrims((surf,),
+        hou.hmath.buildScale((20, 10, 1)) *
+        hou.hmath.buildRotateAboutAxis((1, 0, 0), 90))
+    }}}
+
+    See also:
+    - [Hom:hou.Geometry#transformPrims]
+    - [Hom:hou.Matrix4]
+    - [Hom:hou.hmath]
+
+::`createBezierSurface(self, rows, cols, is_closed_in_u=False, is_closed_in_v=False)` -> [Hom:hou.Surface]:
+    #cppname: HOM_Geometry::createBezierSurface
+    Create a Bezier surface in the XY plane centered at the origin with size
+    (1, 1) and return it.  You would typically call this method from the code
+    of a Python-defined SOP.
+
+    rows, cols:
+        Determines the size of the 2D array of vertices defining the control
+        points of the surface. 
+
+        Note that the number of rows corresponds to `v` and the number or
+        columns corresponds to `u`, which can be slightly confusing.  For
+        example, `geo.createBezierSurface(9, 7, is_closed_in_u=False,
+        is_closed_in_v=True)` is valid, but `geo.createBezierSurface(9, 7,
+        is_closed_in_u=True, is_closed_in_v=False)` raises
+        [Hom:hou.OperationFailed].
+
+    is_closed_in_u, is_closed_in_v:
+        Determines if it is open or closed in each of the `u` and `v`
+        directions; see [Hom:hou.Surface#isClosedInU] for more information.
+
+    order_u, order_v:
+       Specifies the surface's order in of the U and V directions. 
+       The default order for both is 4, corresponding to a cubic NURBS surface. 
+       An order of 2, the lowest order, will give a surface with linear segments,
+       essentially a mesh.
+    
+    As with Bezier curves, a Bezier surface has some restrictions on the point
+    count in each of the U and V directions. For a given direction; if it's 
+    open the number of points in the direction must be `(order - 1) * n + 1`
+    for some integer `n >= 1` (e.g. 4, 7, 10, ...). If it's open, the number of
+    points must be `(order - 1) * n` where `n >= 1` in that direction (e.g. 
+    2, 4, 6, .. for order 3).
+    
+    You can move or resize the surface using [Hom:hou.Geometry#transformPrims].
+
+    If the geometry contains primitive attributes, the new surface receives the
+    default values for those attributes.
+
+    Raises [Hom:hou.GeometryPermissionError] if this geometry is not
+    modifiable.
+
+    {{{
+    #!python
+    import math
+
+    # This code will work from inside a Python SOP, but not from the Python
+    # shell.
+    geo = hou.pwd().geometry()
+
+    # Build a tube-like object about the y axis.
+    num_rows, num_cols = (10, 9)
+    surf = geo.createBezierSurface(num_rows, num_cols, is_closed_in_u=True)
+    for v_index in range(num_rows):
+        for u_index in range(num_cols):
+            angle = u_index * (2.0 * math.pi) / num_cols
+            surf.vertex(u_index, v_index).point().setPosition(
+                (math.cos(angle), v_index / float(num_cols-1), math.sin(angle)))
+    }}}
+
+::`createMeshSurface(self, rows, cols, is_closed_in_u=False, is_closed_in_v=False)` -> [Hom:hou.Surface]:
+    #cppname: HOM_Geometry::createMeshSurface
+    Create a quadrilateral mesh surface in the XY plane centered at the origin
+    with size (1, 1) and return it.  You would typically call this method from
+    the code of a Python-defined SOP.
+
+    Note that a mesh object is not the same as a set of polygons defining the
+    same shape.  A mesh object is a single primitive.
+
+    See [Hom:hou.Geometry#createNURBSSurface] for more information.
+
+::`createVolume(self, xres, yres, zres, bounding_box=None)` -> [Hom:hou.Volume]:
+    #cppname: HOM_Geometry::createVolume
+    Given the x, y, and z resolution (or size) of a voxel array, add a new
+    volume primitive to the geometry and return it.  The values in the new
+    volume's voxels are all zero.
+
+    xres, yres, zres:
+        Integers greater than zero that specify the size of the voxel array
+        in one dimension.  Raises [Hom:hou.OperationFailed] if any of these
+        values are not positive.
+
+    bounding_box:
+        A [Hom:hou.BoundingBox] that specifies the volume's 3D size.  Note that
+        this size is independent of the volume's voxel resolution.  If
+        this parameter is None, Houdini uses a bounding box going from
+        (-1,-1,-1) to (1,1,1).
+
+::`createMetaball(self)` -> [Hom:hou.Metaball]:
+    #cppname: HOM_Geometry::createMetaball
+    #status: ni
+
+::`createPacked(self, typename)` -> [Hom:hou.PackedPrim]:
+    #cppname: HOM_Geometry::createPacked
+
+    `typename`:
+        A string containing the name of a type of packed primitive.
+        Typical examples are `"PackedDisk"` (on-disk geometry file)
+        or `"AlembicRef"` (Alembic file).
+        
+        To see a complete list of possible `typename` values,
+        run `ginfo -P` on a Houdini tools command line.
+    
+    See [Hom:hou.PackedPrim] for more information.
+
+
+== Deletion ==
+
+::`deletePrims(self, prims, keep_points=False)`:
+    #cppname: HOM_Geometry::deletePrims
+    Delete a sequence of primitives.  You would typically call this method
+    from the code of a Python-defined SOP.
+
+    keep_points:
+        if `True`, the primitive will be deleted but its points will remain.
+
+    To delete a single primitive, pass in a sequence with one primitive.
+    
+    Raises [Hom:hou.GeometryPermissionError] if this geometry is not modifiable.
+
+    {{{
+    #!python
+    # Delete every other primitive:
+    prims = [p for p in geo.prims() if p.number() % 2 == 0]
+    geo.deletePrims(prims)
+    
+    # Delete the first primitive:
+    geo.deletePrims([geo.iterPrims()[0]])
+    }}}
+
+::`deletePoints(self, points)`:
+    #cppname: HOM_Geometry::deletePoints
+    Delete a sequence of points.  You would typically call this method
+    from the code of a Python-defined SOP.
+
+    Note that Houdini will delete any vertices that reference the point.
+    For example, suppose you have a box with 6 polygons, each with 4 vertices.
+    Also suppose that each point on the box is shared by 3 vertices on 3
+    separate polygons.  If you delete one of those points, Houdini will remove
+    each of those vertices from their corresponding polygons, leaving 3
+    polygons with 4 vertices and 3 polygons with 3 vertices.
+
+    To delete a single primitive, pass in a sequence with one point.
+
+    Raises [Hom:hou.GeometryPermissionError] if this geometry is not modifiable.
+
+
+== Groups ==
+
+::`findPointGroup(self, name)` -> [Hom:hou.PointGroup] or `None`:
+    #cppname: HOM_Geometry::findPointGroup
+    Return the point group with the given name, or `None` if no such group
+    exists.
+
+::`pointGroups(self)` -> `tuple` of [Hom:hou.PointGroup]:
+    #cppname: HOM_Geometry::pointGroups
+    #replaces: Exp:pointgrouplist
+    Return a tuple of all the point groups in the geometry.
+
+    The following function returns the names of all the groups in the
+    geometry:
+    {{{
+    #!python
+    def pointGroupNames(geometry):
+        return [group.name() for group in geometry.pointGroups()]
+    }}}
+
+::`createPointGroup(self, name, is_ordered=False)` -> [Hom:hou.PointGroup]:
+    #cppname: HOM_Geometry::createPointGroup
+    Create a new point group in this geometry.
+
+    `name`:
+        The name of the new group.  Raises [Hom:hou.OperationFailed] if a
+        group with this name already exists.
+    `is_ordered`:
+        Whether or not the new group should be ordered.  See
+        [Hom:hou.PointGroup] for more information about ordered groups.
+
+    Use [Hom:hou.PointGroup#destroy] to remove a primitive group from the
+    geometry.
+
+::`findPointGroups(self, pattern)` -> `tuple` of [Hom:hou.PointGroup]:
+    #cppname: HOM_Geometry::findPointGroups
+    #replaces: Exp:pointgroupmask
+    #status: ni
+
+::`findPrimGroup(self, name)` -> [Hom:hou.PrimGroup] or `None`:
+    #cppname: HOM_Geometry::findPrimGroup
+    Return the primitive group with the given name, or `None` if no such group
+    exists.
+
+::`primGroups(self)` -> `tuple` of [Hom:hou.PrimGroup]:
+    #cppname: HOM_Geometry::primGroups
+    #replaces: Exp:primgrouplist
+    Return a tuple of all the primitive groups in the geometry.
+
+::`createPrimGroup(self, name, is_ordered=False)` -> [Hom:Hou.PrimGroup]:
+    #cppname: HOM_Geometry::createPrimGroup
+    Create a new primitive group in this geometry.
+
+    `name`:
+        The name of the new group.  Raises [Hom:hou.OperationFailed] if a
+        group with this name already exists.
+    `is_ordered`:
+        Whether or not the new group should be ordered.  See
+        [Hom:hou.PrimGroup] for more information about ordered groups.
+
+    Use [Hom:hou.PrimGroup#destroy] to remove a primitive group from the
+    geometry.
+
+::`findPrimGroups(self, pattern)` -> `tuple` of [Hom:hou.PrimGroup]:
+    #cppname: HOM_Geometry::findPrimGroups
+    #replaces: Exp:primgroupmask
+    #status: ni
+
+
+::`findEdgeGroup(self, name)` -> [Hom:hou.EdgeGroup] or `None`:
+    #cppname: HOM_Geometry::findEdgeGroup
+    
+    `name`:
+        The name of the edge group.  
+        
+    Return the edge group with the given name, or `None` if no such group
+    exists.
+
+::`edgeGroups(self)` -> `tuple` of [Hom:hou.EdgeGroup]:
+    #cppname: HOM_Geometry::edgeGroups    
+    Return a tuple of all the edge groups in the geometry.    
+
+::`createEdgeGroup(self, name)` -> [Hom:hou.EdgeGroup]:
+    #cppname: HOM_Geometry::createEdgeGroup
+    Create a new edge group in this geometry.
+
+    `name`:
+        The name of the new group.  Raises [Hom:hou.OperationFailed] if a
+        group with this name already exists.    
+
+    Use [Hom:hou.EdgeGroup#destroy] to remove an edge group from the
+    geometry.
+
+
+== Freezing ==
+
+::`freeze(self, read_only=False)` -> [Hom:hou.Geometry]:
+    #cppname: HOM_Geometry::freeze
+    Return another Geometry object that is not linked to a particular SOP.
+
+    Normally, when you call [Hom:hou.SopNode#geometry], the resultant Geometry
+    object retains a reference to that SOP, and is said to be unfrozen.  Each
+    time you access points, primitives, attributes, etc. in an unfrozen
+    Geometry object, Houdini uses the SOP's latest cooked geometry.  So, if you
+    change parameters or change the time for an animated SOP, the Geometry
+    object will update to the SOP's new geometry.
+
+    Unless Python SOPs are involved, a frozen Geometry object does not have a
+    similar live association with a particular SOP.  If you ask a SOP for its
+    geometry and then store a frozen copy of that geometry, when the SOP
+    recooks the frozen Geometry object will not update.  Instead, the frozen
+    geometry saves its own copy of the point and primitive data, and is
+    unaffected by subsequent changes to the SOP.  When a frozen Geometry object
+    is destroyed, any geometry copy it created is also destroyed.
+
+    Note that accessing a Geometry object's points, primitives, attributes,
+    etc. may be faster when dealing with frozen objects.  You may want to work
+    with frozen Geometry in speed-sensitive operations.
+
+    Calling this method on an unfrozen Geometry object returns a frozen
+    one.  Calling it on a frozen object has no effect, and it returns
+    a frozen object.
+
+    When a Python-defined SOP cooks and runs Python code that asks for the
+    SOP's geometry, the returned Geometry object is writable.  Modifying this
+    Geometry object affects the output of this SOP.  For efficiency, this
+    geometry object is already frozen, so calling freeze on it has no effect.
+
+    read_only:
+	If True, the resulting frozen geometry will be read-only.  Use
+	read-only frozen geometry to share embedded geometry among multiple
+	packed primitives.
+
+
+== Nodes ==
+
+::`sopNode(self)` -> [Hom:hou.SopNode]:
+    #cppname: HOM_Geometry::sopNode
+    If the Geometry is not frozen, return the [Hom:hou.SopNode] object
+    corresponding to this Geometry.  Otherwise, return None.
+
+    See [Hom:hou.Geometry#freeze] for more information on frozen geometry.
+
+::`sopNodeOutputIndex(self)` -> `int`:
+    #cppname: HOM_Geometry::sopNodeOutputIndex
+    If the Geometry is not frozen, return the index of the SOP node output that
+    this geometry corresponds to.  Otherwise, return -1.
+
+    For most cases this method will return 0 to indicate that the geometry
+    corresponds to the first output.  This method will only return a value
+    other than 0 for SOP nodes that have multiple outputs.
+
+    See [Hom:hou.Geometry#freeze] for more information on frozen geometry.
+
+
+== Points ==
+
+::`points(self)` -> `tuple` of [Hom:hou.Point]:
+    #cppname: HOM_Geometry::points
+    Return a tuple of all the points in the geometry.
+
+    See also the [Hom:hou.Geometry#iterPoints] method.
+
+::`iterPoints(self)` -> generator of [Hom:hou.Point]:
+    #cppname: HOM_Geometry::iterPoints
+    #replaces: Exp:haspoint, Exp:point, Exp:points, Exp:pointlist, Exp:poppoint
+    Return a generator that iterates through all the points in the geometry.
+    
+    Whereas [Hom:hou.Geometry#points] allocates and returns a tuple of all the
+    points in the geometry, this method returns a generator object that will
+    allocate [Hom:hou.Point] objects on demand.  This object is very fast at
+    random access into the sequence.
+
+    If you're accessing a specific point by index and the geometry contains many
+    points, it is faster to use iterPoints() than points().  If, however, you
+    are iterating over all the points in the geometry, it is generally faster
+    to use points() than iterPoints().
+    
+    {{{
+    #!python
+    # This is preferred:
+    geo.iterPoints()[23]
+    
+    # over this:
+    geo.points()[23]
+    
+    # But this is preferred:
+    for point in geo.points():
+        ...process point...
+    
+    # over this:
+    for point in geo.iterPoints():
+        ...process point...
+    }}}
+
+::`globPoints(self, pattern)` -> `tuple` of [Hom:hou.Point]:
+    #cppname: HOM_Geometry::globPoints
+    #replaces: Exp:pointpattern
+    Return a tuple of points corresponding to a pattern of point numbers.
+
+    The pattern format is the same one used by the group fields on SOP
+    nodes that take point selections.  Elements in the pattern are separated
+    by spaces, and elements can be point numbers, point number ranges,
+    or group names.
+
+    This method can be useful when writing a Python SOP that works on only
+    a selected set of points.
+
+    Raises [Hom:hou.OperationFailed] if the pattern is not valid or if it
+    refers to a group that does not exist.  Note that an empty pattern is
+    considered to be invalid.  Numbers that do not refer to valid points are
+    not errors, and simply do not match points.
+
+    {{{
+    #!python
+    # Return a tuple containing points 5 and 7.
+    geo.globPoints("5 7")
+
+    # Return a tuple containing points 5 to 10.
+    geo.globPoints("5-10")
+
+    # Return a tuple containing all the points in the pointgroup called group1.
+    geo.globPoints("group1")
+
+    # Return all the points except those from 0 to 98.
+    geo.globPoints("!0-98")
+
+    # Return points 5, 10 to 20, and those in group1.
+    geo.globPoints("5 group1 10-20")
+    }}}
+
+    The following Python SOP example is behaves similarly to the
+    [Point sop|Node:sop/point].
+    {{{
+    #!python
+    # This code will work from inside a Python SOP, but not from the Python
+    # shell.  It assumes the Python sop has the following parm tuples:
+    #     group: A string containing which points to affect
+    #     t:     A set of 3 floats that behaves like the point sop's position
+    #            parameter.  Set these parameters to the expressions ($TX, $TY, $TZ).
+    geo = hou.pwd().geometry()
+
+    # Use the group field to determine which points to affect.  If it's blank,
+    # operate on all points.
+    pattern = hou.ch("group")
+    if pattern == "":
+        points = geo.points()
+    else:
+        points = geo.globPoints(pattern)
+
+    # Loop through the points, setting the SOP's current point as we go.
+    # Then evaluate the t parm tuple, so it can use the current point (e.g.
+    # with hscript's $TX or Python's pwd().curPoint()).
+    for point in points:
+        hou.pwd().setCurPoint(point)
+        new_position = hou.pwd().evalParmTuple("t")
+        point.setPosition(new_position)
+    }}}
+
+::`findClosestPoint(self, pos3)` -> [Hom:hou.Point] or `None`:
+    #cppname: HOM_Geometry::findClosestPoint
+    #replaces: Exp:nearpoint
+    #status: ni
+
+::`pointFloatAttribValues(self, name)` -> `tuple` of `float`:
+    #cppname: HOM_Geometry::pointFloatAttribValues
+    Return a tuple of floats containing one attribute's values for all the
+    points.
+
+    This method only works on int or float attributes.  If the attribute
+    contains more than one element, each point will correspond to multiple
+    values in the result.  For example, if "Cd" is a float attribute of size 3
+    and there are 3 points with values (0.1, 0.2, 0.3), (0.5, 0.5, 0.5), and
+    (0.8, 0.7, 0.6) then the result will be (0.1, 0.2, 0.3, 0.5, 0.5, 0.5, 0.8,
+    0.7, 0.6).
+    
+    Calling this method is faster than looping over all the points and calling
+    [Hom:hou.Point#attribValue].
+
+    If the attribute name is invalid or the attribute is not an int or float
+    (e.g. it's a string attribute), this method raises
+    [Hom:hou.OperationFailed].
+
+    Note that you cannot pass a [Hom:hou.Attrib] object to this method like
+    you can with many methods dealing with attributes.  However, you can use
+    [Hom:hou.Attrib#name] to easily get the name from an Attrib object.
+
+::`pointFloatAttribValuesAsString(self, name, float_type=hou.numericType.Float32)` -> `str`:
+    #cppname: HOM_Geometry::pointFloatAttribValuesAsString
+    Return a string representation of the floats of one attribute's value
+    for all the points.  This method is faster than
+    [Hom:hou.Geometry#pointFloatAttribValues], and you can use the `array`
+    module to convert the string into a Python sequence.
+
+    float_type:
+        A [Hom:hou.numericType] value to specify the float data type (either
+        Float16, Float32 or Float64).
+
+    This method provides a faster implementation of the following:
+    {{{
+    #!python
+    import array
+    def pointFloatAttribValuesAsString(self, name):
+        return array.array("f", self.pointFloatAttribValues(name)).tostring()
+    }}}
+
+    You can convert the return value from this method to an array using the
+    following method:
+    {{{
+    #!python
+    import array
+    def pointFloatAttribValuesAsArray(geometry, name):
+        a = array.array("f")
+        a.fromstring(geometry.pointFloatAttribValuesAsString(name))
+        return a
+    }}}
+
+    See [Hom:hou.Geometry#pointFloatAttribValues] for more information.
+
+::`setPointFloatAttribValues(self, name, values)`:
+    #cppname: HOM_Geometry::setPointFloatAttribValues
+    For a particular attribute, set the attribute values for all points.
+    You would typically call this method from the code of a Python-defined
+    SOP.
+
+    name:
+        The name of the point attribute.
+    values:
+        A sequence of int or float values in the same format as that returned
+        by [Hom:hou.Geometry#pointFloatAttribValues].  See that method for
+        more information.
+
+    Raises [Hom:hou.OperationFailed] if the attribute name is not valid, the
+    attribute is not an int or float (i.e. it's a string), or the array of
+    values is not the correct size.
+
+    Raises [Hom:hou.GeometryPermissionError] if this geometry is not
+    modifiable.
+
+    Also see [Hom:hou.Geometry#pointFloatAttribValues].
+
+::`setPointFloatAttribValuesFromString(self, name, values, float_type=hou.numericType.Float32)`:
+    #cppname: HOM_Volume::setPointFloatAttribValueFromString
+    For a particular attribute, set the attribute values for all points from
+    a string representation of a sequence of the specified float_type values.
+    This method is faster than [Hom:hou.Geometry#setPointFloatAttribValues].
+
+    Note that this method can accept more types that just a string: it can
+    receive any Python object that supports the buffer interface.  In
+    particular, arrays from the `array` and `numpy` Python modules are
+    supported, so there is no need to first construct strings from those
+    arrays.
+
+    float_type:
+        A [Hom:hou.numericType] value to specify the float data type (either
+        Float16, Float32 or Float64).
+
+    Raises [Hom:hou.OperationFailed] if the length of the string is not
+    `len(self.iterPoints() * byte_size_of_float_type)`.
+
+    See [Hom:hou.Geometry#setPointFloatAttribValues] and
+    [Hom:hou.Geometry#pointFloatAttribValuesAsString] for more information.
+
+    The following example function accepts an `array.array("f")` and sets
+    the attribute values to its contents:
+    {{{
+    #!python
+    def setPointFloatAttribValuesFromArray(geometry, arr):
+        assert(arr.typecode == "f")
+        geometry.setPointFloatAttribValuesFromString(arr))
+    }}}
+
+::`pointIntAttribValues(self, name)` -> `tuple` of `int`:
+    #cppname: HOM_Geometry::pointIntAttribValues
+    Return a tuple of integers containing one attribute's values for all the
+    points.
+
+    This method only works on int or float attributes.  If the attribute
+    contains more than one element, each point will correspond to multiple
+    values in the result.  For example, if "idmap" is an integer attribute of
+    size 2 and there are 3 points with values (1, 2), (2, 3), and (3, 4)
+    then the result will be (1, 2, 2, 3, 3, 4).
+    
+    Calling this method is faster than looping over all the points and calling
+    [Hom:hou.Point#attribValue].
+
+    If the attribute name is invalid or the attribute is not an int or float
+    (e.g. it's a string attribute), this method raises
+    [Hom:hou.OperationFailed].
+
+    Note that you cannot pass a [Hom:hou.Attrib] object to this method like
+    you can with many methods dealing with attributes.  However, you can use
+    [Hom:hou.Attrib#name] to easily get the name from an Attrib object.
+
+::`pointIntAttribValuesAsString(self, name, int_type=hou.numericType.Int32)` -> `str`:
+    #cppname: HOM_Geometry::pointIntAttribValuesAsString
+    Return a string representation of the integers of one attribute's value
+    for all the points.  This method is faster than
+    [Hom:hou.Geometry#pointIntAttribValues], and you can use the `array`
+    module to convert the string into a Python sequence.
+
+    int_type:
+        A [Hom:hou.numericType] value to specify the integer data type (either
+        Int8, Int16, Int32 or Int64).
+
+    This method provides a faster implementation of the following:
+    {{{
+    #!python
+    import array
+    def pointIntAttribValuesAsString(self, name):
+        return array.array("i", self.pointIntAttribValues(name)).tostring()
+    }}}
+
+    You can convert the return value from this method to an array using the
+    following method:
+    {{{
+    #!python
+    import array
+    def pointIntAttribValuesAsArray(geometry, name):
+        a = array.array("i")
+        a.fromstring(geometry.pointIntAttribValuesAsString(name))
+        return a
+    }}}
+
+    See [Hom:hou.Geometry#pointIntAttribValues] for more information.
+
+::`setPointIntAttribValues(self, name, values)`:
+    #cppname: HOM_Geometry::setPointIntAttribValues
+    For a particular attribute, set the attribute values for all points.
+    You would typically call this method from the code of a Python-defined
+    SOP.
+
+    name:
+        The name of the point attribute.
+    values:
+        A sequence of int or float values in the same format as that returned
+        by [Hom:hou.Geometry#pointIntAttribValues].  See that method for
+        more information.
+
+    Raises [Hom:hou.OperationFailed] if the attribute name is not valid, the
+    attribute is not an int or float (i.e. it's a string), or the array of
+    values is not the correct size.
+
+    Raises [Hom:hou.GeometryPermissionError] if this geometry is not
+    modifiable.
+
+    Also see [Hom:hou.Geometry#pointIntAttribValues].
+
+::`setPointIntAttribValuesFromString(self, name, values, int_type=hou.numericType.Int32)`:
+    #cppname: HOM_Volume::setPointIntAttribValueFromString
+    For a particular attribute, set the attribute values for all points from
+    a string representation of a sequence of the specified int_type values.
+    This method is faster than [Hom:hou.Geometry#setPointIntAttribValues].
+
+    Note that this method can accept more types that just a string: it can
+    receive any Python object that supports the buffer interface.  In
+    particular, arrays from the `array` and `numpy` Python modules are
+    supported, so there is no need to first construct strings from those
+    arrays.
+
+    int_type:
+        A [Hom:hou.numericType] value to specify the integer data type (either
+        Int8, Int16, Int32 or Int64).
+
+    Raises [Hom:hou.OperationFailed] if the length of the string is not
+    `len(self.iterPoints() * byte_size_of_int_type)`.
+
+    See [Hom:hou.Geometry#setPointIntAttribValues] and
+    [Hom:hou.Geometry#pointIntAttribValuesAsString] for more information.
+
+    The following example function accepts an `array.array("i")` and sets
+    the attribute values to its contents, assuming sizeof(signed int) == 4:
+    {{{
+    #!python
+    def setPointIntAttribValuesFromArray(geometry, arr):
+        assert(arr.typecode == "i")
+        geometry.setPointIntAttribValuesFromString(arr))
+    }}}
+
+::`pointStringAttribValues(self, name)` -> `tuple` of `str`:
+    #cppname: HOM_Geometry::pointStringAttribValues
+    Return a tuple of strings containing one attribute's values for all the
+    points.
+
+    This method only works on string attributes.  If the attribute
+    contains more than one element, each point will correspond to multiple
+    values in the result.  For example, if "strmap" is a string attribute of
+    size 2 and there are 3 points with values ("apple", "orange"), 
+    ("red", "blue"), and ("one", "two")
+    then the result will be ("apple", "orange", "red", "blue", "one", "two").
+    
+    Calling this method is faster than looping over all the points and calling
+    [Hom:hou.Point#attribValue].
+
+    If the attribute name is invalid or the attribute is not a string attribute
+    then this method raises [Hom:hou.OperationFailed].
+
+    Note that you cannot pass a [Hom:hou.Attrib] object to this method like
+    you can with many methods dealing with attributes.  However, you can use
+    [Hom:hou.Attrib#name] to easily get the name from an Attrib object.
+
+::`setPointStringAttribValues(self, name, values)`:
+    #cppname: HOM_Geometry::setPointStringAttribValues
+    For a particular attribute, set the attribute values for all points.
+    You would typically call this method from the code of a Python-defined
+    SOP.
+
+    name:
+        The name of the point attribute.
+    values:
+        A sequence of string values in the same format as that returned
+        by [Hom:hou.Geometry#pointStringAttribValues].  See that method for
+        more information.
+
+    Raises [Hom:hou.OperationFailed] if the attribute name is not valid, the
+    attribute is not a string, or the array of values is not the correct size.
+
+    Raises [Hom:hou.GeometryPermissionError] if this geometry is not
+    modifiable.
+
+    Also see [Hom:hou.Geometry#pointStringAttribValues].
+
+
+== Edges ==
+
+::`findEdge(self, p0, p1)` -> [Hom:hou.Edge]:
+    #cppname: HOM_Geometry::findEdge 
+    
+    `p0`:
+        The first point that makes up the edge.  See [Hom:hou.Point] for more information.
+        
+    `p1`:
+        The second point that makes up the edge.  See [Hom:hou.Point] for more information.
+       
+    finds an edge given two points, or `None` if no such edge exists
+
+::`findClosestPrim(self, pos3)` -> [Hom:hou.Prim] or `None`:
+    #cppname: HOM_Geometry::findClosestPrim
+    #replaces: Exp:xyzdist
+    #status: ni
+
+::`globEdges(self, pattern)` -> `tuple` of [Hom:hou.Edge]:
+    #cppname: HOM_Geometry::globPrims
+    Return a tuple of edges corresponding to an edge pattern.
+
+    The pattern format is the same one used by the group fields on SOP nodes
+    that take edge selections.  See [Hom:hou.Geometry#globPoints] for
+    more information.
+
+
+== Primitives ==
+
+::`nearestPrim(self, position)` -> ([Hom:hou.Prim] or `None`, `float`, `float`, `float`):
+    #cppname: HOM_Geometry::nearestPrim
+    #replaces: Exp:xyzdist
+    Given a sequence of three floats containing a position, find the location
+    on the primitive closest to that position and return a tuple containing
+    that primitive, the u value on the primitive, the v value on the primitive,
+    and the distance to the primitive.
+
+    Note that the first value in the return tuple can be None if there are
+    no primitives in the geometry.
+
+::`findParticleById(self, particle_id)` -> [Hom:hou.Point] or `None`:
+    #cppname: HOM_Geometry::findParticleById
+    #replaces: Exp:poppointid, Exp:poppointnum
+    #status: ni
+
+::`prims(self)` -> `tuple` of [Hom:hou.Prim]:
+    #cppname: HOM_Geometry::prims
+    #replaces: Exp:hasprim, Exp:prim, Exp:prims, Exp:primlist
+    Return a tuple of all the primitives in the geometry.  The primitives
+    returned will be subclasses of [Hom:hou.Prim] (e.g.polygons, volumes,
+    etc.).
+
+    See also:
+    - [Hom:hou.Geometry#iterPrims]
+    - [Hom:hou.Face]
+    - [Hom:hou.Polygon]
+    - [Hom:hou.Surface]
+    - [Hom:hou.Volume]
+
+::`iterPrims(self)` -> generator of [Hom:hou.Prim]:
+    #cppname: HOM_Geometry::iterPrims
+    Return a generator that iterates through all the primitives in the
+    geometry.
+
+    Whereas [Hom:hou.Geometry#prims] allocates and returns a tuple of all the
+    primitives in the geometry, this method returns a generator object that
+    will yield [Hom:hou.Prim] objects on demand.  This object is very fast at
+    random access into the sequence.
+
+    If you're accessing a specific primitive by index and the geometry contains
+    many primitives, it is faster to use `iterPrims()` than `prims()`.  If, however,
+    you are iterating over all the primitives in the geometry, it is generally
+    faster to use `prims()` than `iterPrims()`.
+
+    {{{
+    #!python
+    # This is preferred:
+    geo.iterPrims()[23]
+    
+    # over this:
+    geo.prims()[23]
+    
+    # But this is preferred:
+    for prim in geo.prims():
+        ...process prim...
+    
+    # over this:
+    for prim in geo.iterPrims():
+        ...process prim...
+    }}}
+
+    See also the [Hom:hou.Geometry#prims] method.
+
+::`globPrims(self, pattern)` -> `tuple` of [Hom:hou.Prim]:
+    #cppname: HOM_Geometry::globPrims
+    Return a tuple of primitives corresponding to a pattern of primitive
+    numbers.
+
+    The pattern format is the same one used by the group fields on SOP nodes
+    that take primitive selections.  See [Hom:hou.Geometry#globPoints] for
+    more information.
+
+::`containsPrimType(self, typename)` -> `bool`:
+    #cppname: HOM_Geometry::containsPrimType
+    Returns whether the geometry contains at least one primitive of the
+    specified type.
+
+    `typename`:
+        A string containing the name of a primitive type.
+        Typical examples are `"Poly"` (polygon) or `"PackedAgent"` (agent
+        packed primitive).
+        
+        To see a complete list of possible `typename` values, run `ginfo -P` on
+        a Houdini tools command line.
+
+::`countPrimType(self, typename)` -> `long`:
+    #cppname: HOM_Geometry::countPrimType
+    Returns the number of primitives of the specified type in the geometry.
+
+    `typename`:
+        A string containing the name of a primitive type.
+        Typical examples are `"Poly"` (polygon) or `"PackedAgent"` (agent
+        packed primitive).
+        
+        To see a complete list of possible `typename` values, run `ginfo -P` on
+        a Houdini tools command line.
+
+::`primFloatAttribValues(self, name)` -> `tuple` of `float`:
+    #cppname: HOM_Geometry::primFloatAttribValues
+    Return a tuple of floats containing one attribute's values for all the
+    primitives.
+    
+    This method only works on int or float attributes.  If the attribute
+    contains more than one element, each primitive will correspond to multiple
+    values in the result.  For example, if `Cd` is a float attribute of size 3
+    and there are 3 primitives with values (0.1, 0.2, 0.3), (0.5, 0.5, 0.5), and
+    (0.8, 0.7, 0.6) then the result will be (0.1, 0.2, 0.3, 0.5, 0.5, 0.5, 0.8,
+    0.7, 0.6).
+    
+    Calling this method is faster than looping over all the primitives and
+    calling [Hom:hou.Prim#attribValue].
+
+    If the attribute name is invalid or the attribute is not an int or float
+    (e.g. it's a string attribute), this method raises
+    [Hom:hou.OperationFailed].
+
+    Note that you cannot pass a [Hom:hou.Attrib] object to this method like
+    you can with many methods dealing with attributes.  However, you can use
+    [Hom:hou.Attrib#name] to easily get the name from an Attrib object.
+
+::`primFloatAttribValuesAsString(self, name)` -> `str`:
+    #cppname: HOM_Geometry::primFloatAttribValuesAsString
+    Return a string representation of the floats of one attribute's value
+    for all the primitives.  This method is faster than
+    [Hom:hou.Geometry#primFloatAttribValues], and you can use the `array`
+    module to convert the string into a Python sequence.
+
+    This method provides a faster implementation of the following:
+    {{{
+    #!python
+    import array
+    def primFloatAttribValuesAsString(self, name):
+        return array.array("f", self.primFloatAttribValues(name)).tostring()
+    }}}
+
+    You can convert the return value from this method to an array using the
+    following method:
+    {{{
+    #!python
+    import array
+    def primFloatAttribValuesAsArray(geometry, name):
+        a = array.array("f")
+        a.fromstring(geometry.primFloatAttribValuesAsString(name))
+        return a
+    }}}
+
+    See [Hom:hou.Geometry#primFloatAttribValues] for more information.
+
+::`setPrimFloatAttribValues(self, name, values)`:
+    #cppname: HOM_Geometry::setPrimFloatAttribValues
+    For a particular attribute, set the attribute values for all primitives.
+    You would typically call this method from the code of a Python-defined
+    SOP.
+
+    name:
+        The name of the primitive attribute.
+    values:
+        A sequence of int or float values in the same format as that returned
+        by [Hom:hou.Geometry#primFloatAttribValues].  See that method for
+        more information.
+
+    Raises [Hom:hou.OperationFailed] if the attribute name is not valid, the
+    attribute is not an int or float (i.e. it's a string), or the array of
+    values is not the correct size.
+
+    Raises [Hom:hou.GeometryPermissionError] if this geometry is not
+    modifiable.
+
+    Also see [Hom:hou.Geometry#primFloatAttribValues].
+
+::`setPrimFloatAttribValuesFromString(self, name, values, float_type=hou.numericType.Float32)`:
+    #cppname: HOM_Volume::setPrimFloatAttribValueFromString
+    For a particular attribute, set the attribute values for all primitives
+    from a string representation of a sequence of the specified float_type
+    values.
+    This method is faster than [Hom:hou.Geometry#setPrimFloatAttribValues].
+
+    Note that this method can accept more types that just a string: it can
+    receive any Python object that supports the buffer interface.  In
+    particular, arrays from the `array` and `numpy` Python modules are
+    supported, so there is no need to first construct strings from those
+    arrays.
+
+    float_type:
+        A [Hom:hou.numericType] value to specify the float data type (either
+        Float16, Float32 or Float64).
+
+    Raises [Hom:hou.OperationFailed] if the length of the string is not
+    `len(self.iterPrims() * byte_size_of_float_type)`.
+
+    See [Hom:hou.Geometry#setPrimFloatAttribValues] and
+    [Hom:hou.Geometry#primFloatAttribValuesAsString] for more information.
+
+    The following example function accepts an `array.array("f")` and sets
+    the attribute values to its contents:
+    {{{
+    #!python
+    def setPrimFloatAttribValuesFromArray(geometry, arr):
+        assert(arr.typecode == "f")
+        geometry.setPrimFloatAttribValuesFromString(arr)
+    }}}
+
+::`primIntAttribValues(self, name)` -> `tuple` of `int`:
+    #cppname: HOM_Geometry::primIntAttribValues
+    Return a tuple of integers containing one attribute's values for all the
+    primitives.
+    
+    This method only works on int or float attributes.  If the attribute
+    contains more than one element, each primitive will correspond to multiple
+    values in the result.  For example, if `idmap` is an integer attribute of
+    size 2 and there are 3 primitives with values (1, 2), (2, 3), and (3,4)
+    then the result will be (1, 2, 2, 3, 3, 4).
+    
+    Calling this method is faster than looping over all the primitives and
+    calling [Hom:hou.Prim#attribValue].
+
+    If the attribute name is invalid or the attribute is not an int or float
+    (e.g. it's a string attribute), this method raises
+    [Hom:hou.OperationFailed].
+
+    Note that you cannot pass a [Hom:hou.Attrib] object to this method like
+    you can with many methods dealing with attributes.  However, you can use
+    [Hom:hou.Attrib#name] to easily get the name from an Attrib object.
+
+::`primIntAttribValuesAsString(self, name, int_type=hou.numericType.Int32)` -> `str`:
+    #cppname: HOM_Geometry::primIntAttribValuesAsString
+    Return a string representation of the integers of one attribute's value
+    for all the primitives.  This method is faster than
+    [Hom:hou.Geometry#primFloatAttribValues], and you can use the `array`
+    module to convert the string into a Python sequence.
+
+    int_type:
+        A [Hom:hou.numericType] value to specify the integer data type (either
+        Int8, Int16, Int32 or Int64).
+
+    This method provides a faster implementation of the following:
+    {{{
+    #!python
+    import array
+    def primIntAttribValuesAsString(self, name):
+        return array.array("i", self.primIntAttribValues(name)).tostring()
+    }}}
+
+    You can convert the return value from this method to an array using the
+    following method:
+    {{{
+    #!python
+    import array
+    def primIntAttribValuesAsArray(geometry, name):
+        a = array.array("i")
+        a.fromstring(geometry.primIntAttribValuesAsString(name))
+        return a
+    }}}
+
+    See [Hom:hou.Geometry#primIntAttribValues] for more information.
+
+::`setPrimIntAttribValues(self, name, values)`:
+    #cppname: HOM_Geometry::setPrimIntAttribValues
+    For a particular attribute, set the attribute values for all primitives.
+    You would typically call this method from the code of a Python-defined
+    SOP.
+
+    name:
+        The name of the primitive attribute.
+    values:
+        A sequence of int or float values in the same format as that returned
+        by [Hom:hou.Geometry#primFloatAttribValues].  See that method for
+        more information.
+
+    Raises [Hom:hou.OperationFailed] if the attribute name is not valid, the
+    attribute is not an int or float (i.e. it's a string), or the array of
+    values is not the correct size.
+
+    Raises [Hom:hou.GeometryPermissionError] if this geometry is not
+    modifiable.
+
+    Also see [Hom:hou.Geometry#primIntAttribValues].
+
+::`setPrimIntAttribValuesFromString(self, name, values, int_type=hou.numericType.Int32)`:
+    #cppname: HOM_Volume::setPrimIntAttribValueFromString
+    For a particular attribute, set the attribute values for all primitives
+    from a string representation of a sequence of the specified int_type
+    values.
+    This method is faster than [Hom:hou.Geometry#setPrimIntAttribValues].
+
+    Note that this method can accept more types that just a string: it can
+    receive any Python object that supports the buffer interface.  In
+    particular, arrays from the `array` and `numpy` Python modules are
+    supported, so there is no need to first construct strings from those
+    arrays.
+
+    int_type:
+        A [Hom:hou.numericType] value to specify the integer data type (either
+        Int8, Int16, Int32 or Int64).
+
+    Raises [Hom:hou.OperationFailed] if the length of the string is not
+    `len(self.iterPrims() * byte_size_of_int_type)`.
+
+    See [Hom:hou.Geometry#setPrimIntAttribValues] and
+    [Hom:hou.Geometry#primIntAttribValuesAsString] for more information.
+
+    The following example function accepts an `array.array("i")` and sets
+    the attribute values to its contents, assuming sizeof(signed int) == 4:
+    {{{
+    #!python
+    def setPrimIntAttribValuesFromArray(geometry, arr):
+        assert(arr.typecode == "i")
+        geometry.setPrimIntAttribValuesFromString(arr)
+    }}}
+
+::`primStringAttribValues(self, name)` -> `tuple` of `str`:
+    #cppname: HOM_Geometry::primStringAttribValues
+    Return a tuple of strings containing one attribute's values for all the
+    primitives.
+    
+    This method only works on string attributes.  If the attribute
+    contains more than one element, each primitive will correspond to multiple
+    values in the result.  For example, if "strmap" is a string attribute of
+    size 2 and there are 3 primitives with values ("apple", "orange"), 
+    ("red", "blue"), and ("one", "two")
+    then the result will be ("apple", "orange", "red", "blue", "one", "two").
+    
+    Calling this method is faster than looping over all the primitives and
+    calling [Hom:hou.Prim#attribValue].
+
+    If the attribute name is invalid or the attribute is not a string
+    attribute) then this method raises [Hom:hou.OperationFailed].
+
+    Note that you cannot pass a [Hom:hou.Attrib] object to this method like
+    you can with many methods dealing with attributes.  However, you can use
+    [Hom:hou.Attrib#name] to easily get the name from an Attrib object.
+
+::`setPrimStringAttribValues(self, name, values)`:
+    #cppname: HOM_Geometry::setPrimStringAttribValues
+    For a particular attribute, set the attribute values for all primitives.
+    You would typically call this method from the code of a Python-defined
+    SOP.
+
+    name:
+        The name of the primitive attribute.
+    values:
+        A sequence of string values in the same format as that returned
+        by [Hom:hou.Geometry#primStringAttribValues].  See that method for
+        more information.
+
+    Raises [Hom:hou.OperationFailed] if the attribute name is not valid, the
+    attribute is not a string, or the array of values is not the correct size.
+
+    Raises [Hom:hou.GeometryPermissionError] if this geometry is not
+    modifiable.
+
+    Also see [Hom:hou.Geometry#primStringAttribValues].
+
+::`metaballWeight(self, pos3)`:
+    #cppname: HOM_Geometry::metaballWeight
+    #replaces: Exp:metaweight
+    #status: ni
+
+
+== Vertices ==
+
+::`globVertices(self, pattern)` -> `tuple` of [Hom:hou.Vertex]:
+    #cppname: HOM_Geometry::globPrims
+    Return a tuple of vertices corresponding to a pattern of vertex
+    numbers.
+
+    The pattern format is the same one used by the group fields on SOP nodes
+    that take vertex selections.  See [Hom:hou.Geometry#globPoints] for
+    more information.
+
+
+== Data ==
+
+::`data(self)` -> `str`:
+    #cppname: HOM_Geometry::data
+    Return the geometry data in bgeo format.
+
+    For example:
+    {{{
+    #!python
+    geometry = hou.node("/obj/geo1/torus1").geometry()
+    bgeo_data = geometry.data()
+    open("/tmp/torus.bgeo", "wb").write(bgeo_data)
+    }}}
+
+::`saveToFile(self, file_name)`:
+    #cppname: HOM_Geometry::saveToFile
+    #replaces: Cmd:opsave
+    
+    Save the contents of the geometry object to a file.  The file extension
+    determines what file format to use.
+
+    All file formats supported by Houdini (e.g. geo, bgeo, obj, etc.),
+    including extensions listed in `GEOio`, are supported.  If the file
+    extension is not recognized, the bgeo format is used.
+
+    Raises [Hom:hou.OperationFailed] if the path to the file is invalid or
+    there were permission or other I/O errors.
+
+::`loadFromFile(self, file_name)`:
+    #cppname: HOM_Geometry::loadFromFile
+    
+    Replace the contents of this geometry object with the data stored in a
+    file.  You would typically call this method from the code of a
+    Python-defined SOP.
+
+    You may specify any type of file supported by Houdini's File SOP.  See
+    [Hom:hou.Geometry#saveToFile] for more information.
+
+    Raises [Hom:hou.OperationFailed] if the file does not exist or otherwise
+    cannot be loaded.
+
+    Raises [Hom:hou.GeometryPermissionError] if this geometry is not
+    modifiable.
+
+    See also [Hom:hou.Geometry#merge].
+
+::`clear(self)`:
+    #cppname: HOM_Geometry::clear
+    Remove everything from this geometry object.  The geometry will have no
+    points or primitives after calling this method.
+
+    Raises [Hom:hou.GeometryPermissionError] if this geometry is not
+    modifiable.
+
+::`merge(self, geometry)`:
+    #cppname: HOM_Geometry::merge
+    Merge the points and primitives from another [Hom:hou.Geometry] object into
+    this one.  The new points and primitives are appended to this geometry's
+    points and primitives.  You would typically call this method from the code
+    of a Python-defined SOP.
+
+    Raises [Hom:hou.GeometryPermissionError] if this geometry is not
+    modifiable.
+
+    See also [Hom:hou.Geometry#loadFromFile].
+
+::`intersect(self, rayorig, dir, p, n, uvw, pattern=nullptr)` -> `int`:
+    #cppname: HOM_Geometry::intersect
+    Deterimines if a ray (given by it's origin and direction) intersects the
+    geometry. The intersection point (in world space), the normal, and the 
+    parametric coordinates are stored in p, n, uvw respectively. The primitive
+    number of the intersected primitive is returned. A group 
+    pattern is optional.
+
+    Raises [Hom:hou.ObjectWasDeleted] if the SOP is deleted.
+
+::`execute(self, verb, inputs=[])` -> `HOM_Geometry`:
+    #cppname: HOM_Geometry::execute
+    Invokes verb.execute() with myself as the first input, and returns
+    the resulting geometry.  This allows one to chain a series of
+    verbs invocations: geo.execute(subdivide).execute(subdivide).
+
+    The optional inputs will have the geometry itself prepended.
+
+== Transformation ==
+
+::`transform(self, matrix)`:
+    #cppname: HOM_Geometry::transform
+    Transforms (e.g. rotates, scales, translates, etc.) the geometry by a
+    transformation matrix.  You would typically call this method from the code
+    of a Python-defined SOP.
+
+    See [Hom:hou.hmath] for functions that build transformation matrices.
+
+    Raises [Hom:hou.GeometryPermissionError] if this geometry is not
+    modifiable.
+
+::`transformPrims(self, prims, matrix)`:
+    #cppname: HOM_Geometry::transformPrims
+    Transforms a set of primitives (e.g. rotates, scales, translates, etc.) by
+    a transformation matrix.  You would typically call this method from the
+    code of a Python-defined SOP.
+
+    {{{
+    #!python
+    import math
+
+    # This code will work from inside a Python SOP, but not from the Python
+    # shell.
+
+    def createCircle(geo, num_vertices=10):
+        # Create a closed curve with the specified number of vertices.
+        curve = geo.createNURBSCurve(num_vertices)
+        curve.setIsClosed(True)
+
+        # Arrange the points into a unit circle on the XZ plane,
+        # centered about the origin.
+        for i, vertex in enumerate(curve.vertices()):
+            angle = i * (2.0 * math.pi) / num_vertices
+            position = (math.cos(angle), 0, math.sin(angle))
+            vertex.point().setPosition(position)
+        return curve
+
+    # Create a bunch of circles on the XZ plane, tilt them slightly
+    # about X, translate them away from the origin, and rotate each
+    # one about the y axis by a different amount.
+    geo = hou.pwd().geometry()
+    num_copies = 20
+    for i in range(num_copies):
+        curve = createCircle(geo)
+        geo.transformPrims([curve],
+            hou.hmath.buildRotateAboutAxis((1, 0, 0), 30) *
+            hou.hmath.buildTranslate((2, 0, 0)) *
+            hou.hmath.buildRotateAboutAxis((0, 1, 0), i * 360.0 / num_copies))
+    }}}
+
+    See [Hom:hou.hmath] functions that build transformation matrices.
+
+    Raises [Hom:hou.GeometryPermissionError] if this geometry is not
+    modifiable.
+
+
+== Loops ==
+
+::`primLoop(self, prims, loop_type)` -> `tuple` of [Hom:hou.Prim]:
+    #cppname: HOM_Geometry::primLoop
+    Returns a tuple of [Hom:hou.Prim] objects that make a path connecting the
+    primitives provided in the prims parameter. If multiple paths are being
+    returned, they will be separated in the single returned tuple by a value
+    of None. The paths are generated using the same algorithm used when
+    performing loop selections in the viewport.
+
+    prims:
+    A list of [Hom:hou.Prim] objects that define the path or paths of
+    connected primitives this function should return. Must contain at least
+    two primitives.
+
+    loop_type:
+    Controls the type of path returned. Can be any of the
+    [Hom:hou.componentLoopType] values. If using either the
+    [Hom:hou.componentLoopType.Extended] or
+    [Hom:hou.componentLoopType.Closed] loop types, the inputs prims
+    cannot contain any None entries. Furthermore, each pair of primitives
+    is used to define a separate full loop, so the number of primitives
+    must be even. If these conditions are not met, a
+    [Hom:hou.OperationFailed] exception will be thrown.
+
+    Raises a [Hom:hou.OperationFailed] if it was unable to construct a loop
+    from the desired components.
+
+::`pointLoop(self, points, full_loop)` -> `tuple` of [Hom:hou.Point]:
+    #cppname: HOM_Geometry::pointLoop
+    Returns a tuple of [Hom:hou.Point] objects that make a path connecting the
+    points provided in the points parameter. If multiple paths are being
+    returned, they will be separated in the single returned tuple by a value
+    of None. The paths are generated using the same algorithm used when
+    performing loop selections in the viewport.
+
+    points:
+    A list of [Hom:hou.Point] objects that define the path or paths of
+    connected points this function should return. Must contain at least
+    two points.
+
+    loop_type:
+    Controls the type of path returned. Can be any of the
+    [Hom:hou.componentLoopType] values. If using either the
+    [Hom:hou.componentLoopType.Extended] or
+    [Hom:hou.componentLoopType.Closed] loop types, the inputs points
+    cannot contain any None entries. Furthermore, each pair of points
+    is used to define a separate full loop, so the number of points
+    must be even. If these conditions are not met, a
+    [Hom:hou.OperationFailed] exception will be thrown.
+
+    Raises a [Hom:hou.OperationFailed] if it was unable to construct a loop
+    from the desired components.
+
+::`edgeLoop(self, edges, loop_type, full_loop_per_edge, force_ring, allow_ring)` -> `tuple` of [Hom:hou.Edge]:
+    #cppname: HOM_Geometry::edgeLoop
+    Returns a tuple of [Hom:hou.Edge] objects that make a path connecting the
+    edges provided in the edges parameter. If multiple paths are being
+    returned, they will be separated in the single returned tuple by a value
+    of None. The paths are generated using the same algorithm used when
+    performing loop selections in the viewport.
+
+    edges:
+    A list of [Hom:hou.Edge] objects that define the path or paths of
+    connected edges this function should return. Must contain at least
+    one or two edges depending on the loop options.
+
+    loop_type:
+    Controls the type of path returned. Can be any of the
+    [Hom:hou.componentLoopType] values. If using either the
+    [Hom:hou.componentLoopType.Extended] or
+    [Hom:hou.componentLoopType.Closed] loop types, the inputs edges
+    cannot contain any None entries. If these conditions are not met, a
+    [Hom:hou.OperationFailed] exception will be thrown.
+
+    full_loop_per_edge:
+    If set to True, with the loop_type set to
+    [Hom:hou.componentLoopType.Extended] or
+    [Hom:hou.componentLoopType.Closed] loop types, each inputs edge
+    is used to create its own full loop or ring. If False, the edges
+    are taken in pairs, and so the number of edges must be even.
+
+    force_ring:
+    If set to True, this function will return edge rings instead of edge
+    loops.
+
+    allow_ring:
+    If set to True, this function may return an edge ring if the
+    edges provided produce a ring more naturally than they produce a
+    loop (for example if two perpendicular edges are provided from the
+    same row on a polygonal grid). If set to False, only edge loops will
+    be returned.
+
+    Raises a [Hom:hou.OperationFailed] if it was unable to construct a loop
+    from the desired components.
+
+::`seamPoints(self, seam_half)` -> `tuple` of [Hom:hou.Point]:
+    #cppname: HOM_Geometry::seamPoints
+    #replaces: Exp:seampoints
+    #status: ni
+
+
+== Selection ==
+
+::`selection(self)` -> [Hom:hou.Selection]:
+    #cppname: HOM_Geometry::selection
+    Returns the current cook component selection associated with this geometry.
+    This is the default selection set by the SOP that created the geometry.

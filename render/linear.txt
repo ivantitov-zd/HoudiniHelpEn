@@ -1,0 +1,150 @@
+= Linear lighting and color =
+
+== Overview ==
+
+Working with "linear color" means lighting and rendering in a color space where the mapping between numeric color values and "absolute color" is a straight line. This is the standard in digital cinema and is the best way to produce realistic lighting. Houdini does all internal color calculations in a linear color space.
+
+However, many image formats, monitors, and some older video production workflows use a _non-linear_ color space. Outputting linear color data in a format that expects non-linear color (that is, that expects gamma to be "baked in") produces a dark and overly contrasted image. Conversely, loading a non-linear image data (such as `sRGB`) into a linear pipeline without correction produces an image that is overly bright and washed out.
+
+[Image:/images/render/srgb_errors.png]
+
+To avoid this, Houdini converts to/from linear color space when images are loaded and saved/displayed. Houdini applies a default gamma correction of 2.2 to its display, on the assumption the monitor expects image data with pre-baked gamma. When saving images to formats that assume non-linear color space, Houdini converts the data to the image format's color space or saves the original color space as meta-data (depending on the features of the format).
+
+Why does Houdini work in a linear color space even if the inputs and outputs use non-linear color? Working with linear color gives more accurate arithmetical results, and makes color faster and easier for the computer to deal with. Doubling the numeric values of a color in linear color space doubles the intensity and has no loss of precision. Doubling values in non-linear color space will result in more or less than double the intensity, _and_ may give a loss of precision. In a non-linear color space, summing color contributions from various lights and transparent surfaces would have this problem, giving an unrealistic rendered result.
+
+== Background ==
+
+Gamma correction is rooted in cathode ray tube (CRT) displays. In a CRT, an electron beam excites phosphors on the screen _non-linearly_: doubling the beam power did not double the brightness of the phosphor. Instead, it responding according to a curve very close to x<sup>2.2</sup>.
+
+[Image:/images/render/signal_response.png]
+
+As a result, manufacturers calibrated recording equipment to produce signals with an x<sup>1/2.2</sup> response to cancel out the CRT's non-linear response. This is became known as a "gamma correction of 2.2".
+
+Even though today CRTS are mostly replaced by film, LCD, and digital technologies and technically it's no longer really necessary, the 2.2 gamma correction had become a standard. Image formats such as JPEG bake the gamma correction into the pixels to avoid any pre-display correction. Houdini must convert these image formats to linear color when it loads them.
+
+The most common non-linear color spaces are `sRGB` and `REC709`, which have minor variations from the gamma 2.2 curve.
+
+== Display settings ==
+
+* To change the global gamma settings, choose __Edit > Color Settings__ and click the __Color correction__ tab.
+
+* Houdini allows display gamma correction to color in a variety of places:
+
+    MPlay:
+        Both foreground and background images. Use the color correction toolbar along the bottom.
+        
+    Scene View:
+        All user generated geometry and background images.
+        
+        Open the [Icon:BUTTONS/displayoptions] display options and click the __Viewport__ tab.
+        
+        To show the color correction toolbar with more color controls, open the viewport options menu and turn on "Corrections toolbar".
+        
+        [Image:/images/ui/viewport_menus_anno.png]
+        
+    Render View:
+        Foreground and background images. Use the color correction toolbar along the bottom (it is collapsed by default).
+        
+    Composite View:
+        Foreground and background images. Use the color correction toolbar along the bottom.
+        
+    Image file browser:
+        Image previews.
+        
+    Color swatches:
+        Color rectangle shown in Color Editors and color parameters.
+
+    All of these places can also have a _look-up table_ (LUT) applied along with the gamma correction.
+
+* It is possible to disable color correction for specific areas of Houdini, though this is not recommended.
+
+=== Using OpenColorIO for display ===
+
+OpenColorIO can be used for color correction by setting the environment variable `OCIO` to a valid OpenColorIO configuration file. The default colorspace can be set using the `OCIO_ACTIVE_DISPLAYS` and `OCIO_ACTIVE_VIEWS` environment variables. These environment variables are specific to the OpenColorIO library and are not Houdini environment variables, so they cannot be put in the `houdini.env` file.
+
+When OpenColorIO is active, the gamma and LUT controls are replaced by __Display__ and __View__ menus. These define the output colorspace for the display. The colorspace within Houdini is linear, and the `scene_linear` role is used to specify the OpenColorIO linear colorspace.
+
+MPlay can load both linear and non-linear files, such as OpenEXR (linear) and JPEG (sRGB). Renders from mantra are in linear space, and flipbooks from the viewport are either sRGB or linear, depending on the "Render Beauty Pass Only" option (linear when On, sRGB when off). 
+
+For sRGB files and sources, the source colorspace used for sRGB is defined by the Houdini environment variable `HOUDINI_OCIO_SRGB_FILE_COLORSPACE`. If this variable is not defined, the OpenColorIO config file is searched for a colorspace that matches srgb, either fully or partially.
+
+NOTE: 
+  The `OCIO`, `OCIO_ACTIVE_VIEWS`, and `OCIO_ACTIVE_DISPLAYS` environment variables are not Houdini environment variables. They cannot be set through the [Aliases and Variables |/ref/windows/alias] dialog, nor can they be set in the `houdini.env` file. They must be set in the shell or environment before launching Houdini.
+
+== Importing and exporting linear images ==
+
+When you import images as textures or compositing layers, Houdini can detect the color space automatically, or assume it to be linear.
+
+* The [File COP|Node:cop2/file] has a __Linearize Non-Linear Images__ parameter. Turn this off to assume the image is in linear color space. There is also an __Image Color Space__ parameter which can override the colorspace inferred from the format or stored in the image file before the image is linearized.
+
+* The [Texture VOP|Node:vop/texture] has a __Source Color Space__ parameter. Set this to "Linear" to assume the image is in linear color space.
+
+* Houdini automatically converts images imported as textures for OpenGL rendering or as [viewport background images|/ref/windows/displayopts_3d]. To avoid this conversion, first load them using a [File COP|Node:cop2/file], and then get the texture from the COP using `op:` syntax.
+
+When saving images, you can output linear images or set an output gamma (assuming the image format supports it).
+
+* The [Composite render node|Node:out/comp] has a __Convert to image format's colorspace__ parameter. If this parameter is on, the node uses the __Output gamma__ parameter to set the gamma to bake in. If conversion is off, the image data is written without correction.
+
+* The Image Save file dialog (available when you right click a compositing node and choose __Save image__) works the same as the [Composite render node|Node:out/comp].
+
+== Image Formats ==
+
+Format ||
+    Color space ||
+
+Houdini `.pic` |
+    Stores the color space as per-plane meta-data.
+
+Houdini `.rat` |
+    2.2 gamma for 8 bit planes, linear for other plane formats
+
+OpenEXR |
+    Linear
+
+PNG, JPEG, TIFF, Targa |
+    `sRGB`
+
+Other |
+    If the data is stored in 8 bit fixed format, it is assumed to be `sRGB`, otherwise linear
+
+NOTE:
+    Custom image formats implemented using plugins can specify their color spaces using `IMG_Format` virtual methods. See the HDK documentation for more information.
+
+== MPlay ==
+
+[MPlay|/mplay] is the image preview/display program included with Houdini.
+
+By default, MPlay applies a 2.2 gamma correction. This indicates the color space to _view_ the image in. For example, if you load a JPEG (which is pre-corrected to `sRGB`, very close to 2.2 gamma), the viewer does not alter the image. However, if you load a linear image (for example, a floating point `.rat` texture), the viewer will correct it to 2.2 gamma. (While if you set the display gamma to `1.0`, the JPEG would be corrected and the RAT not corrected.)
+
+In other words, it is _not_ a gamma that is _unconditionally applied to image_, but rather a "target" gamma that the viewer may have to alter the data to achieve.
+
+* You can set the display gamma in the [Icon:BUTTONS/displayoptions] display options, on the __Corrections__ tab.
+
+* You can start it with the `-g <<gamma>>` option to set the viewer gamma correction on launch.
+
+* By default, MPlay does not gamma correct image planes it knows to contain geometric data, such as `P`, `Pz`, `N`, `B`, `V`, `M`, and `Af`.
+
+* When you render and image or flipbook to MPlay (using the `ip` special file), the color space is passed along with the image data (usually linear), so color correction is applied when needed.
+
+* Flipbooking only the "beauty pass" will send linear color to MPlay, while flipbooking the entire viewport (with handles and other UI) uses the same color space as the viewport (2.2 gamma by default).
+
+== Tips ==
+
+* Set your monitor to `sRGB` color mode, or calibrate it to a 2.2 gamma. Many monitors without calibration have display gammas between 2.1 and 2.4, which can subtly change the image.
+
+* The [Gamma COP|Node:cop2/gamma] does not change color spaces. It bakes a correction into the pixels of the image, but the resulting data is still in the linear color space. You can use it to apply or undo gamma correction, or as a way to control image contrast.
+
+* Visit [opencolorio.org|http://opencolorio.org] for information on color spaces and for tools to generate Houdini LUT files.
+
+* To globally disable linear workflow, set `HOUDINI_IMAGE_DISPLAY_GAMMA` to 1.0 and `HOUDINI_AUTOCONVERT_IMAGE_FILES` to 0 (defaults of 2.2 and 1, respectively).
+
+@related
+
+- [3D view display options|/ref/windows/displayopts_3d]
+- [Compositing view display options|/ref/windows/displayopts_image]
+- [Color settings|/ref/windows/color]
+- [Node:cop2/file]
+- [Node:out/comp]
+- [Node:vop/texture]
+- [MPlay|/mplay]
+

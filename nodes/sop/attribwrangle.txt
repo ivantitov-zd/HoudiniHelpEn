@@ -1,0 +1,153 @@
+= Attribute Wrangle =
+
+#type: node
+#context: sop
+#internal: attribwrangle
+#icon: SOP/attribwrangle
+#tags: attrs, vex, tech
+
+"""Runs a VEX snippet to modify attribute values."""
+
+== Overview ==
+
+This is a very powerful, low-level node that lets experts who are
+familiar with VEX tweak attributes using code.
+
+This node corresponds to the [Attribute VOP SOP|Node:sop/attribvop],
+but uses a textual VEX snippet instead of a VOP network.
+
+WARNING:
+    This node requires that you understand the [vex language|/vex].
+    It is very easy to write incorrect code using this node.
+
+This node _runs the snippet on the detail or every point/primitive/vertex_
+(depending on the __Class__ parameter) in the input geometry.
+The snippet can edit the input geometry by changing attributes.
+It can access information from other geometry using attributes and VEX functions.
+
+* Press ((MMB)) on the node to see any error output from the snippet.
+
+* You can use the VEX function `ch` to evaluate parameters.
+  The path is relative to this node (`ch("parm")` will evaluate the parameter `parm` on this node). This evaluation will be done at the current time.
+
+* Unlike the [Attrib Create SOP|Node:sop/attribcreate], this does not use local variables.
+  Further, all backtick expressions and `$F` variables will be evaluated at frame 1,
+  not the current time.
+  Use `@Frame`, `@Time`, or `@TimeInc` instead.
+
+[Include:wrangle_syntax]
+
+@parameters
+
+
+== Code ==
+Group:
+    A subset of points in the input geometry to run the program on.
+    Leave this blank to affect all points in the input.
+
+Group Type:
+    What the group is made of.
+
+Run Over:
+    What class of geometry attributes to modify.
+    No attributes will be bound, except read-only detail attributes, when set to __Numbers__.
+
+Number Count:
+    #id: vex_numcount
+
+    Iteration count when __Run Over__ is set to __Numbers__.
+    `@elemnum` will be the iteration number from 0 (inclusive), to this number (exclusive),
+    and `@numelem` will be this number.
+    No attributes will be bound when in this mode, except read-only detail attributes.
+
+Thread Job Size:
+    #id: vex_threadjobsize
+
+    Maximum number of iterations run at a time in any thread when __Run Over__ is set to __Numbers__.
+    If this is greater than or equal to __Number Count__, the VEX code will run single-threaded.
+    If each iteration will take a very large amount of time, set this to 1, but
+    there is quite often a significant advantage to making this value larger, especially if
+    each iteration will take a small amount of time, and if any work can avoid being duplicated
+    by running multiple iterations at a time.
+
+[Include:pointwrangle#snippet]
+
+Attributes to Create:
+    Only create attributes if their names match this pattern.
+    The default pattern allows any attribute to be created.
+    
+    You can restrict the created attributes by replacing the `*` with a list of allowed names.
+
+    Bound attributes, such as `vtxnum`, cannot be created and will be ignored.
+
+Enforce Prototypes:
+    Automatic binding with the `@` syntax can be convenient, but if your
+    system becomes more complex there is the risk that a typo in an `@` binding
+    will silently just bind a non-existent attribute.
+
+    This option forces all `@` bindings to be explicitly declared as
+    prototypes before use.
+
+== Bindings ==
+
+Autobind by Name:
+    Automatically bind attributes to parameters by name.
+    If for some reason you need CVEX parameters to have different names
+    than the corresponding attributes,
+    turn this off and use the __Number of bindings__ parameter to set up
+    mappings between __Attribute name__ and __VEX parameter__.
+
+    Integer attributes will bind to integer parameters.
+    Float attributes will bind to float, vector, point, matrix, or matrix4 depending on their tuple size.
+    String attributes will bind to strings.
+
+Autobind Groups by Name:
+    Automatically bind any groups to the integer parameter prefixed with `group_`. If for some reason you need CVEX parameters to have different names than the corresponding groups, turn this off and use the __Group Bindings__ parameter to set up mappings between __Group Name__ and __VEX Parameter__.
+    
+Group Bindings:
+        Manually specifies the bindings of each group. 
+
+Evaluation Node Path:
+    VEX functions like `ch()` usually evaluate with respect to this node.
+    Enter a node path here to override where the path search starts from.
+    This is useful for embedding in a digital asset, where you want searches
+    to start from the asset root.
+
+Export Parameters:
+    When a VEX parameter is exported, the bound attribute will be
+    created if it doesn't exist.  This pattern can be used to override
+    the export option on the VEX shader to avoid writing to or creating
+    certain attributes.  The pattern matches the VEX parameter, not
+    the bound attribute. The attribute will still be bound for reading.
+
+Update Normals If Displaced:
+    If points are being run over, and the `P` attribute is written to,
+    but the `N` attribute is not written to, any incoming normals will
+    become out of date.  When this option is set, vertex and point
+    normals will be updated when this occurs.
+
+Attribute To Match:
+    Which attribute to use for matching.  This attribute must be
+    present on both inputs for matching to be done.  Otherwise matching
+    is done by element number (ie, point number when running over points).
+    The attribute should either be an integer or string attribute.
+    This controls how the `opinput#_` virtual bindings connect.
+    You can use `v@opinput1_Cd`, for example, to read the second input's
+    `v@Cd` attribute.
+
+Compute Results In Place:
+    When compiled the Attribute VOP is able to work on the incoming
+    geometry in place without making a copy of it.  This can speed
+    up processing as one less copy is made, but requires that the
+    VEX code doesn't bind for writing any attributes that are
+    read from the first input.
+
+Output Selection Group:
+    The name of a group to use as the output selection.  When the highlight flag is enabled for this node, this group will be the output selection used by later modeling tools (if it exists).
+
+@related
+
+- [Node:sop/attribexpression]
+- [Node:sop/attribvop]
+- [Node:sop/vexdeform]
+- [Node:sop/volumewrangle]

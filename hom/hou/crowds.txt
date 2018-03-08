@@ -1,0 +1,89 @@
+= hou.crowds =
+#type: hommodule
+#cppname: HOM_crowds
+#group: crowds
+
+"""Crowd-related functions."""
+
+@functions
+
+::`computeRotationLimits(rig, clips, transform, parent_transform)` -> `dict` of `str` to values:
+    #cppname: HOM_crowds::computeRotationLimits
+
+    Computes rotation limits for the specified joint based on the range of motion in the provided clips.
+
+    The return value is a dictionary with the following keys:
+    - `anchor_pos`: A [Hom:hou.Vector3] containing the cone's anchor position.
+    - `rotation`: A [Hom:hou.Vector3] containing the cone's orientation.
+    - `child_rotation`: A [Hom:hou.Vector3] containing the child's orientation.
+    - `twist_limits`: A [Hom:hou.Vector2] containing the rotation limits for the twist axis.
+    - `up_limits`: A [Hom:hou.Vector2] containing the rotation limits for the up axis.
+    - `out_limits`: A [Hom:hou.Vector2] containing the rotation limits for the out axis.
+
+    `rig`:
+        A [Hom:hou.AgentRig].
+
+    `clips`:
+        A list of [Hom:hou.AgentClip].
+
+    `transform`:
+        Index of a transform in the agent's rig.
+
+    `parent_transform`:
+        Index of the parent transform in the agent's rig.
+
+::`findAgentDefinitions(geometry, group = "")` -> `tuple` of [Hom:hou.AgentDefinition]:
+    #cppname: HOM_crowds::findAgentDefinitions
+
+    Returns a list of the unique agent definitions in the geometry.
+
+    This is equivalent to the following code, but is significantly faster.
+
+    {{{
+    #!python
+    definitions = set()
+    for prim in geometry.globPrims(group):
+        if prim.type() == hou.primType.Agent:
+            definitions.add(prim.definition())
+
+    return definitions
+    }}}
+
+    `geometry`:
+        A [Hom:hou.Geometry].
+
+    `group`:
+        An optional group string to filter which primitives are inspected.
+        The pattern format is the same as the format used for group parameters on SOP nodes.
+
+::`replaceAgentDefinitions(geometry, new_definition_map, group = "")`:
+    #cppname: HOM_crowds::replaceAgentDefinitions
+
+    Replaces agent definitions in the geometry with new versions.
+    This is a useful convenience function when modifying each agent definition in the geometry, particularly when also using [Hom:hou.crowds#findAgentDefinitions].
+
+    For example:
+    {{{
+    #!python
+    defns = hou.crowds.findAgentDefinitions(geo, group)
+    new_defn_map = {}
+    for defn in defns:
+        new_defn = defn.freeze()
+        new_defn_map[defn] = new_defn
+
+        # Add a clip to the new agent definition.
+        new_defn.addClip(...)
+
+    # Switch all agents in the group to their respective new agent definition.
+    hou.crowds.replaceAgentDefinitions(geo, new_defn_map, group)
+    }}}
+
+    `geometry`:
+        A modifiable [Hom:hou.Geometry].
+
+    `new_definition_map`:
+        A dictionary mapping each [Hom:hou.AgentDefinition] to a [Hom:hou.AgentDefinition] that it should be replaced by.
+
+    `group`:
+        An optional group string to filter which primitives are modified.
+        The pattern format is the same as the format used for group parameters on SOP nodes.

@@ -1,0 +1,64 @@
+= hou.ScriptEvalContext =
+#type: homclass
+#cppname: HOM_ScriptEvalContext
+#group: scripting
+
+"""Use this to temporarily change the scripting evaluation context within a Python code block."""
+
+@methods
+
+::`__init__(self, node_or_parm)`:
+    #cppname: HOM_ScriptEvalContext::HOM_ScriptEvalContext
+
+    Constructs a new ScriptEvalContext context manager. When used inside a
+    `with` code block, node and parameter evaluations will use the argument to
+    resolve relative paths and for adding data dependencies. The code block
+    will also have its hou.pwd() modified accordingly.
+
+    When constructed with a node, it behaves the same as calling hou.setPwd()
+    and then restoring it to the old node when the code block ends. For
+    example,
+    {{{
+    #!python
+    with hou.scriptEvalContext(some_node):
+	print hou.pwd() # prints path for some_node
+    }}}
+    is equivalent to,
+    {{{
+    #!python
+    old_node = hou.pwd()
+    hou.setPwd(some_node)
+    print hou.pwd() # prints path for some_node
+    hou.setPwd(old_node)
+    }}}
+
+    When constructed with a parameter, relative node and parameter paths inside
+    the code block will be resolved using the parameter's owner node. Data
+    dependencies will be added from the referenced parameter or node to this
+    parameter. This changes what [Hom:hou.evaluatingParm] will return. Here's
+    an example:
+    {{{
+    #!python
+    with hou.scriptEvalContext(some_parameter):
+	# prints path for some_parameter's owner node
+	print hou.pwd()
+	# prints path for some_parameter
+	print hou.evaluatingParm()
+	# adds data dependency from the sibling test to some_parameter
+	x = ch("test")
+    }}}
+
+::`node(self)`:
+    #cppname: HOM_ScriptEvalContext::node
+    
+    Return the [Hom:hou.Node] for this context.
+
+::`parm(self)`:
+    #cppname: HOM_ScriptEvalContext::parm
+    
+    Return the [Hom:hou.Parm] for this context. Returns `None` if this context
+    was created from a [Hom:hou.Node].
+
+    @related
+    - [Hom:hou.evaluatingParm]
+

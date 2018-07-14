@@ -281,6 +281,8 @@ The `id`s correspond to hotkeys with the `h.pane.parms.` prefix. For example, an
     
     `<scriptCode>`:
         Contains a Python script to be executed when the user chooses this menu item.
+
+	The script executes immediately when the menu item is selected.  To defer script execution until after the menu closes, see [Deferring execution of <scriptCode>|/basics/config_menus#deferring-execution-of-scriptcode].
         
     `<scriptArgs>`:
         (Optional) An argument string to pass to the script when it's called. In the script you can retrieve these arguments using the `sys.argv` list.
@@ -435,6 +437,10 @@ The `id`s correspond to hotkeys with the `h.pane.parms.` prefix. For example, an
         current context.  It also contains `selectedtoken` and `selectedlabel`
         entries that store the internal token name and label of the selected
         menu item respectively.
+
+	The script executes immediately when the menu item is selected.  To
+	defer script execution until after the menu closes, see
+	[Deferring execution of <scriptCode>|/basics/config_menus#deferring-execution-of-scriptcode].
    
     Here is an example of a scripted dynamic menu strip:
     {{{
@@ -749,5 +755,40 @@ Technically, the script can do anything and is not required to use these command
 </subMenu>
 }}}
 
+== Deferring execution of `<scriptCode>` ==
 
+There are times when it is best to defer the execution of the `<scriptCode>` script
+instead of immediately running the script when the menu item is clicked.
 
+For example, consider when the script contains code that pops up a message
+dialog or prompts for a selection from a choice dialog.  In either case the
+script indefinitely runs until the dialog is closed.  Immediately running such
+a script is undesirable as the menu does not fully close until the script
+completes.  This can sometimes cause the menu to be visible and frozen while
+the dialog is open.  It can also cause a crash in Houdini since opening a dialog
+can internally change the order of processed UI events.
+
+To defer execution of the `<scriptCode>` script so that it runs after the menu
+has fully closed use the `hdefereval` module.
+
+For example, suppose you had this script:
+{{{
+#!xml
+<scriptCode><![CDATA[
+hou.ui.displayMessage("Hello World")
+]]>
+</scriptCode>
+}}}
+
+Then to defer execution change the script to this:
+{{{
+#!xml
+<scriptCode><![CDATA[
+def runLater():
+    hou.ui.displayMessage("Hello World")
+
+import hdefereval
+hdefereval.executeDeferred(runLater)
+]]>
+</scriptCode>
+}}}

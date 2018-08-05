@@ -26,7 +26,7 @@ WARNING:
 # In the Houdini shell, type:
     
     {{{
-    hhelp serve --bgindex
+    hhelp serve --bgindex=true
     }}}
     
     ...to start the help server with background indexing.
@@ -36,6 +36,7 @@ WARNING:
     {{{
     http://localhost:8080/
     }}}
+
 
 === `hhelp serve` ===
 
@@ -192,7 +193,7 @@ See below for some useful configuration keys.
     Directory containing the search index.
 
 
-== Configuring a central server to not use a batch license ==
+== Configuring a central server to not use a batch license == (nolicense)
 
 The default server uses `hou` for certain functionality:
 
@@ -206,18 +207,7 @@ To prevent the server from using a batch license, you need to:
 
 * In the configuration file replace the default list of document sources, and change the default `PAGES_CLASS` configuration key.
 
-* Specify the configuration file when you start the server (see above).
-
-For example, make a `nolicense.cfg` file with the following:
-
-{{{
-#!python
-# The directories you want to serve from
-DOCUMENTS = ["$HFS/houdini/help", "/my/documents"]
-
-# Specify a page manager that doesn't use hou
-PAGES_CLASS = "houdinihelp.hpages.HoudiniPagesWithoutHou"
-}}}
+* Create a script to start the server using regular Python. (Starting the server using `hhelp` or `hython` will automatically import `hou` and use a license).
 
 Using this configuration file will disable functionality that relies on `hou`:
 
@@ -226,4 +216,137 @@ Using this configuration file will disable functionality that relies on `hou`:
 * Help links and references to `opdef:` will not work.
 
 * Indexing example files.
+
+
+=== How to run the help server without a license ===
+
+This procedure assumes an install of Houdini on the computer you want to run the server on. While it's technically possible to copy all the required files out of Houdini, it's beyond the scope of this document and will not be supported. It's much easier and more convenient to just use an installation, including a free Apprentice installation.
+
+# Run the server from a Houdini shell (so environment variables like `$HFS` are available).
+
+    You can get a Houdini shell environment by starting the shell from the utility included with Houdini.
+    
+    :platform:Mac
+        `Applications/Houdini/Current/Utilities/Houdini Terminal X.X.X`
+    
+    :platform:Windows
+        `Start menu > Side Effects Software > Command Line Tools X.X.X`
+    
+    :platform:Linux
+        `cd` to the Houdini install directory and run `source ./houdini_setup`.
+        
+    Or, just set the `$HFS` variable in your environment.
+
+# Use the following script to start. Remember to run the script using *regular Python 2.7* (_not_ `hython`).
+
+    {{{
+    #!python
+    import argparse
+    import sys
+    from os.path import expandvars
+
+    # Add Houdini libraries to Python path
+    sys.path.append(expandvars("$HFS/houdini/python2.7libs"))
+
+    # Add Houdini's third-party Python libraries. Unfortunately this path is
+    # platform-specific
+    if sys.platform in ("linux", "linux2"):
+       sys.path.append(expandvars("$HFS/python/lib/python2.7/site-packages-forced"))
+    elif sys.platform == "darwin":
+        sys.path.append(
+            expandvars(
+                "$HFS/Frameworks/Python.framework/Versions/Current/lib/python2.7/site-packages-forced"
+            )
+        )
+    elif sys.platform in ("win32", "win64"):
+        sys.path.append(expandvars("$HFS/python27/lib/site-packages-forced"))
+
+    from houdinihelp.hconfig import HoudiniAppConfig
+    from houdinihelp.server import get_houdini_app
+
+
+    class MyConfig(HoudiniAppConfig):
+        # The directories you want to serve from
+        DOCUMENTS = [
+            # "Loose" (unzipped) files under $HFS/houdini/help
+            expandvars("$HFS/houdini/help"),
+            {
+                # This adds ability to read docs out of .zip files in
+                # $HFS/houdini/help
+                "type": "object",
+                "classname": "bookish.stores.ZipTree",
+                "args": {
+                    "dirpath": expandvars("$HFS/houdini/help"),
+                }
+            },
+            # This adds files under the help dir in your user prefs
+            expandvars("$HOUDINI_USER_PREF_DIR/help"),
+            # Any other directories you want to add to the server...
+            "/my/dir",
+        ]
+
+        # Store the cache in the user's prefs dir
+        CACHE_DIR = expandvars("$HOUDINI_USER_PREF_DIR/config/Help")
+
+        # The full-text index to use
+        INDEX_DIR = expandvars("$HFS/houdini/config/Help/index")
+
+        # Specify a page manager that doesn't use hou
+        PAGES_CLASS = "houdinihelp.hpages.HoudiniPagesWithoutHou"
+
+
+    if __name__ == "__main__":
+        parser = argparse.ArgumentParser(description="Starts bookish help server")
+        parser.add_argument("--host", metavar="HOSTNAME", default="0.0.0.0",
+                            help="IP address to serve on.")
+        parser.add_argument("--port", metavar="NUM", type=int, default=8888,
+                            help="Port number to serve on.")
+        parser.add_argument("--config", metavar="FILE", default=None,
+                            help="Configuration file to override defaults.")
+        parser.add_argument("--log", metavar="FILE", default=None,
+                            help="File to output the log to.")
+        parser.add_argument("--loglevel", default="INFO",
+                            help="The verbosity of the log: DEBUG, INFO, WARNING, or ERROR.")
+        args = parser.parse_args()
+    
+        app = get_houdini_app(
+            use_houdini_path=False,
+            config_obj=MyConfig,
+            config_file=args.config,
+            logfile=args.log,
+            loglevel=args.loglevel,
+            debug=False,
+        )
+    
+        app.run(host=args.host, port=args.port, threaded=True)
+    
+    }}}
+    
+    (If Python complains that it can't import `houdinihelp`, check that the path to Houdini's libraries is correct. If it complains it can't import `flask`, check that the path to the third-party libraries is correct.)
+
+# After you run the script, open a browser application (such as Chrome or Safari) and try to access `http://localhost:8888/`.
+
+# This is a simple example script which lets you set the hostname and port on the command line, but hard-codes directories and other options.
+
+    Depending on your needs, you can edit the script to get more options (such as the hostname and port) from command line options (see the documentation for Python's `argparse` module).
+    
+    You can also override options using a configuration file. For example, start the script above with a configration file argument:
+    
+    {{{
+    python runserver.py --config /Users/matt/helpserver.cfg
+    }}}
+    
+    Then in that file, you can override options:
+    
+    {{{
+    EXTRA_DOCUMENTS = ["/path/to/my/help_dir/"]
+    }}}
+
+
+
+
+
+
+
+
 

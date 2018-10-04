@@ -1,40 +1,62 @@
 = RPC =
 
-=== Houdini RPC port ===
+"""You can control Houdini through HOM scripting from another Python session across the network."""
 
-You can control Houdini remotely by accessing HOM through an RPC (remote
-procedure call) interface over the network.  Houdini provides a built-in RPC
-module, so you can control a remote copy of Houdini from a Python script.
 
-You might also want to use RPC to communicate between two Python/hython
-processes running on the same machine, or to communicate between Houdini
-and Maya, for example.
+== How to ==
 
-To start Houdini's RPC server, type the following in Houdini's Python shell.
+# Houdini does not open an RPC port by default. You must start the RPC server in Houdini before you can connect to it from another computer:
 
-{{{
-#!python
-import hrpyc
-hrpyc.start_server()
-}}}
+    {{{
+    #!python
+    import hrpyc
+    hrpyc.start_server()
+    }}}
 
-The RPC server will run in a separate thread, waiting for RPC calls from
-other processes.  By default, it listens on port 18811.  If you'd like to run
-it in the main thread, call `hrpyc.start_server(use_thread=False)`.
+    * By default, it listens on port `18811`. To set the port number, call  `hrpyc.start_server(port=<<portnum>>)`.
 
-Now you can remotely control Houdini from another process (or on another
-computer).  For example, in hython or Maya, you could connect to an RPC server
-on the local machine with:
+    * The RPC server will run in a separate thread, waiting for RPC calls from other processes. If want the server to run in the main thread, call `hrpyc.start_server(use_thread=False)`.
 
-{{{
-#!python
-connection, hou = hrpyc.import_remote_module()
-}}}
+# Then, in a Python session in another process or on another computer (for example, in a Maya Python shell), connect to the RPC server:
 
-The `connection` variable needs to persist for the duration of the RPC
-connection.  The `hou` variable behaves just like the `hou` module, and you
-use it just like you would if you imported hou into a local session.
+    {{{
+    #!python
+    connection, hou = hrpyc.import_remote_module()
+    }}}
 
-Note that the RPC server does not do any authentication by default, so you
-should ensure that your firewall protects you from unauthorized access to the
-RPC port.
+    `connection` is an object representing the network connection. If this object is deleted or goes out of scope and is garbage collected, the connection will be closed, so you should keep a reference to it as long as you want the connection to stay open.
+
+    `hou` is an object that acts like the `hou` package in Houdini. You use it as if you had imported `hou` into `hython` or a Python shell in Houdini:
+
+    {{{
+    #!python
+    node = hou.node("/obj/sphere1")
+    node.parm("scale").set(2.0)
+    }}}
+
+Please read the notes below for important information.
+
+
+== Notes ==
+
+* `hrpyc` is a very thin wrapper around the [rpyc library|https://pypi.org/project/rpyc/]. It is limited to the capabilities provided by the third-party library.
+
+* The library works by proxying objects and functions. When the remote side calls a function or method, the proxy object sends the request across the network and the Houdini side sends back the result.
+
+    `rpyc` proxy object do _not_ support Python operators (the library does not proxy special methods such as `__eq__`). For example, you can't compare two `hou.Node` proxies on the remote side to see if they are the same node, because the proxies do not support the equality operator:
+
+    {{{
+    #!python
+    # This will fail
+    node1 == node2
+    }}}
+
+    Instead you should rework your code so you compare plain Python results of function/method calls instead of the proxied objects themselves:
+
+    {{{
+    #!python
+    # This will work
+    node1.path() == node2.path()
+    }}}
+
+* The RPC server *does not do any authentication*. If you want to use RPC, you should ensure your IT setup (for example, a firewall) prevents unauthorized access to the server port.

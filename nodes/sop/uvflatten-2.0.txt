@@ -1,0 +1,362 @@
+= UV Flatten =
+
+#type: node
+#context: sop
+#internal: uvflatten
+#icon: SOP/uvflatten
+#version: 2.0
+#tags: uvs, textures
+
+"""Creates flattened pieces in texture space from 3D geometry."""
+
+== Overview ==
+
+To apply a texture image to a 3D model, you must first create _flattened_ version of the 3D geometry in texture space, so the computer knows how to map pixels in the flat image onto points on the 3D surface. This flattened representation of the model is stored as UV coordinates in an attribute (usually `uv`) on each vertex of the geometry.
+
+This node works in two steps. It takes individual texture pieces (defined by _seams_ that cut the model's geometry up into smaller pieces that are easier to work with) and _flattens_ them into 2D texture space, trying to equalize polygon size. Then it lays out or _packs_ all the flattened pieces into the available texture space as efficiently as possible (using the same algorithm as the [UV Layout node|Node:sop/uvlayout]) to maximize coverage.
+
+You can use the tools in this node (cut, join, pin, align, straighten) to give the node hints to help it give better results.
+
+//:vimeo:UV flatten
+//    #id: 116671338
+
+
+== Set up the viewer to show UVs == (views)
+
+By default, the Houdini viewer only shows one view, the Perspective view ("Persp"). You can  
+
+* To switch a viewport to show UV space, click the View menu (the left menu in the top right corner of a viewport) and choose __Set view > UV Viewport__, or hover the mouse over the viewport and press ((Space + 5)).
+
+* The Scene View can be split into multiple viewports. You may want to split the viewer so you can see/work on the 3D model in the Perspective view and the UVs in the UV View at the same time.
+
+	To set how the viewer is split, click the [Icon:VIEW/layout_single] layout menu icon at the far right end of the viewer tool, then select a layout such as [Icon:VIEW/layout_quad] "Four views" or [Icon:VIEW/layout_tall2] "Two views side-by-side".
+	
+	Then you can switch one of the views to show UVs (see above).
+
+
+== Using the UV Flatten tool == (howto)
+
+:task: Use UV Flatten to lay out a model's texture space:
+
+	# You should [set up the viewer|#views] to show a UV view.
+
+	# Select the geometry you want to flatten in texture space.
+	
+	# On the __Texture__ shelf tab, click the [Icon:SOP/uvflatten] UV Flatten tool.
+	
+	# Use the controls in the operation toolbar (across the top of the viewer) or in the parameter editor to change how the node works.
+	
+	*Note* most geometry will flatten into self-overlapping pieces at first. For example, if you apply UV Flatten to a torus, the node will simply project the top and bottom of the torus down on top of each other in the UV plane. You need to [cut UV seams|#seams] to allow the node to "unwrap" separate 3D pieces into non-overlapping flat pieces.
+
+:task: Show the UV Flatten interface back in the viewer again:
+	If you ever press ((Esc)) to switch to the View tool, or switch to a different node, the viewer will switch to show the interface for the new tool.
+	
+	To get the UV Flatten interface back, select the UV Flatten node in the network editor, then click the [Icon:TOOLS/handles] Handles tool or press ((Enter)) in the viewer.
+
+:task: Specify the area to pack into:
+	When the UV Flatten tool is active, it shows a box handle in the UV view around the 0,0 to 1,1 area. The node packs flattened pieces within this are. You can drag the corners or sides of the box to change the size/shape of the packing area. You can also use the __Center__ and __Size__ parameters to set the box's coordinates exactly.
+	
+	This is useful if you need to avoid existing UV islands already in the __UV attribute__, or if you want to pack the pieces into a UV area other than 0,0 to 1,1.
+	
+	NOTE:
+		If you've [pinned|#pins] any pieces, they won't move/resize when you change the packing area.
+
+
+== Creating seams == (seams)
+
+You will usually need to manually specify seams along which to cut the model into texture pieces or _islands_. You will usually need to cut geometry into at least a few pieces to prevent them from overlapping when flattened.
+
+:task: Cut seams interactively in the UV Flatten tool:
+
+	# Click the [Icon:BUTTONS/texture_cut_seams] Cut icon in the operation toolbar (across the top of the viewer).
+	
+	# Whether [secure selection|#secure] is on or off changes how the cut tool works. See [secure selection|#secure] below.
+
+:task: Cut seams by selecting them _before_ using UV Flatten:
+
+	If the geometry has an [edge group|/model/groups] named `seams`, the node will automatically cut seams along those edges.
+	
+	For example, you can create an edge group using the [Group node|Node:sop/group]:
+	
+	# Before using UV Flatten, click the [Icon:TOOLS/select_component] Select tool, and right-click the [Icon:TOOLS/select_edges] component select mode icon and choose Edges (or press ((3))).
+	
+	# Select edges on the model that should separate texture pieces.
+	
+	# Use the ((Tab)) menu to add a [Group node|Node:sop/group]. In the parameter editor, set the __Base group__ name to `seams`.
+
+:task: Join seams back together:
+	# Click the [Icon:BUTTONS/texture_merge_seams] Join icon in the operation toolbar (across the top of the viewer).
+	
+	# Whether [secure selection|#secure] is on or off changes how the join tool works. See [secure selection|#secure] below.
+	
+	This tool "un-cuts" edges that were seams (edges in the `seams` group or edges that you cut interactively). You only need to click/select one side of the "split" in the UV view and both sides will join together. You can't use this tool to join edges that are boundaries in the 3D model.
+	
+	When you start joining edges, it may get hard to see/click individual edges as the flattened pieces starts to overlap itself. You may find it easier to click/select edges in the 3D Perspective view than the UV view.
+
+:task: Repack the pieces taking into account new seams:
+	Click the __Repack__ button in the operation toolbar (across the top of the viewer).
+
+
+=== Tips === (seam_tips)
+
+* You can click edges in the UV view or the 3D views.
+
+* The node has two parameters for holding seams: "Layout" __Seams__ and "Flattening" __Seams__. This is to accomodate interactive seam cutting. When you interactively cut seams, the new seams are added to the "Flattening" seams parameter. These seams affect _flattening_ (the shape of the piece will change as you cut), but not _layout_ (the node will not re-pack all the pieces in different positions as you cut).
+
+	When you click __Repack__, the node will copy from "Flattening" __Seams__ to "Layout" __Seams__ (so they will affect the layout), and clear __Post-packing__.
+	
+	See [understanding manual layout|#manual] below for more information.
+
+* Island boundary edges are bright green in the UV view. "New" seams (in the __Post-packing__ parameter) have a thicker line.
+
+
+=== Cut/join and secure selection === (secure)
+
+The cut and join tools work slightly differently based on whether [secure selection mode|/basics/select#secure] is on or off. When secure selection is *off*, clicking edges cuts/joins them instantly. When secure selection is *on*, you select one or more edges and press ((Enter)) to cut/join them all at once.
+
+To toggle secure selection, right-click the [Icon:TOOLS/select][Icon:TOOLS/select_component] Select tool and turn __Secure selection__ on or off in the menu (or press [Shift + ~|Key:h.pane.gview.secureselection]). However you should remember that secure selection mode changes how selection works *in all tools*. See [the documentation for secure selection|/basics/select#secure] for more information.
+
+
+== Pinning vertices == (pins)
+
+_Pinning_ a vertex locks it to the pin's UV coordinates. When the node recomputes flattening and layout, the vertex will stay in place. (You can however move the vertex manually by moving the pin.)
+
+:task: Pin vertices in place:
+	# Click the [Icon:DOP/constraint] Pin icon in the operation toolbar (across the top of the viewer).
+	
+	# Select one or more vertices in the UV view to turn into pins, then press Enter.
+
+:task: Move a pin:
+	# Click the [Icon:DOP/constraint] Pin icon in the operation toolbar (across the top of the viewer).
+	
+	# Click an existing pin.
+	
+		A move handle appears on the pin.
+	
+	# Drag the handle to move the pin.
+	
+	* You can move an island by putting a pin in the island and dragging the pin around in texture space.
+	
+	* You can rotate an island by putting _two_ pins in the island and dragging one pin around the other.
+
+:task: Delete a pin:
+	# Click the [Icon:DOP/constraint] Pin icon in the operation toolbar (across the top of the viewer).
+	
+	# Click an existing pin.
+	
+	# Press ((Delete)).
+
+TIP:
+	You must have the Pin mode selected to work with pins. For example, if you are in the Cut mode and click a pin, the tool will cut the edge under the pin.
+
+
+== Aligning and straightening == (align)
+
+You can tell the node that you want certain groups of edges to be straight, or to be aligned with the UV grid. The node will take these hints into account when it re-flattens the texture pieces.
+
+TIP:
+	Edges may not become completely straight or axis-aligned if those hints conflict with other constraints, such as [pins|#pins]. Removing the other constraint(s) will cause the node to re-flatten with better straightening/alignment.
+
+:task: Straighten edges (ABF only):
+	# Click the [Icon:BUTTONS/texture_straighten] Straighten icon in the operation toolbar (across the top of the viewer). This mode is only available when the __Flattening method__ is "Angle-based (ABF)".
+	
+	# Select some contiguous edges, then press ((Enter)).
+	
+		The node will remember that you want these edges to be straight when it re-flattens the texture piece.
+
+:task: Align vertices to the U or V axis:
+	# Click the [Icon:BUTTONS/texture_align] Align icon in the operation toolbar (across the top of the viewer).
+	
+	# Select the vertices you want to align with each other, then press ((Enter)).
+	
+	# Currently the tool aligns in U (horizontally) by default. 
+	
+		If you want to align in V (vertically) instead, the current interface is less than ideal. First, expand the __Axis aligned vertex groups__ heading in the parameter editor. Find the alignment constraint you just created at the end of the list of constraints under the heading. Change the __Align parallel to__ parameter for that constraint to "V Axis".
+
+		This should be fixed in a future release.
+
+:task: Repack the pieces taking into account new straighten/align constraints:
+	Click the __Repack__ button in the operation toolbar (across the top of the viewer).
+
+
+== Visualize UV space distortion == (visualize)
+
+Houdini starts with a UV distortion visualizer already configured, but disabled by default.
+
+:task: Turn on the UV distortion visualizer:
+	# Right click the [Icon:VIEW/visualization] Visualization icon in the View toolbar (along the right side of the 3D viewer).
+	
+	# Turn on the checkbox next to the "UV Distortion" visualizer.
+
+:task: Change the UV distortion visualizer settings:
+	# Right click the [Icon:VIEW/visualization] Visualization icon in the View toolbar (along the right side of the 3D viewer).
+	
+	# Turn on the [Icon:BUTTONS/edit] Edit icon to the right of the "UV Distortion" visualizer.
+	
+		* UV distortion is a range from `-n` to `+n`, so the visualizer should have __Set using__ as "Center and Width", and the __Center__ set to `0`. You can change the width based on the amount of distortion, but `2` or `3` are usually good values.
+	
+		* You can change the __Color Ramp__ preset to visualize the distortion using different colors.
+
+
+== Understanding manual layout == (manual)
+
+There are two ways of using UV Flatten: interactively, and procedurally. You can switch between them, but you should understand the difference in how the node works.
+
+* When you use the node *interactively* (the default), the node will apply some constraints (__Layout constraints__) such as cutting seams before packing, then use the shapes influenced by those constraints to pack the pieces. Then, you can create more constraints interactively (for example, cutting more seams or pinning UVs). These constraints (__Flattening constraints__) are applied _on top of_ the packed layout.
+
+	This is because re-packing after each small change could radically alter the layout, making it extremely hard to work interactively with the pieces jumping around. By applying interactive changes _post-packing_, pieces won't move as you work on them.
+	
+	When you want to "commit" your interactive changes and re-pack for the most efficient layout with the new constraints, click the __Repack__ button in the operation toolbar at the top of the viewer. When you click __Repack__, the node _copies_ the post-packing "flattening" constraints you added interactively into the pre-packing "layout" constraints parameters. The node then repacks the pieces taking those constraints into account.
+	
+	You can work in a cycle like this, making interactive changes, repacking to see their effect on the layout, and then making more interactive changes if necessary.
+
+* It is possible you don't care about flattening interactively and want the node to work *procedurally*. For example, you might calculate the seams somehow using a script. Or you might have existing islands and just want to use this node for layout and/or relaxing the UVs. In this case you want changes to the parameters to be immediately visible in the output, without having to click __Repack__.
+
+	To set the node to work procedurally, turn on the __Enable manual layout__ parameter (under the __Layout constraints__).
+
+	When __Enable manual layout__ is on, the "Flattening" constraints are _the only constraints_, and they are applied _before packing_. There are no post-packing constraints. Any values in the "Layout" constraints parameters are ignored.
+
+	In this mode, any changes you make to the "Flattening" constraints immediately changes the node's output.
+
+
+@parameters
+
+Group:
+	The polygonal faces to flatten in texture space. If this is empty, the node works on all incoming polygons. You can enter the name of a [group|/model/groups] here or specify polygons [by number|/model/groups#manual]. Click the [Icon:BUTTONS/reselect] Reselect button next to this field to select different polygons in the viewer.
+
+UV Attribute:
+	The name of the attribute to store the UV coordinates (`uv` by default). You can enter a different name if you want to have multiple sets of UVs on the same geometry.
+
+Flattening Method:
+	How to flatten 3D geometry into 2D texture space. The node has two different methods that allow different hints (constraints) and have different efficiencies. Both methods are designed to minimize _angular distortion_, meaning that angles in the texture image should appear correct when projected onto the textured 3D surface. The methods differ mainly in how to handle _area distortion_, that is keeping polygons roughly the same size in texture space.
+	
+	Spectral (SCP):
+		The default. Tends to be faster than ABF. Allows preserving island shapes. Allows aligning selected edges to UV grid.
+	
+	Angle Based (ABF):
+		Slightly slower than SCP but produces less area distortion. Allows straightening of edge groups and quad patches.
+
+
+~~~~ Existing UVs ~~~~
+
+What to do with existing texture pieces if there are already texture coordinates in the __UV attribute__.
+
+Preserve Seams:
+	Any existing seams in the incoming geometry are added to contents of the __Seams__ parameter.
+
+Preserve Layout:
+	Preserves the positions of any existing UV islands, and tries to lay out new islands around them.
+
+Preserve Island Boundary Shapes (SCP only):
+	Preserves the shape of any existing UV islands (allowing them to rotate or scale), and re-flattens their interior UVs. You can turn on this option _and_ __Preserve layout__ if you want to preserve existing islands in-place but relax their UVs.
+
+
+~~~~ Flattening constraints ~~~~
+
+Seams:
+	#id: seamgroup
+	
+	When __Enable manual layout__ is off, these are the "interactive" post-packing seams. Any edges in this parameter that are not in the "Layout" seams parameter are cut, and any edges in the "Layout" seams parameter that are not in this parameter will be joined. When __Enable manual layout__ is on, these are the only seam constraints, and the "Layout" __Seams__ parameter is ignored.
+
+	See [understanding manual layout|#manual] above for more information.
+
+div style="margin-left: 2em">>
+	~~~~ Vertex pins ~~~~
+
+	::Enable pins:
+		#id: usepins
+
+		A "master switch" to enable or disable all pins.
+
+	This section contains a multiparameter where each item corresponds to a pin. You can edit the pins by changing the parameters but it is usually easier to change them interactively. See [pinning vertices|#pins] above.
+	
+	::Primitive/Vertex:
+		The primitive number of the polygon containing the pinned vertex and the sequential index of the pinned vertex in that polygon. 
+		
+	::UV:
+		The coordinates to pin the vertex to.
+		
+	::Reference UV:
+		The UV coordinates of the next vertex in the same polygon. It is ignored unless the pin is the only pin in its respective island. Mainly used in interactive state.
+
+
+	~~~~ Axis-aligned vertex groups ~~~~
+
+	::Enable Axis Alignment:
+		#id: usealignments
+
+		A "master switch" to enable or disable all alignment constraints.
+
+	This section contains a multiparameter where each item corresponds to an alignment constraint. You can delete individual constraints here. See [aligning edges|#align] above.
+	
+	::Group:
+		The vertices to line up. Note that it is enough include only one of possibly several vertices in the island wired to the same point.
+		
+	::Align Parallel To:
+		Axis along which to line up.
+
+
+	~~~~ Straightened Loops (ABF only) ~~~~
+
+	::Enable Loop Straightening:
+		#id: usestraightenings
+
+		A "master switch" to enable or disable all straightening constraints.
+
+	This section contains a multiparameter where each item corresponds to a straightening constraint. You can delete individual constraints here. See [straightening edges|#align] above.
+	
+	::Group:
+		#id: straight_group
+		
+		A group of vertices that describe a sequence of edges to be forced into a straight line. Each vertex represents the edge between that vertex and the its subsequent vertex in its respective polygon. (You can't simply define these using edge groups because seam edges are shared between islands, so straightening would have to be applied to all the affected islands at once.)
+
+
+~~~~ Layout constraints ~~~~
+
+Enable manual layout:
+	Switches the node to work non-interactively. The Flattening constraints will be applied before packing, and the Layout constraints will be ignored. This allows you to use the node procedurally, where changes to the parameters immediately change the node's output, without having to click __Repack__.
+	
+	See [understanding manual layout|#manual] above for more information.
+	
+Seams:
+	#id: layoutseamgroup
+	
+	When __Enable manual layout__ is off, these are the "base" pre-packing seams. When __Enable manual layout__ is on, the "Flattening" seams are the only seam constraints, and this parameter is ignored.
+	
+	See [understanding manual layout|#manual] above for more information.
+
+
+~~~~ Output groups ~~~~
+
+Seams:
+	#id: outputseams
+	
+	Turn the checkbox next to this parameter on to create an edge group in the output containing the seam edges.
+
+Constrained Islands:
+	#id: outputconstrislands
+	
+	Turn the checkbox next to this parameter on to create a primitive group in the output containing the polygons in all islands that have a pin, axis-alignment, or straighten constraint.
+
+
+~~~~ Packing area ~~~~
+
+Controls the area of texture space within which the node will try to pack the texture pieces. You can use these parameters to position the area exactly, or drag the corners or sides of the box handle in the UV view when this node is active.
+
+Center:
+	The center of the packing area, as UV coordinates.
+
+Size:
+	The width and height of the packing area, in UV units.
+
+
+@related
+
+- [/shade/textures]
+- [Node:sop/uvproject]
+- [Node:sop/uvquickshade]
+- [Node:sop/texture]
+- [Node:sop/uvpelt]
+- [Node:sop/uvunwrap]
+- [Node:sop/uvlayout]
+

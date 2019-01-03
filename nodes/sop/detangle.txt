@@ -1,0 +1,220 @@
+#type:     node
+#context:  sop
+#internal: detangle
+#icon:     SOP/detangle
+
+= Detangle =
+
+"""Attempts to prevent collisions when deforming geometry."""
+
+Detangle is one part of the Vellum collision pipeline.   It adjusts
+point positions to try to avoid any collisions, both external and
+self, that occur as a result of a deformation.  It requires a good
+configuration for its starting setup, however.
+
+It can handle line and surface collisions.  All polygons are converted
+to triangles internally, however, so the collision surface may not
+be what is drawn in the viewport.   Collisions with external objects
+also allows the use of some types of packed primitives.
+
+Several physically inspired attributes are also respected if
+present.  `mass` controls how self collision restoration is shared
+between points.  `stopped` can be used to freeze certain points.
+
+Two attributes are used to adjust the raw `pscale` attribute for
+collision detection: `overlap_self` and `overlap_external`.  These
+store the initial overlap of neighboring points avoiding explosions
+when the initial configuration doesn't respect the full `pscale`.
+
+@parameters
+
+Previous Position:
+    #id: prevpos
+
+    The incoming `P` attribute is considered the new deformed version
+    of the geometry. The Previous Position attribute stores the undeformed
+    version which is assumed to be collision free.
+    
+    
+Disable Self Attr.:
+    #id: disableselfattr
+
+    This integer attribute will prevent points from engaging in self
+    collisions if it is non-zero.
+    
+    
+Disable External Attr.:
+    #id: disableexternalattr
+
+    This integer attribute will prevent points from engaging in external
+    collisions if it is non-zero.
+    
+    
+Weld Attr.:
+    #id: weldattr
+
+    It is often useful to fuse points together logically without
+    actually fusing the point numbers.   The weld attribute is an
+    integer attribute on points giving which point they should weld to.
+    If -1 or their own number, they are unwelded.  The weld number
+    refers to a point number, unless an `id` attribute is present, then
+    it refers to an `id` number.
+    
+    
+Default Thickness:
+    #id: thickness
+
+    Where `pscale` is present, the `pscale` attribute is used for the point
+    thickness and can vary per point.  This parameter is the default when it is
+    absent, either in the external or self collision geometry.
+    
+    
+Self Collisions:
+    #id: doself
+
+    Enable self collision detection.
+    
+    
+Collide with Tetrahedral Open Faces:
+    #id: dotet
+
+    The unshared faces of a tetrahedral mesh will generate collision geometry if this is set.  Sometimes one wishes to use both a triangle shell and a tetrahedral mesh, making this operation redundant.
+    
+    
+Update Overlap Distances:
+    #id: updateoverlap
+
+    The `overlap_self` and `overlap_external` will be updated to reflect
+    the current configuration.   They only decrease with this operation,
+    so to initialize set to a large initial value.
+    
+    
+Update Disabled Points:
+    #id: updatedisable
+
+    Because not all collisions may have been properly handled, this will
+    set the disabled point attributes on those points which are now
+    colliding.  This can be used to avoid trying to enforce them in
+    their now incorrect positions, allowing them to eventually return
+    to the right side of the surface.
+
+    When points are set to be disabled their value will be or-ed with
+    `2`.
+    
+    
+Reset Detangled Points:
+    #id: resetdetangled
+
+    If a disabled point resolves its colliding relationship and is no longer
+    detangled, reset its disabled status so it will start colliding again.
+
+    When points are reset, they are and-ed with not-`2`.  This ensures if
+    you manually disable a point by setting its value to 1, it won't be
+    removed by the reset pass, but only those points disabled by the
+    auto-disable will be reset.
+    
+    
+Mark Changed:
+    #id: markattr
+    
+    Any point altered by detangle will have this attribute set to 1.
+    
+Resolve Collisions:
+    #id: doresolve
+
+    Enable adjustment of `P` by collisions.  You may not want to do this if
+    updating disabled status, as adjusting positions can cause other points
+    to start to fail that might not be detected.
+    
+    
+Max Weight:
+    #id: maxweight
+
+    A point may often be moved by multiple collision events at once.  All these
+    adjustments are averaged together.  This is the total weight to apply.
+    Larger values will over-relax and may cause instabilities, but may also
+    lead to faster convergence.
+    
+    
+Max Displacement:
+    #id: maxdisplace
+
+    Maximum amount to move a point.  If it has to move farther than this,
+    it will clamp to this displacement and likely be disabled for failing
+    to resolve the collision.
+    
+    
+Resolve All Collisions:
+    #id: resolveall
+
+    An initial gather pass is done across all potential collisions.  These are resolved individually, but averaging the results may not fully resolve the collision.   This will repeat the resolution on colliding pairs until max passes is reached or they are resolved.  Note it does not detect any collisions created in this process.
+    
+    
+Resolve All Max Passes:
+    #id: resolveallmax
+
+    Maximum number of passes to resolve the collision list.
+    
+Resolve All Free Edges:
+    #id: resolvealledges
+    
+    Open curves, like hairs, tend to not resolve well in a pair-wise fashion.  So applying the resolve all collisions to them just increasingly tangles them.   This option will enable resolve-all for such open curves if your situation allows it.
+    
+Layer Attr.:
+    #id: layerattr
+
+    An integer point attribute providing a layer count for the geometry.   Higher numbers are considered higher layers; ie; will stack on top of the lower numbers.
+    
+    
+Layer Shock:
+    #id: layershock
+    
+    If two points of different layer numbers collide, their relative mass is adjusted by this layershock factor.   This causes the higher layer to get out of the way of the lower layer.   Note the total layer difference is not used, merely whether it is greater or less.   A value of 2 will cause the lower layer numbers to be effectively twice as heavy as higher numbers for the purpose of collisions.
+    
+External Friction:
+    #id: externalfriction
+
+    A scale factor on the amount of friction effect to apply for collisions with external geometry.
+    
+    
+Self Friction:
+    #id: selffriction
+
+    A scale factor on the amount of friction effect to apply for collisions with self geometry.
+    
+    
+Static Threshold:
+    #id: static_threshold
+    
+    A threshold at which to apply full friction.  When the ratio of the tangential velocity and the normal impulse is less than this, the tangential velocity will be fully eliminated through friction.  This is roughly tan() of the slope angle that will allow sliding under gravity.
+    
+Scale Kinetic:
+    #id: kinetic_scale
+    
+    If the static threshold fails, this controls what percentage the tangential velocity will be reduced in the dynamic friction case.
+
+Assume Constant Collision Topology:
+    #id: constantcollisiontopology
+    
+    Most cases of constant topology (ie, polygons are wired to the same point)
+    will be automatically detected.  However, this will avoid checking the
+    topology at all and assume the points are wired up the same way they
+    were when first encountered.
+    
+Shared Cache Name:
+    #id: sharedcache
+    
+    A global cache shared between multiple detangle SOPs.  This allows them
+    to share the same acceleration structures and topology.  Note that they
+    should genuinely be referring to the same geometry - only one version
+    is saved per cache name, so sharing unnecessarily will just needlessly
+    flush the cache.
+    
+Cache Reset Key:
+    #id: resetkey
+    
+    A collision tree can often be re-used for different point positions if they have not changed over much.  If this parameter evaluates to the same value, the tree will only be reset if the topology changed.  This will not result in missed collisions, only possibly in slow down as the tree stops representing the geometry.   Negative values will always reset the tree.
+    
+@related
+- [Node:sop/vellumsolver]
+

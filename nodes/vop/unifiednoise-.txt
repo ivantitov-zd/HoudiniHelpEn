@@ -1,0 +1,249 @@
+= Unified Noise =
+
+#type: node
+#context: vop
+#internal: unifiednoise
+#icon: VOP/unifiednoise
+
+"""Presents a unified interface and uniform output range for all the noise types available in VEX."""
+
+This node lets you play with parameters on the __Construction__ tab to design an interesting noise with `0-1` output, and then use the parameters on the __Output__ tab to condition the output to the range you need.
+
+:fig:[Image:/images/nodes/vop/unifiednoise_types.jpg]
+
+This node is designed to have most of its interface promoted up to the parent
+material. to promote the UI for this node, you must choose 
+__Promote Interface > UI + Links + Inputs__ to trigger scripts on the node 
+to promote and create parameters up on the parent node.
+
+TIP:
+    The noise functions sometimes give artifacts or an area of static results around offset `0`, so you want want to always begin designing your noise with non-zero values in the offset.
+
+@inputs
+
+The data type of the position (`pos`) input is controlled by the __Signature__ parameter.
+
+The VOP has inputs for dual positions (`pos` and `pos2`) and weights (`kpos` and `kpos2`). These fields are output by [Pyro simulations|/pyro/pyro] when using dual rest fields. The weights allow you to indicate the current importance of each rest field. For example, if the first rest field is the most important, you would set `kpos` high and `kpos2` low, and then as you gradually switch to the second rest field, lower `kpos` and raise `kpos2`. These values are output by DOPs.
+
+@outputs
+
+`noise`:
+    The output of the noise function. The data type of this output is controlled by the __Signature__ parameter.
+
+`x_avg`:
+    The calculated average of the noise.
+
+`x_oct`:
+    The actual number of octaves in the output. This may differ from the number of octaves requested in the parameters. For example, if you request 2000 octaves but the filtering of the output means that number of octaves can't be used.
+
+`x_off`:
+    The offset of warping in the noise space.
+
+@parameters
+
+Signature:
+    Sets the data types this node expects for the inputs, and the data type of the output. This allows you to integrate the noise with various other VOPs. If you choose a __Noise type__ that doesn't need this many components, the node will simply not use/set every component of the input/output.
+
+Active:
+    Whether to add noise to the input. When this checkbox is off value of __Inactive Output__ is used as the `noise` output. This is useful for checking the effect of the node.
+
+Inactive output:
+    When __Active__ is off, this value is used as the output instead of the noise function.
+
+Frequency:
+    #id: freq
+    
+    The frequency of the noise. Higher values give smaller scaled details in the noise.
+    
+    [Anim:/images/nodes/vop/unoise_frequency.gif]
+
+Offset:
+    #id: offset
+    
+    The offset of the input into the noise function. If you visualize the noise as a 2D graph or 3D height field, this has the effect of "panning" across the space of possible noise outputs. If you have the general noise effect you want but just want to get a different set of values for a different look, try changing the offset.
+    
+    [Anim:/images/nodes/vop/unoise_offset.gif]
+    
+Period:
+    #id: period
+    
+    For periodic noise types, the multiple of the input range before the noise pattern repeats.  
+    
+    NOTE:
+        If Lacunarity is not 2, successive octaves will not have matching periods so a periodic noise won't be built.
+    
+    [Anim:/images/nodes/vop/unoise_period.gif]
+
+== Construction == (construction)
+
+The output of the noise constructed by the parameters on this tab is always in the range `0` to `1`. You can the condition the output, for example remap it to the range `-1` to `1`, using the parameters on the [Output tab|#output].
+
+Noise type:
+    #id: basis
+    The type of noise to generate. Different algorithms give noise with different characteristics.
+    
+    Sinusoid:
+        *Not actually noise*. This simply outputs a sine wave instead of adding noise to the input signal. This may be useful for debugging with an output that spans the entire `0-1` range.
+        
+        [Image:/images/nodes/vop/unoise_sine.png]
+    
+    Perlin:
+        A noise where the visual details are the same size. [Wikipedia article|Wp:Perlin_noise]
+        
+        [Image:/images/nodes/vop/unoise_perlin.png]
+    
+    Periodic Perlin:
+        A variant of Perlin noise with a repeating pattern. This can be useful for creating images, geometry, and motion that can be tiled and merged.
+        
+        [Image:/images/nodes/vop/unoise_periodic_perlin.png]
+    
+    Simplex (Improved Perlin):
+        The default. A faster and more interesting variant of Perlin noise.
+        
+        [Image:/images/nodes/vop/unoise_simplex.png]
+    
+    Sparse Convolution:
+        Sparse Convolution noise is similar to Worley noise. Does not have artifacts at grid points.
+        
+        [Image:/images/nodes/vop/unoise_sparse.png]
+    
+    Flow:
+        A noise that's stable over time, like a rotated Perlin noise, useful to create noise that seems to swirl and flow smoothly across time. Use the __Flow rotation__ parameter below to control the rotation.
+        
+        [Anim:/images/nodes/vop/unoise_flow.gif]
+    
+    Periodic Flow:
+        A variant of Flow noise with a repeating pattern. This can be useful for creating images, geometry, and motion that can be tiled and merged. Use the __Flow rotation__ parameter below to control the rotation.
+        
+        [Anim:/images/nodes/vop/unoise_periodic_flow.gif]
+    
+    Worley (cellular) F1:
+        Produces cellular features similar to plant cells, ocean waves, honeycombs, cratered landscapes, and so on. [Wikipedia article|Wp:Worley_noise]
+        
+        [Image:/images/nodes/vop/unoise_worley_f1.png]
+    
+    Worley (cellular) F2:
+        A variant of Worley noise that produces blunted and cornered features.
+        
+        [Image:/images/nodes/vop/unoise_worley_f2.png]
+    
+    Alligator:
+        Produces a bumpy output. Named for its alleged resemblance to alligator skin.
+        
+        [Image:/images/nodes/vop/unoise_alligator.png]
+
+Complement:
+    Outputs the numerical complement (`1 - x`) of the computed noise. Basically turns the output upside-down.
+    
+    [Image:/images/nodes/vop/unoise_sine.png]
+    [Image:/images/nodes/vop/unoise_complement.png]
+
+Exponent:
+    Raises the output to this exponent. For example, a value of `2` would square all output values. This has the effect of raising or lowering the values toward `1` or `0`.
+
+Lattice warp and gradient warp are two methods for adding "fractal-ness" to the basic noises by warping the noise space.
+
+Enable Lattice Warp:
+    #id: dolwarp
+    Adds "stringiness" or "wiriness" to standard noise.
+
+    [Anim:/images/nodes/vop/unoise_lattice_warp.gif]
+    
+Accumulate Lattice Warp:
+    #id: accuml
+    When __Lattice Warp__ is on, this accumulates the warp for each iteration (octave) of added fractal noise. When used in images, this can add interesting smudgy effects, and interesting landmarks when used for terrain.
+
+Enable Gradient Warp:
+    #id: dogwarp
+    Widens the peaks or valleys of the noise output.
+    
+    [Anim:/images/nodes/vop/unoise_gradient_warp.gif]
+
+Accumulate Gradient Warp:
+    #id: accumg
+    When __Gradient Warp__ is on, this accumulates the warp for each iteration (octave) of added fractal noise.
+
+Flow Rotation:
+    #id: flowrot
+    The rotation of the "swirl" when __Noise type__ is "Flow", from `0` to `1`. Because this parameter is fractional, you can't just use `$F` to animate it, since all integral values will look the same, representing a complete revolution.
+
+The fractal controls let you add additional fractal noise _on top of_ the output of the basic noise type.
+
+Fractal Type:
+    #id: fractal
+    None:
+        Does not add any additional noise on top of the basic noise.
+        
+        [Image:/images/nodes/vop/unoise_fractal_none.png]
+    
+    Standard:
+        Adds pseudo-random noise on top of the basic output.
+        
+        [Image:/images/nodes/vop/unoise_fractal_standard.png]
+    
+    Terrain:
+        Adds noise like "Standard" but dampens the noise in the valleys, which can be useful for generating mountainous terrain.
+        
+        [Image:/images/nodes/vop/unoise_fractal_terrain.png]
+    
+    Hybrid:
+        Like terrain, but with more sharpness in the valleys.
+
+Max octaves:
+    #id: oct
+    The number of iterations of distortion to add to the output of the basic noise. The more iterations you add, the more "detailed" the output. Note that the output may have fewer octaves than this parameter (that is, increasing the parameter will eventually stop adding detail), because the node eventually stops when there's no more room to add more detail in the output.
+
+Lacunarity:
+    #id: lac
+    The frequency increment between iterations of fractal noise added to the basic output. Note that you can use a negative value.
+    
+    [Anim:/images/nodes/vop/unoise_lacunarity.gif]
+
+Roughness:
+    #id: rough
+    The scale increment between iterations of fractal noise added to the basic output. The higher the value the larger the "jaggies" added to the output. You can use a negative value for roughness.
+    
+    [Anim:/images/nodes/vop/unoise_roughness.gif]
+
+== Output == (output)
+
+The output generated using the parameters on the __Construction__ tab is guaranteed to be in the range `0-1`. If you need different output, you can use the parameters on this tab to conveniently condition the output without messing with your noise parameters.
+
+Fold:
+    #id: cc_fold
+    "Flips" values below the median to be above the median, so all valleys become peaks. (Note it flips across the _median_, not `0`.) If the median is `0`, this is like taking the absolute value.
+
+    [Image:/images/nodes/vop/unoise_fold1.png]
+    [Image:/images/nodes/vop/unoise_fold2.png]
+
+Bias:
+    #id: cc_dobias
+    Moves the output down or up toward `0` or `1`.
+
+Gain:
+    #id: cc_dogain
+    Increases or decreases the contrast from 0.5 in the output.
+
+Complement:
+    #id: cc_inv
+    Outputs the numerical complement (`1 - x`) of the computed noise. Basically turns the output upside-down.
+
+Output range (clamped):
+    #id: cc_dorng
+    Enables the __New minimum__ and __New maximum__ parameters to allow you to map the noise, which is normally in the `[0,1]` range, to a different range of values.
+
+New minimum:
+    #id: cc_rnglo
+    Remaps the output so `0` values become this value.
+
+New maximum:
+    #id: cc_rnghi
+    Remaps the output so `1` values become this value.
+
+Final amplitude:
+    #id: cc_amp
+    Scales the final conditioned output up or down.
+
+Filter Scale:
+    #id: fscale
+    A scale on the filter width to use in shading a shading context.

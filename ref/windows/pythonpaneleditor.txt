@@ -25,6 +25,15 @@ sys.path.append("/path/to/site-packages")
 from PyQt5 import QtWidgets
 }}}
 
+=== New to Houdini 17.0 ===
+
+- Houdini 17.0 only supports Python Panels built with PySide2 or PyQt5.  PySide
+  and PyQt4 are no longer supported.
+
+- You can specify the placement of your interface in the pane tab type menu
+  using the new PaneTabTypeMenu.xml file.  See the [Pane tab type
+  menu|/ref/windows/pythonpaneleditor#pane-tab-type-menu] section for details.
+
 === New to Houdini 16.5 ===
 
 Houdini 16.5 no longer automatically scales PySide/PyQt interfaces by Houdini's
@@ -146,6 +155,13 @@ class MyCustomWidget(QtWidgets.QWidget):
 
 # Drag and drop available interface definitions from the list on the left and into the menu list on the right. Entries in the menu list can also be reordered using drag and drop.  You can alternatively use the [Icon:BUTTONS/move_to_right] button to add entries to the menu and the [Icon:BUTTONS/move_to_left] button to remove entries. Multiple entries can be moved at the same time.
 
+NOTE:
+    When editing the pane tab type menu note that any interfaces that are
+    already specified in the pane tab type menu XML file, PaneTabTypeMenu.xml,
+    are ignored from the Python Panel menu definition.  See the [Pane tab type
+    menu|/ref/windows/pythonpaneleditor#pane-tab-type-menu] section for
+    details.
+
 == Deleting Interfaces ==
 
 # Open the Delete Interfaces dialog from the Python Panel Editor or from the [Icon:BUTTONS/gear] toolbar button in a Python Panel pane tab.
@@ -211,6 +227,11 @@ Icon:
     - <<dirname>> is the directory name under `$HFS/houdini/help/icons/large`, such as `OBJ`, `SHELF`, or `MISC`, and
     - <<filename>> is the icon's filename minus any extension. For example, `OBJ_sticky` specifies the standard icon for the Sticky object.
 
+Show Network Navigation Bar:
+    #id: show_network_navigation_bar
+    When checked on, the pane tab containing the Python Panel interface will
+    show the controls for navigating around the Houdini network.
+
 Menu Hints:
     #id: menu_hints
 
@@ -218,13 +239,13 @@ Menu Hints:
     are used to instruct Houdini on whether to include the interface in the
     menu and where to insert the interface into the menu.
 
-    Include in toolbar menu:
+    Include in Toolbar Menu:
 	#id: include_in_toolbar_menu
 
 	Check this option to include the interface in the toolbar menu
 	when no toolbar menu definition has been loaded from disk.
 
-	Menu position:
+	Menu Position:
 	    #id: toolbar_menu_position
 
 	    The position where the interface should be inserted into the menu.
@@ -235,19 +256,18 @@ Menu Hints:
 	    interface B will appear first in the menu followed by A and then
 	    followed by C.
 
-	Create preceding separator:
+	Create Preceding Separator:
 	    #id: create_separator_in_toolbar
 
 	    Check this option to create a separator immediately before the
 	    interface in the menu.
 
-    Include in pane tab menu:
+    Include in Pane Tab Menu:
 	#id: include_in_panetab_menu
 
-	Check this option to include the interface in the panetab menu
-	when no panetab menu definition has been loaded from disk.
+	Check this option to include the interface in the panetab menu when no panetab menu definition has been loaded from disk.
 
-	Menu position:
+	Menu Position:
 	    #id: panetab_menu_position
 
 	    The position where the interface should be inserted into the menu.
@@ -258,16 +278,17 @@ Menu Hints:
 	    interface B will appear first in the menu followed by A and then
 	    followed by C.
 
-	Create preceding separator:
+	Create Preceding Separator:
 	    #id: create_separator_in_panetab
 
 	    Check this option to create a separator immediately before the
 	    interface in the menu.
 
     NOTE:
-	If a menu definition has been loaded from disk then Houdini will ignore
-	the interface's menu hints.  In this case a warning will appear below
-	the menu hints.
+	    If a menu definition has been loaded from disk then Houdini will ignore the interface's menu hints.  In this case a warning will appear below the menu hints.
+
+    NOTE:
+	    Menu hints for the pane tab type menu are also ignored if the interface has already been specified in the pane tab type menu XML file, `PaneTabTypeMenu.xml`.  See the [Pane tab type menu|/ref/windows/pythonpaneleditor#pane-tab-type-menu] section for details.
 
 Script:
     #id: script
@@ -295,31 +316,41 @@ Script:
     - `onDeactivateInterface()`
 	Executed when the interface becomes inactive and hidden.
 
+    - `onNodePathChanged(node)`
+	Executed when Houdini has changed the current node.
+	This function hook is useful for when your Python Panel interface is
+	interested in following navigation around the Houdini node network.
+
+	`node` is the current node and is a [Hom:hou.Node] object.
+	If there is no current node then `node` is set to `None`.
+
+	Note that this function hook is also called when the Python Panel
+	interface is first loaded.
+
     Only the `onCreateInterface()` function is required by the interface.
     The other functions are optional.
     
 
     NOTE:
-	In older Houdini versions, the `createInterface()` function was
-	required.  This function is now deprecated and replaced by
-	`onCreateInterface()`.
+	    In older Houdini versions, the `createInterface()` function was required.  This function is now deprecated and replaced by `onCreateInterface()`.
 
     NOTE:
-	The kwargs dictionary is available in the interface script.  The dictionary contains the following entries:
-	- _paneTab_ - The pane tab ([Hom:hou.PaneTab]) that contains the interface.
+	    The kwargs dictionary is available in the interface script.  The dictionary contains the following entries:
+	    - _paneTab_ - The pane tab ([Hom:hou.PaneTab]) that contains the interface.
+	      It is recommended that the result of `kwargs["paneTab"]` not be stored in a persistent variable because the [Hom:hou.PaneTab] object may not be valid later on.  For example, switching to another pane tab type and then back to the Python Panel can cause the old pane tab object to be deleted and a new one created.  Instead, always call `kwargs["paneTab"]` when you need to access the pane tab.
 
-	Here is an example of using kwargs in the script:
-	{{{
-	#!python
-	from PySide2 import QtWidgets
-
-	def onCreateInterface():
-	    panetab = kwargs["paneTab"]
-
-	    label = QtWidgets.QLabel()
-	    label.setText("Running in pane tab '%s'" % panetab.name())
-	    return label
-	}}}
+    	Here is an example of using kwargs in the script:
+    	{{{
+    	#!python
+    	from PySide2 import QtWidgets
+    
+    	def onCreateInterface():
+    	    panetab = kwargs["paneTab"]
+    
+    	    label = QtWidgets.QLabel()
+    	    label.setText("Running in pane tab '%s'" % panetab.name())
+    	    return label
+    	}}}
 
 == Menu tab ==
 
@@ -338,6 +369,43 @@ menu. An unlimited number of separators can be added to the Menu Entries list.
 
 The __Save To__ field indicates which file the menu is saved to. This file must
 be writeable by Houdini.
+
+== Pane tab type menu ==
+
+Aside from using menu hints or creating a Python Panel menu definition you can
+insert Python Panel interfaces into the pane tab type menu using the menu's
+XML definition file, PaneTabTypeMenu.xml.
+
+There are several benefits to using the XML definition file:
+- You can insert your interface anywhere in the pane tab type menu instead of
+  inserting only at the bottom of the menu.
+- You can place your interface in a submenu.
+- You can add an expression filter so that the interface appears in the menu
+  only when certain conditions are met.
+
+
+To insert the interface into the pane tab type menu using XML:
+# Make a copy of `$HFS/houdini/PaneTabTypeMenu.xml`.
+# Paste the copy into your Houdini user preferences directory (`$HOME/houdiniX.Y` on Linux and Windows, `$HOME/Library/Preferences/houdini/X.Y` on macOS).
+# In the pasted file,
+place a new `<actionItem>` element into the XML with the `id` property set to
+"pythonpanel::<interface_name>".
+
+  For example, suppose you had a Python Panel interface named "myInterface",
+  then your new action item would look like this~:
+    {{{
+    #!xml
+    <actionItem id="pythonpanel::myInterface">
+	<label>Label for My Interface</label>
+    </actionItem>
+    }}}
+
+You can alternatively use any of the `insertBefore` or `insertAfter` elements
+that are described in [Reorganizing
+menus|/basics/config_menus#reorganizing-menus] to insert the interface into the
+menu without making a full copy of PaneTabTypeMenu.xml file.
+
+For more information on customizing menus in Houdini, see [/basics/config_menus].
 
 == Python Panel files ==
 

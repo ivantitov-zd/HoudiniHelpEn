@@ -1,0 +1,427 @@
+= Python state |> user interface events =
+
+#flow: /hom/index#state
+
+"""How to listen for and respond to direct UI input."""
+
+
+== Overview ==
+
+(See [Python states|python_states] for the basics of how to implement a custom viewer state.)
+
+The standard way to allow user interaction with a node is to [bind handles|state_handles] to node parameters in a node's state. Handles can be very powerful on their own, letting you specify a ready-made user interface for a wide variety of parameter setups.
+
+However, sometimes you want the ability to interpret lower-level user input such as mouse moves, button presses, mouse wheel clicks, tablet tilt and pressure, and so on. You can implement the `onMouseEvent()` callback 
+
+* 
+
+* While your state is active, in your mouse event handler you can get a _ray_ (a directional line) from the mouse "into" the screen. You can intersect this [pointing ray|#ray] with the geometry to know what is under the mouse pointer at that moment.
+
+* To set up a right-click context menu for your custom state, see [Python state menu|state_menus].
+
+* The [UI device object|#device] has useful methods for detecting modifier keys and arrow keys. For information on capturing hotkeys, see [Python state menu hotkeys|state_menus#hotkeys]
+
+
+== Input events ==
+
+The Python state impelementation supports the following callback methods:
+
+Method ||
+    Called for ||
+
+`onMouseEvent` |
+    input device moves/clicks |
+        See [reading the UI device|#device] below.
+
+`onMouseWheelEvent` |
+    mouse wheel scroll |
+        See [scroll wheel|#wheel] below.
+
+The UIEvent object you get from the `"ui_event"` key of the dictionary passed to these callbacks has two useful methods: [Hom:hou.UIEvent#device] returns a [Hom:hou.UIEventDevice] object that lets you read the state of the user input device. [Hom:hou.UIEvent#ray] returns a [pointing ray|#ray] into the 3D scene.
+
+
+== Reading the UI input device == (device)
+
+The [Hom:hou.UIEventDevice] returned by `kwargs["ui_event"].device()` in a UI event handler contains methods for getting the screen coordinates of the mouse within the view, the state of the mouse buttons and modifier keys, and also [tablet-specific data|#tablet].
+
+See the help for [Hom:hou.UIEventDevice] to see what data is available.
+
+{{{
+#!python
+from __future__ import print_function
+
+
+class MyState(object):
+    def __init__(self, state_name, scene_viewer):
+        self.state_name = state_name
+        self.scene_viewer = scene_viewer
+
+    def onMouseWheelEvent(self, kwargs):
+        # Get the UI envent
+        ui_event = kwargs["ui_event"]
+        # Get the UI device object
+        device = ui_event.device()
+
+        print("Screen X=", device.mouseX())
+        print("Screen Y=", device.mouseY())
+        print("LMB pressed=", device.isLeftButton())
+        print("MMB pressed=", device.isMiddleButton())
+        print("RMB pressed=", device.isRightButton())
+        print("Shift pressed=", device.isShiftKey())
+        print("Ctrl pressed=", device.isCtrlKey())
+        print("Alt/option pressed=", device.isAltKey())
+}}}
+
+
+== Left mouse button == (reason)
+
+Instead of storing whether the left mouse button was pressed (using `device.isLeftButton()`) in the last event and comparing it to the current event to see if the mouse was pressed or dragged or released, you can call [Hom:hou.UIEvent#reason] and check the [Hom:hou.uiEventReason] value.
+
+{{{
+#!python
+from __future__ import print_function
+
+
+def onMouseEvent(self, kwargs):
+    ui_event = kwargs["ui_event"]
+    reason = ui_event.reason()
+    if reason == hou.uiEventReason.Picked:
+        print("LMB click")
+
+    elif reason == hou.uiEventReason.Start:
+        print("LMB was pressed down")
+
+    elif reason == hou.uiEventReason.Active:
+        print("Mouse dragged with LMB down")
+
+    elif reason == hou.uiEventReason.Changed:
+        print("LMB was released")
+
+}}}
+
+Other than mouse clicks/drags, the usual reason returned will be `hou.uiEventReason.Located` for a mouse move.
+
+
+== Mouse wheel == (wheel)
+
+If the user scrolls the mouse wheel vertically, Houdini calls your state's `onMouseWheelEvent()` method (if it exists). You can then read the scroll value from the [device|#device] using [Hom:hou.UIEventDevice#mouseWheel].
+
+This API does not currently support scoll axes other than vertical.
+
+{{{
+#!python
+from __future__ import print_function
+
+
+class MyState(object):
+    def __init__(self, state_name, scene_viewer):
+        self.state_name = state_name
+        self.scene_viewer = scene_viewer
+
+    def onMouseWheelEvent(self, kwargs):
+        # Get the UI device object
+        device = kwargs["ui_event"].device()
+        scroll = device.mouseWheel()
+        print("Scroll=", scroll)
+}}}
+
+See the help for [Hom:hou.UIEventDevice#mouseWheel] for information about the number returned.
+
+
+== Tablet ==
+
+The [Hom:hou.UIEventDevice] returned by `kwargs["ui_event"].device()` in a UI event handler lets you check whether the user is using a tablet, and read tablet-specific intput data.
+
+See the help for [Hom:hou.UIEventDevice] to see what tablet-specific data is available.
+
+{{{
+#!python
+from __future__ import print_function
+
+
+class MyState(object):
+    def __init__(self, state_name, scene_viewer):
+        self.state_name = state_name
+        self.scene_viewer = scene_viewer
+
+    def onMouseWheelEvent(self, kwargs):
+        # Get the UI envent
+        ui_event = kwargs["ui_event"]
+        # Get the UI device object
+        device = ui_event.device()
+
+        print("Screen X=", device.mouseX())
+        print("Screen Y=", device.mouseY())
+        print("LMB pressed=", device.isLeftButton())
+        print("MMB pressed=", device.isMiddleButton())
+        print("RMB pressed=", device.isRightButton())
+        print("Shift pressed=", device.isShiftKey())
+        print("Ctrl pressed=", device.isCtrlKey())
+        print("Alt/option pressed=", device.isAltKey())
+
+        if device.isTablet():
+            print("Angle=", device.tabletAngle())
+            print("Pressure=", device.tabletPressure())
+            print("Roll=", device.tabletRoll())
+            print("Tilt=", device.tabletTilt())
+}}}
+
+
+== Getting the pointing ray == (ray)
+
+* In the `onMouseEvent` handler, you can get a reference to the [Hom:hou.ViewerEvent] object using `kwargs["ui_event"]`, and then call [Hom:hou.ViewerEvent#ray] to get a world-space origin and direction vector representing a "pointing ray" firing from the mouse pointer "into" the scene. You can use this to tell what's under the mouse pointer in the 3D scene.
+
+    {{{
+    #!python
+    class MyState(object):
+        def __init__(self, state_name, scene_viewer):
+            self.state_name = state_name
+            self.scene_viewer = scene_viewer
+
+        def onMouseEvent(self, kwargs):
+            ui_event = kwargs["ui_event"]
+            origin, direction = ui_event.ray()
+    }}}
+
+* If you want the pointing ray to *take the current snapping controls into account*, use [Hom:hou.ViewerEvent#snappingRay] instead of `ray()`. This method returns a tuple of `(ray_origin, ray_direction, snapped)`, where the third item is a boolean indicating whether the ray was snapped.
+
+
+== Intersecting geometry == (geo)
+
+You can check what geometry is under the pointer using [Hom:hou.Geometry#intersect]. This method is a bit unusual in that it requires setting up C-style "output arguments". You can make it slightly easier to use by wrapping it in a utility function:
+
+{{{
+#!python
+
+# In stateutils
+def sopGeometryIntersection(geometry, ray_origin, ray_dir):
+    # Make objects for the intersect() method to modify
+    position = hou.Vector3()
+    normal = hou.Vector3()
+    uvw = hou.Vector3()
+    # Try intersecting the ray with the geometry
+    intersected = geometry.intersect(
+        ray_origin, ray_dir, position, normal, uvw
+    )
+    # Returns a tuple of four values:
+    # - the primitive number of the primitive hit, or -1 if the ray didn't hit
+    # - the 3D position of the intersection point (as Vector3)
+    # - the normal of the ray to the hit primitive (as Vector3)
+    # - the uvw coordinates of the intersection on the primitive (as Vector3)
+    return intersected, position, normal, uvw
+}}}
+
+This function takes a [Hom:hou.Geometry] object, the ray origin, and the ray direction. You get the ray origin and direction from `kwargs["ui_event"].ray()` (see [above|#ray]). For the geometry, you should generally use the _current node's input geometry_.
+
+TIP:
+    *You should get a single reference to the geometry and hold onto it* rather than getting the geometry separately in each `onMouseEvent()`.
+
+    The reason is Houdini builds acceleration structures to make intersection faster when you call `Geometry.intersect()`. If you keep one reference to the geometry, you only pay this cost once, whereas if you get a new `Geometry` reference in each event, you have to pay this cost over and over, leading to slow performance.
+
+{{{
+#!python
+class MyState(object):
+    def __init__(self, state_name, scene_viewer):
+        self.state_name = state_name
+        self.scene_viewer = scene_viewer
+        self._geometry = None
+
+    def onEnter(self, kwargs):
+        node = kwargs["node"]
+        if inputs and inputs[0]:
+            self._geometry = inputs[0].geometry()
+
+    def onMouseEvent(self, kwargs):
+        node = kwargs["node"]
+        ui_event = kwargs["ui_event"]
+        ray_origin, ray_dir = ui_event.ray()
+
+        if self._geometry:
+            hit, pos, norm, uvw = sopGeometryIntersection(
+                self._geometry, ray_origin, ray_dir
+            )
+            # ...
+}}}
+
+Depending on the type of state you create, you might want to intersect a different geometry. For example, in an "inspector" state (not tied to a node), you might want to intersect the display geometry:
+
+{{{
+#!python
+from stateutils import ancestorObject
+
+network = ancestorObject(scene_viewer.pwd())
+geometry = network.displayNode().geometry()
+}}}
+
+The `sopGeometryIntersection` function returns a tuple of four items:
+
+Type ||
+    Content ||
+
+`int` |
+    An integer representing the primitive number of the primitive hit by the ray. If the ray missed the geometry, this is `-1`.
+
+[Hom:hou.Vector3] |
+    The 3D coordinates of the intersection point.
+
+[Hom:hou.Vector3] |
+    The direction of the ray relative to the surface of the hit primitive at the intersection point.
+
+[Hom:hou.Vector3] |
+    The U, V (and W) coordinates of the intersection point across the surface of the hit primitive.
+
+(If the ray missed, the three vectors are left at their defaults: `0, 0, 0`.)
+
+See [flexible intersection|#flex] below for how to combine geometry intersection with construction plane intersection.
+
+
+== Interacting with the intersected primitive ==
+
+* If the first number returned by `sopGeometryIntersection()` is not `-1`, it is a primitive number. You can get a [Hom:hou.Prim] object for that primitive using [Hom:hou.Geometry#prim].
+
+* The object you get will often be a more specialized _subclass_ of `Prim`. For example, if you ask for a polygon primitive, you will get a [Hom:hou.Polygon] object.
+
+    The best way to check what kind of primitive you have is to call [Hom:hou.Prim#type] and check what kind of [Hom:hou.primType] value it returns.
+
+    {{{
+    #!python
+    prim = geometry.prim(prim_num)
+    if prim.type() != hou.primType.Polygon:
+        raise hou.Error("This tool only works with polygons")
+    }}}
+
+* The [Hom:hou.Prim]/[Hom:hou.Polygon] object has lots of useful methods for inspecting the geometry. (Remember that the geometry you get from the scene is read-only.)
+
+    For example:
+
+    * Get the bounding box of the primitive ([Hom:hou.Prim#boundingBox]).
+
+    * Get the value of a primitive attribute ([Hom:hou.Prim#attribValue]).
+
+    * Get references to the polygon's vertices ([Hom:hou.Prim#vertices]).
+
+    * Use the `uvw` coordinates returned by `sopGeometryIntersection()` to look up the blended value of a point attribute at that location on the polygon surface ([Hom:hou.Prim#attribValueAtInterior]).
+
+* Note that some primitive, point, or vertex related methods might be on the [Hom:hou.Geometry] object rather than on [Hom:hou.Prim], [Hom:hou.Point], or [Hom:hou.Vertex].
+
+    For example, if you want a list of all current primitive attributes, that information is actually on the `Geometry` object ([Hom:hou.Geometry#primAttribs]).
+
+
+== Intersecting a plane == (cplane)
+
+The [Hom:hou.hmath#intersectPlane] function lets you find the intersection position between a ray and an arbitrary plane.
+
+The `intersectPlane` function expects the plane in the form of an origin and a normal vector. Often you will want to project the pointing ray onto the construction plane or reference plane. You can get the position and orientation of the construction or reference plane as a transformation matrix, but you will have to do some conversion to turn that into an origin and normal. The following function shows how to do the conversion and get the intersection with a plane object.
+
+{{{
+#!python
+
+# In stateutils
+def cplaneIntersection(scene_viewer, ray_origin, ray_dir):
+    # Find the intersection between the pointing ray and the construction
+    # plane. Returns a hou.Vector3 representing the point in world space,
+    # or raises an exception if the ray does not hit the plane
+
+    # Grab a reference to the construction plane
+    cplane = scene_viewer.constructionPlane()
+    # Get the construction plane's transform matrix
+    xform = cplane.transform()  # type: hou.Matrix4
+
+    # The "rest" position for the construction plane has origin=0, 0, 0
+    # and normal=0, 0, 1. We can multiply the current transform matrix by
+    # those vectors to get the current origin and normal.
+    cplane_origin = hou.Vector3(0, 0, 0) * xform  # type: hou.Vector3
+    cplane_normal = hou.Vector3(0, 0, 1) * xform.inverted().transposed()
+
+    # Use convenience function in hmath to find intersection
+    return hou.hmath.intersectPlane(
+        cplane_origin, cplane_normal, ray_origin, ray_dir
+    )
+
+# Grab a reference to a scene viewer's construction plane.
+# Note you could do scene_viewer.referencePlane() to get the
+# reference plane instead.
+cplane = scene_viewer.constructionPlane()
+# Given a ray origin and direction, computer the intersection
+# point with the construction plane
+point = cplane_intersection(cplane, origin, direction)
+}}}
+
+
+== Flexible intersection == (flex)
+
+For some tools, you might want to project onto geometry if it's available, or onto the construction plane if the pointing ray doesn't hit any geometry. For example:
+
+{{{
+#!python
+from __future__ import print_function
+
+from stateutils import sopGeometryIntersection
+
+
+class MyState(object):
+    def __init__(self, state_name, scene_viewer):
+        self.state_name = state_name
+        self.scene_viewer = scene_viewer
+        self._geometry = None
+
+    def onEnter(self, kwargs):
+        node = kwargs["node"]
+        inputs = node.inputs()
+        if inputs and inputs[0]:
+            self._geometry = inputs[0].geometry()
+
+    def onMouseEvent(self, kwargs):
+        node = kwargs["node"]
+        ui_event = kwargs["ui_event"]
+        device = ui_event.device()
+        origin, direction = ui_event.ray()
+        
+        intersected = -1
+        inputs = node.inputs()
+        if inputs and inputs[0]:
+            # Only try intersecting geometry if the node has input
+            intersected, position = sopGeometryIntersection(
+                self._geometry, origin, direction
+            )
+        if intersected < 0:
+            # Either there was no incoming geometry or the ray missed, so
+            # try intersecting the construction plane
+            position = cplaneIntersection(self.scene_viewer, origin, direction)
+
+        print("position=", position)
+}}}
+
+
+== Compensating for parent transforms == (world)
+
+If you want to display [Drawable guide geometry|state_guides] based on the ray (for example, display a "cursor" guide in the scene showing the intersection position), you should transform local coordinates into world space.
+
+See [compensating guide transforms|state_guides#world] for more information.
+
+
+== Interrupt and Resume events ==
+
+Method name ||
+    Called by Houdini ||
+        #width: 20%
+        Notes ||
+
+`onInterrupt` |
+    state is interrupted |
+        This method is called when:
+        * The window loses focus.
+        * The pointer leaves the viewer (including moving over a menu).
+        * The user pushes a "volatile" tool (for example, holding down ((S)) to enter the volatile selection tool).
+
+`onResume` |
+    interruption ends |
+        This method is called when:
+        * The pointer re-enters the viewer.
+        * The user pops back to this state from a "volatile" tool (for example, releasing ((S)) after using the volatile selection tool).
+
+* If you're remembering and comparing the state of mouse buttons in the `onMouseEvent()` handler to tell if the mouse button is being held down, you should also implement `onInterrupt()` and make it act like the user releasing the mouse button.
+
+    Note that, for the left mouse button, you don't need to track its state manually, you can use [the UIEvent reason|#reason].
+
+* If you want to show something when the mouse pointer is in the viewer (for example a guide geometry preview under the mouse pointer), and hide it when the user is doing something else, you should hide in `onInterrupt()` but show in `onMouseEvent()` instead of `onResume()`. The state is active and the mouse pointer is in the viewer, by definition, when `onMouseEvent()` is called, and using `onMouseEvent()` instead of `onResume()` allows you to update what you're showing based on the mouse position if needed.

@@ -1,0 +1,204 @@
+#type: node
+#context: sop
+#icon: SOP/retime
+#internal: retime
+
+= Retime =
+
+"""Retimes the time-dependent input geometry."""
+
+The Retime SOP provides a friendly interface for retiming its input geometry
+according to the given playback speed or time function. For requested times
+that correspond to non-integer frames of the input geometry, this operator can
+perform the necessary interpolation to approximate intermediate results. This
+is useful to control the playback speed of a cached pyro simulation.
+
+@inputs
+
+Input:
+    Time-dependent geometry to retime.
+
+@outputs
+
+Output:
+    Input geometry, evaluated/interpolated at the appropriate time.
+
+@parameters
+
+== Time ==
+
+Evaluation Mode:
+    #id: evalmode
+    Controls how the evaluation times are computed for generating the output.
+
+    By Frame:
+        Output corresponds to evaluation of the input geometry at the given
+        __Frame__.
+    By Time:
+        Output corresponds to evaluation of the input geometry at the given
+        __Time__.
+    By Speed:
+        Evaluation time is calculated from the specified __Start Frame__ and
+        playback __Speed__.
+    Shift Range:
+        __Input Frame Range__ is shifted to start at the specified frame.
+    Fit Range:
+        __Input Frame Range__ is uniformly expanded/contracted to the __Output
+        Frame Range__.
+
+Frame:
+    #id: frame
+    Frame to evaluate the input at; only available when __Evaluation Mode__ is
+    set to __By Frame__.
+
+Time:
+    #id: time
+    Time to evaluate the input at; only available when __Evaluation Mode__ is
+    set to __By Time__.
+
+Start Frame:
+    #id: startframe
+    First output frame (per __Output Frame Range__) corresponds to evaluation
+    of the input at this frame. Only available when __Evaluation Mode__ is set
+    to __By Speed__.
+
+Speed:
+    #id: speed
+    Controls the playback speed when evaluating __By Speed__. Pace of playback
+    can be varied by animating this paramter.
+
+Shift to Frame:
+    #id: shiftframe
+    __Input Frame Range__ is shifted to start at this frame when __Evaluation
+    Mode__ is set to __Shift Range__.
+
+Output Frame Range:
+    #id: outputrange
+    When evaluating __By Speed__, playback __Speed__ is considered inside this
+    frame range; boundary conditions control behavior outside of the range.
+    When __Evaluation Mode__ is set to __Fit Range__, __Input Frame Range__ is
+    uniformly expanded or contracted to span this range.
+
+Input Frame Range:
+    #id: inputrange
+    Range of input frames. Boundary conditions are called upon if the input
+    must be queried outside of this range.
+
+Boundary conditions are used to control the bahavior when evaluation frame
+falls outside of the relevant range. The conditions always apply to the __Input
+Frame Range__, but are only available for the output range when evaluating __By
+Speed__.
+* __Hold__: clamp evaluation to the respective range limit.
+* __Extend__: allow free evaluation beyond the limit.
+    NOTE:
+        When evaluating __By Speed__, an __Extend__ condition on the __Output
+        Frame Range__ will use the __Speed__ value at that limiting frame to
+        extrapolate outside of the range. For example, if __Output Frame
+        Range__ is set to `10-20` with __Pre-Extend__, and __Speed__ at frame
+        10 is set to 5, the node will assume playback speed is 5 for all frames
+        before 10.
+* __Cycle__: wrap to the other end of the range.
+* __Zig-Zag__: upon hitting the limit, turn around and continue.
+
+== Interpolation ==
+
+Interpolate Between Input Frames:
+    #id: interpolate
+    Allows interpolation of input geometry from the nearest integer frames. If
+    this option is disabled, the input is directly cooked at fractional frames.
+
+Interpolate Rotations of Normals, Quaternion, and Transforms:
+    #id: doslerp
+    Use spherical linear interpolation for smoother transitions of attributes
+    marked as normals, quaternions, and transforms.
+
+Interpolation:
+    #id: interp
+    Interpolation method for blending multiple inputs.
+
+    Linear:
+        Data will be linearly interpolated between 2 nearest frames.
+    Cubic:
+        Data will be cubically interpolated between 4 input frames where
+        possible.
+    Subdivision:
+        Data will follow a cubic spline curve (based on subdivision curves)
+        between 4 input frames where possible.
+
+Input Timestep:
+    #id: timestep
+    Difference in time between adjacent input frames. This value is needed to
+    correctly interpret velocities.
+
+Use Velocity When Interpolating Position:
+    #id: usevforinterp
+    If points have a velocity attribute (`v`), enabling this option cubically
+    interpolates the point position using the velocity and quadratically
+    interpolates the velocity. The velocity attribute is also properly scaled
+    to account for the playback speed.
+
+Scale Velocities:
+    #id: scalevel
+    If enabled, velocities in the output are scaled to account for difference
+    in playback speeds. This applies to the `v` point attribute as well as the
+    __Velocity Field__ if volume __Blend Mode__ is set to __Advected__.
+
+=== Attributes ===
+
+Attributes:
+    #id: attribs
+    A space-separator list of names/patterns for attributes to linearly
+    interpolate. Attributes that don't match here are switched instantly when
+    the source interpolation frames change.
+
+Point ID Attribute:
+    #id: ptidattr
+    Value of this (string or integer) point attribute is used to match points,
+    instead of the point number.
+
+Primitive ID Attribute:
+    #id: primidattr
+    Value of this (string or integer) primitive attribute is used to match
+    primitives, instead of the primitive number.
+
+    NOTE:
+        Primitive matching convention also applies to volumes and VDBs.
+
+=== Volumes ===
+
+Blend Mode:
+    #id: voxelblend
+    Specifies the method used to blend voxels of the volume or VDB primitives.
+
+    Transform Only:
+        Volume transforms are interpolated; no blending of voxel data is
+        performed.
+    By Grid Index:
+        Voxel values are linearly interpolated; the voxels are paired by their
+        number, so matching volumes should have the exact same dimensions and
+        resolution.
+    By Voxel Position:
+        Voxel values are linearly interpolated; the voxels are matched by their
+        spatial position.
+    Advected:
+        Voxel values are linearly interpolated along motion paths, as governed
+        by the __Velocity Field__.
+
+Velocity Field:
+    #id: vel
+    Name of velocity field used to deduce travel paths in __Advected__ blending
+    mode. The referenced primitive must be a vector VDB or a triplet of scalar
+    volumes or VDBs (whose components are suffixed with `.x`, `.y`, `.z`).
+
+Advection Stepsize:
+    #id: advdt
+    Maximum timestep used for computing travel curves. Lower values of this
+    parameter may yield better advected interpolation, at the cost of longer
+    running times.
+
+Interpolate Velocity Field:
+    #id: interpvel
+    When __Voxel Blend__ is set to __Advected__, the __Velocity Field__ is
+    normally left untouched. Enabling this parameter also linearly interpolates
+    the __Velocity Field__.
+

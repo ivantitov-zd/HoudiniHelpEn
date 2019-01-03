@@ -29,7 +29,7 @@ No `stamp()` expression:
     The [Exp:stamp] expression function is the ultimate spooky action at a distance. It relies on any node being able to force another node anywhere else in the network to cook. This complete freedom is not possible with compiled blocks.
 
 No local variables, no per-component expressions:
-    When a node is part of a compiled block, its [algorithm|#verb] is compiled into the block's operation, and its parameters are left behind. _Expressions are not evaluated over each component in the geometry_. Only expressions that work statically "ahead of time" on the entire geometry will work (for example, reading from a numbered input).
+    When a node is part of a compiled block, its algorithm is compiled into the block's operation, and its parameters are left behind. _Expressions are not evaluated over each component in the geometry_. Only expressions that work statically "ahead of time" on the entire geometry will work (for example, reading from a numbered input).
     
     If you need to do something per-component (for example, move points based on the value of a point attribute), you must use a VEX-based node, such as [Attribute Wrangle|Node:sop/attribwrangle].
     
@@ -155,59 +155,7 @@ Violation of strict nesting of blocks. Incompatible For Block Begin encountered 
     To fix this problem, add a loop/compiled block begin node to the incoming wire. For loop begin nodes, if you just want to use the input, set the __Method__ to "Fetch input".
 
 
-== Verbs == (verbs)
+@related
 
-As part of making SOP nodes compilable, we separated out the node's basic operation code (what the node _does_ to geometry) from the code that deals with the concerns of the node (caching, reading inputs, evaluating parameters, and so on). We call these functions _verbs_. You can use them in Python scripting to modify geometry held in a [Hom:hou.Geometry] object. This might be useful anywhere you need to programmatically alter geometry and don't want to have to build a geometry network to do so.
+* [verbs]
 
-Use [Hom:hou.NodeTypeCategory#nodeVerbs] to get a dictionary mapping node names to [Hom:hou.SopVerb] objects, or use [Hom:hou.NodeTypeCategory#nodeVerb] to get a verb by name. Verbs have the same name as the node whose functionality they contain.
-
-You can list the available "verbs" in a Python shell with:
-
-{{{
-#!python
-sorted(hou.sopNodeTypeCategory().nodeVerbs().keys())
-}}}
-
-The following example grabs the geometry from a node and applies the [Subdivide|Node:sop/subdivide] and [IsoOffset|Node:sop/isooffset] verbs to it.
-
-{{{
-#!python
-node = hou.node("/obj/geo1/testgeometry_pighead1")
-geo = node.geometry()
-resultgeo = hou.Geometry()
-
-# Get a hou.SopVerb that knows how to subdivide.
-sops = hou.sopNodeTypeCategory()
-subverb = sops.nodeVerb('subdivide')
-
-# Pass in a dictionary mapping parameter names to values.
-# Node defaults are already set, so just set non-default things.
-subverb.setParms({'iterations':3})
-
-# SopVerb.execute() takes a target hou.Geometry to write the results into,
-# and a list of hou.Geometry to be the inputs of the verb (use None in the
-# list to represent an unwired input).
-subverb.execute(resultgeo, [geo])
-
-# Now do an isooffset
-isoverb = sops.nodeVerb('isooffset')
-isoverb.setParms({'samplediv':100, 'output':0})
-isoverb.execute(resultgeo, [resultgeo])
-}}}
-
-If you are using verbs to modify geometry inside a [Python SOP|Node:sop/python], you need to overwrite the node's geometry at the end of the script:
-
-{{{
-#!python
-# Grab a reference to this node
-node = hou.pwd()
-geo = node.geometry()
-
-# ... operate on geometry ...
-
-# When verbs execute on the hou.Geometry they may replace the
-# underlying geometry rather than in-place edit it. So you have
-# to explicitly write it back to the node's geometry.
-node.geometry().clear()
-node.geometry().merge(resultgeo)
-}}}

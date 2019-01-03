@@ -1,0 +1,256 @@
+= Rename nodes =
+
+"""You can change the name of a node, or mass-rename a bunch of nodes at once using find-and-replace."""
+
+== How to ==
+
+:task: Change name of a single node:
+	In the network editor, click the name of the node (next to the node body).
+	Or, select the node and press [F2|Key:h.pane.wsheet.rename_node].
+
+TIP:
+	Houdini automatically updates any existing references to the node in the scene. You don't have to worry about renaming a node breaking expressions.
+
+
+== Find and replace across all node names ==
+
+[Image:/images/ui/rename_nodes.png]
+
+:task: Find and replace text/patterns in all node names at once:
+	# In the network editor, choose __Edit > Rename Nodes__, or press [Alt + W|Key:h.pane.wsheet.batch_rename].
+	
+		The "Find and Replace in Node Names" window will open.
+	
+	# In the __Find__ field, enter the text/pattern to look for in node names. (See [patterns|#patterns] below for how to search and replace with glob patterns.) In the __Replace__ field, enter the text/pattern to use to replace matches in node names.
+	
+		As you type in the fields, the preview table below the controls updates to show the renames that will happen if you click __Rename__ or press ((Enter)). If any rename would cause an error (for example, the "After" name is invalid or already used), it is highlighted in red in the table.
+		
+		If any of the rename operations in the table have an error, the __Rename__ button will be disabled.
+	
+	# If you turn on __Ensure Unique Names__, Houdini will deal with any renames conflicting with existing names by adding/incrementing a number at the end of the renamed node's name. This means no rename will fail because a name is already in use, but the new names may not be exactly as you expected. (When this option is on, the preview may not be accurate because it can't predict when/how Houdini will add numbers.)
+	
+		When this option is off (the default), the window will not allow you to proceed if it detects one of the renamed nodes would conflict with an existing name.
+	
+	# If you turn on __Match Whole Name__, Houdini will only consider a node if the __Find__ pattern matches the name from beginning to end.
+
+		For example, if __Match whole name__ is on and __Find__ is `null`, it will match a node named `null` but not a node named `null2`.
+
+		TIP:
+			If the __Find__ string starts or ends with an asterisk `*`, Houdini acts like __Match Whole Name__ is on.
+	
+	# If you turn on __Find in Selected__, Houdini only looks at the currently selected nodes.
+
+	The table below the controls shows a live preview of the renames that will happen if you click __Rename__ or press ((Enter)).
+
+:task: Rename nodes in multiple networks at once:
+	You can enter a space-separated list of directory path patterns in the __In__ path field to specify multiple networks to rename inside.
+
+TIP:
+	If you want to match nodes to rename using criteria other than their names, first use the [Find dialog|find] to select the nodes you want to rename, then chooe __Edit > Rename Nodes__ and turn on __Find in selected__ to make the rename only operate on those nodes.
+
+
+== Patterns (advanced) == (patterns)
+
+* You can use glob patterns in the find and replace strings. The special characters are the same as standard Houdini patterns, with the addition of `#` to mean a sequence of digits.
+
+	`*`:
+		Matches any number of characters.
+
+	`#`:
+		Matches one or more digits. For example, `1`, `0005`, or `50607`.
+
+	`?`:
+		Matches any single character.
+
+	`[<<chars>>]`:
+		Matchs any of the characters in the brackets. For example, `[abc]` matches `a`, `b`, or `c`.
+
+	`[<<start>>-<<end>>]`:
+		Matches any of the characters in the given range. For example, `[a-z]` matches any lower-case letter from `a` to `z` (inclusive).
+	
+	`[!<<chars>>]`:
+		Negates a character set/range, so it matches any chars _other than_ than characters in the set/range. For example, `[!a-m]` would match any characters other than lower-case letters from `a` to `m`. (*Note* this syntax is not available in regular Houdini globs.)
+
+* The text matching a pattern (any group of special characters) in the __Find__ text will be used to replace a corresponding pattern in the __Replace__ text.
+
+	Find ||
+		Replace ||
+	`left_*` |
+		`right_*`
+	Before ||
+		After ||
+	`left_arm` |
+		`right_arm`
+	`left_foot` |
+		`right_foot`
+	
+* If the __Find__ text has more than one pattern, they will replace corresponding patterns in the __Replace__ text _by position_ (for example, the first `*` in the __Find__ will replace the first `*` in the __Replace__, the second will replace the second, and so on).
+
+	Find ||
+		Replace ||
+	`*_alpha_*` |
+		`*_beta_*`
+	Before ||
+		After ||
+	`lamp_alpha_matt` |
+		`lamp_beta_matt`
+	`window_alpha_lee` |
+		`window_beta_lee`
+
+* If patterns have distinctive text, you can move them around and Houdini will match them up by the pattern text:
+
+	Find ||
+		Replace ||
+	`*_???` |
+		`old_???_*` |
+	Before ||
+		After ||
+	`lamp_esr` |
+		`old_esr_lamp`
+	`window_jwz` |
+		`old_jwz_window`
+
+* You can use `$1`, `$2`, etc. in the __Replace__ text to refer to the match of a pattern in the __Find__ text by position. For example, `$1` will be replaed with the match to the first pattern in the __Find__:
+
+	Find ||
+		Replace ||
+	`*_*` |
+		`$2_$1`
+	Before ||
+		After ||
+	`lamp_new` |
+		`new_lamp`
+	`window_final` |
+		`final_window`
+
+	TIP:
+		When counting pattern positions, each of the following counts as one:
+	
+		* An asterisk (`*`)
+		* A number sign (`#`)
+		* One or more question marks (`?`)
+		* One or more character ranges (`[]`)
+	
+		So, for example, the __Find__ text `*#_???` has three patterns: `*`, `#`, and `???`.
+
+* You can _negate_ part of the find pattern by putting `^` in front of it. This is mostly useful for excluding names that start with or end with a certain string. For example, `^beta_*` matches names that _don't_ start with `beta_`. 
+
+	A `^` character will negate the next "part" of the pattern. Each of the following counts as a part:
+	
+	* One or more literal characters
+	* An asterisk (`*`)
+	* A number sign (`#`)
+	* One or more question marks (`?`)
+	* One or more character ranges (`[]`)
+	
+	If you include a negative match in the find pattern, the find pattern must match the entire name (as if __Match Whole Name__ was on).
+
+	NOTE:
+		Negation works differently in the rename dialog than in regular Houdini globs, because the regular behavior isn't very useful for renaming.
+
+
+=== Examples === (examples)
+
+To... ||
+	Find ||
+		Replace ||
+
+Remove a prefix |
+	`prefix*` |
+		`*`
+
+Add a prefix |
+	`*` |
+		`prefix*`
+
+Remove a suffix |
+	`*suffix` |
+		`*`
+
+Add a suffix |
+	`*` |
+		`*suffix`
+
+Replace a prefix |
+	`left_*` |
+		`right_*`
+
+Replace a suffix |
+	`*_left` |
+		`*_right`
+
+Remove everything up to and including a double-underscore |
+	`*__*` |
+		`$2`
+
+Add `_beta` suffix to nodes that don't already have it |
+	`*^_beta` |
+		`*_beta`
+
+add `_keep` to the end of names that don't start with `delete_` |
+	`^delete_*` |
+		`*_keep`
+
+
+== Scripting ==
+
+If you have a [Hom:hou.Node] reference to a node, you can change its name with [Hom:hou.Node#setName]:
+
+{{{
+#!pycon
+>>> node = hou.node("/obj/geo1")
+>>> node.setName("table_lamp")
+}}}
+
+To do a mass-rename in a script, you can use the `nodeutils.rename_nodes()` function:
+
+{{{
+#!python
+from nodeutils import rename_nodes
+
+success = rename_nodes(network, find, replace, selected=False, whole_name=False, errors=None,
+                       fail_fast=False, unique_name=False, ignore_case=True)
+}}}
+
+The `rename_nodes` function takes the following arguments:
+
+`network`:
+	A [Hom:hou.Node] object representing the parent network in which to perform the renames.
+
+`find`:
+	A string representing the text/pattern to find (see [patterns|#patterns] above).
+
+`replace`:
+	A string representing the text/pattern to replace matches with (see [patterns|#patterns] above).
+
+`selected=False`:
+	If True, the function only considers the currently selected nodes in the network to rename.
+
+`whole_name=False`:
+	If True, the `find` pattern must match the entire node name, not just a substring.
+
+`errors=None`:
+	If you supply a list in this argument, the function will append a `("oldname", "newname", "errormessage")` tuple to the list for each rename that fails (for example, because the new name is invalid, or already used).
+
+`unique_name=False`:
+	If this is True, when a rename would conflict with an existing name, Houdini will add/increment a number at the end of the new name to make it unique. This means no rename will fail because a name is already in use, but the new names may not be exactly as you expected. There may still be failures if the "find" and "replace" patterns generate an invalid node name.
+
+`ignore_case=True`:
+	Ignore uppercase/lowercase differences when comparing node names to the find pattern.
+
+`fail_fast=False`:
+	If this is True, the function stop and return when a rename fails. By default, the function ignores failures and goes on trying to perform the rest of the renames.
+
+Returns:
+	`True` if all renames completed without error, or `False` otherwise.
+
+The `rename_nodes` function puts the renames in an undo block. You can undo the renames that succeeded with [Hom:hou.undos#performUndo].
+
+
+
+
+
+
+
+
+

@@ -7,60 +7,52 @@
 
 """A microsolver that reinitializes a signed distance field while preserving the zero isocontour. """
 
-The Gas Reinitialize SDF DOP is a microsolver used in building larger
-fluid simulations. The [Fluid Solver|Node:dop/fluidsolver] and [Smoke Solver|Node:dop/smokesolver] DOPs that allow
-microsolvers to be added before or after the main solver step to extend
-or tweak the simulation. Alternatively, enterprising people may attempt
+The Gas Reinitialize SDF DOP is a microsolver used in building larger fluid simulations. The [Fluid Solver|Node:dop/fluidsolver] and [Smoke Solver|Node:dop/smokesolver] DOPs that allow microsolvers to be added before or after the main solver step to extend or tweak the simulation. Alternatively, enterprising people may attempt
 to build an entire new solver out of microsolvers.
 
-The Gas Reinitialize SDF DOP is used to ensure signed distance fields
-remain signed distance fields. Under various operations, such as
-advection, the signed distance field may become distorted and no longer
-represent actual distances to the surface. This DOP restores the
-distance-to-surface property of the SDF while preserving the zero
-isocontour that represents the surface.
+The Gas Reinitialize SDF DOP is used to ensure signed distance fields remain signed distance fields. Under various operations, such as advection, the signed distance field may become distorted and no longer represent actual distances to the surface. This DOP restores the
+distance-to-surface property of the SDF while preserving the zero isocontour that represents the surface.
 
 
 @parameters
-    Field:
-        The field to be restored into an SDF.
-    Rebuild SDF:
-        The voxels that border the zero isocontour are used to
-        determine the initial zero isocontour. The rest of the field is
-        then rebuilt from these values directly.
-    Apply Sign Fix:
-        If the field does not have the correct signs associated with
-        inside/outside, this option will enable a sign fixing operation
-        during the __Rebuild SDF__ stage.
-    Reinitialize SDF:
-        If the field is already almost a signed distance field, a less
-        drastic error correction can be performed. 
 
-	    The reinitialization equation is applied which will converge on a signed distance
-        field without affecting the boundary.
-    Reinitialize Iterations:
-        The number of times to apply the reinitialization equation.
-    Integration Method:
-        The method of integration for applying the reinitialization equation.
-        __Midpoint__ is more accurate than __Euler__, but also more expensive.
-    Use Bandwidth:
-        Assume that beyond the supplied __Bandwidth__, the SDF is already
-        valid and does not need reinitialization. This option works for both
-        __Rebuild SDF__ and __Reinitialize SDF__ operations.
-    Bandwidth:
-        Beyond this number of voxels, the SDF is assumed to be valid and does not
-        need reinitialization.
-    [Include:standard_solver_parms]
+Field:
+    The field to be restored into an SDF.
+Rebuild SDF:
+    The voxels that border the zero isocontour are used to determine the initial zero isocontour. The rest of the field, within the bandwidth from the surface, is then rebuilt from these values directly. This approach uses Fast Marching, which does not parallelize. If performance is preferred over accuracy, activate the Fast Iterative Method.
+Rebuild SDF With Fast Iterative Method:
+    Rebuilds field similar to Fast Marching but uses a parallel implementation.  It can often be faster but it is generally not as accurate when compared to Fast Marching.
+FIM Tolerance (Fraction of Voxel Size):
+    The signed distance at a voxel will be recomputed at each rebuilding iteration until it converges to the specified tolerance.  This value is based on the fraction of the current voxel size. For example, if the voxel size of the volume is 0.05 and the user-specified FIM tolerance is 0.001, then the voxel will be recomputed until the new value changes by less than 0.05 * 0.001.
+Max FIM Iterations:
+    The Fast Iterative Method will continually recompute the signed distance value of a voxel until it converges to the above tolerance.  This repeats until all the voxels in the bandwidth (or entire field if bandwidth is turned off) have converged.  In the unlikely event that the voxels do not converge, the maximum iteration parameter will allow the rebuilder
+    to exit at this specified limit.  This value should be several times larger than the bandwidth size to ensure that all the voxels in the band can be rebuilt.
+Apply Sign Fix:
+    If the field does not have the correct signs associated with inside/outside, this option will enable a sign fixing operation during the __Rebuild SDF__ stage.
+Reinitialize SDF:
+    If the field is already almost a signed distance field, a less drastic error correction can be performed. 
+
+    The reinitialization equation is applied which will converge on a signed distance field without affecting the boundary.
+    
+Reinitialize Iterations:
+    The number of times to apply the reinitialization equation.
+Integration Method:
+    The method of integration for applying the reinitialization equation. __Midpoint__ is more accurate than __Euler__, but also more expensive.
+Use Bandwidth:
+    Assume that beyond the supplied __Bandwidth__, the SDF is already valid and does not need reinitialization. This option works for both __Rebuild SDF__ and __Reinitialize SDF__ operations.
+Bandwidth:
+    Beyond this number of voxels, the SDF is assumed to be valid and does not need reinitialization.
+[Include:standard_solver_parms]
 
 @inputs
-    [Include:standard_data_inputs]
+[Include:standard_microsolver_inputs]
 
 @outputs
-    [Include:standard_data_outputs]
+[Include:standard_data_outputs]
 
 @locals
-    [Include:standard_data_locals]
+[Include:standard_data_locals]
 
-    [Include:standard_locals]
+[Include:standard_locals]
 
 

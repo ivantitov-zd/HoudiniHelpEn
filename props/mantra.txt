@@ -34,12 +34,14 @@ WARNING:
     
     When generating an image, mantra runs the sample filter to composite samples to a single color. Mantra then runs the pixel filter to produce the final color for a pixel. A deep resolver is used to store information about each sample prior to sample filtering. This allows the image resolver to store information about each individual sample before compositing. 
     
-    `No Deep Resolver`: 
-    Deep image will not be output
-    `Deep Shadow Map`:
-    Only the opacity (`Of`) and depth (`Pz`) image planes will be written out.
-    `Deep Camera Map`:
-    All planes selected for deep images will be written out. Use the `Exclude from DCM` toggle to leave a specific image plane from the deep image output.
+    No Deep Resolver: 
+        Deep image will not be output.
+    
+    Deep Shadow Map:
+        Only the opacity (`Of`) and depth (`Pz`) image planes will be written out.
+    
+    Deep Camera Map:
+        All planes selected for deep images will be written out. Use __Exclude from DCM__ to leave a specific image plane from the deep image output.
 
 ::DCM Filename:
     #hprop: vm_dcmfilename
@@ -48,8 +50,11 @@ WARNING:
 ::DCM Interpolation:
     #hprop: vm_dcmdepthinterp
     Deprecated in Houdini 14.5. Specifies how each pixel sample should be interpreted. Unlike some other deep image formats, mantra only writes out a single depth value for each sample.
-        * `discrete` -- Each depth sample represents a discrete surface.
-        * `continuous` -- Each depth sample is part of a continuum (i.e. volume).
+    
+    `discrete`:
+        Each depth sample represents a discrete surface.
+    `continuous`:
+        Each depth sample is part of a continuum (i.e. volume).
 
 ::DCM Compression:
     #hprop: vm_dcmcompression
@@ -68,24 +73,10 @@ WARNING:
 ::DCM Of Storage:
     #hprop: vm_dcmofstorage
     Specifies the amount of bits to use to store opacity samples. The default is 16 bits. Larger values may cause the file size to increase substantially, with little gain in fidelty.
-    
-    `16 bit float`: 
-    16 bit floating point values.
-    `32 bit float`:
-    32 bit floating point values.
-    `64 bit float`:
-    64 bit floating point values.
         
 ::DCM Z Storage:
     #hprop: vm_dcmpzstorage
     Specifies the amount of bits to use to store opacity samples. The default is 32 bits. Smaller values may cause unnecessary discretization of samples of sample far away from the camera, but can save substantially on file size.
-    
-    `16 bit float`:
-    16 bit floating point values.
-    `32 bit float`:
-    32 bit floating point values.
-    `64 bit float`:
-    64 bit floating point values.
     
 ::DCM Z-Bias:
     #hprop: vm_dcmzbias
@@ -104,21 +95,28 @@ WARNING:
     #hprop: vm_dcmdepthmode
     Deprecated in Houdini 14.5. Used in compression to determine whether to keep the nearest, the farthest or the midpoint of samples.
     
-    `Nearest sample`:
-    Choose the smallest `Pz` value.
-    `Midpoint sampling`:
-    Choose the midpoint of `Pz` values.
-    `Farthest sample`: 
-    Choose the largest `Pz` value.
+    Nearest sample:
+        Choose the smallest `Pz` value.
+        
+    Midpoint sampling:
+        Choose the midpoint of `Pz` values.
+        
+    Farthest sample: 
+        Choose the largest `Pz` value.
 
 ::DCM Special Planes:
     #hprop: vm_dcmdepthplanes
 
     Deep camera images can contain several "special" image planes.  These can be used to improve compositing of deep images.  The special planes currently recognized are:
-        * `zfront` -- The z value of the depth sample.
-        * `zback` -- For volume samples, this specifies the farthest extent of the sample.
-        * `deepcover` -- Store sample coverage as a bit mask
-        * `deepflags` -- Store flags indicating whether the shading sample is a volume or a matte surface.
+    `zfront`:
+        The z value of the depth sample.
+    `zback`:
+        For volume samples, this specifies the farthest extent of the sample.
+    `deepcover`:
+        Store sample coverage as a bit mask.
+    `deepflags`:
+        Store flags indicating whether the shading sample is a volume or a matte surface.
+
     These special channels are discussed in: [Improved Deep Compositing|http://research.dreamworks.com/papers/Improved_Deep_Compositing_DWA_2015.pdf]
 
 ::DCM Create MIP Maps:
@@ -172,10 +170,19 @@ WARNING:
     #hprop: vm_dsmdepthplanes
 
     Deep shadow images can contain several "special" image planes.  These can be used to improve compositing of deep images.  The special planes currently recognized are:
-        * `zfront` -- The z value of the depth sample.
-        * `zback` -- For volume samples, this specifies the farthest extent of the sample.
-        * `deepcover` -- Store sample coverage as a bit mask
-        * `deepflags` -- Store flags indicating whether the shading sample is a volume or a matte surface.
+    
+    `zfront`:
+        The z value of the depth sample.
+        
+    `zback`:
+        For volume samples, this specifies the farthest extent of the sample.
+        
+    `deepcover`:
+        Store sample coverage as a bit mask.
+        
+    `deepflags`:
+        Store flags indicating whether the shading sample is a volume or a matte surface.
+    
     These special channels are discussed in: [Improved Deep Compositing|http://research.dreamworks.com/papers/Improved_Deep_Compositing_DWA_2015.pdf]
 
 ::DSM Create MIP Maps:
@@ -249,6 +256,23 @@ WARNING:
     #hprop: vm_motionfactor
     #ifdprop: object:motionfactor
 
+    Fast moving objects which have significant amounts of motion blur are rendered with the same sampling quality as slow moving or static objects. However, in cases where objects are very blurry, small details are usually lost. In these cases, it is a useful optimization to reduce the shading quality on those objects which are moving quickly since the loss in detail is hidden in the motion blur.
+
+    Increasing the Motion Factor will dynamically reduce the shading quality of an object based on the rate of motion. This optimization is primarily useful for objects which are refined at render time like subdivision surfaces or objects with displacement-based shading.
+
+    [Image:/images/render/mug/blur/MotionFactorSimple.jpg]
+
+    In the above example, you can see that the motion factor does not have a large impact on the quality of the final render.
+
+    However, sometimes too much detail can be lost, especially in cases where much of the surface detail is generated by the shader. Objects whose shape is derived through significant amounts of displacement, for example.
+
+    [Image:/images/render/mug/blur/MotionFactorComplex.jpg]
+
+    In these cases, the Motion Factor value must be adjusted carefully to retain a believable amount of surface detail.
+
+    NOTE:
+        The exact motion factor used will depend on the degree of motion in your scene. For more information, see [Motion factor|/props/mantra] on the mantra rendering properties page.
+
     Automatically adjusts the shading quality for objects which are significantly blurred. Increasing the motion factor of an object will dynamically decrease the shading quality based on the rate of motion. This can significantly speed up renderings of rapid moving objects. It also affects depth of field and may improve speed of scenes with deep depth of focus.
 
     Motion factor reduces shading quality using the following formula:
@@ -259,11 +283,8 @@ WARNING:
 
     Objects traveling more than 16 pixels within the frame will have their shading quality reduced by the above factor. For example, an object blurred over 32 pixels with a shading quality of 1 will have the quality reduced to 0.5. You should not use very large values for this parameter. Values between 0 and 1 are reasonable.
 
-    When using the Ray Tracing or Physically Based Rendering rendering engine, motion factor will only affect the geometric subdivision for subdivision surfaces, NURBS/beziers, or displacements and will not change the amount of shading.
+    When using the Ray Tracing or Physically Based Rendering rendering engine, motion factor will only affect the geometric subdivision for subdivision surfaces, NURBS/Beziers, or displacements and will not change the amount of shading.
     
-    NOTE:
-        This parameter has only limited effect on Raytrace/PBR renders, reducing the geometry's subdivision frequency but not the shading. For more information, see [Motion Factor|/render/blur] on the Motion blur page.
-
 ::Geometry measuring:
     #hprop: vm_measure
     #ifdprop: object:measure
@@ -331,11 +352,13 @@ WARNING:
 
     This property will cause this object to generate all displaced and subdivided geometry before the render begins. Ray tracing can be significantly faster when this setting is enabled at the cost of potentially huge memory requirements.
 
-    `Disable Predicing`:
+    Disable Predicing:
         Geometry is diced when it is hit by a ray.
-    `Full Predicing`:
+        
+    Full Predicing:
         Generate and store all diced geometry at once.
-    `Precompute Bounds`:
+        
+    Precompute Bounds:
         Generate all diced geometry just to compute accurate bounding boxes.  This setting will discard the diced geometry as soon as the box has been computed, so it is very memory efficient.  This can be useful to improve efficiency when using displacements with a large displacement bound without incurring the memory cost of full predicing.
 
     When ray-tracing, if all polygons on the model are visible (either to primary or secondary rays) it can be more efficient to pre-dice all the geometry in that model rather than caching portions of the geometry and re-generating the geometry on the fly. This is especially true when global illumination is being computed (since there is less coherency among rays).
@@ -349,10 +372,10 @@ WARNING:
     This property is used to select different tessellation style for heightfield objects.
 
     Uniform:
-	Uniform mesh grid whose the number of rows and columns depend on its distance to camera.
+        Uniform mesh grid whose the number of rows and columns depend on its distance to camera.
     
     Edge Length:
-	Adaptively split each face based on projected edge length in raster space.
+        Adaptively split each face based on projected edge length in raster space.
 
 
 == Driver ==
@@ -418,7 +441,7 @@ WARNING:
     #hprop: vm_extractimageplanes
     #ifdprop: renderer:extractimageplanes
 
-    When enabled, image planes contained in the output image will be extracted to separate files. The files will be saved alongside the output image, in the format: <basename>.<plane name>.<extension>.
+    When enabled, image planes contained in the output image will be extracted to separate files. The files will be saved alongside the output image, in the format: `$<basename>>.<<plane_name>>.<<extension>>`.
 
 ::Extract image planes format:
     #hprop: vm_extractimageplanesformat
@@ -1066,12 +1089,23 @@ Lights objects inherit many of the geometry object properties in addition to the
 
     The shape of an area light.
     
-    * `point` -- No area shape
-    * `line` -- Line light (unit line along x-axis)
-    * `grid` -- Grid light (unit square in XY plane)
-    * `disk` -- Circle shaped light (radius 0.5 in XY plane)
-    * `sphere` -- Sphere shaped light (radius 0.5)
-    * `environment` -- Sphere shaped light (infinite radius)
+    `point`:
+        No area shape.
+        
+    `line`:
+        Line light (unit line along x-axis).
+        
+    `grid`:
+        Grid light (unit square in XY plane).
+        
+    `disk`:
+        Circle shaped light (radius 0.5 in XY plane).
+        
+    `sphere`:
+        Sphere shaped light (radius 0.5).
+        
+    `environment`:
+        Sphere shaped light (infinite radius).
 
 ::Area size:
     #hprop: vm_areasize
@@ -1079,11 +1113,20 @@ Lights objects inherit many of the geometry object properties in addition to the
 
     The size of the area light. The sizes are interpreted slightly differently for each shape.
     
-    * `line` -- Only the X size is used
-    * `grid` -- The X & Y size of the grid
-    * `disk` -- The X & Y radii of the circle
-    * `sphere` -- The average of the sizes is used as the radius
-    * `environment` -- Ignored
+    `line`:
+        Only the X size is used.
+        
+    `grid`:
+        The X & Y size of the grid.
+        
+    `disk`:
+        The X & Y radii of the circle.
+        
+    `sphere`:
+        The average of the sizes is used as the radius.
+        
+    `environment`:
+        Ignored.
 
 ::Area texture:
     #hprop: vm_areamap
@@ -1147,9 +1190,15 @@ Lights objects inherit many of the geometry object properties in addition to the
     #hprop: vm_misbias
 
     Controls whether multiple importance sampling samples from the BSDF, the light, or both the BSDF and light.
-    * `-1` -- Sample only from the BSDF
-    * `0` -- Sample from both the BSDF and the light
-    * `1` -- Sample only from the light
+    
+    `-1`:
+        Sample only from the BSDF.
+        
+    `0`:
+        Sample from both the BSDF and the light.
+        
+    `1`:
+        Sample only from the light.
 
     The default `vm_misbias` for area lights and environment lights with an
     environment map is 0.
@@ -1524,9 +1573,12 @@ Lights objects inherit many of the geometry object properties in addition to the
 ::PNG premultiplied:
     #hprop: vm_image_png_frompremult
     
-    How to interpret mantra's framebuffer when saving out PNG. Possible values are `"premult"` or `"unpremult"`. Note that mantra's framebuffer always stores colors premultiplied by alpha, whereas PNG expects unpremultiplied colors, so using the default setting of `"premult"`, it will correctly interpret the data and predivide RGB channels upon write. If set to `"unpremult"`, then it will assume that the alpha is unassociated and will not touch RGB channels. 
+    How to interpret mantra's framebuffer when saving out PNG. Possible values are `"premult"` or `"unpremult"`. 
+    
+    NOTE:
+        Mantra's framebuffer always stores colors premultiplied by alpha, whereas PNG expects unpremultiplied colors, so using the default setting of `"premult"`, it will correctly interpret the data and predivide RGB channels upon write. If set to `"unpremult"`, then it will assume that the alpha is unassociated and will not touch RGB channels. 
 
-    `"unpremult"` option may be used for storing certain effects losslessly (such as emission that's not tied to opacity and thus does not contribute to alpha), however keep in mind that it will be outside the PNG specification and will be interpreted incorrectly without user intervention.
+        The `"unpremult"` option may be used for storing certain effects losslessly (such as emission that's not tied to opacity and thus does not contribute to alpha), however keep in mind that it will be outside the PNG specification and will be interpreted incorrectly without user intervention.
 
 ::MPlay render mode:
     #hprop: vm_image_mplay_rendermode
@@ -1610,9 +1662,16 @@ Lights objects inherit many of the geometry object properties in addition to the
     #hprop: soho_skip_frame
 
     Determine how the output driver should deal with existing rendered frames.
-        * `no` -- Overwrite any existing files
-        * `exist:vm_picture` -- Skip rendering when a disk file already exists
-        * `valid:vm_picture` -- Skip rendering only when the disk file that exists is a valid image file.
+    
+    `no`:
+        Overwrite any existing files.
+        
+    `exist:vm_picture`:
+        Skip rendering when a disk file already exists.
+        
+    `valid:vm_picture`:
+        Skip rendering only when the disk file that exists is a valid image file.
+        
     This parameter checks only the main image, not any deep raster or secondary images.
 
 ::Sample filter:
@@ -1676,6 +1735,9 @@ Lights objects inherit many of the geometry object properties in addition to the
         
         NOTE:
             This option is very slow and may eliminate some noise in an image, even if the noise is supposed to be there (ie, not just noise due to undersampling), resulting in loss of detail. 
+    
+    `denoise optix [-a <<AOV>>]`
+        Apply the [NVIDIA OptiX denoiser|/render/optixdenoiser], if it is installed. The `-a` option specifies which image plane to use as the albedo input.
 
 ::Gamma:
     #hprop: vm_gamma
@@ -2331,8 +2393,10 @@ Lights objects inherit many of the geometry object properties in addition to the
 
 ::Allow motion blur:
     #hprop: allowmotionblur
-    
-    Mantra will render the image using motion blur. The shutter parameter on the camera determines the duration of the shutter, specified as a fraction of the frame.  The __Xform Time Samples__ and __Geo Time Samples__ parameters should be used in motion blur renders to control how motion blur is computed.  By default, only transformation motion blur with 2 segments will be computed - meaning that animated SOPs will not produce blur in the render.  To enable motion blur for moving geometry, it's necessary to increase the __Geo Time Samples__.
+
+    This is the "master switch" for simulated motion blur when rendering. Turning it on enables _transformation_ motion blur (blurring by interpolating each object's transforms between frames). You can set the number of transform blur samples using [Mantra:xform_motionsamples]. To enable _deformation_ motion blur, increase [Mantra:geo_motionsamples].
+
+See [motion blur|/render/blur] for more information about rendering motion blur.
 
 ::Auto Engine Procedural:
     #hprop: vm_auto_engine_procedural
@@ -2397,15 +2461,20 @@ Lights objects inherit many of the geometry object properties in addition to the
     If not specified or empty the SOP with the display flag is used.
 
     TIP:
-	Rendering with motion blur can invalidate the cache of the SOP being
-	cooked, causing all dependent nodes to recook when they are displayed
-	in Houdini after a render. To avoid this, create a separate SOP for
-	computing geometry to represent the bounding box of the display
-	geometry. Use this property to specify the final node of that chain.
+        Rendering with motion blur can invalidate the cache of the SOP being
+        cooked, causing all dependent nodes to recook when they are displayed
+        in Houdini after a render. To avoid this, create a separate SOP for
+        computing geometry to represent the bounding box of the display
+        geometry. Use this property to specify the final node of that chain.
 
 ::Shutter offset:
     #hprop: shutteroffset
     
+    :fig:[Image:/images/render/mug/blur/ShutterOffset.jpg]
+        This parameter controls which segment of time will be considered when generating motion blur. A value of 1 will use the current position of the object and the position of the object on the next frame as the time interval to use for motion blur. A value of -1 will use the position of the object on the previous frame and the current position of the object as the time. A value of 0 will generate an interval which lasts halfway through the previous frame and half way into the next frame.
+
+        Adjusting this parameter is usually unnecessary unless you are attempting to match motion- blur which has been generated outside of Mantra (for example a photographic background plate).
+
     Controls where the blur occurs in the image relative to the position of the object at the current frame. A value of `-1` blurs from the position at the previous frame to the position in the current frame. A value of `0` blurs from halfway to the previous frame to halfway to the next frame. A value of `1` blurs from the current position to the position at the next frame. You can use fractional frame values and values greater than `-1` or `1` to move the blur less or more.
     
     To change the _size_ of the blur, change the __Shutter time__ (`shutter` property).
@@ -2415,18 +2484,38 @@ Lights objects inherit many of the geometry object properties in addition to the
 ::Xform time samples:
     #hprop: xform_motionsamples
     #ifdprop: object:xformsamples
-    
-    The number of transformation blur motion samples. Each object (unless the parameter exists on the object) will have this many transforms output over the shutter duration. Increasing this number will result in smoother sub-frame motion, at a small memory and compute expense. Any number of segments may be specified, though the default of 2 is often adequate unless significant nonlinear motion occurs within the shutter time for a frame.
+
+    The number of samples to compute when rendering _transformation_ motion blur over the shutter open time. The default is 2 samples (at the start and end of the shutter time), giving one blurred segment.
+
+    [Image:/images/render/mug/blur/XFormSampleSimple.jpg]
+
+    If you have object moving and changing direction extremely quickly, you might want to increase the number of samples to capture the sub-frame direction changes.
+
+    [Image:/images/render/mug/blur/XFormSampleComplex.jpg]
+
+    In the above example, it requires 40 transformation samples to correctly render the complex motion that occurs within one frame. (This amount of change within a single frame is very unusual and only used as a demonstration.)
+
+    Transformation blur simulates blur by interpolating each object's transformation between frames, so it's cheap to compute but does not capture surface deformation. To enable blurring deforming geometry, increase [Mantra:geo_motionsamples].
 
 ::Geo time samples:
     #hprop: geo_motionsamples
     #ifdprop: object:geosamples
-    
-    The number of deformation blur motion samples. Each object (unless the parameter exists on the object) will have this many copies of the geometry included in the IFD. When an object is deforming it is necessary to increase this parameter to a value of 2 to see motion blurred geometry.  Any number of segments may be specified, though a value of 2 is often adequate unless significant nonlinear motion occurs within the shutter time for a frame.
-    
-    This option has no effect on objects which use velocity blur, since velocity blur is linear by nature.
 
-    Any number of segments may be specified; however, duplicate geometry is sent down for each sample which may significantly impact the memory footprint of mantra. 
+    The number of sub-frame samples to compute when rendering _deformation_ motion blur over the shutter open time. The default is 1 (sample only at the start of the shutter time), giving *no* deformation blur by default. If you want rapidly deforming geometry to blur properly, you must increase this value to 2 or more. Increasing the number of geometry time samples is relatively expensive because Houdini must cook the sub-frame geometry and send it to Mantra.
+
+    "Deformation" may refer to simple transformations at the Geometry (SOP) level, or actual surface deformation, such as a character or object which changes shape rapidly over the course of a frame.
+
+    [Image:/images/render/mug/blur/GeoTimeSamplesSimple.jpg]
+
+    Objects whose deformations are quite complex within a single frame will require a higher number of Geo Time Samples.
+
+    [Image:/images/render/mug/blur/GeoTimeSamples.jpg]
+
+    Deformation blur also lets you blur _attribute change_ over the shutter time. For example, if point colors are changing rapidly as the object moves, you can blur the `Cd` attribute. You must explicitly specify which attributes to blur using the [Mantra:vm_segmentattrs] property.
+
+    Increasing the number of Geo Time Samples *can have an impact* on the amount of memory Mantra uses. For each additional Sample, Mantra must retain a copy of the geometry in memory while it samples across the shutter time. When optimizing your renders, it is a good idea to find the minimum number of Geo Time Samples necessary to create a smooth motion trail.
+
+    Deformation blur is ignored for objects that have [Velocity motion blur|/render/blur#velocity] turned on.
 
 ::Render engine:
     #hprop: vm_renderengine
@@ -2455,11 +2544,20 @@ Lights objects inherit many of the geometry object properties in addition to the
 
     Though this IFD token has an integer value, it's also possible to set the value through a string value.
     
-    * `micropoly` -- Micropolygon scanline rendering (default).
-    * `raytrace` -- All rendering will be performed using ray-tracing.
-    * `pbrmicropoly` -- Physically Based Rendering using micro-polygon scanline rendering
-    * `pbrraytrace` -- Physically Based Rendering using ray-tracing only.
-    * `photon` -- Photon map generation.
+    `micropoly`:
+        Micropolygon scanline rendering (default).
+        
+    `raytrace`:
+        All rendering will be performed using ray-tracing.
+        
+    `pbrmicropoly`:
+        Physically Based Rendering using micro-polygon scanline rendering.
+        
+    `pbrraytrace`:
+        Physically Based Rendering using ray-tracing only.
+        
+    `photon`:
+        Photon map generation.
 
 ::Raytrace motion blur:
     #hprop: vm_traceblur
@@ -2485,9 +2583,16 @@ Lights objects inherit many of the geometry object properties in addition to the
 
 ::Shutter time:
     #hprop: shutter
-    
-    The portion of the frame interval that the camera shutter is
-    open. Used to determine motion blur. `[0,1]`
+
+    The shutter time refers to the portion of a frame the shutter is actually open. On a physical camera, this if often referred to as Shutter Speed. The renderer uses this determine motion blur. The value should be in the range `[0,1]`.
+
+    A value of 0 for the shutter time would mean that there is no motion blur at all, as the shutter is only “Open” for an instant. A value of 1 on the other hand would mean that the shutter is open for the entire length of the frame.
+
+    [Image:/images/render/mug/blur/ShutterTime.jpg]
+
+    In the above example the sphere is rotating a full 360 degrees over the course of a single frame. You can see how the length of the “motion trail” or “blur” changes based on the shutter time. In most cases, the default value of .5 is appropriate for animated sequences and a good match for real world settings.
+
+    Keep in mind that this parameter controls the amount of time within a single frame, that the shutter is open. It does not refer to how long an individual frame is. To adjust the frame rate, change the Frames Per Second parameter in the Global Animation Options.
 
 ::Motion blur style:
     #hprop: motionstyle
@@ -2507,20 +2612,40 @@ Lights objects inherit many of the geometry object properties in addition to the
 ::Geometry velocity blur:
     #hprop: geo_velocityblur
     #ifdprop: object:velocityblur
-    
-    If enabled, this object's rendered motion blur will be based upon
-    the vector attribute named `v` in the geometry. The units of the
-    attribute are in (1 unit/second).
 
-    Velocity motion blur should be used if it contains changing point
-    counts since it cannot be rendered correctly with deformation
-    motion blur. For example, a particle system with changing particle
-    counts should use this option.
+    This menu lets you choose what type of _geometry velocity blur_ to do on an object, if any. Separate from _transform blur_ and _deformation blur_, you can render motion blur based on point movement, using attributes stored on the points that record change over time. You should use this type of blur if the number points in the geometry changes over time (for example, a particle simulation where points are born and die).
 
-    You can use Velocity blur on these types of objects as long as they
-    have valid `v` attributes. Particles automatically have the "v"
-    attribute so if you are rendering particles, simply enable this
-    parameter.
+    If your geometry changes topology frame-to-frame, Mantra will not be able to interpolate the geometry to correctly calculate Motion Blur. In these cases, motion blur can use a `v` and/or `accel` attribute which is consistent even while the underlying geometry is changing. The surface of a fluid simulation is a good example of this. In this case, and other types of simulation data, the solvers will automatically create the velocity attribute.
+
+    No Velocity Blur:
+        Do not render motion blur on this object, even if the renderer is set to allow motion blur.
+
+    Velocity Blur:
+        To use velocity blur, you must compute and store point velocities in a point attribute `v`. The renderer uses this attribute, if it exists, to render velocity motion blur (assuming the renderer is set to allow motion blur). The `v` attribute may be created automatically by simulation nodes (such as particle DOPs), or you can compute and add it using the [Point velocity SOP|Node:sop/pointvelocity].
+
+        The `v` attribute value is measured in Houdini units per second.
+
+    Acceleration Blur:
+        To use acceleration blur, you must compute and store point acceleration in a point attribute `accel` (you can change the acceleration attribute name using the [Mantra:geo_accelattribute] property). The renderer uses this attribute, if it exists, to render multi-segment acceleration motion blur (assuming the renderer is set to allow motion blur). The `accel` attribute may be created automatically by simulation nodes, or you can compute and add it using the [Point velocity SOP|Node:sop/pointvelocity].
+
+        When Acceleration Blur is on, if the geometry has a _angular velocity_ attribute (`w`), rapid rotation will also be blurred. This should be a vector attribute, where the components represent rotation speeds in radians per second around X, Y, and Z.
+
+    When this is set to "Velocity Blur" or "Acceleration Blur", deformation blur is not applied to the object. When this is set to "Acceleration Blur", you can use the [Mantra:geo_motionsamples] property to set the number of acceleration samples.
+
+    :col:
+        :fig:[Image:/images/render/motionblur_velocity.jpg]
+            """Velocity motion blur used the velocity attribute (`v`) to do linear motion blur."""
+    :col:
+        :fig:[Image:/images/render/motionblur_acceleration.jpg]
+            """Acceleration motion blur uses the change in velocity to more accurately blue objects turning at high speed."""
+    :col:
+        :fig:[Image:/images/render/motionblur_angular_acceleration.jpg]
+            """Angular acceleration blur works with object spin, such as these fast-spinning cubes."""
+
+::Acceleration attribute:
+    #hprop: geo_accelattribute
+
+    This property is valid only when __Geometry motion blur__ is set to "Acceleration Blur". Enter the name of a point attribute to use as the acceleration value when rendering multi-segment acceleration blur. The default is `accel`, which may be added to geometry automatically by various simulation solvers.
 
 ::Depth of field aspect ratio:
     #hprop: vm_dofaspect
@@ -2875,7 +3000,23 @@ Lights objects inherit many of the geometry object properties in addition to the
     #hprop: vm_imageblur
     #ifdprop: renderer:imageblur
     
-    This parameter is related to the motion blur parameters which are available only when Motion Blur is enabled. Disabling this option will cause motion blur to be removed from the final rendered image, however the blurred Position will still be calculated, allowing for custom motion vector image planes to be created. For more information, see [motion blur|/render/blur].
+    Occasionally, when motion blur is going to be added to an image as a post-process or for other compositing operations, it is necessary to calculate the motion blur but not include it in the final rendered image. In these cases, Allow Image Motion Blur should be disabled.
+
+    This means that the blurred positions necessary for Motion Blur can be exported as a custom Motion Vector Image Plane from within a shader using the GetBlurP() function without the small overhead of doing the actual shading in the render.
+
+    This parameter is related to the motion blur parameters which are available only when Motion Blur is enabled. Disabling this option will cause motion blur to be removed from the final rendered image, however the blurred Position will still be calculated, allowing for custom motion vector image planes to be created.
+
+::SSS sampling mode:
+    #hprop: vm_pbrssssamplingmode
+    #ifdprop: renderer:pbrssssamplingmode
+
+    Sampling strategy to use for PBR SSS in direct lighting. The default is `Perceptual`.
+
+    `Ideal`:
+        Sample distribution matches the diffusion profile perfectly.
+
+    `Perceptual`:
+        Sample distribution is biased toward low-energy areas so that unlit regions may converge faster.
 
 == Shaders ==
 
@@ -2987,8 +3128,11 @@ Lights objects inherit many of the geometry object properties in addition to the
 
     The type of path tracing to perform in PBR mode.
     
-    * `diffuse` -- Trace all diffuse and specular bounces, but once a diffuse bounce is encountered continue tracing only diffuse reflections.
-    * `all` -- All paths are traced.  This option can be used to enable rendering of caustics without the use of photon maps - however when using point or small area lights, the rendered result can turn out to be extremely noisy.
+    `diffuse`:
+        Trace all diffuse and specular bounces, but once a diffuse bounce is encountered continue tracing only diffuse reflections.
+        
+    `all`:
+        All paths are traced.  This option can be used to enable rendering of caustics without the use of photon maps. However when using point or small area lights, the rendered result can turn out to be extremely noisy.
 
 ::Constrain by Maximum Roughness:
     #hprop: vm_constrainmaxrough
@@ -3016,9 +3160,14 @@ Lights objects inherit many of the geometry object properties in addition to the
     
     The space in which you specify displacement bounds.
     
-    - `"object"` -- Displacements occur in object space.
-    - `"camera"` -- Displacements occur in camera space.
-    - `"world"` -- Default, currently an alias for camera.
+    `"object"`:
+        Displacements occur in object space.
+        
+    `"camera"`:
+        Displacements occur in camera space.
+        
+    `"world"`:
+        Default, currently an alias for camera.
 
 ::Velocity bound:
     #hprop: vm_velocitybound
@@ -3152,6 +3301,12 @@ Lights objects inherit many of the geometry object properties in addition to the
     interface.
     
     The `object:lightmask` property in Mantra is a computed property containing the results of combining light categories and light masks.
+
+::LPE Tag
+    #hprop: vm_lpetag
+    #ifdprop: object:lpetag
+
+    Custom label assigned to lights or objects for use with [light path expression|/render/lpe].
 
 ::Light selection:
     #hprop: lightcategories
@@ -3305,12 +3460,23 @@ Lights objects inherit many of the geometry object properties in addition to the
     
     The special properties queried may be...
     
-    * `tile:ncomplete` -- The number of tiles which have been completed.
-    * `tile:ntiles` -- The total number of tiles in the image.
-    * `tile:laptime` -- The number of seconds taken to render the last tile.
-    * `tile:totaltime` -- The total number of seconds to render since the render began.  This does *not* include time to load the scene, but rather is defined as the time since the first tile began rendering.
-    * `tile:coords` -- The tile bounding box (in pixels).
-    * `tile:memory` -- The amount of RAM in use by mantra.
+    `tile:ncomplete`:
+        The number of tiles which have been completed.
+    
+    `tile:ntiles`:
+        The total number of tiles in the image.
+    
+    `tile:laptime`:
+        The number of seconds taken to render the last tile.
+    
+    `tile:totaltime`:
+        The total number of seconds to render since the render began.  This does *not* include time to load the scene, but rather is defined as the time since the first tile began rendering.
+    
+    `tile:coords`:
+        The tile bounding box (in pixels).
+    
+    `tile:memory`:
+        The amount of RAM in use by mantra.
 
     {{{
     #!python
@@ -3713,15 +3879,39 @@ Lights objects inherit many of the geometry object properties in addition to the
     projections that can't be modeled as perspective or orthographic
     projections.  Lens shaders can have the following parameters and
     exports:
-    * `float x` -- X screen coordinate in the range -1 to 1
-    * `float y` -- Y screen coordinate in the range -1 to 1
-    * `float Time` -- Sample time
-    * `float dofx` -- X depth of field sample value
-    * `float dofy` -- Y depth of field sample value
-    * `float aspect` -- Image aspect ratio (x/y)
-    * `export vector P` -- Ray origin in camera space
-    * `export vector I` -- Ray direction in camera space
-    * `export int valid` -- Whether the sample is valid for measuring
+    
+    `float x`:
+        X screen coordinate in the range -1 to 1.
+        
+    `float y`:
+        Y screen coordinate in the range -1 to 1.
+        
+    `float Time`:
+        Sample time.
+        
+    `float dofx`:
+        X depth of field sample value.
+        
+    `float dofy`:
+        Y depth of field sample value.
+        
+    `float aspect`:
+        Image aspect ratio (x/y).
+
+    `int xres`:
+        Image horizontal resolution.
+
+    `int yres`:
+        Image vertical resolution.
+        
+    `export vector P`:
+        Ray origin in camera space.
+        
+    `export vector I`:
+        Ray direction in camera space.
+        
+    `export int valid`:
+        Whether the sample is valid for measuring.
 
     The lens shader should be able to handle x and y values outside the -1
     to 1 range, in case samples outside the image need to be generated. The
@@ -3911,9 +4101,12 @@ The following properties are computed in scripts  during the mapping process. Th
 
     The video field to render.
     
-    * `0` -- Both even & odd fields.
-    * `1` -- Odd field.
-    * `2` -- Even field.
+    `0`:
+        Both even & odd fields.
+    `1`:
+        Odd field.
+    `2`:
+        Even field.
 
 ::`image:crop`:
     #ifdprop: image:crop

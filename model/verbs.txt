@@ -1,0 +1,176 @@
+= Programmatic geometry with verbs =
+
+"""Many geometry (SOP) nodes allow you to use them in Python scripts to generate geometry programmatically."""
+
+
+== Overview ==
+
+As part of making SOP nodes compilable, we separated out the node's basic operation code (what the node _does_ to geometry) from the code that deals with the concerns of the node (caching, reading inputs, evaluating parameters, and so on). We call these functions _verbs_. You can use them in Python scripting to modify geometry held in a [Hom:hou.Geometry] object. This might be useful anywhere you need to programmatically alter geometry and don't want to have to build a geometry network to do so.
+
+
+== Getting a verb ==
+
+* [Hom:hou.NodeTypeCategory#nodeVerb] returns the verb for the named node type:
+
+    {{{
+    box_verb = hou.sopNodeTypeCategory().nodeVerb("box")
+    }}}
+
+* If you have a reference to a specific node type already, you can use [Hom:hou.NodeType#verb] to get the corresponding verb:
+
+    {{{
+    #!python
+    node = hou.node("/obj/geo1/box")
+    node_type = node.type()
+    box_verb = node_type.verb()
+    }}}
+
+* [Hom:hou.NodeTypeCategory#nodeVerbs] returns a dictionary mapping node type names to verbs:
+
+    {{{
+    verbs = hou.sopNodeTypeCategory().nodeVerbs()
+    box_verb = verbs["box"]
+    sphere_verb = verbs["sphere"]
+    }}}
+
+    You can list the available SOP "verbs" in a Python shell with:
+
+    {{{
+    #!python
+    sorted(hou.sopNodeTypeCategory().nodeVerbs().keys())
+    }}}
+
+
+== Using a verb ==
+
+Using a verb is a two-step process: set the parameters on the verb, then apply the verb to a [Hom:hou.Geoemtry] object.
+
+# Set the parameters on the verb.
+
+    Pass a dictionary to [Hom:hou.NodeVerb#setParms] where the keys are the internal names of the parameters. You can see the internal name of a parameter in the Parameter Editor by hovering over the parameter's name.
+
+    {{{
+    #!python
+    box_verb.setParms({
+        "t": hou.Vector(0.5, -0.5, 2.0)
+        "scale": 0.5,
+    })
+    }}}
+
+# Apply the node to a geometry object.
+
+    Before you do this you must have a geometry object. You can create an empty Geometry object:
+
+    {{{
+    #!python
+    geo = hou.Geometry()
+    }}}
+
+    Then you can execute the verb and write its output to the geometry object:
+
+    {{{
+    #!python
+    box_verb.execute(geo, [])
+    }}}
+
+    If your verb has inputs (for example, the [Node:sop/copy] verb takes the geometry to copy and the points to copy onto), you can supply [Hom:hou.Geometry] objects representing the inputs in the second argument. You can get a live _read-only_ reference to of the geometry from a node using [Hom:hou.SopNode#geometry].
+
+    {{{
+    #!python
+    c2p_verb = hou.sopNodeTypeCategory.nodeVerb("copytopoints")
+    instance = hou.node("/obj/geo1/sphere1").geometry()
+    points = hou.node("/obj/geo1/pointcloud").geometry()
+    c2p_verb.execute(geo, [instance, points])
+    }}}
+
+NOTE:
+    When you `execute()` a verb, it _overwrites_ the geometry you pass it. If you want to combine multiple generators (or multiple generator/filter chains), you must generate each piece in a "buffer" `Geometry` object, and merge the pieces into a "main" `Geometry` using [Hom:hou.Geometry#merge].
+
+    {{{
+    #!python
+sops = hou.sopNodeTypeCategory()
+box = sops.nodeVerb("box")
+box.setParms({"scale": 0.25})
+
+geo = hou.Geometry()
+temp = hou.Geometry()
+
+for x in (-0.5, 0.5):
+    for y in (-0.5, 0.5):
+        for z in (-0.5, 0.5):
+            box.setParms({
+                "t": hou.Vector3(x, y, z)
+            })
+            box.execute(temp, [])
+            geo.merge(temp)
+    }}}
+
+
+== Notes and tips ==
+
+* You can use a [Python SOP|Node:sop/python] to preview, test, or debug your geometry generation script. It outputs a [Hom:hou.Geometry] object you build in the node's __Python code__ parameter.
+
+* [Hom:hou.NodeVerb#execute] always overwrites the Geometry object you supply. If you want to _add_  to an existing Geometry object, execute into an empty Geometry, then use [Hom:hou.Geometry#merge] to merge it with another Geometry object.
+
+    {{{
+    #!python
+    # Existing content we want to add to
+    existing_geometry = hou.node("/obj/geo1/phone").geometry()
+    # Blank geometry to hold new content
+    new_geometry = hou.Geometry()
+    # Write into the new geometry
+    box_verb.execute(new_geometry, [])
+    # Add the new geometry into the existing geometry
+    existing_geometry.merge(new_geometry)
+    }}}
+
+* If you are using verbs to modify geometry inside a [Python SOP|Node:sop/python], you need to overwrite the node's geometry at the end of the script:
+
+    {{{
+    #!python
+    # Grab a reference to this node
+    node = hou.pwd()
+    geo = node.geometry()
+
+    # ... operate on geometry ...
+
+    # When verbs execute on the hou.Geometry they may replace the
+    # underlying geometry rather than in-place edit it. So you have
+    # to explicitly write it back to the node's geometry.
+    node.geometry().clear()
+    node.geometry().merge(resultgeo)
+    }}}
+
+
+== Example ==
+
+The following example grabs the geometry from a node and applies the [Subdivide|Node:sop/subdivide] and [IsoOffset|Node:sop/isooffset] verbs to it.
+
+{{{
+#!python
+node = hou.node("/obj/geo1/testgeometry_pighead1")
+geo = node.geometry()
+resultgeo = hou.Geometry()
+
+# Get a hou.SopVerb that knows how to subdivide.
+sops = hou.sopNodeTypeCategory()
+subverb = sops.nodeVerb('subdivide')
+
+# Pass in a dictionary mapping parameter names to values.
+# Node defaults are already set, so just set non-default things.
+subverb.setParms({'iterations': 3})
+
+# SopVerb.execute() takes a target hou.Geometry to write the results into,
+# and a list of hou.Geometry to be the inputs of the verb (use None in the
+# list to represent an unwired input).
+subverb.execute(resultgeo, [geo])
+
+# Now do an isooffset
+isoverb = sops.nodeVerb('isooffset')
+isoverb.setParms({'samplediv':100, 'output':0})
+isoverb.execute(resultgeo, [resultgeo])
+}}}
+
+
+
+

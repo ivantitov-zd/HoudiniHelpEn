@@ -48,7 +48,7 @@ splash particles with their own property attributes is now possible.
 
 The FLIP Solver contains an embedded POP Solver, enabling the use of
 POP forces by plugging them into the __Particle Velocity__ input or
-inline below any [Source Volume|Node:dop/sourcevolume] emitters.  Any
+inline below any [Volume Source|Node:dop/volumesource] emitters.  Any
 POP node that updates the `v`, `targetv`, or `force` attribute can
 be used, as well as others that affect attributes like particle color
 or age.  The POP Solver also supports other particle behavior such
@@ -63,8 +63,8 @@ NOTE:
 
 == Tips ==
 
-For emitting large numbers of particles, the [Source Volume
-DOP|Node:dop/sourcevolume] can be much faster than the [Particle Fluid
+For emitting large numbers of particles, the [Volume Source
+DOP|Node:dop/volumesource] can be much faster than the [Particle Fluid
 Emitter DOP|Node:dop/particlefluidemitter]. You can set up surface
 emission using the [Source From Surface|/shelf/sourcefromsurface] shelf
 tool or volumetric emission using [Source From
@@ -82,10 +82,10 @@ simulating on a system with multiple CPU cores.
 Use the Performance Monitor to detect bottlenecks in your FLIP
 simulations.  In general the FLIP Solver should consume most of the
 solve time for a typical DOP Network.  If emitting particles is taking a
-large amount of time, consider using [Source
-Volume|Node:dop/sourcevolume] emission as described above and possibly
-even caching the points created by the corresponding [Fluid Source
-SOP|Node:sop/fluidsource].
+large amount of time, consider using [Volume
+Source|Node:dop/volumesource] emission as described above and possibly
+even caching the points created by the corresponding [FLIP Source
+SOP|Node:sop/flipsource].
 
 If writing out large FLIP simulations to disk using the [Dop I/O
 SOP|Node:sop/dopio], enable __Save In Background__ to allow the
@@ -110,7 +110,7 @@ Increasing the __Particle Separation__ will lower the resolution, which will mak
 
 Usually you will not need to increase __Substeps__ with FLIP. However, you may want to increase this value when simulating fast moving fluid that collides with other objects. You can also increase __Substeps__ to improve the look of slow moving viscous fluid. Surface tension is an exception where substepping is likely required to maintain stability.
 
-You can vary amounts of stickiness to different objects, by building your own sticky field. The [Fluid Source|Node:sop/fluidsource] can be used to take a point attribute like `sticky` and make it a varying volume where you want stickiness to occur. Then, in the solver, you can use this field as the control field for the __Stick On Collision__ function on the __Collisions__ tab of the solver.
+You can vary amounts of stickiness to different objects, by building your own sticky field. The [Volume Rasterize Attributes SOP|Node:sop/volumerasterizeattributes] can be used to take a point attribute like `sticky` and make it a varying volume where you want stickiness to occur. Then, in the solver, you can use this field as the control field for the __Stick On Collision__ function on the __Collisions__ tab of the solver.
 
 A good debugging rule of thumb for FLIP when seeing unexpected collision behavior is to immediately enable the __Collision__ and __Collision Velocity__ visualization on the [FLIP Object|Node:dop/flipobject], so you can see exactly what the solver is seeing for collisions.
         NOTE:
@@ -142,17 +142,17 @@ geometry as a FLIP collision object.
 Another option for adding collision objects to fluid simulations was the 
 [Collide With Object|/shelf/collidewithobjects] shelf tool, which adds
 collision volumes directly to the simulation using the
-[Source Volume|Node:dop/sourcevolume] DOP. However, as of Houdini 14, this
+[Volume Source|Node:dop/volumesource] DOP. However, as of Houdini 14, this
 option is deprecated and not recommended.  Instead use the the
 [Deforming Object|/shelf/deformingobject] shelf tool.
 
 NOTE:
-    If using __Source Volume__ based collisions, you _must_ use the
+    If using __Volume Source__ based collisions, you _must_ use the
     __Move Outside Collision__ method for particle collisions, because the __Particle__
     method only works when a collision is represented by an actual DOP object.
 
 NOTE:
-    The default velocity scale for Source Volume is 1.5, which will cause
+    The default velocity scale for Volume Source is 1.5, which will cause
     larger splashes by default, but for moving containers this should be
     set to 1.
 
@@ -167,7 +167,7 @@ generates a thicker SDF.
 
 __Move Outside Collision__ is the fastest collision handling method and provides
 the smoothest splashes, however it is not as accurate with fast-moving collision geometry.
-It is also the only collision method that works with __Source Volume__ based collisions.
+It is also the only collision method that works with __Volume Source__ based collisions.
 
 
 @parameters
@@ -180,7 +180,7 @@ Timescale:
     You can use expression functions such as [Exp:doptime], [Exp:dopframe],[Exp:dopsttot], and [Exp:dopttost] to convert between global times and simulation times.
 
     NOTE:
-        Changing the __Timescale__ only affects the timestep of the simulation. If adding velocities calculated in SOPs to the simulation for collisions or pumps with the [Source Volume DOP|Node:dop/sourcevolume], scale the incoming velocities by `1 / Timescale` to match the timestep of the simulation.
+        Changing the __Timescale__ only affects the timestep of the simulation. If adding velocities calculated in SOPs to the simulation for collisions or pumps with the [Volume Source DOP|Node:dop/volumesource], scale the incoming velocities by `1 / Timescale` to match the timestep of the simulation.
 
 Min Substeps:
     The FLIP solver will always enforce this minimum number of substeps.
@@ -638,7 +638,7 @@ Velocity Scale:
 Velocity Type:
     The method used to calculate collision velocities for colliding DOP
     Objects. This setting does not affect collision velocities
-    introduced by a [Source Volume DOP.|Node:dop/sourcevolume]
+    introduced by a [Volume Source DOP.|Node:dop/volumesource]
 
     Rigid Velocity:
         The collision velocity of the objects is calculated by treating
@@ -1045,7 +1045,8 @@ Sink Surface:
 
 === Narrow Band ===
 
-When this tab is enabled, FLIP particles are only maintained near the fluid surface. The rest of the fluid is represented by volumes (e.g. surface or velocity).
+When enabled, FLIP particles are only maintained near the fluid surface.
+The rest of the fluid is represented by volumes (e.g. surface or velocity).
 
 Removing particles deep inside the fluid reduces the memory footprint
 and can often improve the performance of the fluid simulation. 
@@ -1053,6 +1054,8 @@ and can often improve the performance of the fluid simulation.
 NOTE:
     Because the fluid is largely represented by volumes, __Density
     by Attribute__ and __Viscosity by Attribute__ are not supported.
+    They must bound to a volumetric field using the __Attribute/Field Pair__
+    parameters.
   
 Enable Particle Narrow Band:
     A narrow band of FLIP particles will be used to update the
@@ -1065,6 +1068,39 @@ Bandwidth:
     thickness. Very fast moving simulations might require a larger
     bandwidth to maintain stability.
 
+    It is not recommended to use world space units for the bandwidth,
+    because adjusting simulation parameters can cause the simulation
+    to become unstable if the narrow band is too small. It could also cause the
+    simulation to become less efficient if the narrow band is too
+    large. However, if necessary, it is possible to convert the
+    desired world space bandwidth to voxel space with the following
+    expression: `(world_space_bandwidth) / (particle_separation * grid_scale)`,
+    where `world_space_bandwidth` is chosen by the user, and `particle_separation`
+    and `grid_scale` are references from the __FLIP Object__.
+
+Attribute-Field Pairs:
+    Because particles deeper than the narrow band are removed,
+    it is no longer possible to use attributes on the particles to represent
+    the state of the entire liquid (`temperature`, `density`, `viscosity`, etc.).
+    This parameter allows users to bind particle attributes to volumetric fields
+    to allow these attribute values to persist throughout the simulation after
+    the particles are removed.
+
+    In regions where the particles remain (within the narrow band), values on
+    the particle attributes will be written to the paired field at the start of each
+    substep. Inside the liquid, where particles have been removed, the values stored
+    in the paired field will persist between substeps and will be advected through
+    the simulation velocity's field.
+
+NOTE:
+    This pairing option does not create the named field, this must be initialized by
+    the user. Additionally, modifying attribute values on particles will not change
+    the values stored in the field. To change values of an attribute throughout
+    the entire liquid volume, both the particle attribute values and the paired field values must be
+    modified. For example, using a [POP Wrangle|Node:dop/popwrangle] and a [Gas Field Wrangle|Node:dop/gasfieldwrangle] with equivalent expressions.
+
+    See the [Narrow Band|/fluid/narrowband] page in the Fluid Chapter for more information.
+    
 === Distribution ===
 
     FLIP simulations are distributed in the same manner as particle
@@ -1114,7 +1150,7 @@ Volume Velocity:
 
 Sourcing (post-solve):
     The main use for this input is to add or remove particles using the
-    [Source Volume node|Node:dop/sourcevolume] that imports particles
+    [Volume Source node|Node:dop/volumesource] that imports particles
     and volumes from a geometry network. See [fluid
     sourcing|/dyno/fluid_sourcing] for more information.
 

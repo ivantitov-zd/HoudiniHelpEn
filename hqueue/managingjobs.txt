@@ -1,0 +1,225 @@
+= Managing Jobs =
+Use the __JOBS__ page on the HQueue web interface to manage running and completed jobs.
+
+<center>
+[Image:/images/hqueue/jobs_table.png]
+The jobs list on the HQueue web interface.
+</center>
+
+Below is a list of the data that appear at the top of the __JOBS__ page:    
+
+Label name ||
+    Description ||
+
+Active Jobs |
+    The number of all jobs that are active (i.e., all the jobs that are in the __RUNNING JOBS__ table together with the child jobs of them). 
+Running Jobs |
+    The number of all jobs that are running on clients. This doesn't include the top level jobs which are just a wrapper of child jobs and are not assigned to any clients. 
+Clients |
+    The number of all clients that are registered on the farm. 
+Clients Running Jobs |
+    The number of all clients that are running jobs. 
+
+Below is a list of the columns that appear in the job lists:
+
+Column Name ||
+    Description ||
+
+(no name) |
+    Contains a checkbox for selecting a job.  Apply actions to selected jobs using the buttons at the bottom of the list. 
+Job Id |
+    The job's unique identifier.  Click on the id to view the job's details. 
+Name |
+    The job name and description. 
+Submitted By |
+    The user account that submitted the job. 
+Priority |
+    The job's priority.  Jobs with higher priorities are assigned to clients before jobs with lower priorities.  0 is the lowest priority. 
+Status |
+    The job's status.  See [Job Statuses|jobdetails#statuses]. 
+Progress |
+    The amount of work completed specified as a percentage. 
+Tasks |
+    The status of child jobs. The first number in the column displays the number of finished child jobs while the second shows the number of total child jobs. If there is any failed/cancelled/abandoned child job, the column would add a message at the end saying "n failed" where n is the number of failed child jobs.
+Time |
+    This column shows the elapsed time for running jobs and the time to complete for completed jobs.
+    
+    Elapsed time: the duration of time that the job has been running.
+    
+    Time to Complete: the amount of time for the job to complete.
+ETA |
+    The estimated amount of time left until the job finishes. 
+Submission Time |
+    The time when the job was submitted to the farm. 
+Notes (no label) |
+    Indicates whether the job has a note attached to it or not.
+    :box:
+        #display: bordered gray
+        [Icon:/images/hqueue/note.png]-> note thread exists. Hover over to see the latest note. Click on the icon to view note's full thread.
+        
+        [Icon:/images/hqueue/add_note.png]-> no thread. Click on the icon to attach a note.
+
+
+
+== Job View Pages == (viewing)
+Click on the job's id in the job list to view it in detail.
+
+<center>
+[Image:/images/hqueue/job_view.png]
+The job view page.
+</center>
+
+The following table describes the fields in the __Job Details__ section:
+
+Field ||
+    Description ||
+
+Name |
+    The job name and description. 
+Submitted By |
+    The user account that submitted the job. 
+Id |
+    The job's unique identifier. 
+Parent Job(s) |
+    The jobs that depend on this job. Click on a parent job's id to view its details.  This field is hidden if the job has not parents. 
+Clients |
+    The clients assigned to process the job.  This field is hidden if there are no clients assigned to the job. 
+Status |
+    The job's status.  See [Job Statuses|jobdetails#statuses]. 
+Overall Progress |
+    The amount of work completed by this job and its child job specified as a percentage. 
+ETA |
+    The estimated amount of time left until the job finishes. 
+Properties |
+    Click on the 'View' link to see a list of the job's properties. See [The Properties Dialog|#properties_dialog]. 
+Status Log |
+    Click on the 'View' link to see a log of the status changes.  This field is hidden if there are no status changes. 
+Cleanup |
+    The script that is executed after the job finishes regardless of whether it succeeded or failed.  This field is hidden if no such script has been assigned to the job. 
+Command |
+    The commands that the job executes if the job is assigned to a client machine.  This field is hidden if the job has no commands. 
+Output Log |
+    The combined STDOUT and STDERR outputs of the job's command set execution.  Click on the 'Download Output' link to download and view the full command output.  This field is hidden if the job has no commands. 
+
+=== The Properties Dialog === (properties_dialog)
+
+The properties dialog includes the job properties listed at [Job Properties|jobdetails#properties] as well as the following:
+
+Property ||
+    Description ||
+
+Queue time |
+    The time when the job was added to the server queue. 
+Runnable time |
+    The time when the job was marked as available for assignment to a client machine. 
+Command start time |
+    The time when the job began execution of its command set. 
+Command end time |
+    The time when the job finished execution of its command set. 
+Start time |
+    The time when the job started running on the assigned client machine. 
+End time |
+    The time when the job finished. 
+Time to complete |
+    The amount of time for the job to complete. 
+Time in queue |
+    The amount of time that the job spent waiting before it started execution on a client machine.  This field is hidden if the job has not started. 
+Time to run command |
+    The amount of time that the job took to finish execution.  This field is hidden if the job has not finished. 
+Requirements |
+    A set of client conditions with every two lines corresponding to a condition. A client machine must match the conditions in order to be eligible for processing the job.  This field is hidden if the job has no conditions. 
+Environment |
+    A set of client's environment variables. This field is hidden if no environment variable is set. 
+
+
+
+== Submitting Jobs == (submit)
+
+=== Submitting Jobs from Houdini ===
+
+See [How to Submit Jobs|submittingjobs].
+
+=== Submitting Jobs from Python ===
+
+It is possible to submit custom jobs to HQueue from Python.  Below is a sample script:
+
+{{{
+#!python
+import xmlrpclib
+
+# Connect to the HQueue server.
+hq_server = xmlrpclib.ServerProxy("http://hq_server_hostname:5000")
+
+# Define a job which prints "Hello World!".
+job_spec = { 
+    "name": "Print Hello World",
+    "shell": "bash",
+    "command": "echo 'Hello World!'"
+}
+
+# Submit the job to the server.
+# newjob() returns a list of job ids (in case multiple jobs are passed in at once).
+job_ids = hq_server.newjob(job_spec)
+
+# Query the job's status.
+status = hq_server.getstatus(job_ids[0])
+print "Status: ", status
+}}}
+
+See [Python API|api] to learn how to script HQueue.
+
+
+== Rescheduling Jobs == (reschedule)
+
+Go to the __JOBS__ page, check the box for the target job and click on the 'Reschedule' button located below the job list.  Check multiple boxes to reschedule several jobs at once.
+
+When a job is rescheduled, it is placed back on the scheduling queue where it waits for an available client machine.  Rescheduling a job also reschedules its parent jobs and any failed child jobs.
+
+To reschedule only failed, abandoned or cancelled jobs, click on the 'Reschedule Failed Jobs' button located below the job list.
+
+NOTE:
+     You cannot reschedule jobs that are running.
+
+
+== Cancelling Jobs == (cancel)
+
+Go to the __JOBS__ page, check the box for the target job and click on the 'Cancel' button located below the job list.  Check multiple boxes to cancel several jobs at once.
+
+When a job is cancelled, it is terminated on the assigned client machine and is removed from the scheduled queue.  Cancelling a job also cancels its child jobs.
+
+NOTE:
+     Only running jobs can be cancelled.  
+
+
+== Pausing Jobs == (pause)
+
+Go to the __JOBS__ page, check the box for the target job and click on the 'Pause' button located below the job list.  Check multiple boxes to pause several jobs at once.
+
+When a job is paused, it is halted on the assigned client machine.  The job remains in the scheduling queue where it waits for the user to either resume or cancel the job.  Pausing a job also pauses its child jobs.
+
+NOTE:
+     Only unfinished jobs can be paused.  
+
+
+== Resuming Jobs == (resume)
+
+Go to the __JOBS__ page, check the box for the target job and click on the 'Resume' button located below the job list.  Check multiple boxes to resume several jobs at once.
+
+When a job is resumed, it is reactivated on the assigned client machine and continues execution.  Resuming a job also resumes its child jobs.
+
+NOTE:
+     Only paused jobs can be resumed.  
+
+
+== Deleting Jobs == (delete)
+
+Go to the __JOBS__ page, check the box for the target job and click on the 'Delete' button located below the job list.  Check multiple boxes to delete several jobs at once.
+
+When a job is deleted, it is *permanently removed* from the system.  Deleting a job also deletes its child jobs.
+
+To delete only failed, abandoned or cancelled jobs, click on the 'Delete Failed Jobs' button located below the job list.
+
+To delete only finished (failed, abandoned, cancelled or succeeded) jobs, click on the 'Delete Finished Jobs' button located below the job list.
+
+NOTE:
+     Only completed jobs can be deleted.  

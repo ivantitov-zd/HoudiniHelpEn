@@ -1,0 +1,378 @@
+#type: node
+#context: dop
+#icon: SHELF/whitewater
+#internal: whitewatersolver
+
+
+= Whitewater Solver =
+
+""" Sets and configures a Whitewater solver."""
+
+The Whitewater solver simulates foam, spray, and bubbles from a source liquid
+simulation.  The solver classifies particles in the simulation according to
+their depth within the `surface` field that is sourced from the input liquid
+simulation.  Particles can freely transition between different particle types
+during their lifetime, and can be partially advected by the `velocity` field
+along with ballistic behavior. Individual particle types can be disabled, in 
+which case particles classified as that type will be killed, allowing
+a simulation to be limited to only spray, for example.
+
+This solver simulates three types of particles:
+* Foam particles form a layer on top of the liquid surface and are strongly
+  advected with the velocity field.
+* Spray particles above the foam layer are simulated ballistically with 
+  gravity.
+* Bubble particles below the foam layer are weakly advected with the velocity 
+  field and simulated ballistically with a buoyancy force.
+* Ballistic particles are specified by setting their `ballistic` attribute
+  to 1, and are exempt from any whitewater forces.
+
+== Setup ==
+The [Whitewater Source|Node:sop/whitewatersource] node can create the
+proper whitewater emission points and input fields to serve as input to this
+solver.  A [Whitewater Emitter|Node:dop/whitewateremitter] node can effectively
+create a denser, volumetric particle cloud from single emission particles.
+
+The [Whitewater Object|Node:dop/whitewaterobject] DOP creates an object with
+the proper data for this solver, which uses the following subdata:
+* A `surface` field that represents the extent of the input liquid surface as
+  a Signed Distance field.
+* A `vel` vector field that represents the velocity of the input liquid
+  simulation.
+* `Geometry` data that stores the particle geometry for each timestep.
+
+
+== Tips ==
+
+* The [Whitewater shelf tool|Tool:/shelf/whitewater] sets up a whitewater
+  simulation from a source [FLIP|Node:dop/flipsolver] or
+  [Liquid|Node:dop/fluidsolver] simulation.
+
+* Visualize the `surface` field on the 
+  [Whitewater Object|Node:dop/whitewaterobject] to display the whitewater 
+  particles in context with the liquid surface.
+
+* Disable all but one of the particle types to augment the primary whitewater
+  simulation with additional passes.  For example, a spray pass with different
+  emission settings can be layered on top of a full whitewater simulation.
+
+* Use a [Whitewater Emitter|Node:dop/whitewateremitter] DOP for volumetric
+  emission of whitewater particles and to customize the whitewater simulation.
+  Increase the __Velocity Offset__ parameter on this node to move the emitted
+  particles farther along the emission velocity vector, leading to more
+  particles initially classified as spray.  Increase the __Radial Velocity__ to
+  give more outward direction to spray particles.
+
+@inputs
+
+Objects to Solve:
+	One or more [Whitewater Object|Node:dop/whitewaterobject] for which to
+	solve. This object contains the required subdata and has options for
+	visualizing the particle types and the source liquid simulation fields.
+
+Particle Forces:
+	Additional forces to apply to the particles.
+	
+	TIP:
+		The solver organizes the different particle types into point groups
+		named `foam`, `spray`, and `bubbles`, making it easy to apply forces
+		to specific types of particles.
+
+Sources:
+	Particle sources, usually including a 
+	[Whitewater Emitter|Node:dop/whitewateremitter] DOP to provide volumetric 
+	emission.
+
+@parameters
+
+Volume Source:
+	#channels: /source
+	The path of the SOP node providing the source volumes for the solver.
+	The node should provide an SDF volume or VDB that represents the extent
+	of the liquid surface and has a primitive `name` attribute set to 
+	`surface`.  It should also provide a set of three volumes or one vector VDB
+	containing the velocity field of the source simulation, with the three primitives
+	having `name` attributes of `vel.x`, `vel.y`, and `vel.z` for volumes, or simply
+	`vel` for a single vector VDB.  The  [WhitewaterSource|Node:sop/whitewatersource],
+	[Fluid Compress|Node:sop/fluidcompress], and [DOP Import|Node:sop/dopimport]
+	nodes all output volumes with the proper names.
+
+Import Volumes Into DOPs:
+	#channels: /importvolumes
+	Import the source volumes into DOP fields before using them for advection and
+	depth testing against particles.  If this option is disabled, those operations
+	are performed using the original source volumes from SOPs, avoiding any resampling
+	or duplication of volume data and saving processing time and memory.  
+	
+	NOTE:
+	    The field guides on	the accompanying [Whitewater Objects|Node:dop/whitewaterobject] will not work if the data is not copied to DOPs first.
+
+== Foam == (foam)
+
+Depth:
+	#channels: /foamdepth
+	The distance to the top or bottom of the foam layer, measured from the
+	middle of the foam layer. The total height of the foam layer will
+	be twice this value.
+
+Iso Surface:
+	#channels: /foamiso
+	The middle of the foam layer will lie at this depth value on the 
+	`surface` field.  Increasing this value will raise the entire foam layer,
+	which can be effective in ensuring it stays above the liquid
+	surface for rendering.
+
+Enable Foam:
+	#channels: /dofoam
+	Enable solving for foam particles.  If foam particles are disabled, any
+	particles that enter the foam layer depth will be killed.
+
+=== Lifespan === (lifespan)
+
+Lifespan Attribute:
+	#channels: /foamlifespanattrib
+	The initial lifespan of foam particles can be mapped from a zero to one
+	attribute on the foam particles.  The lifespan will range from 
+	__Min Lifespan__ to __Max Lifespan__, or just be set to __Min Lifespan__
+	if this parameter is not set.  Using the same attribute	that originally	
+	controlled particle emission (typically the `emit` attribue) will give
+	larger clumps of foam a longer initial lifespan.
+
+Min Lifespan:
+	#channels: /minfoamlife
+	The minimum lifespan for foam particles that map to the zero value of
+	of the __Lifespan Attribute__, or for all particles if that attribute
+	is not set.
+
+Max Lifespan:
+	#channels: /maxfoamlife
+	The maximum lifespan for foam particles that map to the one value of
+	the __Lifespan Attribute__.
+
+Lifespan Variance:
+	#channels: /foamlifevar
+	A random number of seconds within this range is added or subtracted from
+	the	foam lifespan.
+
+Preserve Foam:
+	#channels: /preservefoam
+	Increase or decrease the lifespan of foam particles based on the local
+	density of foam particles, which can help create clumps and streaks of
+	foam on the liquid surface over time.  
+
+Min Foam Density:
+	#channels: /minfoamdensity
+	When the local foam density surrounding a foam particle lies in the range
+	of this value down to zero, proportionally reduce its lifespan each 
+	timestep by the __Reduction Rate__.
+
+Max Foam Density:
+	#channels: /maxfoamdensity
+	When the local foam density surrounding a foam particle lies in the range
+	of  __Min Foam Density__ up to this value, proportionally increase its
+	lifespan each timestep by the __Preservation Rate__.
+
+Preservation Rate:
+	#channels: /foampreserverate
+	The proportional amount to increase the lifespan of a foam particle with
+	sufficiently high local foam density.  This value is the number of
+	seconds to add per second, so if greater than one can effectively preserve
+	high density foam clumps from every being killed.
+
+Reduction Rate:
+	#channels: /foamreducerate
+	The proportional amount to decrease the lifespan of a foam particle with
+	sufficiently low local foam density.  This value is the number of
+	seconds to reduce the lifespan per second.
+
+=== Behavior === (behavior)
+
+Advection Strength:
+	#channels: /foamadvect
+	The strength of the advection force that carries the foam with the
+	velocity field from the source liquid simulation.  Very high values
+	will cause the foam to follow the liquid surface very closely and lead to
+	fine, streaky foam.  Lower values give more diffuse, spread-out foam.
+
+Falloff Bias:
+	#channels: /foamfalloff
+	The rate at which the foam advection force falls off away from the middle
+	of the foam layer.  Low values representing a slow falloff mean more
+	foam particles have strong advection forces and produce tighter streaks
+	of foam.  With a higher falloff the foam gradually gets smeared across 
+	the surface over time.
+
+Behavior At Limits:
+	#channels: /foamlimit
+	Specifies the foam particle behavior when hitting the __Volume Limits__.
+
+	Collide at Closed:
+		Collide with any closed boundaries.  At open boundaries this is
+		equivalent to __Kill__.
+	Make Ballistic:
+		Make any foam particles ballistic when outside the
+		__Volume Limits__.
+	Kill:
+		Kill any foam particles type when outside the __Volume Limits__.
+
+Volumetric Foam:
+	#channels: /dovolumefoam
+	Adds additional advection velocity towards a unique depth within the foam
+	layer for each particle, giving more control over the volume of the resulting foam and
+	keeping the foam particles closer to the foam __Iso Surface__ value over time.
+
+Depth Scale:
+	#channels: /foamdepthscale
+	A multiplier for the the foam __Depth__ when choosing unique depth values for each
+	foam particle.  Setting this parameter below 1 acts similar to surface tension, where
+	the foam will be attracted inwards toward the fluid surface over time.
+
+Depth Scale Variance:
+	#channels: /foamdepthvariance
+	A random variance added to the __Depth Scale__ parameter.   Higher values for this parameter
+	increase the "fuzziness" of the foam around the edges.  Lower values give harder edges to the foam.
+
+Move Amount:
+	#channels: /foammoveamount
+	The amount each foam particle will move towards its goal depth on each timestep.  Higher
+	values give a stronger volumetric force, but can cause snapping artifacts as bubble and
+	spray particles transition to foam.
+
+Seed:
+	#channels: /foamseed
+	A random seed for controlling the goal depth and variance for each form particle.
+
+Depth Scale Lifetime Ramp:
+	#channels: /foamdepthscaleramp
+	A ramp that multiplies the __Depth Scale__ over the lifetime of the foam particle.  A decreasing
+	ramp creates foam that starts out more volumetric then attracts inwards over time as the foam
+	begins to dissipate.
+
+== Spray == (spray)
+
+Enable Spray:
+	#channels: /dospray
+	Enable solving for spray particles.  If spray particles are disabled, any
+	particles that are emitted or leave the surface as spray will be killed.
+
+Lifespan:
+	#channels: /spraylife
+	The default initial lifespan of spray particles.
+
+Lifespan Variance:
+	#channels: /spraylifevar
+	A random number of seconds within this range is added or subtracted from
+	the	spray lifespan.
+
+Gravity:
+	#channels: /spraygravityx /spraygravityy /spraygravityz
+	The gravity force to apply to spray particles.
+
+Drag:
+    #channels: /spraydrag
+    The amount of drag apply to the spray particles.
+
+Speed Limit:
+	#channels: /sprayspeedlimit
+	The maximum allowed speed of the spray particles.
+
+Behavior At Limits:
+	#channels: /spraylimit
+	Specifies the spray particle behavior when hitting the __Volume Limits__.
+
+	Collide at Closed:
+		Collide with any closed boundaries.  At open boundaries this is
+		equivalent to __Kill__.
+	Make Ballistic:
+		Make any spray particles ballistic when outside the
+		__Volume Limits__.
+	Kill:
+		Kill any spray particles when outside the __Volume Limits__.
+
+== Bubbles == (bubbles)
+Enable Bubbles:
+	#channels: /dobubbles
+	Enable solving for bubble particles.  If bubble particles are disabled, 
+	any	particles that are emitted or dip below the surface as bubbles will
+	be killed.
+
+Lifespan:
+	#channels: /bubbleslife
+	The default initial lifespan of bubble particles.
+
+Lifespan Variance:
+	#channels: /bubbleslifevar
+	A random number of seconds within this range is added or subtracted from
+	the	bubbles lifespan.
+
+Advection Strength:
+	#channels: /bubblesadvect
+	The strength of the advection force that carries the bubbles with the
+	velocity field from the source liquid simulation.
+
+Buoyancy:
+	#channels: /bubblesbuoyancyx /bubblesbuoyancyy /bubblesbuoyancyz
+	The buoyancy force to apply to bubble particles, which will move
+	the bubbles upwards towards the surface.
+
+Behavior At Limits:
+	#channels: /bubbleslimit
+	Specifies the bubble particle behavior when hitting the __Volume Limits__.
+
+	Collide at Closed:
+		Collide with any closed boundaries.  At open boundaries this is
+		equivalent to __Kill__.
+	Make Ballistic:
+		Make any bubble particles ballistic when outside the
+		__Volume Limits__.
+	Kill:
+		Kill any bubble particles when outside the __Volume Limits__.
+
+== Solver == (solver)
+
+Timescale:
+    An overall scale applied to the actual timestep. This parameter can be animated.
+
+Closed Boundaries:
+	#channels: /closedends
+    The volume limits can be clamped to prevent any particles from
+    entering or leaving the box. Any particles that leave open boundaries
+    will be killed.
+
+X, Y, Z:
+    When closed boundaries is set, these select which
+    sides will be closed.
+
+Visualize Limits:
+        Display the guide showing the maximum limits of the simulation.
+
+Volume Limits Size:
+	#channels: /limits_sizex /limits_sizey /limits_sizez
+    The size of the maximum volume.
+
+Volume Limits Center:
+	#channels: /limits_tx /limits_ty /limits_tz
+    The center of the maximum volume.
+
+Delete Internal Attributes:
+	#channels: /delattribs
+	To save memory, the solver deletes several particle attributes used 
+	internally during the solving process.  Some of these can be useful as 
+	debugging aids or for further processing, in which case they should be
+	removed from this list.
+
+	`foamamount`:
+		The 0-1 amount of foam forces applied to the particle.
+	`foamdensity`:
+		The local foam density when __Preserve Foam__ is enabled.
+	`depth`:
+		The surface depth.
+	`emit`:
+		The original emission probability for the particle.
+
+@related
+[Whitewater Source|Node:sop/whitewatersource]
+[Whitewater Object|Node:dop/whitewaterobject]
+[Whitewater Emitter|Node:dop/whitewateremitter]
+[FLIP Solver|Node:dop/flipsolver]
+[Fluid Solver|Node:dop/fluidsolver]

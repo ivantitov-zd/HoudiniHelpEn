@@ -1,5 +1,101 @@
 #type: include
 
+=== Constraint Attributes ===
+
+You can [create attributes|/model/attributes] on the geometry to customize each constraint's behavior and type.
+If a primitive attribute with the same name as a constraint property (such as `damping`) is present, the attribute value will be multiplied with the value from the constraint sub-data.
+
+The following attributes can be used to control the type of constraint described by each primitive.
+
+table>>
+    tr>>
+        th>> Name
+        th>> Class
+        th>> Type
+        th>> Description
+    tr>>
+        td>> `constraint_name`
+        td>> Primitive
+        td>> String
+        td>>
+            Specifies the __Data Name__ of the constraint to create. If this
+            attribute is not present or the name is invalid, no constraint will
+            be created from the primitive. This attribute can be modified in a
+            [SOP Solver|Node:dop/sopsolver] to change the constraint's type
+            during the simulation.
+    tr>>
+        td>> `constraint_type`
+        td>> Primitive
+        td>> String
+        td>>
+            Specifies whether the constraint affects `position`, `rotation` or
+            `all` degrees of freedom. If this attribute is not present or has
+            an invalid value, the default value will be `position`.
+    tr>>
+        td>> `next_constraint_name`
+        td>> Primitive
+        td>> String
+        td>>
+            Specifies a new value for the `constraint_name` attribute to switch to if the constraint is broken by the solver.
+            This is simpler than using a [Node:dop/sopsolver] and allows the transition to take place at the instant the constraint breaks.
+            Currently, only [glue constraints|Node:dop/glueconrel] may be broken during the timestep by the [Node:dop/bulletrbdsolver].
+    tr>>
+        td>> `next_constraint_type`
+        td>> Primitive
+        td>> String
+        td>>
+            Specifies a new value for the `constraint_type` attribute to switch to if the constraint is broken by the solver and the `next_constraint_name` attribute is valid.
+    tr>>
+        td>> `propagate_iteration`
+        td>> Detail
+        td>> Integer
+        td>>
+            Specifies the number of impact propagations for all [glue bonds|Node:dop/glueconrel] in the constraint network.
+
+            NOTE:
+                In Houdini 17, the number of propagation iterations can instead be varied per glue constraint with the __Propagation Iterations__ parameter, so this detail attribute is deprecated.
+
+=== Feedback Attributes ===
+
+The following attributes are created by the solver to provide information about how the constraints behaved during the previous timestep.
+These attributes can be used to control when [constraints are broken|Node:dop/constraintnetwork#breaking].
+
+table>>
+    tr>>
+        th>> Name
+        th>> Class
+        th>> Type
+        th>> Description
+    tr>>
+        td>> `angle`
+        td>> Primitive
+        td>> Float
+        td>> The current angle (in radians) between the two anchors.
+    tr>>
+        td>> `distance`
+        td>> Primitive
+        td>> Float
+        td>> The current distance between the two anchors.
+    tr>>
+        td>> `force`
+        td>> Primitive
+        td>> Float
+        td>> This attribute stores the magnitude of the force that was applied to satisfy the constraint during the previous timestep.
+    tr>>
+        td>> `impact`
+        td>> Primitive
+        td>> Float
+        td>> For [glue constraints|Node:dop/glueconrel], this attribute is updated by the solver with the accumulated impulses for the glue bond, as impacts occur and propagate through the network.
+    tr>>
+        td>> `torque`
+        td>> Primitive
+        td>> Float
+        td>> This attribute stores the magnitude of the torque that was applied to satisfy the constraint during the previous timestep.
+
+=== Anchor Attributes ===
+
+The following attributes can be used to control how the anchor points are [attached to objects|Node:dop/constraintnetwork#anchortypes].
+
 table>>
     tr>>
         th>> Name
@@ -47,24 +143,6 @@ table>>
             Identifies the number of constrained degrees of freedom for an
             anchor (0 to 3).
     tr>>
-        td>> `constraint_name`
-        td>> Primitive
-        td>> String
-        td>>
-            Specifies the __Data Name__ of the constraint to create. If this
-            attribute is not present or the name is invalid, no constraint will
-            be created from the primitive. This attribute can be modified in a
-            [SOP Solver|Node:dop/sopsolver] to change the constraint's type
-            during the simulation.
-    tr>>
-        td>> `constraint_type`
-        td>> Primitive
-        td>> String
-        td>>
-            Specifies whether the constraint affects `position`, `rotation` or
-            `all` degrees of freedom. If this attribute is not present or has
-            an invalid value, the default value will be `position`.
-    tr>>
         td>> `local_orient`
         td>> Point
         td>> Quaternion
@@ -89,20 +167,6 @@ table>>
             For agent primitives, a transform name can be appended to the anchor name (e.g. `agent2/head`) to attach the constraint to a specific transform in the agent's rig.
             For all other types of objects, the DOP object name is used.
     tr>>
-        td>> `next_constraint_name`
-        td>> Primitive
-        td>> String
-        td>>
-            Specifies a new value for the `constraint_name` attribute to switch to if the constraint is broken by the solver.
-            This is simpler than using a [Node:dop/sopsolver] and allows the transition to take place at the instant the constraint breaks.
-            Currently, only [glue constraints|Node:dop/glueconrel] may be broken during the timestep by the [Node:dop/bulletrbdsolver].
-    tr>>
-        td>> `next_constraint_type`
-        td>> Primitive
-        td>> String
-        td>>
-            Specifies a new value for the `constraint_type` attribute to switch to if the constraint is broken by the solver and the `next_constraint_name` attribute is valid.
-    tr>>
         td>> `orient`
         td>> Point
         td>> Quaternion
@@ -115,20 +179,6 @@ table>>
         td>> Point
         td>> Vector
         td>> Identifies the initial world space position of the anchor.
-    tr>>
-        td>> `propagate_iteration`
-        td>> Detail
-        td>> Integer
-        td>>
-            Specifies the number of impact propagations for glue bonds in the
-            constraint network.
-            
-            When a glued object is hit, its impact value is spread along the
-            constraint network to other glue bonds.  This allows distant glue
-            bonds that are weak to be broken prior to nearer, strong bonds. The
-            impact propagations is the number of rounds of propagation to do.
-            Impulses will not travel more than this number of bonds each solve
-            step.
     tr>>
         td>> `r`
         td>> Point

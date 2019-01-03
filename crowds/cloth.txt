@@ -1,0 +1,91 @@
+= Attaching cloth to agents =
+
+"""You can add and constrain vellum cloth as part of agent shape geometry, and then simulate the cloth based on agent movements."""
+
+
+== Overview ==
+
+[Image:/images/crowds/cloth_cape_example.jpg]
+
+[Vellum|/dyno/vellum] is Houdini's fast cloth (and other PBD) solver. You can associate cloth with agent shapes and then simulate the cloth as part of the overall dynamics simulation along with the crowd and any other dynamics such as rigid bodies.
+
+Because you can set up Vellum cloth in geometry using SOPs, it's ideal for inclusion in an agent shape.
+
+See the [SimpleCrowdCloth|/examples/nodes/sop/agentvellumunpack/SimpleCrowdCloth] node example for a fully worked example attaching capes to agents and simulating them.
+
+[Image:/images/crowds/crowd_cloth_setup.jpg]
+
+
+== Set up the cloth ==
+
+In the SOP network where you set up your agent definition(s), you will add vellum cloth on top of the imported agent geometry, and then use that as the agent shape geometry.
+
+# Alongside the agent definition SOPs, create a new SOP chain that creates the cloth geometry.
+
+    You can import the cloth geometry or define it here. In the cape example, the cloth is a simple grid.
+
+# Append a [Vellum Constraints|Node:sop/vellumconstraints] node to the cloth geometry. Set the __Constraint type__ to "Cloth". This sets up attributes on the geometry for the Vellum solver to treat it as cloth.
+
+# Connect the agent shape's rest geometry to the Vellum Constraints node's third input.
+
+# Append another [Vellum Constraints|Node:sop/vellumconstraints] node and set the __Constraint type__ to "Attach to Geometry".
+
+    Instead of attaching specific points, you can simply specify a group on the cloth geometry and turn on __Constrain to closest point__.
+
+# Append a [Vellum Pack|Node:sop/vellumpack] node to pack up the cloth geometry.
+
+# Append a [Null|Node:sop/null] at the end of the chain, and give it a recongnizable name (for example, `CAPE1_OUTPUT`). We will use this node when we import the cape into an agent shape.
+
+    (It's usually a good idea to put a Null node at the end of SOP chains you will be importing from, so you can insert nodes above it and not have to change any references to the final node in the chain.)
+
+TIP:
+    You can add a Vellum Solver SOP at the end of the vellum setup chain to do a quick sim of the cloth, for example to check how it hangs on the character. This is faster than running the full crowd + cloth simulation.
+
+
+== Add the cloth to an agent ==
+
+[Image:/images/crowds/crowd_agent_nodes.png]
+
+# In the SOP chain where you [define the agent|agent#defn], above the `AGENT_DEFINITION` Null, add an [Agent Layer|Node:sop/agentlayer] node.
+
+    A [layer|diversity] creates a way of varying a character.
+
+# Set the __Layer name__ to a name describing this skin variant, for example `skin_with_short_cape`.
+
+# Add a __Layer binding___.
+
+# In the new layer instance:
+
+    * Set the __Transform name__ to the named transform the new shape should be relative to (this is usually the character skin).
+
+    * Tturn on __Add shape__.
+
+    * In the __SOP path__ field, enter the path to the cloth geometry for this variant.
+
+    * In the __Shape name__ field, enter a descriptive name for this shape (the cloth), such as `short_cape`.
+
+# Repeat for each cloth shape layer you want to add to the agent definition.
+
+    [Image:/images/crowds/crowd_agent_clothshape_nodes.png]
+
+TIP:
+    When you [populate the crowd|setup#populate], remember to seed the crowd with the variants you've created.
+
+
+== Simulate the cloth ==
+
+# In a SOP network, grab the output of the [Crowd Solver DOP|Node:dop/crowdsolver].
+
+    For example, you can use a [DOP Import SOP|Node:sop/dopimport], point it to the [Node:dop/crowdobject] inside the DOP network, and set __Import style__ to "Fetch Geometry from DOP Network".
+
+# Append an [Agent Vellum Unpack|Node:sop/agentvellumunpack] node to extract the vellum geometry.
+
+# Append a [Vellum Solver SOP|Node:sop/vellumsolver] to simulate the vellum geometry.
+
+[Image:/images/crowds/crowd_cloth_sim.png]
+
+TIP:
+    The output of the [Vellum Solver SOP|Node:sop/vellumsolver] is _only_ the simulated cloth geometry. You need to take that geometry and merge it with the crowd output somehow (for example, merge the geometry, or render them seperately and composite them together).
+
+    (You can extract just the character skin layer from the simulation output using an [Agent Edit SOP|Node:sop/agentedit]. Turn on __Set current layer__ and set it to the default skin layer.)
+

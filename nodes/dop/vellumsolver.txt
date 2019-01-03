@@ -1,0 +1,303 @@
+#type:     node
+#context:  dop
+#internal: vellumsolver
+#icon:     DOP/vellumsolver
+
+= Vellum Solver =
+
+"""Sets and configures a Vellum solver."""
+
+Vellum Solvers are a type of POP Solver that include support for internal triangle and edge collisions and explicit constraint geometry.
+
+The Geometry data stores the dynamic attributes of the simulation as point attributes.  It also stores the collision geometry, so the triangle or poly-line mesh is used to detect and resolve collisions. However, the way the points are held together is determined by the separate Constraint Geometry data.  The Constraint Geometry data should have a one-to-one point correspondence with the Geometry.  Polygons in the Constraint Geometry are interpreted as rules to maintain certain properties of the source points, such as distance or bend angle.
+
+POP Forces can be wired into the solver-inputs to adjust the behavior of the object.
+
+Usually an empty Vellum object is created using a [Vellum Object DOP|Node:dop/vellumobject] and patches of geometry are added to this object with [Vellum Source DOPs|Node:dop/vellumsource].
+
+
+@parameters
+
+== Common ==
+
+[Include:/nodes/sop/vellumsolver#enablecollisions]
+[Include:/nodes/sop/vellumsolver#doselfcollisions]
+[Include:/nodes/sop/vellumsolver#timescale]
+
+=== Iterations ===
+
+[Include:/nodes/sop/vellumsolver#substeps]
+[Include:/nodes/sop/vellumsolver#niter]
+[Include:/nodes/sop/vellumsolver#smoothiter]
+
+=== Collisions ===
+
+[Include:/nodes/sop/vellumsolver#collisionsiter]
+[Include:/nodes/sop/vellumsolver#postcollisioniter]
+[Include:/nodes/sop/vellumsolver#resolveallmax]
+[Include:/nodes/sop/vellumsolver#layershock]
+
+=== Friction ===
+
+[Include:/nodes/sop/vellumsolver#static_threshold]
+[Include:/nodes/sop/vellumsolver#dynamic_scale]
+[Include:/nodes/sop/vellumsolver#friction]
+[Include:/nodes/sop/vellumsolver#selffriction]
+
+Static SDF Enable:
+    #id: static_sdfscale
+
+    A scale factor for the volume collider's static friction.  Useful to
+    create frictionless grounds.
+
+Dynamic SDF Enable:
+    #id: dynamic_sdfscale
+
+    A scale factor for the volume collider's dynamic friction.  Useful to
+    create frictionless grounds.
+
+== Advanced ==
+
+[Include:/nodes/sop/vellumsolver#integration]
+
+External Forces:
+    #id: externalforce
+
+    The Vellum points will receive forces from DOP forces.  Turning this off
+    will remove this effect, and the points will only be affected by POP forces.
+
+Default Mass:
+    #id: mass
+
+    If no `mass` attribute is on the incoming geometry, this will be used as the
+    default value for the points.
+
+    Usually mass should already be set by the [Vellum Constraints|Node:sop/vellumconstraints] SOP.
+
+
+Default Thickness:
+    #id: thickness
+
+    If the incoming geometry has no `pscale` attribute, it will be set to this value.
+
+    Usually thickness should already be set by the [Vellum Constraints|Node:sop/vellumconstraints] SOP.
+
+
+=== Collisions ===
+
+Disable Failed Collisions:
+    #id: disablefailedcollisions
+
+    If points fail to resolve their collisions after the post-collision passes,
+    they will be flagged as disabled, allowing them and any primitives attached
+    to them to move collision free.
+
+
+Reset Collided Points:
+    #id: resetcollided
+
+    If a disabled point detects it is no longer in a tangled situation,
+    and is connected to non-disabled point, it will re-activate itself.  The
+    hope is that it has moved back to the correct side of the geometry.
+
+
+Initialize Overlap Distances:
+    #id: initoverlap
+
+    The `overlap_self` and `overlap_external` attributes will be created
+    and initialized to respect the initial setup of the solver.
+
+    Note if the attributes are already present, they will not be
+    initialized.  If the configuration has changed due to modeling
+    operations you may need to delete those attributes.
+
+
+Update Overlap Distances:
+    #id: updateoverlap
+
+    The `overlap_self` and `overlap_external` will be updated to reflect
+    the current configuration.   The only decrease with this operation,
+    so to initialize set to a large initial value.
+
+Tetrahedral Open Faces:
+    #id: dotet
+
+    The unshared faces of a tetrahedral mesh will generate collision geometry if this is set.  Sometimes one wishes to use both a triangle shell and a tetrahedral mesh, making this operation redundant.
+
+
+=== Motion ===
+
+[Include:/nodes/sop/vellumsolver#maxaccel]
+[Include:/nodes/sop/vellumsolver#accelfallback]
+[Include:/nodes/sop/vellumsolver#limitaccel]
+[Include:/nodes/sop/vellumsolver#limitdisplace]
+
+Breaking Frequency:
+    #id: breakfrequency
+
+    How frequently welds and constraints are tested to see if they
+    have reached their breaking point.  Higher rates will give more
+    accuracy to the solve, but changes to the topology from a broken
+    constraint can slow down the solve considerably.
+
+    Never:
+	Do not test for any breaking.
+
+    Per Frame:
+	Check only once every frame, regardless of number of substeps.
+
+    Per Substep:
+	Check every substep.
+
+== Sleeping ==
+
+Enable Auto Sleep:
+    Particles that remain near-stationary for sufficient time will be
+    put to sleep by setting their `stopped` attribute to `1`.
+
+    You can use the Pinned visualization to visualize which points are
+    sleeping.
+
+Velocity Threshold:
+    How slowly particles need to be moving before they are eligible
+    for sleeping.  The amount of time they remain below this speed
+    is accumulated in the `deactivation_time` attribute.  If they
+    exceed this speed, the `deactivation_time` is reset to zero.
+
+Sleep Delay:
+    How many seconds particles need to remain at or below the
+    velocity threshold before they are put to sleep.  See the
+    [Wake Up POP|Node:dop/popwakeup] for methods to wake the 
+    particles back up again.
+
+
+=== Grain Collisions ===
+
+Vellum grains use a separate collision pass to deal with collisions
+between the grains.  These parameters control that behavior.  They
+are similar to those on [POP Grains|Node:dop/popgrains]
+
+Search Scale:
+    #id: grain_searchscale
+
+    Potential intersection particles are any within this scaled distance
+    of the average of the two particles `pscale` attribute.  This
+    is an overestimate because usually collisions are not updated
+    during the constraint iterations, so it needs to record not
+    just the currently colliding particles, but those that may
+    start to collide due to the earlier iterations.
+
+    This also effects the range of the attraction force in clumping.
+
+Max Neighbors:
+    #id: grain_maxneighbor
+
+    The maximum number of particles that will be considered when searching for potential collisions over the substep. Capping this is useful to avoid excessive computations, if too many particles are created at one spot.
+
+Global Weight:
+    #id: grain_weight
+
+    A universal weight scale applied repulsion weight, attraction weight,
+    and the friction weight.   Because constraint averaging isn't used,
+    this may need to be reduced for stability, especially when high
+    attraction stiffness values are used.  A value of 1 / Max Neighbours
+    should provide stability, but at the cost of slower convergence.
+
+
+Assume Uniform Radius:
+    #id: grain_uniformradius
+
+    The `pscale` attribute is used to determine the radius of each
+    particle.  If all particles have the same radius, faster acceleration
+    structures can be used to find neighbors.
+
+Repulsion Weight:
+    #id: repulsionweight
+
+    A weighting for how much the particle collision forces are weighted.
+    A value of zero will disable particle collision.
+
+Repulsion:
+    #id: repulsionstiffness
+
+    How strongly particles are kept apart.  Higher values result in
+    less bouncy repulsion.
+
+Attraction Weight:
+    #id: attractionweight
+
+    A weighting for how much the particles will naturally stick together
+    when close.  A value of zero will disable particle clumping.
+
+    Scale with the `attractionweight` point attribute.
+
+Attraction:
+    #id: attractionstiffness
+
+    How strongly nearby particles stick to each other.  Higher values
+    result in a less bouncy adhesion.
+
+Enable Mass Shock:
+    #id: domassshock
+
+    Artificially scales the mass of particles according to their position
+    with respect to gravity.  By making particles higher up lighter,
+    stacks of particles will converge faster and be more stable.
+
+Shock Scaling Power:
+    #id: massshockpower
+
+    The amount of scaling to perform.  Higher numbers increase the
+    contrast between successive particles.  A value of 0 will
+    cause no ratio between particles, a value of 1 a 15% ratio
+    between two particles stacked vertically.
+
+    Too high a number makes higher particles extremely light
+    and destabilizes the system.
+
+Shock Axis:
+    #id: massshockaxis
+
+    The up-vector used to define a gradient of particle masses.
+
+    Should be in the direction of stacking, so usually is
+    opposite to that of gravity.
+
+=== OpenCL ===
+
+Kernel Options:
+    #id: kerneloptions
+
+    Specify any desired compile flags for the kernel.
+
+    NOTE:
+        The Apple OSX OpenCL compiler requires only a single space between kernel options!
+
+
+Finish Kernels:
+    #id: finish
+
+    When Finish Kernels is disabled, no attempt is to wait for the
+    OpenCL kernels to complete before continuing the next solver.
+    This lets them run in the background until their results
+    are actually needed.  To simplify debugging or timing, it is useful
+    to ensure kernels are finished to make sure errors are detected
+    in the right spot.
+
+
+Recompile Kernels:
+    #id: recompile
+
+    When loading kernels from disk the kernel is cached to avoid
+    regenerating it every solve.  Turning this on forces the re-loading
+    and recompiling of the kernel.  This is useful if #include files
+    refer to code that has changed, or the kernel file is changed
+    in an external text editor.
+
+    It should always be disabled when prototyping is complete.
+
+@related
+    - [Node:dop/vellumobject]
+    - [Node:dop/vellumsource]
+    - [Node:dop/vellumconstraints]
+

@@ -1,0 +1,46 @@
+= Resources =
+This section describes how to manage HQueue resources. HQueue uses resource information to make scheduling decisions for jobs that require a resources such as a Houdini license or Render license (specified in the job specification).
+
+== Houdini Resources == (houdini_resources)
+You can manage Houdini resources, i.e. Houdini licenses and Render licenses, on the resource management page under the *HOUDINI RESOURCES* section (go to the __RESOURCES__ page and click the "Manage Resources" button). You can specify the number of Houdini licenses and Render licenses available across the farm. HQueue will schedule jobs that require these licenses only when there is at least one of the required license available for use. For example, if you have 5 Houdini licenses, HQueue will schedule jobs requiring a Houdini license if there is at least one unused license available or if another job can be run on a machine that is already using a license. Houdini and Render licenses are a "per machine resource" - that is, the licenses are consumed on a per machine basis rather than a per job basis. See [Custom Resources|resourcedetails#custom_resources] for more information about per machine resources.
+
+NOTE:
+    To decrease the amount of a Houdini resource, the new amount should not be less than the amount of the resource currently in use. The amount of a resource currently in use is listed on the __RESOURCES__ page under the "Amount in Use" column.
+
+
+== Custom Resources == (custom_resources)
+Custom resources can be registered with HQueue to help manage access to shared
+farm resources (i.e. 3rd-party software licenses, network files, etc.).  This
+provides you with the control needed to limit the number of jobs that access a
+shared resource at any given time.
+
+=== Per Job Resources versus Per Machine Resources ===
+A per job resource is a resource that is consumed per job. For example, suppose you have a set of jobs that connect to a database and you want to limit the number of concurrent connections.  To do that you can create a custom per job resource to represent the connections, name it "db_connection", and give it a limit amount, say 5.  Then in your jobs if you add the `"resources": {"db_connection": 1}` property in the job specification then at most 5 jobs will run at once.
+
+A per machine resource, on the other hand, is a resource that is consumed per machine. As an example, a Houdini license is a per machine resource; this means that while a machine is running a job that requires a Houdini license, the machine can run other jobs that require a Houdini license without the need for additional Houdini licenses. Based on the the difference between per machine resources and per job resources, there is the implicit assumption that a job will only ever need one unit of a per machine resource, while a job can require more than one unit of a per job resource.
+
+=== Adding a Custom Resource ===
+To add a custom resource to HQueue, navigate to the resource management page (`http://<server_name>:5000/resources/view`), and click on *Add* under *CUSTOM RESOURCES*. Specify the resource name and the amount of the resource in the appropriate fields. If the resource is a per machine resource, select the checkbox beside "Per machine resource". After specifying the details for the custom resource, click the *Save* button under *CUSTOM RESOURCES* to save the new resource.
+
+=== Specifying Jobs That Require a Custom Resource ===
+The name of the custom resource added in the previous section can be used as part of a property of the job specification to denote that the job requires the custom resource. To do so, specify a dictionary for the `"resources"` property of a job where keys are the resource names and corresponding values are the amount of the resource required. The following example demonstrates how to specify a job that uses a custom resource named "Custom_resource_1" in the job specification.
+
+{{{
+#!python
+job_spec = { 
+    "name": "Hello World",
+    "shell": "bash",
+    "command": 'echo "Hello World"'
+    "resources": {"Custom_resource_1": 1}
+}
+}}}
+
+The example defines a job named `"Hello World"` which uses the bash shell to execute its command set. The job specifies that it requires the custom resource named `"Custom_resource_1"` by assigning a dictionary to the `"resources"` property. The dictionary consists of one key-value pair where the key is the resource name, and the value is the amount of the resource required; in this case the example job requires one unit of the `"Custom_resource_1"` resource. For jobs that require multiple resources, simply add one key-value pair for every resource that the job requires to the dictionary. More information about the job specification and available properties can be found on the job [properties|jobdetails#properties] page.
+
+=== Modifying Custom Resources ===
+You can modify custom resources on the resource management page under the *CUSTOM RESOURCES* section (go to the __RESOURCES__ page and click the "Manage Resources" button). You can modify the resource name, amount of the resource, and whether the resource is a per machine resource by editing the appropriate fields.
+
+NOTE:
+    To decrease the amount of a Houdini resource, the new amount should not be less than the amount of the resource currently in use. The amount of a resource currently in use is listed on the __RESOURCES__ page under the "Amount in Use" column. 
+    
+    Additionally, if the resource is to be switched from a per machine resource to a per job resource (or vice versa), the resource must not be in use, i.e. there must be no jobs running or paused which require the resource that is to be modified.

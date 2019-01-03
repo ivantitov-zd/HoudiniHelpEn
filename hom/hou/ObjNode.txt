@@ -176,7 +176,11 @@ NOTE:
     {{{
     #!python
     def parmTransform(self):
-    pivot_transform = hou.hmath.buildTranslate(self.evalParmTuple("p"))
+    pivot_transform = hou.hmath.buildTransform({
+        "translate":self.evalParmTuple("p"),
+        "rotate":self.evalParmTuple("pr")},
+        transform_order="srt",
+        rotate_order="xyz")
     return (
         pivot_transform.inverted() *
         hou.hmath.buildTransform({
@@ -230,6 +234,57 @@ NOTE:
         pivot=hou.Vector3(self.evalParmTuple('p')))
 
     for parm_name, key in ('t', 'translate'), ('r', 'rotate'), ('s', 'scale'):
+        self.parmTuple(parm_name).set(parm_values[key])
+    }}}
+
+    See also [Hom:hou.Matrix4#explode].
+
+::`parmPivotTransform(self)` -> [Hom:hou.Matrix4]:
+    #cppname: HOM_ObjNode::parmPivotTransform
+    Return the pivot transform defined by the parameters on this node.
+
+    This method can approximately be implemented as follows:
+    {{{
+    #!python
+    def parmPivotTransform(self):
+    pivot_transform = hou.hmath.buildTranslate(self.evalParmTuple("p"))
+    return (
+        hou.hmath.buildTransform({
+            "translate": self.evalParmTuple("p"),
+            "rotate": self.evalParmTuple("pr")},
+        transform_order="srt",
+        rotate_order="xyz")
+    }}}
+
+    See also [Hom:hou.ObjNode#parmTransform].
+
+::`setParmPivotTransform(self, matrix, fail_on_locked_parms=False)`:
+    #cppname: HOM_ObjNode::setParmPivotTransform
+    Sets the pivot transform controlled by this object's parameters.
+
+    This method will adjust the pivot translate and pivot rotate values of this
+    object to achieve the desired transform.  It will not compensate for any
+    changes this causes to the world transform of this object.
+
+    If `fail_on_locked_parms` is `True`, and any of the pivot translate or
+    pivot rotate rotate parameters of the object are locked, this method will
+    raise hou.OperationFailed.  If it is `False` and any of those parameters are
+    locked, this method will change their values but leave them locked.
+
+    See also [Hom:hou.ObjNode#parmPivotTransform] and
+    [Hom:hou.ObjNode#setParmTransform].
+
+    This method can be approximately implemented as follows, ignoring locked
+    parameters:
+    {{{
+    #!python
+    def setParmPivotTransform(self, matrix):
+    parm_values = matrix.explode(
+        transform_order=self.parm('xOrd').evalAsString(),
+        rotate_order=self.parm('rOrd').evalAsString(),
+        pivot=hou.Vector3())
+
+    for parm_name, key in ('p', 'translate'), ('pr', 'rotate'):
         self.parmTuple(parm_name).set(parm_values[key])
     }}}
 
@@ -601,5 +656,40 @@ NOTE:
 
     See the [Transforms from Disk|/hom/cookbook/xforms_from_disk] example.
 
+== Animation ==
+
+::`saveParmClip(self, file_name, start=None, end=None, sample_rate=0, scoped_only=False)`:
+    #cppname: HOM_ObjNode::saveParmClip
+    Saves the animation associated with the parameters of this node to the clip
+    file specified by <<file_name>>.
+
+    If the constraints parameter for this node is off, this method works the same 
+    as the super class method [Hom:hou.Node#saveParmClip].
+
+    If the constraints parameter for this node is on, then, in addition to 
+    what the super class method does, the method computes values for 
+    all transform parameters (Translate X, Y, Z, Rotate X, Y, Z, 
+    and Scale X, Y, Z) and includes them in the saved clip file. This allows 
+    you to load the saved clip file into another node and retain the same 
+    animation without setting up the constraints parameter on the other node.
+
+::`parmClipData(start=None, end=None, binary=True, use_blosc_compression=True, sample_rate=0, scoped_only=False)` -> `str`:
+    #cppname: HOM_ObjNode::parmClipData
+    Returns the clip data for the parameters of this node.
+
+    This method is similar to [Hom:hou.ObjNode#saveParmClip], except that it returns
+    the clip data (file contents) instead of saving the animation to a clip file.
+
+    <<start>>, <<end>>, <<sample_rate>>, and <<scoped_only>> behave the same as
+    in [Hom:hou.ObjNode#saveParmClip].
+
+    If <<binary>> is `True`, return binary clip data,
+    otherwise return plain text (ASCII) clip data.
+
+    If <<use_blosc_compression>> is `True`, blosc compress the binary clip data.
+    This cannot be used for plain text (ASCII) clip data.
+
+    Raises a hou.InvalidInput exception if `binary = False` and
+    `use_blosc_compression = True`.
 
 

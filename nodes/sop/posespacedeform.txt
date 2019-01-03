@@ -1,0 +1,82 @@
+#type: node
+#context: sop
+#internal: posespacedeform
+#icon: SOP/posespacedeform
+#tags: capture, character
+
+= Pose-Space Deform =
+
+"""Interpolates between a set of pose-shapes based on the value of a set of drivers."""
+
+Pose-space deformation (PSD) blends together a set of geometry examples, called pose-shapes, in a manner similar to BlendShapes. The blend weight applied to each pose-shape are automatically adjusted by PSD to interpolate between the pose-shapes as a set of driver values change. For example, with PSD a character's bicep can be made to flex as the angle of the forearm relative to the upper arm changes. The angle increases as the forearm is brought towards the upper arm. The forearm angle is used to drive the interpolation between its rest (straight) pose-shape and a flexed pose-shape where the arm is bent. When the current pose matches that of a given pose-shape the resulting geometry will match that pose-shape's geometry. If the current pose lies between two or more pose-shapes the resulting geometry will be a blend of their geometries.
+
+The Pose-Space Deform SOP takes the packed primitives produced by a chain of [Pose-Space Edit SOPs|Node:sop/posespaceedit] as its second input . Each [Pose-Space Edit SOP|Node:sop/posespaceedit] is associated with a [Stash Pose CHOP|Node:chop/stashpose] that holds drivers produced by [Extract Pose Drivers SOP|Node:chop/extractposedrivers] and transforms produced by [Extract Bone Transforms SOP|Node:chop/extractbonetransforms]. The different geometry of each [Pose-Space Edit SOP|Node:sop/posespaceedit] and its associated drives and transforms make up a pose-shape.
+
+If the first input of the Pose-Space Deform SOP is a [Node:sop/null], the SOP produces a difference geometry that should be combined by addition with the input geometry using a [Pose-Space Deform Combine SOP|Node:sop/posespacedeformcombine]. Otherwise the result will be a pose-specific geometry. The Pose-Space Deform SOP can be placed before a [Bone Deform SOP|Node:sop/bonedeform] or after. Pre-deform PSD, called __Rigging PSD__, is used while creating the character rig and post-deform PSD, called __Shot Finaling PSD__, is used during animation. __Rigging PSD__ should use drivers associated with the character's pose while __Shot Finaling PSD__ should use the current frame `$F` or the current time `$T` as the driver.
+
+Create one PSD for each region of the geometry that needs pose-specific modifications. This an effective way reduce the overall total number of examples that need to be created.
+
+@parameters
+
+Weighted Pose-Space Deformation:
+    With this option bones will only drive the points they are responsible for skinning; that is the points with positive bone capture attribute weights. Weighted PSD significantly reduces the number of variations of the same example that need to be created by driving each point with its parent bones rather than with the skeleton as a whole. For example, when applying weighted PSD to a hand it is not necessary to create multiple variations for the flexion and extension of different combinations of fingers. The knuckle wrinkles are mostly independent of each other and thus only two variations for the flexion and extension of all of the fingers together need to be created. Weighted PSD is, however, computationally intensive. It will increase the time required to solve the PSD coefficients and render each frame.
+
+Deform Normals:
+    Deforms the normals to match the deformation of the points.
+
+Deform Vector Attributes:
+    Deforms the vector attributes to match the deformation of the points.
+
+Vector Attributes:
+    Vector attributes to deform.
+
+Deform Quaternion Attributes:
+    Deforms the quaternion attributes to match the deformation of the points.
+
+Quaternion Attributes:
+    Quaternion attributes to deform.
+
+Allow Negative Blend-Shape Weights:
+    Enable to allow PSD to combine negative amounts of each blend-shape example.
+
+Extrapolate Beyond Examples:
+    If enabled, a best fit method will be used for the extrapolation of data outside of the source inputs.
+
+Best Possible Extrapolation:
+    This option is only used when Extrapolate Beyond Examples is enabled. Turning this on will first maximize the interpolation using the plane of best fit, and then interpolate the remaining differences using the radial basis functions. This gives closer fits to the hyperplane method especially for kernel functions that specify a falloff. For those kernel functions, turning this option will also result in faster cooking. This option can give better results when there is high spatial correlation in the examples.
+
+Kernel:
+    This specifies the kernel function used for the Radial Basis Functions interpolant. Different kernel functions will result in varying fits.
+
+Exponent:
+    Specifies the exponent used for the Thin Plate kernel function. Larger values will give smoother results.
+
+Fall Off:
+    Specifies the fall off factor for the Gaussian, Multiquadric, Inverse Multiquadric, and Exponential Bump kernel functions.
+
+    Larger values will give smoother results.
+
+Solver:
+    Specifies the solver method used for the interpolation.
+
+    Fast:
+        The Cholesky solver is faster but not as stable.
+
+    Robust:
+        The SVD solver is slower but will produce the higher quality interpolations.
+
+Damping:
+    Specifies the damping used for the Cholesky solver. This is normally not needed unless the solver is failing. In that case, start with a very small damping value like 0.00001 for     example. Then use successively larger values like 0.0001, 0.001, 0.01, etc. until the solver succeeds.
+
+Maximum Iterations:
+    Specifies the maximum number of iterations that the SVD solver performs. If the SVD solver fails, then increase this value until the solver succeeds.
+    
+[Include:common#common]
+
+@related
+
+- [Node:sop/posespacedeformcombine]
+- [Node:sop/posespaceedit]
+- [Node:chop/stashpose]
+- [Node:chop/extractposedrivers]
+- [Node:chop/extractbonetransforms]

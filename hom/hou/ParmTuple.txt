@@ -174,6 +174,11 @@ See also [Hom:hou.parmTuple_] and [Hom:hou.Node#parmTuple].
     executing this method either in non-graphical Houdini or when the owner
     node has not yet been loaded into the Parameter Pane.
 
+::`isConstrained(self)` -> `bool`:
+    #cppname: HOM_Parm::isConstrained
+    Returns True if the Parm's parent node is an OBJ that is cooked and has
+    constraints.
+
 == Hierarchy ==
 
 ::`node(self)` -> [Hom:hou.Node]:
@@ -340,6 +345,119 @@ See also [Hom:hou.parmTuple_] and [Hom:hou.Node#parmTuple].
 
 == Animation ==
 
+::`saveClip(self, file_name, start=None, end=None, sample_rate=0)`:
+    #cppname: HOM_ParmTuple::saveClip
+    Saves the animation associated with the parameters of this tuple to the clip
+    file specified by <<file_name>>.
+    The extension of <<file_name>> determines the format of the saved file.
+
+    You can use one of the following extensions:
+    * `.clip`: save animation as plain text (ASCII) clip file.
+    * `.bclip`: save animation as a bclip (binary clip) file.
+    * `.bclip.sc`: save animation as a bclip file using Blosc compression.
+
+    Set <<sample_rate>> to a non-zero, non-negative value to specify the
+    sample_rate to be used for the clip file.
+    For example, if the current frame rate is 24 ([Hom:hou.fps]), and
+    <<sample_rate>> is set to 12, the animation will be sampled every second
+    frame since <<sample_rate>> is half of the current frame rate.
+
+    If <<start>> is not `None`, start saving the animation from the specified
+    frame (inclusive).
+    Otherwise, the animation will be saved from the global start frame (inclusive).
+
+    Similarly, if <<end>> is not `None`, stop saving the animation at the
+    specified frame (inclusive).
+    Otherwise, the animation will be saved until the global end frame (inclusive).
+
+    The global start and end frame are specified in the
+    [Global Animation Options|/ref/windows/global_anim_opts] window.
+
+    Raises a hou.OperationFailed exception if none of the parameters of this
+    tuple have animation.
+
+    Raises a hou.OperationFailed exception if there is an error saving the
+    animation to file.
+
+    Raises a hou.InvalidInput exception if `start >= end`. If specifying only
+    <<start>>, ensure that the specified value is less than the global
+    end frame. Likewise, if specifying only <<end>>, ensure it is larger than
+    the global start frame.
+
+::`loadClip(self, file_name, sample_rate=0, start=None)`:
+    #cppname: HOM_ParmTuple::loadClip
+    Load animation for the parameters in this tuple from the clip file
+    specified by <<file_name>>.
+    See [Hom:hou.ParmTuple#saveClip] for the list of supported clip file formats.
+
+    Any tracks in the clip file that do not match the name of the parameters
+    of this tuple will be ignored.
+
+    If <<sample_rate>> is set to a non-zero, non-negative value, the
+    specified value will be used when loading the animation.
+    For example, if the current frame rate is 24 ([Hom:hou.fps]) and
+    <<sample_rate>> is set to 12, the animation will be loaded with a keyframe
+    at every second frame since <<sample_rate>> is half of the current
+    frame rate.
+
+    <<start>> specifies the frame the loaded animation should start from.
+    By default the animation starts at the frame specified in the clip file.
+
+    WARNING:
+        Any existing keyframes for the parameters of this tuple that are
+        within the range of the loaded animation will be overwritten with
+        the loaded data.
+
+    This function will raise a hou.OperationFailed exception if there is an
+    error reading animation data from the file.
+
+::`clipData(start=None, end=None, binary=True, use_blosc_compression=True, sample_rate=0)` -> `str`:
+    #cppname: HOM_ParmTuple::clipData
+    Returns the clip data for the parameters of this tuple.
+    This method is similar to [Hom:hou.ParmTuple#saveClip], except that it returns
+    the clip data (file contents) instead of saving the animation to a clip file.
+
+    <<start>>, <<end>>, and <<sample_rate>> behave the same as in
+    [Hom:hou.ParmTuple#saveClip].
+
+    If <<binary>> is `True`, return binary clip data,
+    otherwise return plain text (ASCII) clip data.
+
+    If <<use_blosc_compression>> is `True`, blosc compress the binary clip data.
+    This cannot be used for plain text (ASCII) clip data.
+
+    Raises a hou.OperationFailed exception if none of the parameters of
+    this tuple have animation.
+
+    Raises a hou.InvalidInput exception if `start >= end`. If specifying only
+    <<start>>, ensure that the specified value is less than the global
+    end frame. Likewise, if specifying only <<end>>, ensure it is larger than
+    the global start frame.
+
+    Raises a hou.InvalidInput exception if `binary = False` and
+    `use_blosc_compression = True`.
+
+::`setClipData(data, binary=True, blosc_compressed=True, sample_rate=0, start=None)`:
+    #cppname: HOM_ParmTuple::setClipData
+    Load animation for the parameters of this tuple from the given clip <<data>>.
+    This method is similar to [Hom:hou.ParmTuple#loadClip], except that it loads
+    animation from the given clip data instead of a clip file.
+
+    <<sample_rate>> and <<start>> behave the same as in [Hom:hou.ParmTuple#loadClip].
+
+    <<binary>> and <<blosc_compressed>> specify the type of input data.
+
+    If <<binary>> is `True`, the given data is binary clip data,
+    otherwise it is plain text (ASCII) clip data.
+
+    If <<blosc_compressed>> is `True`, the given data is blosc compressed
+    binary data. This cannot be used for plain text (ASCII) clip data.
+
+    Raises a hou.OperationFailed exception if the given data is invalid.
+
+    Raises a hou.InvalidInput exception if `binary = False` and
+    `blosc_compressed = True`.
+
 ::`setPending(self, values)`:
     #cppname: HOM_ParmTuple::setPending
     #replaces: Cmd:opparm
@@ -460,10 +578,10 @@ See also [Hom:hou.parmTuple_] and [Hom:hou.Node#parmTuple].
 
 == CHOPs ==
 
-::`createClip(self, parent_node, name, create_new, apply_immediately, current_value_only)` -> [Hom:hou.ChopNode]:
+::`createClip(self, parent_node, name, create_new, apply_immediately, current_value_only, create_locked, set_value_to_default)` -> [Hom:hou.ChopNode]:
     #cppname: HOM_ParmTuple::createClip
     Creates a Channel CHOP representing this parameter. The Channel CHOP is
-    created with the given name as a child of the given parent node.  The
+    created with the given name as a child of the given parent node. The
     parent_node is typically created via
     [Hom:hou.Node#findOrCreateMotionEffectsNetwork].
     
@@ -480,7 +598,32 @@ See also [Hom:hou.parmTuple_] and [Hom:hou.Node#parmTuple].
     If set to True, then only the current value of the parameter will be
     stored.
 
+    create_locked:
+    If set to True, then the parameters are locked on creation.
+
+    set_value_to_default:
+    If set to True, then the parameters are reverted to their default
+    values on creation
+
     See also [Hom:hou.Node#findOrCreateMotionEffectsNetwork].
+
+::`appendClip(self, chop_node, apply_immediately, current_value_only, create_locked, set_value_to_default)`:
+    #cppname: HOM_ParmTuple::appendClip
+    Appends this parameter to the specified Channel CHOP.
+    
+    apply_immediately:
+    If set to True, then the export flag on the Channel CHOP will be set.
+
+    current_value_only:
+    If set to True, then only the current value of the parameter will be
+    stored.
+
+    create_locked:
+    If set to True, then the parameters are locked on creation.
+
+    set_value_to_default:
+    If set to True, then the parameters are reverted to their default
+    values on creation
 
 == Clipboard ==
 

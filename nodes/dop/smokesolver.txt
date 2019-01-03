@@ -56,7 +56,7 @@ Advection:
 Sourcing (post-solve):
     #id: sourcing_input
     
-    The main use for this input is to add volumes attached to this input as fuel sources, density sources, sinks, collision fields, pumps, etc. These volumes will usually be created by a [Source Volume node|Node:dop/sourcevolume] that imports volumes from a geometry network. See [pyro sourcing|/dyno/fluid_sourcing] for more information.
+    The main use for this input is to add volumes attached to this input as fuel sources, density sources, sinks, collision fields, pumps, etc. This will usually be done by a [Volume Source node|Node:dop/volumesource] that imports volumes from a geometry network. See [pyro sourcing|/dyno/fluid_sourcing] for more information.
     
     Nodes attached to this input can also edit the simulation network's velocity fields, for example to apply custom forces, _after_ the "project gas non-divergent" step.
 
@@ -74,7 +74,7 @@ Timescale:
     You can use expression functions such as [Exp:doptime], [Exp:dopframe],[Exp:dopsttot], and [Exp:dopttost] to convert between global times and simulation times.
 
     NOTE:
-        Changing the __Timescale__ only affects the timestep of the simulation. If adding velocities calculated in SOPs to the simulation for collisions or pumps with the [Source Volume DOP|Node:dop/sourcevolume], scale the incoming velocities by `1 / Timescale` to match the timestep of the simulation.
+        Changing the __Timescale__ only affects the timestep of the simulation. If adding velocities calculated in SOPs to the simulation for collisions or pumps with the [Volume Source DOP |Node:dop/volumesource], scale the incoming velocities by `1 / Timescale` to match the timestep of the simulation.
 	
 Temperature Diffusion:
     A Gaussian blur factor on the temperature field. Higher values spread the temperature out more and create a less sharply defined effect and more cooling. For example, a value of `2 `will blur the temperature field by a radius of 2 every second.
@@ -99,6 +99,89 @@ Buoyancy Lift:
 
 Buoyancy Dir:
     The direction in which buoyancy is applied.  This is usually the Up direction of your simulation, but often can be altered to quickly tweak the look of a sim.
+
+== Color == (colortab)
+
+The solver is capable of managing the smoke object's color data. To this end, it takes care of two
+fields: `Cd`, which stores the color value that can be used as the __Diffuse Field__ for visualization,
+and `Alpha`, which contains the amount of color at each point in space. The `Alpha` field is important
+for determining how colors should be mixed. For example, if white and black smoke mix, the resultant
+gray will be lighter if the white component has a higher `Alpha` value. The clip below provides a
+visual comparison: yellow smoke in the right clip is sourced with a larger value of `Alpha`.
+
+:video:
+    #src: videos/smoke_color_alpha.mp4
+
+Dissipation:
+    #id: enable_color_dissipation color_evap
+    Causes the amount of color (`Alpha` field) to reduce over time. Note that this does not directly
+    affect smoke's color, but makes it easier to mix in new color via sourcing.
+
+Blur:
+    #id: enable_color_blur color_blur
+    Blurs the smoke's color field by mixing its values in neighborhoods of the given size.
+
+Sharpening:
+    #id: enable_color_sharpening color_sharpening
+    Sharpens the smoke's color field, effectively discouraging mixing of different colors.
+
+    NOTE:
+        Large values of the sharpening parameter may introduce visible artefacts. In some cases,
+        the added noise may be reduced by increasing the sharpening __Threshold__.
+
+=== Dissipation === (colordissipationtab)
+
+When dissipation is enabled, the amount of color in the smoke reduces over time, making it easier to
+source new color.
+
+:video:
+    #src: videos/smoke_color_dissipate.mp4
+
+Control Field:
+    #id: use_color_dissipation_field color_dissipation_field
+    When enabled, the amount of dissipation is scaled by the content of this field.
+
+Control Range:
+    #id: color_dissipation_control_range
+    Map from this range of values in the control field.
+
+Remap Dissipation Field:
+    #id: color_remap_dissipation
+    The ramp's vertical axis is amount of dissipation, and the horizontal axis spans __Control Range__.
+    The default ramp, for example, reduces the amount of color faster in areas where temperature is low.
+
+=== Blur === (colorblurtab)
+
+Blur encourages mixing of smoke colors.
+
+:video:
+    #src: videos/smoke_color_blur.mp4
+
+Radius:
+    #id: color_blur_radius
+    Controls how far out the colors will blur per second.
+
+Filter:
+    #id: color_blur_radius
+    Shape of the blur kernel.
+
+=== Sharpness === (colorsharpnesstab)
+
+Sharpening fights mixing, helping preserve sharp boundaries between colors.
+
+:video:
+    #src: videos/smoke_color_sharpen.mp4
+
+Radius:
+    #id: color_sharpen_radius
+    Sharpening boosts the deviation of colors from averaged (blurred) values. This parameter controls
+    the distance to which blurring is performed.
+
+Threshold:
+    #id: color_sharpen_threshold
+    Sharpening boosts the deviation of colors from averaged (blurred) values. If the deviation falls
+    below this threshold at a voxel, no sharpening is done to it. Increasing this value can help reduce
+    the amount of introduced sharpening noise.
 
 == Relationships == (relationships)
 
@@ -368,7 +451,10 @@ Advection CFL:
 === Collisions === (adv_collisionstab)
 
 Correct Collisions:
-    Sets density and fuel fields to `0` inside collision objects. This helps prevent fuel and density from leaking through moving objects.
+    Sets the specified fields to `0` inside collision objects, which helps prevent leaking through moving objects.
+
+Fields to Correct:
+    When __Correct Collisions__ is enabled, fields in this list will have a correction applied inside collision objects.
 
 Feedback Scale:
     A scale factor for applying feedback forces to other objects. Setting this to `0` will prevent any feedback.
@@ -404,6 +490,6 @@ Additional:
 
 - [Pyro Effects|/pyro/pyro]
 - [Node:dop/smokeobject]
-- [Node:sop/fluidsource]
+- [Node:sop/pyrosource]
 - [Node:dop/pyrosolver]
 

@@ -1,6 +1,12 @@
 = Pyro effects (smoke and flames) =
 
-See [how to set up the viewport and desktop|/dyno/setup]. We highly recommend you use the technical [desktop|/basics/panes] (__Windows > Desktop > Technical__) so you have quick access to the tree view and details view.
+
+== Overview ==
+
+The *Pyro solver* handles effects related to hot expanding gases such as fire, smoke, and explosions. The __Pyro FX__ shelf tab contains tools for creating different effects.
+
+Effects are generated from _source geometry_. For example, the skin of a character on fire. This can be as simple as a sphere if you just want to generate smoke and the source shape doesn't matter.
+
 
 == How to == (includeme)
 
@@ -26,90 +32,125 @@ TIP:
 
 See [Pyro look development|/pyro/pyro_look] for information on how to use the various parameters of the source, object, and solver to achieve different smoke and fire looks.
 
+
+== Point based sourcing == (sources)
+
+In Houdini 17, pyro sourcing changed from being based on _volumes_ representing different properties (temperature, fuel) to being based on _points_ with attributes representing the physical properties.
+
+* This conforms better to how most users source pyro sims, for example running a particle sim and then using the result as the source for smoke.
+
+* This makes it easier to manipulate the properties using the large number of SOPs dedicated to editing points and point attributes.
+
+The points are still converted into a volume before export to the simulation, however the new workflow is to edit the points and point attributes rather than the volume itself.
+
+The attributes have the same names as the volume fields: `density`, `temperature`, `fuel`, `divergence`, `burn`, `heat`, `velocity`, `collision`, `source`, and `sink`.
+
+
 == Pyro node networks == (network)
 
-[Image:images/pyro_nodes.png]
+When you use the Pyro shelf tools, they add geometry (SOP) nodes inside _source object_, set up a _DOP network_ for the simulation, and create an _Output object_ to import the result of the simulation back into a renderable Object.
 
-table>>
-    tr>>
-        th>>Network
-        th colspan="2">> Important nodes
-    tr>>
-        td width="33%">>
-            Inside the source object, the tools add surface nodes for creating the source volume.
-        td width="33%">>
-            [Icon:SHELF/fluid_source][Fluid source node|Node:sop/fluidsource]
-        td>>
-            Converts the initial geometry into volumes (`temperature` and `fuel`) suitable for sourcing a pyro simulation. You can use the parameters on this node to control the noise on the source volume, among others.
-            
-            See [Fluid sourcing|/dyno/fluid_sourcing] for more information.
-    tr>>
-        td rowspan="2">>
-            In the DOP network, the tools sets up the dynamics nodes to create the pyro/smoke object, import the source from the geometry network, connect them to the Pyro solver, and make the pyro container resize automatically.
-        td>>
-            [Icon:DOP/smokeobject][Pyro/Smoke object|Node:dop/smokeobject]
-        td>>
-            Controls the 3D resolution of the smoke/fire object, the maximum size of the resizeable container (by default), and whether the container is open on each side, among others. It also has extensive controls for visualizing the contents of the object.
-    tr>>
-        td>>
-            [Icon:DOP/pyrosolver][Pyro solver|Node:dop/pyrosolver]
-            or
-            [Icon:DOP/smokesolver][Smoke solver|Node:dop/smokesolver] (depending on the effect)
-        td>>
-            Controls the rules for how the simulation develops (such how much buoyancy is created by heat), noise, the shaping of flames, among others. It also has extensive controls to visualizing the forces created by the solver (such as shredding).
+[Image:/images/pyro/pyro_nodes.svg]
 
-    tr>>
-        td>>
-            The tools will also create another object that imports the output of the simulation for object-level display and rendering.
-        td>>
-            [Icon:NETWORKS/dop][DOP Import|Node:sop/dopimport]
-        td>>
-            One DOP Import node imports all fields for rendering, and another imports only fast display-related fields for display in the viewport.
+~~~~ Source SOP network ~~~~
 
-== Source geometry ==
+[Icon:SHELF/convert_to_fire] |
+    [Pyro Source node|Node:sop/pyrosource] |
+        #width: 20%
+        Converts the source geometry into points with attributes (`temperature` and `fuel`) you can manipulate to change the character of the fire/smoke generated from the source. For example, to create a "fireball" effect you could generate very high values for `fuel` at the beginning of the effect and then quickly ramp the values down so you get a single "blast" instead of continuous fire.
 
-See [Fluid sourcing|/dyno/fluid_sourcing] for more information.
+        This node has controls for how to scatter the points on/inside the source geometry, what attributes to create, and what to do with existing attributes.
 
-== Fields == (fields)
+[Icon:SOP/attribnoise] |
+    [Attribute Noise node|Node:sop/attribnoise] |
+        Adds some default randomness to the `temperature` and `fuel` values on the points to create a more interesting effect.
 
-- Multifield visualizes heat (flame) and density (smoke).
+[Icon:SOP/volumerasterize] |
+    [Volume Rasterize node|Node:sop/volumerasterize] |
+        Generates a volume from the points and point attributes, for import into DOPs.
 
-- The source adds temperature and fuel to the simulation.
+~~~~ DOP network ~~~~
 
-- Where fuel exists and the temperature is above a certain point, "burn" is created.
+[Icon:DOP/smokeobject] |
+    [Smoke Object node|Node:dop/smokeobject] |
+        #width: 20%
+        Controls the 3D resolution of the smoke/fire object, the maximum size of the resizeable container (by default), and whether the container is open on each side, among others. It also has extensive controls for visualizing the contents of the object.
 
-- Burn creates heat (visible flames).
+        (In the DOP network, this "object" is _the volume in which the effect is simulated_, not the source geometry. The source geometry is imported in a different branch of the network by the Volume Source node.)
 
-- Burn inefficiency leaves a certain percentage of fuel behind after burning.
+[Icon:DOP/volumesource] |
+    [Volume Source node|Node:dop/volumesource] |
+        This node imports the SOP Volume generated by the source network as a series of volume fields. This takes care of renaming attributes and fields that for historical reasons have different names (for example, the `v` velocity attribute becomes the `vel` field).
 
-- Gas released = expansion
+        Generally you will import SOP attributes into their corresponding DOP fields, but if you need to you can edit the relationships, for example copying the same attribute into two different fields.
 
-- Cooling rate, dissipation
+[Icon:DOP/pyrosolver] |
+    [Pyro Solver node|Node:dop/pyrosolver] |
+        Houdini includes two solvers for grid-based smoke/fire simulations. The [Smoke solver|Node:dop/smokesolver] implements the basic fluid simulation engine. It simulates basic smoke effects but does not simulate fire. The [Pyro solver|Node:dop/pyrosolver] is built on top of the smoke solver and adds fire and more controls.
 
-- Velocity = start velocity + temperature * buoyancy
+        The high-level effects created by the tools on the [Pyro FX shelf tab|/shelf/pyro] generally use the Pyro solver.
 
-- Advection affects temperature, heat, density, fuel*
+        The solvers have extensive controls for visualizing forces created by the solver, such as shredding.
 
-In Houdini, temperature = buoyancy, velocity = momentum
+[Icon:DOP/smokesolver] |
+    [Smoke Solver node|Node:dop/smokesolver] |
+        Solver for effects involving smoke, but not flames.
 
-Temperature is one of the most important fields for running a simulation (together with Velocity) and controls to great extend how the sim behaves and looks. Although it isn't often used for rendering and visualization, internally it drives many forces and shape operators (such as __Buoyancy__, __Shredding__ and  __Dissipation__). 
+~~~~ Output SOP network ~~~~
 
-When creating a fire sim, that control is extended to the combustion model. __Temperature Diffusion__ and __Cooling Rate__ act directly on the temperature field and offer great control over the simulation's decay in speed and simulated detail.
+[Icon:SOP/dopimport] |
+    [DOP Import node|Node:sop/dopimport] |
+        #width: 20%
+        One DOP Import node imports all fields for rendering, and another imports only fast display-related fields for display in the viewport.
+
+
+== Inside the Pyro solver == (solver)
+
+- The source adds `temperature` and `fuel` to the simulation.
+
+- Where `fuel` exists and the `temperature` is above a certain point, `burn` is created.
+
+- `burn` creates `heat` (visible flames).
+
+- `burn` inefficiency leaves a certain percentage of `fuel` behind after burning.
+
+- `divergence` represents the expansion caused by heating gas.
+
+- __Dissipation__ and __cooling__ reduce the smoke density and temperature over time, respectively.
+
+- `velocity` = Starting `velocity` plus `temperature` times __Buoyancy__
+
+- Advection affects `temperature`, `heat`, `density`, and `fuel` (if __Advect fuel__ is on in the solver).
+
+- In Houdini, `temperature` represent buoyancy, `velocity` represents momentum.
+
+Notes:
+
+* The "Multifield" visualizer shows both `heat` (flame) and `density` (smoke).
+
+* Temperature is one of the most important fields for running a simulation (together with Velocity) and controls to great extend how the sim behaves and looks. Although it isn't often used for rendering and visualization, internally it drives many forces and shape operators (such as __Buoyancy__, __Shredding__ and  __Dissipation__). 
+
+* When creating a fire sim, that control is extended to the combustion model. __Temperature Diffusion__ and __Cooling Rate__ act directly on the temperature field and offer great control over the simulation's decay in speed and simulated detail.
+
 
 == Collision and expansion fields == (collide_expand)
 
 The Smoke/Pyro solvers allow you to add collision fields (areas the smoke/fire will avoid) and expansion fields (areas that add outward velocity to the simulation).
 
-These tools create the same SOP volume setup as the Pyro tools use for fuel sources, but instead of provided a `fuel` field to the solver, the provide a `collision` or `expansion` field.
+Tools in the Populate Containers shelf tab let you create collision and expansion fields. These create the same sourcing setup as the one Pyro tools use for fuel sources, but instead of creating a `fuel` attribute, they create a `collision` or `divergence` attribute.
+
+NOTE:
+    Since Houdini 14, the recommended way of setting up collision objects for pyro simulations is by using [Icon:DOP/staticobject][Static Object|/shelf/staticobject] or [Icon:SHELF/deforming_object][Deforming Object|/shelf/deformingobject] shelf tools under the [Collisions|/shelf/collisions] tab.
+    However, the [Icon:SHELF/make_collision][Collide with Objects|/shelf/collidewithobjects] shelf tool can still be used if you want fine control over collision velocities.
 
 :task:Turn an object into a collision field:
     # Create a pyro effect.
     
     # Select the geometry object you want the effect to collide with.
     
-    # In the __Populate containers__ shelf tab, click [Icon:SHELF/make_collision] Make Collision.
-    
-    # Select the container and press (Enter).
+    # In the __Collisions__ tab, select [Icon:DOP/staticobject][Static Object|/shelf/staticobject] or [Icon:SHELF/deforming_object][Deforming Object|/shelf/deformingobject] (depending on whether your object is time-dependent).
+
+      Alternatively, you can click [Icon:SHELF/make_collision][Collide with Objects|/shelf/collidewithobjects] under the __Populate Containers__, select your pyro container, then press ((Enter)).
     
     [Image:/images/dynamics/pyro_collision_field.png]
 
@@ -118,19 +159,12 @@ An expansion field adds outward velocity to the simulation within the field. Tha
 
 If you're making an explosion, that can be desirable, but if want something more subtle, you can try the following:
 
-* Add a [Drag force node|Node:dop/drag] after the solver to keep the velocity from continuing forever.
+* Add a [Drag Force node|Node:dop/drag] after the solver to keep the velocity from continuing forever.
 
-* Scale down the expansion source ([Source volume DOP|Node:dop/sourcevolume] > __Scale Source Volume__), or [animate it|/anim/basics] on and off.
+* Scale down the expansion source ([Volume Source DOP|Node:dop/volumesource] > __Scale__ parameter in the `divergence` source), or [animate it|/anim/basics] on and off.
 
 You can also use DOP forces to push smoke/fire around. However, the effect of the force will be dampened by the solver's [project non-divergence|#project] step. Because you set up the expansion field as a direct input to the solver, the solver knows to exclude the expansion field from the project non-divergence calculations.
 
-<!--
-
-        == Manually editing the velocity field ==
-        
-        TBD.
-        
--->
 
 == How to use pyro to advect points of DOP geometry ==
 
@@ -143,12 +177,6 @@ You can use the fields of a pyro simulation to advect the points of DOP geometry
 * Connect a [Gas Advect|Node:dop/gasadvect] to the Advection input of the pyro solver (the third green input). Set the Gas Advect's __Geometry__ parameter to the data name of the editable geometry (`Geometry`) Set the __Velocity field__ to `vel` and the __Collision field__ to `collision`.
 
 
-== Smoke solver vs. Pyro solver ==
-
-Houdini includes two solvers for grid-based smoke/fire simulations. The [Smoke solver|Node:dop/smokesolver] implements the basic fluid simulation engine. It simulates basic smoke effects but does not simulate fire. The [Pyro solver|Node:dop/pyrosolver] is built on top of the smoke solver and adds fire and more controls.
-
-The high-level effects created by the tools on the [Pyro FX shelf tab|/shelf/pyro] use the Pyro solver.
-
 == Temperature diffusion and viscosity are blurs ==
 
 Temperature diffusion is a blur on the temperature field. Increasing it will blur the boundaries between high and low temperature areas, and increase the diffusion of temperature from a source out into the system.
@@ -157,13 +185,6 @@ Viscosity is a blur on the velocity field. Increasing it will blur velocity vari
 
 Because these controls blur the fields, high diffusion/viscosity values will _decrease_ the temperature/velocity in the system, because you are averaging together the areas of high temperature/velocity (for example, near the source) with the surrounding (usually much larger) areas of inactive space.
 
-<!--
-
-        == How "project non-divergent" affects the simulation == (project)
-        
-        TBD.
-
--->
 
 == Rendering Pyro effects ==
 

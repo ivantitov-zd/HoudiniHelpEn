@@ -1,0 +1,252 @@
+= hou.ViewerStateMenu =
+#type: homclass
+#cppname: HOM_ViewerStateMenu
+#group: view
+
+"""Builds a context menu for a viewer state."""
+
+
+== Overview ==
+
+The `ViewerStateMenu` class lets you build a context menu for a [viewer state|/hom/python_states]. This class is also represents sub-menus of the top-level context menu.
+
+Currently you can add the following items to the menu
+
+* Toggle (checkbox) item: represents a setting you can turn on or off
+* Radio strip: represents a choice of several mutually exclusive items.
+* Action item: represents an action to preform. You implement the action in the state's [onMenuAction|/hom/state_menus] method.
+* Separator item: creates a visual separation between groups of items in the menu.
+
+Hotkeys created with [Hom:hou.hotkeys#addCommand] can be added to toggle, action and 
+radio strip menu items.
+
+See [setting up viewer state context menus|/hom/state_menus] for more information.
+
+The following example shows how to implement and bind a menu to a `sop` viewer state.
+
+{{{
+#!python
+from __future__ import print_function
+import hou
+
+
+class ExampleState(object):
+    def __init__(self, state_name, scene_viewer):
+        self.state_name = state_name
+        self.scene_viewer = scene_viewer
+
+    # the menu callback
+    def onMenuAction(self, kwargs):
+        action = kwargs["menu_item"]
+        if action == 'toggle1':
+            print("Set toggle 1 to", kwargs["toggle1"])
+
+        elif action == 'toggle2':
+            print("Set toggle 2 to", kwargs["toggle2"])
+
+        elif action == 'action':
+            print("Chose action 1")
+
+        elif action == 'radio_strip':
+            print("Set the radio strip to", kwargs["radio_strip"])
+
+        elif action == 'submenu_toggle1':
+            print("Set the submenu toggle to", kwargs["submenu_toggle1"])
+
+
+def createViewerStateTemplate(state_type, state_label):     
+    template = hou.ViewerStateTemplate(
+        state_type, state_label, hou.sopNodeTypeCategory()
+    )
+    template.bindFactory(ExampleState)
+
+    # create some hotkeys
+    example_context = "h.pane.gview.state.sop.example"
+    hou.hotkeys.addContext(example_context, "Example Operation", "These keys apply to the Example operations")
+
+    h1 = example_context + 'h1'
+    hou.hotkeys.addCommand(h1, 'example 1', 'example 1')
+    hou.hotkeys.addAssignment(h1, '1')            
+
+    h2 = example_context + 'h2'
+    hou.hotkeys.addCommand(h2, 'example 2', 'example 2')
+    hou.hotkeys.addAssignment(h2, '2')
+
+    h3 = example_context + 'h3'
+    hou.hotkeys.addCommand(h3, 'example 3', 'example 3')
+    hou.hotkeys.addAssignment(h3, '3')
+
+    h4 = example_context + 'h3'
+    hou.hotkeys.addCommand(h4, 'example 4', 'example 4')
+    hou.hotkeys.addAssignment(h4, '4')
+
+    # define the state popupmenu
+    m = hou.ViewerStateMenu('menu', 'Example')
+
+    m.addSeparator()
+    m.addToggleItem( 'toggle1', 'Toggle1', True, hotkey=h1 )
+    m.addToggleItem( 'toggle2', 'Toggle2', False )
+    m.addSeparator()
+    m.addActionItem( 'action', 'Action1', hotkey=h2 )
+    m.addSeparator()
+    m.addRadioStrip( 'radio_strip', 'Radio', "radio_item1" )
+    m.addRadioStripItem( 'radio_strip', 'radio_item1', 'Radio1', hotkey=h3 )
+    m.addRadioStripItem( 'radio_strip', 'radio_item2', 'Radio2', hotkey=h4 )
+    m.addSeparator()
+    subm = hou.ViewerStateMenu('submenu', 'More Example...')
+    subm.addToggleItem( 'submenu_toggle1', 'Sub toggle1', True )
+    m.addMenu( subm )
+    m.addSeparator()
+
+    # attach popupmenu to state
+    template.bindMenu(m)
+
+    return t
+}}}
+
+
+@methods
+
+::`__init__(self, id, label)`:
+    #cppname: HOM_ViewerStateMenu::HOM_ViewerStateMenu
+
+    Creates a [Hom:hou.ViewerStateMenu] object.
+
+    `id`:
+        A unique string ID for the menu. This is not currently used for the top level state context menu.
+
+    `label`:
+        The menu name as it will appear in the interface. This is not currently used for the top level state context menu.
+
+    {{{
+    #!python
+    # The ID and label for the top menu are not used, but you should give
+    # them meaningful values anyway
+    menu = hou.ViewerStateMenu("menu", "State Menu")
+    }}}
+
+
+::`addActionItem(self, id, label, hotkey='')`:
+    #cppname: HOM_ViewerStateMenu::addMenuActionItem
+    
+    Adds an action item to this menu.
+
+    `id`:
+        A unique name to identify the menu item. When this item is chosen by the user, this ID will be passed to the `onMenuAction` method in the arguments dictionary as `kwargs["menu_item"].
+
+    `label`:
+        Menu item label displayed in the menu.
+
+    `hotkey`:
+        An optional hotkey ID string to associate with this menu item. You can use [Hom:hou.hotkeys#addCommand] to create a custom hotkey.
+
+    {{{
+    #!python
+    menu = hou.ViewerStateMenu("menu", "State Menu")
+    menu.addActionItem("delete", "Delete")
+    }}}
+
+::`addToggleItem(self, id, label, default, hotkey='' )`:
+    #cppname: HOM_ViewerStateMenu::addToggleItem
+
+    Adds a toggle menu item to this menu.
+
+    `id`:
+        A unique string ID for this item.
+
+    `label`:
+        The menu item text as it will appear in the menu.
+
+    `default`:
+        Whether the item is on or off by default when the menu is created.
+
+    `hotkey`:
+        An optional hotkey ID string to associate with this menu item. You can use [Hom:hou.hotkeys#addCommand] to create a custom hotkey.
+
+    {{{
+    #!python
+    menu = hou.ViewerStateMenu("menu", "State Menu")
+    menu.addToggleItem("show_points", "Show Points", True)
+    menu.addToggleItem("show_point_nums", "Show Point Numbers", False
+    }}}
+
+
+::`addSeparator(self)`:
+    #cppname: HOM_ViewerStateMenu::addSeparator
+
+    Adds a separator menu item.
+
+    {{{
+    #!python
+    menu = hou.ViewerStateMenu("menu", "State Menu")
+    menu.addActionItem("delete", "Delete")
+    menu.addSeparator()
+    menu.addToggleItem("show_points", "Show Points", True)
+    menu.addToggleItem("show_point_nums", "Show Point Numbers", False)
+    }}}
+    
+::`addRadioStrip(self, id, label, default)`:
+    #cppname: HOM_ViewerStateMenu::addRadioStrip
+
+    Prepares the menu to accept a group of mutually exclusive "radio button" items.
+
+    `id`:
+        A unique string ID for the strip. All menu items added to the group with `addRadioStripItem()` will have this string as their first argument.
+
+    `label`:
+        A title displayed above the group in the menu.
+
+    `default`:
+        A radio item id as specified with [Hom:hou.ViewerStateMenu#addRadioStripItem] representing the default choice when the menu is created.
+
+    {{{
+    #!python
+    menu = hou.ViewerStateMenu("menu", "State Menu")
+    menu.addRadioStrip("deform_type", "Deformation", "bend")
+    menu.addRadioStripItem("deform_type", "bend", "Bend")
+    menu.addRadioStripItem("deform_type", "squash", "Squash")
+    }}}
+
+::`addRadioStripItem(self, strip_id, id, label, hotkey='')`:
+    #cppname: HOM_ViewerStateMenu::addRadioStripItem
+    Adds an menu item to a radio strip menu.
+
+    `strip_id`:
+        The string ID of the radio strip (created with `addRadioStrip()`). All items that share the same `strip_id` are mutually exclusive.
+
+    `id`:
+        A unique string ID for this item.
+
+    `label`:
+        The menu item text as it will appear in the menu.
+
+    `hotkey`:
+        An optional hotkey ID string to associate with this menu item. You can use [Hom:hou.hotkeys#addCommand] to create a custom hotkey.
+
+    {{{
+    #!python
+    menu = hou.ViewerStateMenu("menu", "State Menu")
+    menu.addRadioStrip("deform_type", "Deformation", "bend")
+    menu.addRadioStripItem("deform_type", "bend", "Bend")
+    menu.addRadioStripItem("deform_type", "squash", "Squash")
+    }}}
+
+::`addMenu(self, submenu)`:
+    #cppname: HOM_ViewerStateMenu::addMenu
+    
+    Adds a `ViewerStateMenu` object as a submenu.
+
+    {{{
+    #!python
+    menu = hou.ViewerStateMenu("menu", "State Menu")
+    menu.addActionItem("delete", "Delete")
+    menu.addSeparator()
+    submenu = hou.ViwerStateMenu("options", "Options")
+    submenu.addToggleItem("show_points", "Show Points", True)
+    submenu.addToggleItem("show_point_nums", "Show Point Numbers", False)
+    menu.addMenu(submenu)
+    }}}
+
+
+
+

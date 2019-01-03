@@ -1,0 +1,488 @@
+= Jobs - In Detail =
+This section explains in detail the internal workings of an HQueue job.  It describes the job specification, the job properties and the job relationships.  The section is targeted for users that wish to create and submit custom jobs to HQueue.
+
+
+
+== The Job Specification == (spec)
+
+Every HQueue job is defined by a specification -- a JSON structure containing the job's properties.  Here is a simple example:
+
+{{{
+#!python
+{ 
+    "name": "Print Hello World",
+}
+}}}
+
+The specification defines a job that has exactly one property -- the job name.  This is a valid specification because only the `name` property is required.  The job does not do anything useful.  It will immediately finish and succeed without performing any work when assigned to a client machine.
+
+To execute tasks on the client, a command set can be added to the specification using the `command` property.  For example:
+
+{{{
+#!python
+{ 
+    "name": "Print Hello World",
+    "command" : "echo 'Hello World!'",
+}
+}}}
+
+When the job is assigned to a client machine, it will output "Hello World!" using the default shell installed with the machine's operating system.
+
+To execute the command with a particular shell, add the `shell` property to the specification like so:
+
+{{{
+#!python
+{ 
+    "name": "Print Hello World",
+    "command" : "echo 'Hello World!'",
+    "shell" : "bash",
+}
+}}}
+
+Several commands can be stored in a job and executed in sequence by concatenating them as a single command.  For example:
+
+{{{
+#!python
+{ 
+    "name": "Multiple Print Commands",
+    "command" : "echo 'The First Command' && echo 'The Second Command'",
+}
+}}}
+
+How commands are concatenated depend on the shell but separating commands with `&&` or ending commands with `;` will work in most cases.
+
+For complex command sets, it is easier to store the commands in a script file and then point the `command` property to the script file.  For example:
+
+{{{
+#!python
+{ 
+    "name": "Running a Script",
+    "command" : "/path/to/myScript.sh",
+}
+}}}
+
+For a complete list of the job properties that can be defined in the specification, see [Job Properties|jobdetails#properties].
+
+
+
+== Status Changes == (statuschanges)
+
+An HQueue job passes through a sequence of status changes from when it is submitted to HQueue to when it completes.  A basic job like the example mentioned in the previous subsection typically undergoes this sequence:
+
+<center>*waiting for machine -> running -> succeeded*</center>
+
+When a job is submitted to HQueue, it is placed into the scheduling queue where it _waits_ for a client machine.  Once a machine becomes available and is assigned, then the machine _runs_ the job's command set.  When execution of the job's command set finishes without errors, then the job is marked as _succeeded_.
+
+For a complete list of job statuses, see [Job Statuses|jobdetails#statuses].
+
+
+
+== Parent-Child Relationships == (relationships)
+
+A dependency can be established between two jobs so that the first job cannot run until the second job completes.  Such a dependency is referred to as a parent-child relationship in HQueue.  For example, if job A depends on job B, then job A is a *parent* of job B and job B is a *child* of job A.
+
+=== A Simple Parent-Child Example ===
+
+Suppose that we want to create an AVI video from _X_ frames rendered from a Houdini scene.  Assuming that IFD files have already been generated for the frames, then this work can be performed in 2 steps:
+
+# Render the frames from the IFD files using Mantra.
+# Encode the rendered images into a video.
+
+
+For the first step, we can define _X_ HQueue jobs, one job for every frame to be rendered.  The job specification for rendering frame 1 would look like:
+
+{{{
+#!python
+{ 
+    "name": "Render Frame 1",
+    "command": 
+    """cd $HQROOT/houdini_distros/hfs;
+       source houdini_setup;
+       mantra < $HQROOT/path/to/ifds/frame0001.ifd"""
+
+    "shell": "bash",
+}
+}}}
+
+The job specifications for the rest of the frames would be similar.
+
+Now suppose that Mantra renders the images to `$HQROOT/path/to/output/frame*.png` where `$HQROOT` is the mount point to the shared network folder registered with HQueue, then the job specification for the encoding step would look like:
+
+{{{
+#!python
+{ 
+    "name": "Encode Video",
+    "shell": "bash",
+    "command": "myEncoderApp --input=$HQROOT/path/to/output/frame*.png --output=$HQROOT/path/to/output/myVideo.avi"
+}
+}}}
+
+To ensure that the encoding job is executed after all the render jobs have completed, we create a dependency by making the encoding job a parent of the render jobs.
+
+To create the dependency, we use the `children` job property in the encoding job's specification.  The `children` property accepts a list of child job specifications.
+
+So the final specification for the encoding job would look like:
+
+{{{
+#!python
+{ 
+    "name": "Encode Video",
+    "shell": "bash",
+    "command": "myEncoderApp --input=$HQROOT/path/to/output/frame*.png --output=$HQROOT/path/to/output/myVideo.avi",
+    "children": [
+        {
+            "name": "Render Frame 1",
+            "shell": "bash",
+            "command": 
+            """cd $HQROOT/houdini_distros/hfs;
+               source houdini_setup;
+               mantra < $HQROOT/path/to/ifds/frame0001.ifd"""
+        },
+            "name": "Render Frame 2",
+            "shell": "bash",
+            "command": 
+            """cd $HQROOT/houdini_distros/hfs;
+               source houdini_setup;
+               mantra < $HQROOT/path/to/ifds/frame0002.ifd"""
+        },
+            "name": "Render Frame 3",
+            "shell": "bash",
+            "command": 
+            """cd $HQROOT/houdini_distros/hfs;
+               source houdini_setup;
+               mantra < $HQROOT/path/to/ifds/frame0003.ifd"""
+        },
+        .............................
+
+    ]
+
+}
+}}}
+
+=== Parent Status ===
+
+The parent job's status depends on the statuses of its child jobs.  When the child jobs complete, if at least one child job has failed, then the parent job's status is set to _failed_ and the parent job's command set is not executed. Otherwise, if all the child jobs complete successfully, then the parent job's status is changed to _waiting for machine_ and the parent job is placed into the scheduling queue where it waits for a client machine.
+
+
+=== Submitting Child Jobs from Within The Parent ===
+
+It is possible to submit child jobs from within a running job.  This may be desired if the number of child jobs needed is not known until runtime.  In such cases, commands can be added to the parent job that calculate how many children are required and then submits child job specifications to the HQueue server.
+
+To submit child jobs, use the `newjob()` Python API function (see [Python API|api]).
+
+Here is an example of a Python script that creates a new job and assigns it as a child to the currently running job:
+
+{{{
+#!python
+import os
+import xmlrpclib
+
+# Connect to the HQueue server.
+hq_server = xmlrpclib.ServerProxy("http://hq_server_hostname:5000")
+
+# Define the child job.
+child_job_spec = { 
+    "name": "The Child Job",
+    "shell": "bash",
+    "command": "echo 'Hello World!'" 
+}
+
+# Get the id of the current job.
+# It is defined automatically by HQueue in the JOBID environment variable.
+current_job_id = os.environ["JOBID"]
+
+# Submit the job to the server.
+# newjob() returns a list of job ids (in case multiple jobs are passed in at once).
+job_ids = hq_server.newjob(child_job_spec, current_job_id)
+}}}
+
+If the script is saved into a file, say createChild.py, then it can be added to the `command` property of the parent job.  So the parent job's specification would look like:
+
+{{{
+#!python
+{ 
+    "name": "The Parent Job",
+    "shell": "bash",
+    "command": "python $HQROOT/path/to/scripts/createChild.py"
+}
+}}}
+
+
+
+== Commandless Jobs == (commandless)
+
+It is possible to have a job without the `command` property defined since the only required property is the `name` property.
+
+Commandless jobs do not perform any work, but they can be useful at times.  For example, if you write a Python script that submits jobs to HQueue, you can use commandless jobs to test calls to `newjob()` without burdening the farm with any real work.  Also, you can use commandless jobs as "containers" for several independent but related jobs.  This has an organizational benefit in the HQueue web interface since the work produced by the related child jobs can be viewed under a single job.
+
+
+
+== Job Properties == (properties)
+
+Here is a list of properties that can be added to a job specification.
+
+Property Name ||
+    Property Type ||
+        Property Value ||
+
+children |
+    list/tuple of job specifications |
+        Job specifications that will be submitted and assigned as child jobs. 
+childrenIds |
+    list/tuple of integers |
+        Ids for existing jobs that will be assigned as child jobs. 
+command |
+    string |
+        The set of shell commands to execute on the assigned client machine. 
+conditions |
+    list/tuple of strings |
+        Conditions that the HQueue scheduler must follow when choosing a machine to assign the job to.  For more information, please read [Job Conditions|jobdetails#conditions].   
+cpus |
+    integer |
+        The minimum number of CPUs that the job will use.  The default is 1. 
+description |
+    string |
+        The job description. 
+emailReasons |
+    string |
+        A comma seperated list of reasons to send emails to the addresses specified by the `emailTo` property. If this is empty or not specified, no emails will be sent. Valid reasons are 'abandoned', 'cancelled', 'ejected', 'ejecting', 'failed', 'paused', 'pausing', 'priority changed', 'queued', 'rescheduled', 'resumed', 'resuming', 'runnable', 'running', 'succeeded' and 'waiting'. 
+emailTo |
+    string |
+        A comma seperated list of addresses to send emails to based on reasons specified by the `emailReasons` property. 
+environment |
+    dictionary |
+        A dictionary of variables to define in the client's environment when the job's command set is executed.  The keys and values of the dictionary are the variable names and values respectively. 
+host |
+    string |
+        The hostname of the machine that the job should execute on.  If this property is not set, then the job can execute on any machine. 
+onCancel |
+    string |
+        The set of shell commands to execute if the job is cancelled while running on a client machine. 
+onError |
+    string |
+        The set of shell commands to execute when the job fails. 
+onChildError |
+    string |
+        The set of shell commands to execute if the job has child jobs that failed.  The commands are run after all the child jobs finish and after the job executes its command set.  Note that if the job already has client machines assigned to it, then the job will hold onto those clients and use them to run the onChildError command. 
+onSuccess |
+    string |
+        The set of shell commands to execute when the job completes successfully. 
+maxHosts |
+    integer |
+        The maximum number of client machines allowed to be assigned to the job.  The default is 1. 
+maxTime |
+    integer |
+        The maximum amount of time (in seconds) that the job is permitted to run for.  If the job's running time exceeds the maximum time then it is automatically cancelled by HQueue.  Note that if this property is not specified or set to less than zero then the job has no maximum time and can run indefinitely. 
+minHosts |
+    integer |
+        The minimum number of client machines that must be assigned to the job.  The default is 1. 
+name |
+    string |
+        The job's name. 
+priority |
+    integer |
+        The job's priority.  Jobs with higher priorities are scheduled and processed before jobs with lower priorities.  0 is the lowest priority.  The default is 0. 
+shell |
+    string |
+        The terminal shell to use when executing the job's command set. 
+submittedBy |
+    string |
+        The name of the person that submitted the job. For child jobs, if this value is not specified, then it is inherited from a parent job. 
+tags |
+    list/tuple of strings |
+        A list of tags to apply to the job.  Tags can be used to control whether the job requires a dedicated machine or whether it can share a machine with other running jobs.  For more information, see [Job Tags|jobdetails#tags]. 
+triesLeft |
+    integer |
+        The number of times a job should be automatically rescheduled in an attempt to make it succeed after a failure.  If the job fails after the amount of `triesLeft`, then it is marked as _failed_.  The default value is 0. 
+resources |
+    dictionary |
+        A name value pairing of the HQueue resources used by the job and the
+        amount of each resources used. For e.g., `{"sidefx.license.houdini": 1, "custom_one": 2}`. See the <a href="/help/resourcedetails">Resources</a> help page for more details. 
+
+=== Job Properties Example ===
+
+Here is an example of a job specification that demonstrates the use of some properties:
+
+{{{
+#!python
+{ 
+    "name": "The Main Job",
+    "shell": "bash",
+    "environment": { 
+        "SHOW_MSG": "1", 
+        "MSG": "Hello World!" 
+    }, 
+    "command":  
+    """if [ $SHOW_MSG = 1 ]; then 
+           echo $MSG; 
+    fi""",
+    "tags": [ "single" ], 
+    "maxHosts": 1, 
+    "minHosts": 1, 
+    "priority": 0, 
+    "children": [ 
+        { 
+            "name": "The Child Job",
+            "shell": "bash",
+            "command": "echo 'Hello World!'" 
+        }
+    ] 
+}
+}}}
+
+The example above defines a job named "The Main Job" which has a priority level of 0.  It uses the bash shell to execute its command set and defines two environment variables, "SHOW_MSG" and "MSG".  Its command set directly references these two variables.  The job requires one dedicated machine as defined by the "single" tag, and the "maxHosts" and "minHosts" properties.  Finally, it has a single child job which prints out "Hello World".
+
+
+
+== Job Conditions == (conditions)
+
+Job conditions inform the HQueue scheduler to assign a job to a restricted set of client machines.  A job condition is defined by a type, name, operator and value.  Together they specify a comparison test that the scheduler uses to determine whether a machine can be assigned to run the job.  If a client machine passes *ALL* of the assigned conditions, then it can run the job.
+
+Note that if a job does not define its own set of conditions then it automatically inherits the conditions of its root job.
+
+Below is a description of each of the condition components:
+
+Component ||
+    Description ||
+
+type |
+    The type specifies what the condition applies to.  Since HQueue only supports client conditions at the moment, the type should always be set to "client".  Client conditions determine whether a client machine can be assigned to the job or not. 
+name |
+    The name of the client property to be tested.  The supported names are:
+    * `hostname` - Test against the client's hostname.
+    * `hostname:name` - Test against the client's hostname and name. In a farm where multiple clients may be running on the same machine, this should be used to uniquely identify a client amongst clients with the same hostname (i.e. running on the same machine).
+    * `group` - Test against the client's group memberships. 
+op |
+    The comparison operator to use when testing the client's attribute against the condition's value.  The supported operators are:
+
+    * `==` - returns true if the client's attribute matches the condition value
+    * `!=` - returns true if the client's attribute does not match the condition value.
+    * `in` - returns true if the client's attribute matches any element in the condition value.  Use commas to separate multiple elements in the value.
+    * `not_in` - returns true if the client's attribute does not match any element in the condition value.  Use commas to separate multiple elements in the value.
+    * `any` - Deprecated.  Use "in" instead.
+
+value |
+    The value to test against the requested client attribute.  If the condition operator is "any", then the value can be a list of multiple items where commas are used to separate items. 
+
+=== Job Condition Examples ===
+
+Here is an example that demonstrates how to attach a condition to a job specification:
+
+{{{
+#!python
+{
+    "name": "A Job with Conditions",
+    "shell": "bash",
+    "command": "echo 'I should be running on either machine1 or machine2!'",
+    "conditions": [
+        { 
+            "type" : "client", 
+            "name": "hostname", 
+            "op": "in", 
+            "value": "machine1,machine2"
+        },
+    ]
+}
+}}}
+
+The example above defines a job which can only be assigned to a client machine named either "machine1" or "machine2".  Note that the `conditions` property is a list of dictionaries where each dictionary defines a single condition and its 4 components.
+
+The next example demonstrates how to set a condition where the job can only be assigned to client machines that are members of the "Simulation" group:
+
+{{{
+#!python
+{
+    "name": "A Job for the Simulation Group",
+    "shell": "bash",
+    "command": "echo 'I should be running on a machine that is a member of the Simulation group!'",
+    "conditions": [
+        { 
+            "type" : "client", 
+            "name": "group", 
+            "op": "==", 
+            "value": "Simulation"
+        },
+    ]
+}
+}}}
+
+
+
+== Job Tags == (tags)
+
+Tags can be used to describe whether a job requires a dedicated machine or whether it can share a machine with other running jobs.  If no tags are specified, then the job is configured to share the machine it is running on as long as the machine has enough CPUs.
+
+To declare that your job needs a dedicated machine, add the `single` tag to the `tags` property.  This guarantees that no other jobs will be assigned to the machine while your job is running.
+
+You can also create custom single tags to control which sets of running jobs can share machines and which sets cannot.  The sharing rule works as follows -- *the scheduler will never assign running jobs to the same machine if they have matching tags.*
+
+To create a custom single tag, simply prefix the tag name with "`single`".
+
+For example, suppose we create a custom single tag named "`single:1`" and assign it to two jobs, say A and B.  And suppose we create another custom single tag named "`single:2`" and assign to two other jobs, say C and D.  Then jobs A and B cannot concurrently execute on the same machine and jobs C and D cannot concurrently execute on the same machine.  However, job A or job B can concurrently run on the same machine that is running job C or job D and vice versa.
+
+
+
+== Job Statuses == (statuses)
+
+Here is a list of job statuses and their descriptions.
+
+Status ||
+    Description ||
+
+abandoned |
+    The job is assigned to a client machine but the machine is not reporting the job's progress or status.  This can happen if the machine becomes unresponsive (i.e. reboots, or hangs). 
+cancelled |
+    The job is no longer on the scheduling queue because it was interrupted by a user. 
+failed |
+    The job is finished but an error was reported during execution of its command set or during execution of one of its child jobs. 
+paused |
+    The job has been paused by a user.  The scheduler does not assign a client machine to the job while it is paused.  If the job is already running on a machine, then its execution is halted. 
+pausing |
+    The job is running on a client machine but has been requested by a user to halt execution.  The HQueue server is waiting for a response from the client to confirm that the job has been paused. 
+resuming |
+    The job is assigned to a client machine and is currently paused but has been requested by a user to resume execution.  The HQueue server is waiting for a response from the client to confirm that the job has been resumed. 
+running |
+    The job is executing on a client machine. 
+running (X clients assigned) |
+    One or more of the job's child jobs is running and a total of X clients are assigned to the child jobs. 
+succeeded |
+    The job is finished and no errors were reported during command execution. 
+waiting for resources |
+    The job is ready for execution but is waiting for a resource. These can be
+    <a href="/help/resourcedetails">HQueue resources</a>, client machines, or job conditions. If the job does not have a child job then a tooltip will display the exact reason the job is waiting. 
+
+
+
+== Job Variables == (variables)
+
+Here is a list of the built-in, runtime variables that are defined in the job's environment.
+
+Environment Variable ||
+    Description ||
+
+HQCLIENT |
+    The folder path to the client code on the machine running the job. 
+HQCLIENTARCH |
+    The platform of the client machine running the job.  It consists of the operating system and machine architecture.  Here is a quick list of the possible values:
+
+    * linux-x86_64 -> Linux 64-bit
+    * linux-i686 -> Linux 32-bit
+    * macosx-x86_64 -> Mac OSX 64-bit
+    * macosx-i686 -> Mac OSX 32-bit
+    * windows-x86_64 -> Windows 64-bit
+    * windows-i686 -> Windows 32-bit
+
+HQROOT |
+    The folder path to the shared network drive registered with HQueue.  Depending on the platform of the machine running the job, `$HQROOT` will be set to either one of the HQueue server configuration values:
+
+    * `hqserver.sharedNetwork.mount.linux`
+    * `hqserver.sharedNetwork.mount.windows`
+    * `hqserver.sharedNetwork.mount.macosx`
+
+ See [Configuration|configuration].
+
+HQSERVER |
+    The address of the HQueue server.  It consists of the HQueue server's hostname and the port number that the server is listening on. 
+JOBID |
+    The id of the current job. 
+

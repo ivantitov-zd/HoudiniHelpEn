@@ -1,0 +1,167 @@
+= Light path expression =
+
+== Overview ==
+
+The renderer traces light paths backwards from the camera to the light source. The light path is a series of "scattering events" each time the path interacts with the scene. For example, the light might take a path from the camera (C) where it interacts with a volume (V), a diffuse shaded surface (D), and then reaches a light (L).
+
+[Image:/images/render/lpe_examplepath.png]
+
+A _light path expression_ (LPE) is a type of [regular expression|Wp:Regular_expression] that describes a specific light path (or set of paths) based on the scattering events. The expression can be used to "select" the contributions of those kinds of paths to the output. You can use this to isolate very specific parts of the output when compositing, without having to write a custom shader or render that part as a separate pass.
+
+[Image:/images/render/lpe_examplerender.png]
+
+Mantra's implementation of light path expressions is based on the version in Open Shading Language and shares many of its features and interface.
+
+For more information, you can read the OSL [light path expression documentation|https://github.com/imageworks/OpenShadingLanguage/wiki/OSL-Light-Path-Expressions]. However, you should note the [differences in Mantra's implementation|#compare].
+
+
+== LPE language ==
+
+=== Event types ===
+
+The following letters match an event of the given type, _or_ any scattering type or custom tag (see below). If you want to exclude those from a match, use `<>` angle brackets (see wildcards below).
+
+`C` |
+    Camera
+`R` |
+    Surface Reflection
+`T` |
+    Surface Transmission
+`V` |
+    Volume
+`L` |
+    Light
+`O` |
+    Emissive Object
+
+
+=== Scattering types ===
+
+`D` | 
+    Diffuse scatter
+`G` |
+    Glossy scatter
+
+
+=== Wildcards ===
+
+`.` |
+    Matches *any event*.
+
+`*` |
+    Matches _zero or more_ of the preceding event. For example, `D*` would match any number of sequential interactions with a diffuse surface, including none.
+    
+    You can combine this with `.`, so `.*` matches zero or more arbitrary events. For example, `.*DL` would match any light path that hits a diffuse shaded surface just before reaching a light.
+
+`+` |
+    Matches _one or more_ of the preceding event. For example, `D*` would match one or more sequential interactions with a diffuse surface.
+        
+    As with `*`, you can combine this with `.` to match one or more arbitrary events.
+
+`[<<events>>]` |
+    Matches any of the event types inside the square brackets. For example, `[DG]` would match a diffuse _or_ glossy scattering event.
+
+`[^<<events>>]` | 
+    Matches any event types _except_ the types inside the square brackets. For example, `[^DG]` would match any interaction _except_ a diffuse or glossy scatter.
+
+
+=== Custom tags ===
+
+`'<<tag>>'` |
+    You can "tag" objects and lights with custom labels using the [LPE Tag|Mantra:vm_lpetag] [render property|/props/]. Then you can refer to interactions with any object using that tag in the light path expression.
+    
+    For example, add an __LPE Tag__ property to a wall, and set the text to `leftwall`. Then you can refer to interactions with that wall in a light path expression using `'leftwall'`, such as in:
+    
+    {{{
+    #!re
+    G[GD]+'leftwall'L
+    }}}
+    
+    (Isolates all diffuse and glossy bounces toward object tagged `leftwall`.)
+    
+    [Image:/images/render/lpe_labelrender.png]
+    
+    TIP:
+        You can assign a custom label in a [material|/shade/] as well using the [Properties VOP|Node:vop/properties]. However, if the shaded object itself also has an __LPE Tag__ property, that will [override|/props/index#order] the material's property.
+
+
+=== Fully described event ===
+
+<code>&lt;<var style="margin-right: 0.3em">event_type</var><var>scatter_type</var>&#91;'<var>tag</var>'&#91;'<var>bsdf_label</var>'&#93;&#93;&gt;</code>
+
+When you use `C` to match a camera interaction, or `D` to match a diffuse scattering interaction, this is actually a shorthand for a _fully described event_, which specifies the event type _and_ optionally the scattering type, _and_ optionally a tag.
+
+For example, `R` alone matches any reflection off a surface (diffuse or glossy). `D` alone matches any diffuse scattering event (no matter with what type of object/surface). `<RD>` only matches a diffuse reflection off a surface.
+
+So, `CRL` describes direct lighting that includes any type of reflection (diffuse or glossy). `CGL` describes direct lighting that includes any glossy components (reflection or refraction). If you only want to match direct lighting that is _both_ reflection _and_ glossy, then you would use `C<RG>L`.
+
+You can include an optional custom tag in the full event description. The interacting object must have the specified tag. For example, `<C.'fill'>` only matches interactions with a camera with the tag `fill`. `<RD'wall'>` only matches diffuse surface reflections off an object tagged `wall`.
+
+BSDF label is an optional description that follows custom tag. This can be used to separate contributions from BSDFs that fall under the same broad event category, but have different labels. It's important to note that BSDF label cannot be used in shorthand form. For example, `C<...'coat'>L` is acceptable. `C'coat'L` is _not_.
+
+
+== Using a light path expression ==
+
+:task: Isolate contributions matching an LPE in an image plane:
+    # On the [Mantra render node|Node:out/ifd], use the __Extra image planes__ multiparm to add an image plane.
+    
+    # Set the __Vex variable__ field to `lpe:` followed by the light path expression.
+    
+        For example, `lpe:C<RD>.+L`
+        
+    NOTE:
+        Light Path Expression AOVs will only accumulate direct lighting contributions from BSDF whose label is listed under __Export Components__ (vm_exportcomponents) in Mantra ROP. If you are using any custom BSDFs with non-predefined labels, please make sure to add them to this list.
+
+
+== Examples ==
+
+Beauty |
+    `C.*`
+
+Indirect diffuse |
+    `C<RD>.+L`
+
+Direct and indirect bounces from BSDF labelled 'coat' |
+    `C<...'coat'>.*`
+
+Direct subsurface scatter from BSDF labelled 'sss' |
+    `C<TD.'sss'>L`
+
+Emission and visible area lights: |
+    `C[LO]`
+
+All contribution from light(s) tagged "apple" |
+    `C.*<L.'apple'>`
+
+
+== Comparison to OSL == (compare)
+
+You can see more detailed explanations and examples in the OSL
+[light path expression documentation|https://github.com/imageworks/OpenShadingLanguage/wiki/OSL-Light-Path-Expressions].
+
+In comparison to the OSL implementation, Mantra does not support the following:
+
+* No `B` (background) event type.
+
+* No `S` (singular) or `s` (straight) scatter type. All specular scatter types are defined as `G` (glossy) in mantra.
+
+In addition:
+
+* Mantra uses two different forms of custom labels: LPE Tag that can be assigned to lights and objects, and BSDF label (which is equivalent to OSL's closure label).
+
+
+== Limitations ==
+
+* Mantra's beauty plane uses full opacity filtering on emission (`Ce`) for
+  camera rays, but an LPE expression with visible emission (e.g. `"lpe:CO"`) will
+  use screendoor filtering, potentially leading to differing noise quality if
+  the emissive material is partially opaque.
+
+* If an indirect bounce ray hits partially opaque emissive material, you can't
+  separate its contribution using a custom label (e.g. If an object
+  with emissive material has LPE tag `foo`, using an expression such as
+  `"lpe:CR<O.'foo'>"` is fine if the material is fully opaque, but may lead to
+  unexpected results if the material is not fully opaque).
+
+* PBR Diffuse contributions under the "Translucent" model will be categorized as
+  reflection, not transmission.

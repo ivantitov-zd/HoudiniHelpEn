@@ -14,8 +14,8 @@ primitive, the named volumes will be filled with data from point attributes
 that match the name of the volume. Currently only VDB vector volumes
 support filling from vector point attributes.
 
-The point attributes `pscale` and `density` are used to control the
-generated volume.
+The point attribute `pscale` is used (along with the specified __Coverage
+Attribute__) to control the generated volume.
 
 This is a highly specialized node designed for filling the volume
 as fast as possible, so a lot of the controls present in [Volume Rasterize
@@ -30,48 +30,52 @@ override how points are filtered to voxels. For fields that can't be
 meaningfully averaged together, setting this attribute to a value of 1 on
 that volume primitive will cause only one of the overlapping particles to
 contribute to each voxel, avoiding any averaging. This parameter only
-applies to fields other than density.
+applies to fields other than coverage.
+
+Alternatively, the stamping method for each volume can be controlled separately
+by specifying rules, bypassing the need to set primitive attributes.
 
 NOTE:
-    This does not support rasterizing into tapered volumes.
+    This node does not support rasterizing into tapered volumes.
 
 @parameters
 
 Destination:
     Which volumes or VDBs in the first input to stamp into.
-    Each volume or VDB and is treated as a "density" target.
 
 Particles:
     A group of points in the second input to rasterize.
 
 Filter:
-    The filter shape that to use when splatting particles. The default
-    gaussian filter will produce smooth blobs and is useful for larger
-    particles. When the particle size is smaller than the voxel size, a
-    box filter will produce a similar result in less time.
+    The filter shape to use when splatting particles. The default Gaussian
+    filter will produce smooth blobs and is useful for larger particles. When
+    the particle size is smaller than the voxel size, a box filter will produce
+    a similar result in less time.
 
-Density Scale:
-    The `density` attribute will be scaled by this.  If there is no
-    `density`, 1 will be used as the reference.
+Coverage Attribute:
+    Name of the point attribute that stores the coverage (or influence) of each
+    particle. If the coverage attribute does not exist, each particle is
+    assumed to have a coverage of 1.
+
+Coverage Scale:
+    The coverage attribute will be scaled by this value.
 
 Particle Scale:
-    The `pscale` attribute will be scaled by this.  If there is no
-    `pscale`, 1 will be used as the reference.
+    The `pscale` attribute will be scaled by this value. If this attribute does
+    not exist, 1 will be used as the reference.
 
 Minimum Filter Size:
-    If the particle's radius is much smaller than a voxel, it can appear to
-    pop from grid-location to grid-location as it moves.  This adds an
-    additional blur to particles to ensure they are this fraction of a
-    voxel.  A value of 1 ensures the main-support for each particle is at
-    least a voxel, ensuring that any movement of the particle will
-    correspond to a smooth change in voxel values, at the cost of less
-    sharp boundaries.
+    If the particle's radius is much smaller than a voxel, it can appear to pop
+    from grid-location to grid-location as it moves.  This adds an additional
+    blur to particles to ensure they are this fraction of a voxel.  A value of
+    1 ensures the main-support for each particle is at least a voxel, 
+    guaranteeing that any movement of the particle will correspond to a smooth
+    change in voxel values, at the cost of less sharp boundaries.
 
 Velocity Blur:
-    Enables rasterization of velocity blur. Velocity blurred particles
-    are rasterized by creating multiple point samples along the
-    velocity path and distributing the density of the original point
-    among these samples.
+    Enables rasterization of velocity blur. Velocity blurred particles are
+    rasterized by creating multiple point samples along the velocity path and
+    distributing the coverage of the original point among these samples.
 
 Shutter:
     The shutter time to use for velocity blur rasterization.
@@ -80,10 +84,56 @@ Shutter Offset:
     The shutter offset to use for velocity blur rasterization.
 
 Blur Samples:
-    The number of motion blur samples to use for velocity blur
-    rasterization. Larger numbers of samples will produce smoother and
-    more accurate results but will take more time to compute.
+    The number of motion blur samples to use for velocity blur rasterization.
+    Larger numbers of samples will produce smoother and more accurate results,
+    but will take more time to compute.
+
+Normalize by Clamped Coverage:
+    Enabling this option multiplies the sampled volume by coverage, yielding a
+    smooth transition between areas covered by the particles.
+
+    NOTE:
+        This option changes the default stamping method from __Weighted Average__
+        to __Covered Average__; __Attribute Rules__ can be used to override this
+        default behavior.
+
+Attribute Rules:
+    Rules that specify the stamping method on a per-volume basis.
+
+    NOTE:
+        If multiple rules apply to a volume, the first one is used.
+
+    NOTE:
+        `volumefilterstochastic` primitive attribute takes precedence over the
+        rules. That is, __Stochastic__ stamping will be used for all volumes that
+        have a value of 1 for the aforementioned attribute. If value is 0,
+        however, then the appropriate rule still applies.
+
+    NOTE:
+        The __Coverage Attribute__ is unconditionally stamped using the
+        __Accumulated__ method.
+
+Attributes:
+    This pattern identifies volumes to which the rule applies.
+
+Method:
+    Stamping method to use when generating the volumes to which this rule
+    applies.
+
+    Weighted Average:
+        Voxel value is weighted average of attribute value from the overlapping
+        particles; weight depends on the coverage attribute, as well as
+        distance of the particle from the sample location.
+    Covered Average:
+        Same as __Weighted Average__, but areas outside of particle influence are
+        attenuated, yielding smooth falloff.
+    Accumulated:
+        Contributions from all particles are simply summed up.
+    Stochastic:
+        Voxel value is deduced from a single (pseudorandomly selected)
+        overlapping particle.
 
 @related
 
 - [Node:sop/volumerasterizepoints]
+

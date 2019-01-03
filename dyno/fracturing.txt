@@ -1,0 +1,241 @@
+= Fracturing objects for simulation =
+
+
+== Overview ==
+
+Often in rigid body simulations, you want a solid object to break into pieces because of some impact or force. For example, you might want an earthquake to destroy a house, with the concreate walls fracturing, the wood door splintering, and glass windows shattering. Or you might want a swinging demolition crane ball to cave in a wall.
+
+* Most fracturing tools in Houdini support a _pre-fracturing_ workflow, where you break the geometry into pieces in SOPs, with the pieces held together by _glue constraints_. Pre-fracturing gives you full artistic control over the look of the destruction (for example, do you want big blocky pieces or small jagged pieces). The object will crumble when a force overcomes the glue strength, or you can manually animate the glue off when you want the object to break down.
+
+    The high-level tool for pre-fracturing geometry is the [RBD Material Fracture SOP|Node:sop/rbdmaterialfracture], with plenty of controls over different types of fracturing. There are many lower-level SOPs if you need even more control over fracturing.
+
+    [Image:/images/dynamics/rbdmaterialfracture_house.png]
+
+* You can also do _dynamic fracturing_ during the DOP simulation. See the help for [Make Breakable|/shelf/makebreakable] tool for more information.
+
+
+== General workflow ==
+
+[Icon:SOP/rbdmaterialfracture] |
+    [RBD Material Fracture|Node:sop/rbdmaterialfracture] |
+        #width: 20%
+        Simulates breaking patterns associated with different materials: concrete, wood, and glass.
+
+        * Can iterate multiple levels fracturing.
+
+        * Can simulate [low-res proxy geometry|#proxy] and copy piece transforms onto high-res geometry.
+
+        * Automatically sets up [glue constraints|#constraints] between the pieces.
+
+        * Updates [existing constraint geometry|#existing_constraints] as it fractures.
+
+        * Outputs groups and attributes with information about the fractures if you want to do more complex post-processing.
+
+# Use the [RBD Material Fracture|Node:sop/rbdmaterialfracture] node to pre-fracture your model in SOPs.
+
+# RBD Material Fracture automatically creates glue constraints between the fractured pieces. On the __Constraints__ tab you can set the __Primary strength__ to the initial glue strength you want.
+
+    After you import the fractured object into an RBD simulation (see the next step), you can go back and edit the settings on the RBD Material Fracture and edit the glue strength to control how much the pieces stick together. 
+
+    The value depends on the size and weight of your pieces, and what effect you want to achieve. A value of `1` will usually fall apart immediately.
+
+    If you want the model to stay together until it's hit by another RBD object, you will need to fine-tune the glue strength to a level where it's high enough to keep the model stays together on its own, but not so high it prevents an impact from breaking the constraints.
+
+# Go up to the object level and select the fractured object. On the __Rigid Bodies__ shelf tool, click the [Icon:DOP/rbdpackedobject] RBD Objects tool to import the object into DOPs as rigid body pieces.
+
+See the rest of this page for more information on the available tools.
+
+
+== Tips ==
+
+* Use the [Group node|Node:sop/group] to name groups of primitives. For example, the door, individual windows, and walls. This will allow you to fracture them individually.
+
+* If you see pieces spinning/wobbling in the simulation, you can particle drag to freeze them.
+
+
+== Pre-constraining pieces == (existing_constraints)
+
+If you have multiple connected pieces you want to fracture in different ways, you can *optionally* set up [glue constraints|#constraints] between these pieces using [Connect Adjacent Pieces|Node:sop/connectadjacentpieces] nodes before you use RBD Material Fracture to break them up.
+
+For example, if you are destroying a house, you can start by constraining the door and windows to the walls they're embedded in.
+
+As the RBD Material Fraceture node breaks up the individual objects, it tries to intelligently update existing constraints. So, for example, if a pane of window glass starts constrained to the surrounding window frame, even as RBD Material Fracture shatters the glass, the node will keep the outer shards attached to the frame.
+
+
+== RBD SOP inputs and outputs == (inputs)
+
+The RBD Material Fracture node and [several other RBD SOP nodes|#support] share a consistent set of inputs and outputs, that let you send constraint geometry and proxy geometry through the network alongside the fractured geometry.
+
+* The first input/output is the high-resolution display geometry.
+
+* The second, colored input/output is [constraint network geometry|#constraints].
+
+* The third input/output is [low-res proxy geometry|#proxy].
+
+[Image:/images/dynamics/rbdmaterialfracture_node.png]
+
+
+== Constraint networks == (constraints)
+
+Houdini lets you set up constraints in SOPs using _constraint geometry_. This is a set of polylines with attributes that represent constraint relationships between geometry pieces. These are translated into the equivalent DOP constraints when the geometry is imported into the DOP network. This is to make it easy to set up, edit, and visualize constraints using the large number of SOP nodes dedicated to editing geometry and attributes.
+
+* Each constraint is represented by a two-point polyline.
+
+* Each polyline has a `constraint_type` primitive attribute specifying the constraint type. The two common RBD constraint types are `glue` and `soft` constraints.
+
+    *Glue* constraints keep two pieces together until the amount of force trying to separate them is greater than the _glue strength_.
+
+    *Soft* constraints are similar to springs, but instead of being bouncy, they bend until they break.
+
+* The polyline can have additional primitive attributes related to the constraint, such as `strength` for glue, or `stiffness` and `dampening` for soft constraints.
+
+* The two endpoints each have a `name` attribute specifying the name of the piece that end represents.
+
+* The position of the endpoints may be used by different constraints, for example as anchor points.
+
+You can use the [Connect Adjacent Pieces SOP|Node:sop/connectadjacentpieces] to set up constraint geometry, and the [RBD Constraint Properties SOP|Node:sop/rbdconstraintproperties] node to edit constraint geometry.
+
+The help for the [Constraint Network DOP|Node:dop/constraintnetwork] has more background information about constraint networks (Constraint Network is the low-level DOOP node responsible for converting SOP constraint geometry into the equivalent DOP constraints).
+
+
+== Low-res proxy geometry == (proxy)
+
+The RBD Material Fracture node can work on fast low-res proxy geometry. You need to set up high-res and low-res geometry with the same named pieces (for example, by breaking up the high-res geometry into named pieces and then copying and reducing the number of polygons to create the proxy).
+
+
+== Clustering == (cluster)
+
+_Clustering_ refers to grouping fractured pieces into bigger clumps. There are two main clustering workflows:
+
+* If you just want a bunch of pieces to stick together permanently, give them all the same `name` attribute. Nodes that work on pieces will treat them as once piece.
+
+    This can be useful, for example, with wood splintering, where you often want to group small splinters into bigger jagged chunks.
+
+* For certain directable crumbling effects, you will often want to work with bigger pieces early in the shot and have them break down into smaller pieces later in the shot. You can do this with a hierarchy of glue constraints. You can animate higher-level constraints off to break up bigger pieces into smaller pieces.
+
+The RBD Material Fracture node provides clustering controls when the __Material type__ is "Wood". You can do manual clustering with the [RBD Cluster|Node:sop/rbdcluster] node.
+
+
+== Importing a fractured object into DOPs ==
+
+The __Rigid bodies__ shelf has tools for importing geometry objects into the DOP simulation.
+
+[Icon:DOP/rbdpackedobject] |
+    [RBD Objects|/shelf/rbdobjects] |
+        #width: 20%
+
+        *Use this tool to import fractured objects*. It automatically treats the named pieces as separate Bullet objects, and translates the constraint network geometry into Bullet constraints.
+
+Other rigid body simulation tools:
+
+[Icon:DOP/rbdobject] |
+    [RBD Hero object|/shelf/rbdheroobject] |
+        #width: 20%
+
+        This is for importing an object as a single, unbreakable entity. *Do not use this to import fractured geometry*.
+
+[Icon:DOP/rbdfracturedobject] |
+    [RBD Glued Objects|/shelf/rbdglueobject] |
+        This tool imports an object containing loose pieces and adds glue between them. *Do not use this to import fractured geometry created with RBD Material Fracture* since that node already creates glue constraints automatically.
+
+[Icon:SHELF/makebreakable] |
+    [Make Breakable|/shelf/makebreakable] |
+        Sets up an object for _dynamic fracturing_ in response to simulated impacts.
+
+[Icon:SHELF/debris] |
+    Debris shelf tool |
+        Generates particles from the edges of crumbled pieces. You can use these particles to instance smoke, dust, pebbles, and so on as secondary effects.
+
+
+== RBD SOP support nodes == (support)
+
+The following nodes work with the RBD Material Fracture node. They all have the same inputs and outputs as RBD Material Fracture.
+
+[Icon:SOP/rbdpaint] |
+    [RBD Paint|Node:sop/rbdpaint] |
+        Lets you paint attributes on the input geometry to control how the fracturing works, for example paint where you want more fracturing to occur.
+
+        # Put this node above the RBD Material Fracture node in the network.
+
+        # Use this node to paint the `density` attribute where you want more fracturing.
+
+        # In the downstream RBD Material Fracture node, set __Scatter from__ to "Attribute".
+
+        ~~~~~
+
+[Icon:SOP/rbdconstraintproperties] |
+    [RBD Constraint Properties|Node:sop/rbdconstraintproperties] |
+        Edits constraint geometry. This provides functionality similar to the parameters on the RBD Material Fracture node's __Constraints__ tab.
+
+        You can use this as a convenient interface to edit values in the constraint network if you want to do more complex custom constraints.
+
+[Icon:SOP/rbdinteriordetail] |
+    [RBD Interior Detail|Node:sop/rbdinteriordetail] |
+        Adds noise to exposed interior surfaces after fracturing. This provides functionality similar to the parameters on the RBD Material Fracture node's __Detail__ tab.
+
+[Icon:SOP/rbdcluster] |
+    [RBD Cluster|Node:sop/rbdcluster] |
+        Groups pieces together into bigger pieces. This provides functionality similar to the parameters on the RBD Material Fracture node's __Cluster__ tab when __Material type__ is "Wood".
+
+        ~~~~~
+
+[Icon:SOP/rbdpack] |
+    [RBD Pack|Node:sop/rbdpack] |
+        #width: 20%
+
+        Merges the three RBD SOP [inputs|#inputs] (geometry, constraint network geometry, proxy geometry) into a single output.
+
+[Icon:SOP/rbdunpack] |
+    [RBD Unpack|Node:sop/rbdunpack] |
+        Splits out geometry, constraint geometry, and proxy geometry into separate RBD SOP-style [outputs|#inputs].
+
+
+== Related SOPs ==
+
+The RBD Material Fracture node uses these lower-level nodes internally. You can use them separately if you want to.
+
+[Icon:SOP/booleanfracture] |
+    [Boolean Fracture|Node:sop/booleanfracture] |
+        #width: 20%
+
+        Uses the [Boolean node|Node:sop/boolean] to cut geometry into pieces using intersecting cutting surfaces.
+
+[Icon:SOP/voronoifracture] |
+    [Voronoi Fracture|Node:sop/voronoifracture] |
+        Fractures geometry by creating cells from scattered points inside the geometry.
+
+[Icon:SOP/explodedview] |
+    [Exploded View|Node:sop/explodedview] |
+        Moves pieces away from each other (based on connectivity or `name` attribute). This node is useful for visualizing the shape of the pieces.
+
+== Low-level SOPs ==
+
+These are lower-level nodes, many of which are used inside the RBD Material Fracture SOP to provide functionality. You may find them useful if you are doing complex custom fracturing.
+
+[Icon:SOP/connectadjacentpieces] |
+    [Connect Adjacent Pieces|Node:sop/connectadjacentpieces] |
+        #width: 20%
+
+        Creates constraint geometry based on connectivity and proximity. This is a lower-level node providing functionality included in RBD Material Fracture.
+
+[Icon:SOP/assemble] |
+    [Assemble|Node:sop/assemble] |
+        Assigns `name` attributes to pieces based on connectivity.
+
+[Icon:SOP/voronoifracturepoints] |
+    [Voronoi Fracture Points|Node:sop/voronoifracturepoints] |
+        Very low-level node for Voronoi fracturing.
+
+[Icon:SOP/voronoisplit] |
+    [Voronoi Split|Node:sop/voronoisplit] |
+        Very low-level node for Voronoi fracturing.
+
+
+
+
+
+
+
+
+
+

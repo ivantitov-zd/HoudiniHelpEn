@@ -145,7 +145,7 @@ Be careful not to confuse this class with the function [hou.node|Hom:hou.node_].
     [Hom:hou.NetworkBox], [Hom:hou.SubnetIndirectInput],
     [Hom:hou.StickyNote], and [Hom:hou.NetworkDot] objects.
 
-::`allSubChildren(self, top_down=True)` -> tuple of [Hom:hou.Node]:
+::`allSubChildren(self, top_down=True, recurse_in_locked_nodes=True)` -> tuple of [Hom:hou.Node]:
     #cppname: HOM_Node::allSubChildren
     #replaces: Cmd:oprmtype, Cmd:opfind
     
@@ -157,6 +157,22 @@ Be careful not to confuse this class with the function [hou.node|Hom:hou.node_].
         If True, this function will do a top-down traversal, placing a node
         in the returned tuple before its children.  If False, it will do
         a bottom-up traversal, placing children before their parents.
+    
+    recurse_in_locked_nodes:
+        If True, the function will recurse inside locked child nodes 
+        (child nodes for which the `isEditable()` method returns `False`)
+        and include children of the locked child nodes in the returned tuple.
+
+        If False, the function will not recurse inside locked children nodes, 
+        and children of the locked child nodes will not be included in the 
+        returned tuple. (The locked child nodes, however, will be included.)
+
+        For example if <<recurse_in_locked_nodes>> is `True` and 
+        `hou.node("/obj")` contains a Simple Female node (a locked node),
+        then the tuple returned by `hou.node("/obj").allSubChildren()` 
+        will include the Simple Female node and its child nodes. If 
+        <<recurse_in_locked_nodes>> is `False`, the returned tuple will 
+        contain the Simple Female node, but not its child nodes.
 
     Note that a tuple is returned, not a generator.  This means that it is
     safe to delete or create nodes while looping through the return value.
@@ -348,7 +364,16 @@ Be careful not to confuse this class with the function [hou.node|Hom:hou.node_].
     Raises [Hom:hou.OperationFailed] if you try to delete a node inside a
     locked asset.
 
-::`copyItems(self, items, channel_reference_originals = False, relative_references = True)` -> `tuple` of [Hom:hou.NetworkMovableItem]:
+::`copyTo(destination_node)` -> [Hom:hou.Node]:
+    #cppname: HOM_Node::copyTo
+    
+    Copy this node to a new place in the node hierarchy. The new node is placed
+    inside the given destination node. This method returns the new node.
+
+    Raises [Hom:hou.OperationFailed] if the destination node cannot contain the new node.
+    Raises [Hom:hou.PermissionError] if the destination node is inside a locked asset.
+
+::`copyItems(self, items, channel_reference_originals = False, relative_references = True, connect_outputs_to_multi_inputs = True)` -> `tuple` of [Hom:hou.NetworkMovableItem]:
     #cppname: HOM_Node::copyItems
     Create copies of all specified items in this network. The items do not
     need to be children of this network, but all items must be contained in
@@ -360,6 +385,11 @@ Be careful not to confuse this class with the function [hou.node|Hom:hou.node_].
     original. Child nodes inside the sub-network will be simple copies of the
     original child nodes. The `relative_references` parameter controls whether
     the channel references use relative or absolute paths to the source nodes.
+
+    If `connect_outputs_to_multi_inputs` is True, and any items being copied
+    have outputs connected to a multi-input node (like a Merge), then the new
+    item copies will also be connected to the multi-input node. Normally
+    copied nodes do not have any outputs to nodes outside the copied set.
 
     Returns a `tuple` of all the new network items.
 
@@ -523,7 +553,7 @@ Be careful not to confuse this class with the function [hou.node|Hom:hou.node_].
     Return the parameter at the given path, or `None` if the parameter
     doesn't exist.
 
-::`globParms(self, pattern, ignore_case=False)` -> tuple of [Hom:hou.Parm]:
+::`globParms(self, pattern, ignore_case=False, search_label=False, single_pattern=False)` -> tuple of [Hom:hou.Parm]:
     #cppname: HOM_Node::globParms
     #replaces: Cmd:chls
     Return a tuple of parameters matching the pattern.
@@ -538,6 +568,11 @@ Be careful not to confuse this class with the function [hou.node|Hom:hou.node_].
     True for case-insensitive pattern matching.  Note that case insensitivity
     only applies when matching node and parameter names.  It does not apply
     when matching group, network box or bundle names.
+
+    By default, only parameters with names matching the pattern are returned. Set `search_label` 
+    to True to also return parameters with labels matching the pattern.
+
+    If `single_pattern` is True, the pattern will be treated as one pattern even if there are spaces in the pattern.
 
     This method returns an empty tuple if you pass in an empty pattern.
 
@@ -910,7 +945,132 @@ Be careful not to confuse this class with the function [hou.node|Hom:hou.node_].
     #cppname: HOM_Node::localVariables()
     Return a list of local variables that can be referenced in parameter
     expressions on this node.
-    
+
+
+::`saveParmClip(self, file_name, start=None, end=None, sample_rate=0, scoped_only=False)`:
+    #cppname: HOM_Node::saveParmClip
+    Saves the animation associated with the parameters of this node to the clip
+    file specified by <<file_name>>.
+    The extension of <<file_name>> determines the format of the saved file.
+
+    You can use one of the following extensions:
+    * `.clip`: save animation as plain text (ASCII) clip file.
+    * `.bclip`: save animation as a bclip (binary clip) file.
+    * `.bclip.sc`: save animation as a bclip file using Blosc compression.
+
+    Set <<sample_rate>> to a non-zero, non-negative value to specify the
+    sample_rate to be used for the clip file.
+    For example, if the current frame rate is 24 ([Hom:hou.fps]), and
+    <<sample_rate>> is set to 12, the animation will be sampled every second
+    frame since <<sample_rate>> is half of the current frame rate.
+
+    If <<start>> is not `None`, start saving the animation from the specified
+    frame (inclusive).
+    Otherwise, the animation will be saved from the global start frame (inclusive).
+
+    Similarly, if <<end>> is not `None`, stop saving the animation at the
+    specified frame (inclusive).
+    Otherwise, the animation will be saved until the global end frame (inclusive).
+
+    The global start and end frame are specified in the
+    [Global Animation Options|/ref/windows/global_anim_opts] window.
+
+    If <<scoped_only>> is `True`, only the animation associated with scoped
+    parameters will be saved. If there are no scoped parameters,
+    the animation associated with auto-scoped parameters will be saved.
+
+    If <<scoped_only>> is `False`, animation associated with any of the
+    parameters of this node will be saved.
+
+    Raises a hou.OperationFailed exception if none of the parameters of this
+    node have animation. If <<scoped_only>> is `True`, this exception can be
+    raised if none of the scoped parameters have animation, or if none of
+    the auto-scoped parameters have animation (if the node has no scoped
+    parameters).
+
+    Raises a hou.OperationFailed exception if there is an error saving the
+    animation to file.
+
+    Raises a hou.InvalidInput exception if `start >= end`. If specifying only
+    <<start>>, ensure that the specified value is less than the global
+    end frame. Likewise, if specifying only <<end>>, ensure it is larger than
+    the global start frame.
+
+::`loadParmClip(self, file_name, sample_rate=0, start=None)`:
+    #cppname: HOM_Node::loadParmClip
+    Load animation for the parameters in this node from the clip file
+    specified by <<file_name>>.
+    See [Hom:hou.Node#saveParmClip] for the list of supported clip file formats.
+
+    Any tracks in the clip file that do not match the name of the parameters
+    of this node will be ignored.
+
+    If <<sample_rate>> is set to a non-zero, non-negative value, the
+    specified value will be used when loading the animation.
+    For example, if the current frame rate is 24 ([Hom:hou.fps]) and
+    <<sample_rate>> is set to 12, the animation will be loaded with a keyframe
+    at every second frame since <<sample_rate>> is half of the current
+    frame rate.
+
+    <<start>> specifies the frame the loaded animation should start from.
+    By default the animation starts at the frame specified in the clip file.
+
+    WARNING:
+        Any existing keyframes for the parameters of this node that are
+        within the range of the loaded animation will be overwritten with
+        the loaded data.
+
+    This function will raise a hou.OperationFailed exception if there is an
+    error reading animation data from the file.
+
+::`parmClipData(start=None, end=None, binary=True, use_blosc_compression=True, sample_rate=0, scoped_only=False)` -> `str`:
+    #cppname: HOM_Node::parmClipData
+    Returns the clip data for the parameters of this node.
+    This method is similar to [Hom:hou.Node#saveParmClip], except that it returns
+    the clip data (file contents) instead of saving the animation to a clip file.
+
+    <<start>>, <<end>>, <<sample_rate>>, and <<scoped_only>> behave the same as
+    in [Hom:hou.Node#saveParmClip].
+
+    If <<binary>> is `True`, return binary clip data,
+    otherwise return plain text (ASCII) clip data.
+
+    If <<use_blosc_compression>> is `True`, blosc compress the binary clip data.
+    This cannot be used for plain text (ASCII) clip data.
+
+    Raises a hou.OperationFailed exception if none of the parameters of
+    this tuple have animation.
+
+    Raises a hou.InvalidInput exception if `start >= end`. If specifying only
+    <<start>>, ensure that the specified value is less than the global
+    end frame. Likewise, if specifying only <<end>>, ensure it is larger than
+    the global start frame.
+
+    Raises a hou.InvalidInput exception if `binary = False` and
+    `use_blosc_compression = True`.
+
+::`setParmClipData(data, binary=True, blosc_compressed=True, sample_rate=0, start=1)`:
+    #cppname: HOM_Node::setParmClipData
+    Load animation for the parameters in this node from the given clip <<data>>.
+    This method is similar to [Hom:hou.Node#loadParmClip], except that it loads
+    animation from the given clip data instead of a clip file.
+
+    <<sample_rate>> and <<start>> behave the same as in [Hom:hou.Node#loadParmClip].
+
+    <<binary>> and <<blosc_compressed>> specify the type of input data.
+
+    If <<binary>> is `True`, the given data is binary clip data,
+    otherwise it is plain text (ASCII) clip data.
+
+    If <<blosc_compressed>> is `True`, the given data is blosc compressed
+    binary data. This cannot be used for plain text (ASCII) clip data.
+
+    Raises a hou.OperationFailed exception if the given data is invalid.
+
+    Raises a hou.InvalidInput exception if `binary = False` and
+    `blosc_compressed = True`.
+
+
 
 == Inputs and outputs ==
 
@@ -1019,6 +1179,12 @@ Be careful not to confuse this class with the function [hou.node|Hom:hou.node_].
     #cppname: HOM_Node::indirectInputs
     #replaces: Cmd:opdepend
     Return the hou.SubnetIndirectInput objects of a subnet.
+
+    Raises [Hom:hou.InvalidNodeType] if this node is not a subnetwork.
+
+::`subnetOutputs(self)` -> `tuple` of [Hom:hou.Node]:
+    #cppname: HOM_Node::subnetOutputs
+    Return the hou.Node objects that are produce the subnet's outputs.
 
     Raises [Hom:hou.InvalidNodeType] if this node is not a subnetwork.
 
@@ -1175,6 +1341,23 @@ Be careful not to confuse this class with the function [hou.node|Hom:hou.node_].
     #cppname: HOM_Node::outputLabels
     Returns a tuple of all output labels for this node.
 
+::`editableInputString(self, input_index, key)` -> `str`:
+    #cppname: HOM_NodeType::editableInputString
+    Return the string associated with the specified input index and key.
+    The purpose of this string may vary from one node type to another.
+
+    This method will raise an exception if the node type does not use this
+    feature. Use [hasEditableInputData|Hom:hou.NodeType#hasEditableInputData]
+    to determine if a node type supports editable input data.
+
+::`setEditableInputString(self, input_index, key, value)`:
+    #cppname: HOM_NodeType::setEditableInputString
+    Sets a string value associated with the specified input index and key.
+    The purpose of this string may vary from one node type to another.
+
+    This method will raise an exception if the node type does not use this
+    feature. Use [hasEditableInputData|Hom:hou.NodeType#hasEditableInputData]
+    to determine if a node type supports editable input data.
 
 == Dependencies ==
 
@@ -2132,8 +2315,11 @@ Be careful not to confuse this class with the function [hou.node|Hom:hou.node_].
     None
     }}}
 
-    See [per-node user-defined data|Hom:nodeuserdata] for more information
+    See [per-node user-defined data|/hom/nodeuserdata] for more information
     and examples.
+    
+    TIP:
+        If you prefix a user data key with `nodeinfo_`, the key (without the prefix) and the value will be shown as a custom field in the [node info popup window|/network/nodes#info].
 
 ::`userDataDict(self, name)` -> `dict` of `str` to `str`:
     #cppname: HOM_Node::userDataDict
@@ -2251,6 +2437,42 @@ Be careful not to confuse this class with the function [hou.node|Hom:hou.node_].
 
     Raises [Hom:hou.OperationFailed] if no user data with this name exists.
 
+== Data blocks ==
+
+::`dataBlockKeys(self, blocktype)` -> `tuple` of `str`:
+    #cppname: HOM_Node::dataBlockKeys
+    Return the names of all data blocks stored on this node that are of the
+    data type specified by the `blocktype` parameter.
+
+    Data blocks are similar to user data in that they can contain any extra
+    data that may be useful to attach to a specific node. They differ from user
+    data in that data blocks are designed to more efficiently handle large
+    blocks of data. Data blocks can also contain binary data, and have a data
+    type associated with each block.
+
+::`dataBlockType(self, key)` -> `str`:
+    #cppname: HOM_Node::dataBlockType
+    Return the data type of the block specified by the `key` parameter.
+
+    Raises [Hom:hou.ValueError] if the provided key is not assocaited with any
+    data block on this node.
+
+::`dataBlock(self, key)` -> `str`:
+    #cppname: HOM_Node::dataBlock
+    Returns the data block stored under the given key. This method will only
+    work if the specified data block is has a type that can be represented by
+    a python object. Otherwise None is returned.
+
+    Raises [Hom:hou.ValueError] if the provided key is not assocaited with any
+    data block on this node.
+
+::`setDataBlock(self, key, block, blocktype)`:
+    #cppname: HOM_Node::setDataBlock
+    Stores the provided data block on the node under the provided key name,
+    marking it with the provided data type.
+
+    Passing a block value of `None` will remove any data block with the
+    specified key.
 
 == Dynamics ==
 

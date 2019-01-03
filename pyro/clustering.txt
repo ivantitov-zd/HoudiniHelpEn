@@ -2,7 +2,9 @@
 
 == Overview ==
 
-_Clustering_ partitions a large or sparsely-distributed smoke or pyro simulation into multiple (possibly overlapping) fluid boxes instead of one giant box.
+_Clustering_ partitions a large or sparsely-distributed smoke or pyro
+simulation into multiple (possibly overlapping) fluid boxes instead of one
+giant box.
 
 [Image:/images/dynamics/clustering1.png]
 
@@ -10,54 +12,53 @@ Using multiple small boxes has several advantages:
 
 * Can be distributed to multiple processes and/or machines on a farm.
 
-* Solves faster since they computer doesn't have to deal with the empty spaces between the important parts of the overall simulation.
+* Solves faster since the computer doesn't have to deal with the empty spaces
+between the important parts of the overall simulation.
 
-* The small boxes can be much higher resolution, or multiple resolutions, whereas a giant box usually must have a lower resolution because of memory limitations.
+* The small boxes can be much higher resolution, or multiple resolutions,
+whereas a giant box usually must have a lower resolution because of memory
+limitations.
 
-The multiple containers created by these tools are _separate simulation objects_ with _no interaction between each other_. For example, density cannot move out of one container into an adjacent one. This is usually not a problem smoke and fire simulations
+The multiple containers created by these tools are _separate simulation
+objects_ with _no interaction between each other_. For example, density cannot
+move out of one container into an adjacent one. This is usually not a problem
+for smoke and fire simulations.
 
 == Creating a clustered smoke/pyro simulation from point sources ==
 
-# Select the object containing the points you want to emit from.
+# Select the object you want to emit from.
 
-    The smoke and pyro clustering tools *only work with point sources*. (This is because they use [point clustering|Node:sop/clusterpoints] to partition the source.) If you select surfaces or volumes instead of pure points, the tool will first add a [Scatter node|Node:sop/scatter] to scatter points across/through the surfaces/volumes.
+# On the __Pyro FX__ shelf tab, click [Icon:SHELF/smokecluster] Smoke Cluster
+or [Icon:SHELF/pyrocluster] Pyro Cluster.
 
-# On the __Pyro FX__ shelf tab, click [Icon:SHELF/smokecluster] Smoke Cluster or [Icon:SHELF/pyrocluster] Pyro Cluster.
+    * The tool creates a new network named `<<objectname>>_sourcpts`.
 
-    * Inside the object's geometry network, the tool creates a [Icon:SOP/clusterpoints][Cluster Points surface node|Node:sop/clusterpoints] to partition the points. The clustering branches off into nodes operating on the "instance points" (the points that will emit smoke/fire) and "cluster points" (the points on which the containers will be centered).
+    * The new network contains a [Icon:SOP/scatter][Scatter|Node:sop/scatter]
+    node that creates points on the input geometry's surface.
+
+    * These points are then partitioned by a [Icon:SOP/clusterpoints]
+    [Cluster Points|Node:sop/clusterpoints] surface node. The clustering
+    branches off into nodes operating on the "instance points" (the points that
+    will emit smoke/fire) and "cluster points" (the points on which the
+    containers will be centered).
     
-    * On the "instance point" branch it creates a [Icon:SHELF/fluid_source][Fluid Source node|Node:sop/fluidsource] to turn the points into fluid sources.
+    * On the "instance point" branch it creates a [Icon:SHELF/convert_to_fire]
+    [Pyro Source|Node:sop/pyrosource] and [Icon:SOP/attribnoise]
+    [Attribute Noise|Node:sop/attribnoise] nodes to set appropriate values for
+    the necessary point attributes, which are then rasterized into volumes.
     
         [Image:/images/dynamics/clustering_sops.png]
-    
-    * In the DOP network, the tool creates a regular [pyro node setup|pyro]. On the [Smoke object|Node:dop/smokeobject], it turns on __Create objects from points__ (on the __Instancing__ tab) and imports the cluster points from the geometry network.
 
-# To change the number of containers, in the geometry network select the [Icon:SOP/clusterpoints][Cluster Points node|Node:sop/clusterpoints] and change the __Clusters__ parameter.
+    * In the DOP network, the tool creates a regular [pyro setup|pyro]. On the
+    [Smoke object|Node:dop/smokeobject], it turns on
+    __Create Objects From Points__ (in the __Instancing__ tab) and imports the
+    cluster points from the geometry network.
 
-# Sourcing from points gives very thin smoke. The following controls will let you increase the source (in descending order of usefulness):
-
-    * In the geometry network, on the [Icon:SHELF/fluid_source][Fluid Source node|Node:sop/fluidsource], in the __Scalar volumes > Stamp points__ sub-tab, increase the __Sample distance__. This is the radius around each point which will be added to the source field.
-    
-    * In the dynamics network, on the [Icon:SOP/volume][Source Volume node|Node:dop/sourcevolume], you can increase the __Scale source volume__ parameter to increase the output of the source.
-    
-    * Increase the number of scattered points before clustering.
-
-== Clustering animated point sources ==
-
-It is possible to use clustering with an animated number of points, but it
-requires a couple of tricks to get the cluster boxes to appear as the points
-are created.
-
-Load `$HFS/help/examples/nodes/sop/clusterpoints/AnimatedSourcePoints.hda`
-for an example of how to set this up.
+# To change the number of containers, in the geometry network select the
+[Icon:SOP/clusterpoints][Cluster Points node|Node:sop/clusterpoints] and modify
+the __Clusters__ parameter.
 
 @related
 
 - [Distributed rendering|/render/batch]
-
-
-
-
-
-
 

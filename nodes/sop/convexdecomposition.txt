@@ -1,0 +1,59 @@
+= Convex Decomposition =
+
+#type: node
+#context: sop
+#internal: convexdecomposition
+#icon: SOP/convexdecomposition
+#tags: convex, decomposition
+
+"""Decomposes the input geometry into approximate convex segments."""
+
+This node decomposes the input geometry into approximate convex segments. Lowering the value of the __Max Concavity__ parameter will create more segments and have a better fit to the original geometry. 
+
+NOTE:
+    Make sure the __Create Convex Hull per Set of Connected Primitives__ checkbox is turned on in the [RBD Packed Object DOP|Node:dop/rbdpackedobject] when using dynamics.
+
+== Tips ==
+
+* If the input geometry is open, running it through the [PolyCap SOP|Node:sop/polycap] may give better results than the __Treat as Solid__ option. This is because __Treat as Solid__ only tries to preserve volume during segmentation and measure concavity from the outer side of the mesh, but will still be affected by holes.
+
+* Using the [PolyReduce SOP|Node:sop/polyreduce] to reduce the number of vertices on each convex hull after decomposition may help with performance for simulations with Bullet.
+
+@parameters
+
+Group:
+    The primitives to decompose. If only part of a solid geometry is chosen, it will be treated as open.
+
+Use Piece Attribute:
+    If enabled, the primitives for each unique value of the __Piece Attribute__ will be decomposed separately.
+    This can be useful for decomposing fractured geometry that contains some concave pieces.
+
+Piece Attribute:
+    The name of the primitive attribute to use when __Use Piece Attribute__ is enabled.
+
+Max Concavity:
+    #id: maxconcavity
+    The maximum distance from a point on the geometry to it's closest convex hull edge.
+    Reducing this value will produce convex hulls that are a closer fit to the input geometry, but the geometry may be split into more segments.
+
+Treat as Solid:
+    Specifies whether non-manifold geometries should be treated as solid when possible. This means that they will be capped when segmented if the clipping plane does not go through a boundary and will only measure concavity from the outer side. This does not cap the input geometry boundaries so extreme holes will still cause the geometry to be segmented as if it was hollow.
+
+Merge Nearby Segments:
+    After decomposing the geometry, attempt to merge nearby segments that can be combined without violating the __Max Concavity__.
+    This can be useful for creating proxy geometry that encloses multiple segments.
+
+Geometry Output:
+    The output can be either the original geometry which has been segmented using clipping planes, or the convex hulls of those segments.
+
+Output Segment Attribute:
+    Specifies whether the __Segment Attribute__ is added to the geometry.
+
+Segment Attribute:
+    Segments will be stamped with an integer primitive attribute for identification.
+
+Output Interior Group:
+    Specifies whether the __Interior Group__ is added to the geometry.
+
+Interior Group:
+    When the segmented geometry output is selected and the input is solid, primitives will be added to fill up the holes created by clipping planes.

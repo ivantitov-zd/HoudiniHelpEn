@@ -1,0 +1,297 @@
+#type: node
+#context: dop
+#icon: DOP/volumesource
+#internal: volumesource
+
+= Volume Source =
+
+"""Imports SOP source geometry into smoke, pyro, and FLIP simulations. """
+
+The Volume Source node imports SOP data into DOP fields and geometry. This node
+is capable of merging an arbitrary number of SOP volumes and VDBs with fields,
+as well as importing and destroying simulation particles.
+
+NOTE:
+    If instancing is enabled, volumes corresponding to instance `k` are
+    suffixed with "`_k`". For example, `density` volume for the second object
+    should be named `density_1` (as cluster numbers normally start at 0).
+
+    A DOP object's instance is deduced from its `init_cluster` data. This data
+    can be created automatically by enabling instancing on the
+    [Smoke Object|Node:dop/smokeobject].
+
+@parameters
+
+Initialize:
+    #id: initialize
+    Configures the microsolver according to the selected preset.
+
+Activation:
+    #id: activation
+    Controls whether or not the source will be applied.
+
+Input:
+    #id: input
+    Specifies where to fetch the SOP volumes from. Context geometries refer to
+    SOP nodes attached to inputs of the containing DOP network, while the `SOP`
+    option can be used to direct Volume Source to an arbitrary geometry node.
+
+SOP Path:
+    #id: soppath
+    The path of the SOP node containing the geometry that is to be imported.
+
+== Volumes ==
+
+Create Missing Fields:
+    #id: createmissing
+    When enabled, merging into a non-existent DOP field will cause this node to
+    create a field of the appropriate rank and name.
+
+Field to Match:
+    #id: matchfield
+    When __Create Missing Fields__ is enabled, fields that need to be created
+    will match the size and sampling of this DOP field.
+
+Operations:
+    #id: numvolumes
+    The number of volume merging operations to perform.
+
+Clamped:
+    #id: clamped#
+    When enabled, only parts of the __Target Field__ that fall within the
+    active region of __Source Volume__ are modified.
+
+    NOTE:
+        Active region for a native Houdini volume is defined to be the area
+        inside its bounding box. VDBs, on the other hand, may have an arbitrary
+        active region. The [VDB Visualize Tree|Node:sop/vdbvisualizetree] SOP
+        can be used to visualize the active voxels of a VDB primitive.
+
+Field Rank:
+    #id: rank#
+    Rank of the target field.
+
+    NOTE:
+        It is extremely important to identify data type for fields that the
+        DOP object does not already contain. In these cases, a new field is
+        created with rank governed by value of __Field Rank__ (assuming
+        __Create Missing Fields__ is enabled).
+
+Source Volume:
+    #id: volume#
+    Name of the SOP volume or VDB to merge. For vector fields, this can be a
+    single vector VDB or a space separated list of three scalar volumes or
+    VBDs.
+
+Weight:
+    #id: weightvolume#
+    Name of the SOP scalar volume or VDB containing the weights for __Source
+    Volume__; applicable only when the __Operation__ is set to __Blend__.
+
+Target Field:
+    #id: vfield#
+    The DOP field that is to be modified.
+
+Weight:
+    #id: vweightfield#
+    Name of the weight field for the destination; applicable only when the
+    __Operation__ is set to __Blend__.
+
+SOP Mask:
+    #id: sopmask#
+    Name of the SOP scalar volume or VDB by which __Source Volume__ is
+    multiplied before merging with the __Target Field__.
+
+DOP Mask:
+    #id: mask#
+    Name of the DOP field by which the __Source Volume__ is multiplied before
+    merging with the __Target Field__.
+
+Absolute:
+    #id: sopmabsolute# mabsolute#
+    When this option is enabled, negative mask values are interpreted as 0 and
+    positive values are interpreted as 1.
+
+SDF:
+    #id: sopsdf# msdf#
+    When this option is enabled (along with __Absolute__), negative mask values
+    are interpreted as 1 and positive values are interpreted as 0.
+
+Operation:
+    #id: voperator#
+    The merging operation.
+
+    Copy:
+        Values in the __Target Field__ will be overwritten by those in the
+        __Source Volume__.
+    Add:
+        Result is the sum of values in __Target Field__ and __Source Volume__.
+    Subtract:
+        Result is the difference between values in __Target Field__ and
+        __Source Volume__; the difference can optionally be clamped against
+        zero by enabling __Avoid Negatives__.
+    Multiply:
+        Result is the product of values in __Target Field__ and __Source
+        Volume__.
+    Divide:
+        Values in the __Target Field__ will be divided by the corresponding
+        values in the __Source Volume__.
+    Maximum:
+        Result is the larger of the values in __Target Field__ and __Source
+        Volume__. For vector fields, comparison can be performed length-wise by
+        enabling __Use Vector Length__.
+    Minimum:
+        Result is the smaller of the values in __Target Field__ and __Source
+        Volume__. For vector fields, comparison can be performed length-wise by
+        enabling __Use Vector Length__.
+    Average:
+        Result is the average of values in __Target Field__ and __Source
+        Volume__.
+    Guide:
+        Values in the __Target Field__ are pushed towards the corresponding
+        entries in __Source Volume__, in accordance to settings of
+        __Acceleration Strength__, __Deceleration Strength__, and __Direction
+        Strength__.
+    Blend:
+        Result stored in the __Target Field__ is `(s * v + d * w) / (v + w)`,
+        where `s`, `v`, `d`, `w` represent values of the source, source weight,
+        target field, and target weight, respectively. Additionally, the values
+        of source weight are added to the target weight field.
+    None:
+        The __Target Field__ is left untouched.
+
+Use Vector Length:
+    #id: usenorm#
+    With vector fields, when __Operation__ is set to __Maximum__ or __Minimum__,
+    this option can be enabled to signal that comparisons are to be done using
+    lengths of the vectors, rather than component-wise.
+
+Avoid Negatives:
+    #id: nonneg#
+    When __Operation__ is set to `Subtract` and this option is enabled,
+    negative results will be changed to zero.
+
+Acceleration Strength:
+    #id: accguidestr#
+    Controls how strongly the __Target Field__'s values are pushed towards the
+    __Source Volume__. Applies for the voxels in which the __Source Volume__
+    has larger values than the __Target Field__.
+
+Deceleration Strength:
+    #id: decguidestr#
+    Controls how strongly the __Target Field__'s values are pushed towards the
+    __Source Volume__. Applies for the voxels in which the __Source Volume__
+    has smaller values than the __Target Field__.
+
+Direction Strength:
+    #id: enabledirblend# dirguidestr#
+    When enabled, controls how strongly the __Target Field__'s vectors are
+    pushed to align with __Source Volume__'s. This option can only be used with
+    vector fields; when disabled for vector fields, guiding is performed
+    independently for each component of the __Target Field__.
+
+    NOTE:
+        __Acceleration Strength__ and __Deceleration Strength__ apply to the
+        vector lengths when this option is enabled.
+
+Scale:
+    #id: vscale#
+    A multiplier applied to the source values before merging.
+
+Use Timestep:
+    #id: vnormalize#
+    Normalizes the __Scale__ against the timestep and the canonical frame rate
+    of 24. This ensures that sourcing is performed to the same real extent,
+    regardless of the simulation timescale.
+
+    For example, with the default frame rate of 24, normalization causes the
+    __Scale__ to be used as is for every frame. If frame rate is increased to
+    48, effective scale will be halved per frame, resulting in the same amount
+    of additive sourcing.
+
+== Particles ==
+
+Source Particles:
+    #id: sourceparticles
+    Add the points from the input SOP to the simulation object's geometry.
+
+Group:
+    #id: sourcegroup
+    Only points in this __Group__ will be imported into the DOP geometry.
+
+Time Offset Scale:
+    #id: offsetscale
+    Offset any new particles by adding their scaled velocity multiplied by a
+    random portion of the current timestep. This can help ensure the emitted
+    stream of particles appears regular even at lower simulation substeps.
+
+Global Seed:
+    #id: offsetseed
+    The seed used to randomly offset the particles by their velocities. Also
+    used for random seeding of particle life expectancies.
+
+Life Expectancy:
+    #id: dolife life
+    If enabled, set the particles' `life` attribute to control how long the
+    particle will live. If sourcing particles to the
+    [FLIP Solver|Node:dop/flipsolver], then __Apply POP Solver__ and __Reap
+    Particles__ must be enabled on the solver for this attribute to have an
+    effect.
+
+Life Variance:
+    #id: lifevar
+    Particles will live the number of seconds in __Life Expectancy__, plus or
+    minus this number of seconds. Use 0 for no variance.
+
+Kill Inside SOP:
+    #id: killinsidesop
+    Kill any particles within the specified SOP SDF primitive. If __Source
+    Particles__ is enabled, only particles added in the current timestep are
+    eligible to be killed. If __Source Particles__ is disabled, all particles
+    are eligible to be killed.
+
+Kill Inside DOP:
+    #id: killinsidedop
+    Kill any particles within the specified DOP SDF. If __Source Particles__ is
+    enabled, only particles added in the current timestep are eligible to be
+    killed. If __Source Particles__ is disabled, all particles are eligible to
+    be killed.
+
+Stream Name:
+    #id: streamname
+    Any emitted particles will be placed in this group.
+
+== Instancing ==
+
+Instancing:
+    #id: instancing
+    When performing clustered simulations it is important that each cluster
+    receives its own individual sources. For the merged SOP primitives, the
+    cluster number is affixed to the name of the volume that is sourced
+    (following an underscore).
+
+    This option controls if this cluster identification is performed. `Auto
+    Detect` will attempt to determine it based on the instancing settings of
+    the [Smoke Object|Node:dop/smokeobject]. However, sometimes one wishes to
+    use the same source across many instances, in which cases __Instancing__
+    should be set to __Off__.
+
+@inputs
+
+[Include:standard_data_inputs]
+
+@outputs
+
+[Include:standard_data_outputs]
+
+@locals
+
+[Include:standard_data_locals]
+
+[Include:standard_locals]
+
+@related
+
+- [FLIP Source|Node:sop/flipsource]
+- [Pyro Source|Node:sop/pyrosource]
+

@@ -5,171 +5,359 @@
 #internal: uvlayout
 #icon: SOP/uvlayout
 #tags: uvs, textures, cleanup
+#version: 3.0
 
-"""Tries to pack UV islands efficiently into a limited area."""
+"""Packs UV islands efficiently into a limited area."""
 
-UV Layout produces a packing that tries to minimize the wasted UV area. This is achieved by translating and uniform scaling of the UV islands. The result is a non-overlapping placement of all islands into one or several UV tiles according to the __Packing Method__. The input geometry should have a valid vertex UV attribute. UV Layout uses this attribute to rewrite the UVs.
 
-:vimeo:UV layout
-    #id: 116671421
+== Overview ==
 
-The node's packing algorithm is very good at finding good layouts, however you should keep a few things in mind:
+UV Layout tightly packs UV islands into texture tiles. UV Layout can tightly pack any set of 2D profiles (islands) into any other set of 2D profiles (targets), without any restrictions on the number or size of islands or targets or the attributes that describe them. Islands can be assigned to specific targets or left un-assigned so that UV Layout can choose a target for them that allows a tightest packing.
 
-* There is a theoretical limit to the amount of packing it can do in a square. For example, if you're packing two equal sized square islands into a square tile, the algorithm can't achieve more than 50% coverage.
-
-* Packing is a hard problem for computers, which the node can only solve by trying different sizes and orientations and seeing if they fit.
-
-* Increasing iterations _might_ eventually find a better solution than the initial (iterations=1) packing, and often will, but it might not. The only way to know is to try increasing the iterations and waiting for the result. Unfortunately, when looking at a given packing, there's not even a way of knowing how much room there is for improvement.
+This node can pack into different categories of _targets_: a single UV unit (`0,0` to `1,1`), one or more rectangles with arbitrary size and positions, or [UDIM tiles|#udim], 
 
 :col:
     [Image:/images/nodes/sop/uvlayout_after.jpg]
 :col:
     [Image:/images/nodes/sop/uvlayout_detail.jpg]
 
-TIP:
-    If you have "Descriptive Parameter" text badges on in the network editor (__View > Display Options__, __Text Badges__ tab), the node displays the current coverage percentage (for packing methods where that makes sense).
+
+== UDIM tiles == (udim)
+
+UDIM is a convention for labeling unit squares in the UV texture space grid. It makes it easier to refer to specific squares, and to match up texture files to specific grid squares by putting the UDIM number in the filename. It numbers the 
+
+The typical Udim grid has unit square cells, is 10 cells wide, and its lower-left cell has number 1001. (You can customize all of these conventions using parameters on this node if necessary.)
+
+[Image:/images/uv/udim.svg]
+
+
+== Interactive state == (state)
+
+With the node selected, you can press ((Enter)) in the viewer to get the node's [Icon:TOOL/handles] handles state. In the node's state, you can interactively apply overrides to islands in the viewer.
+
+Select an island in the viewer, and then use the Override menu in the top to choose whether to override the island's target, scale, or orthagonal offset. Set the override value using the text box/slider next to the menu, then click __Apply__.
+
+
+== General packing == (general)
+
+Technically you can use _any_ vector3-type point or vertex attribute to describe islands or targets, and choose a projection (XY, YZ, or ZX) to pack onto. (The projection is always "XY" for texture attributes, with X and Y corresponding to U and V in UVW space.)
+
+You can define targets the same way you define islands, but based on the geometry in the second input. In other words, the targets will be profiles of the pieces of the geometry in a 2D projection of a coordinate attribute where the pieces are defined by connectivity and manipulated by separator edges or islands attributes if needed.
+
+:col:
+    [Image:/images/uv/uvlayout_3d_packing_top.jpg]
+:col:
+    [Image:/images/uv/uvlayout_3d_packing_persp.jpg]
 
 
 @parameters
 
-UV Attribute:
-    #id: uvattr
+== Islands To Pack ==
 
-    The name of the texture coordinate attribute to lay out, defaulting to `uv`.
+UV Attribute:
+    #id: uvattrib
+
+    The name of the attribute to use for the texutre coordinates. Usually this is `uv`. If you're layering multiple UVs on the same geometry, you can enter a custom attribute name.
+
+    (If you're using this node to do general layout in 3D, you could use `P` to project the model's point positions down onto the packing plane.)
 
 Group:
     #id: group
-    
-    Only pack UVs for polygons in this group. If this is blank, pack UVs for all polygons.
 
-Pack Between Non-group Islands:
-    #id: packbetween
-    
-    When this is on, the node tries to pack the islands selected in the __Group__ field in-between any other islands that might exist in the same tile. When this is off, the node ignores any other islands and just lays out the selected islands over them.
+    If this is blank, the node works on all incoming geometry. You can enter the name of a primitive group, or specify primitives using [group syntax|/model/groups#manual] to operate on only a subet of primitives.
 
-Additional Seams:
-    #id: additionalseams
-    
-    The node determines "island" connectivity by points with the same UV values (within the __Connectivity tolerance__ value). If you specify an edge group in this parameter, the group's edges are split apart in the UV islands. This allows you to break up large UV islands, potentially allowing 
-    
+=== Overrides === (overrides)
+    #display: collapsible collapsed
 
-~~~ Packing style ~~~
+    You usually don't need to change these values if you're doing typical UV island packing. However, they can be useful for customizing where things are packed, working around existing data, and general packing.
 
-Packing Method:
-    #id: packing
-    
-    Single Tile:
-        Packs all islands into a single tile (by default, the unit square (`0,0` to `1,1`)). You can use the __Center__ and __Size__ parameters to change the tile to pack into.
-    
-        [Image:/images/uv/uvlayout1.png]
-
-    Fixed Scale:
-        Packs all islands, scaled by the __Scale__ parameter, into as few tiles as possible.
-            
-        [Image:/images/uv/uvlayout2.png]
-
-    `udim` Attribute:
-        Packs islands into individual tiles based on the `udim` attribute. Islands are packed into a tile numbered with the value of the `udim` attribute. Valid `udim` values start at `1000`.
-    
-        It is enough for one polygon in an island to have a valid `udim` number for the island to be packed into the tile with that number. If multiple polygons in an island have valid `udim` numbers, the nodes uses the smallest of these numbers. 
-        
-        Islands with invalid `udim` values are assumed to have `udim` of 1000 and are placed into the first tile (`0,0` to `1,1`).
-
-        [Image:/images/uv/uvlayout3.png]    
-
-    Current Tile:
-        Groups the islands into the tile they currently occupy (based on the island's top-left most vertex).
-
-Padding:
-    #id: padding
-
-    Indicates the distance between distinct islands, measured in 1/1000 of the
-    frame length.
-
-Apply Padding to Tile Boundaries:
-    #id: paddingboundary
-
-    Indicates whether the padding should be also applied to the frame 
-    boundaries.
-
-Pack Islands in Cavities:
-    #id: packincavities
-    
-    If islands have "holes" of unused texture space, pack other smaller islands into them.
-
-Center:
-    #id: bboxcenter
-    
-    When __Packing method__ is "Single tile", sets the center of the tile to pack into. The default is `0.5,0.5`, centering the tile on the unit square (`0,0` to `1,1`).
-
-Size:
-    #id: bboxsize
-    
-    When __Packing method__ is "Single tile", sets the size of the tile to pack into. The default is one unit by one unit.
+    You can apply target, scale, and offset overrides to islands [interactively|#state] in the node's viewer state.
 
 
-~~~ Island transformations ~~~
+    ==== Connectivity ====
+
+    By default this node defines islands by connectivity of UV attribute values across polygon edges. You can override this using these controls.
+
+    Separator edges:
+        #id: separatoredges
+
+        If this field is not empty, the node will use cut the model up into islands using these edges instead of UVs.
+
+        You can use the __Connectivity Tolerance__ parameter (under Packing > Advanced) to make sure small numerical differences in coordinate values do not separate polygons into different islands.
+
+    Island attribute:
+        #id: islandattr
+
+        The name of an integer primitive attribute to use to combine islands. Islands containing polygons with the same value for this attribute will be merged. The "sub-islands" will be packed in the same relative position from each other.
+
+        Negative values are ignored. Conflicting "merged" island numbers on different polygons of the same island are resolved by using the island number from the polygon with the smallest index.
+
+
+    ==== Target assignment ====
+
+    When there are multiple packing targets, UV Layout decides the target for each island to optimize packing coverage. These parameters let you force an island to be packed inside a designated target.
+
+    Target attribute:
+        The name of an integer primitive attribute that specifies which target space (rectangle index or UDIM number) the node should pack the polygon's island into.
+
+        Negative values are ignored. If polygons of the same island have different values, the node uses the value from polygon with the smallest index.
+
+    Overrides:
+        #id: targetoverrides
+
+        A string of space-separated `<<polygon>>:<<target>>` mappings, where <<polygon>> is the primitive number of one of the polygons in the island you want to assign, and <<target>> specifies which target space (rectangle index or UDIM number) the node should pack the island into.
+
+        For example, with UDIM packing, an override string of `35:1009 15:1002` means "pack the island containing polygon 35 into UDIM tile 1009, and pack the island containing polygon 15 into UDIM tile 1002".
+
+        Later mappings override earlier mappings in the string. So, in the example above, if polygons 35 and 15 both belong to the same island, that island will be packed in tile 1003. 
+
+
+    ==== Variable scaling ====
+
+    These parameters allow you to override the scale of individual islands. 
+
+    Island scale attribute:
+        A floating point primitive attribute that specifies the scale for the polygon's island.
+
+        Negative values are ignored. If polygons of the same island have different values, the node uses the value from polygon with the smallest index.
+
+    Overrides:
+        #id: scaleoverrides
+
+        A string of space-separated tokens `<<polygon>>:<<scale>>` mappings, where <<polygon>> is the primitive number of one of the polygons in the island you want to scale, and <<scale>> is a floating point value to scale the island's size by.
+
+        For example, `35:1.5 15:0.5` means "make the island containing polygon 35 1.5x bigger, and make the island containing polygon 15 half as big".
+
+        Later mappings override earlier mappings in the string.
+
+
+    ==== Projection offset ====
+
+    Since UV Layout packs packs 2D profiles of geometries into 2D target domains, the node usually leaves the third (orthogonal) component of input 3D coordinates unchanged.
+
+    In a "general packing" workflow where you get the targets from geometry in second input, the node increases the third component by the smallest corresponding value in the target in which the island is packed.
+
+    For example if the targets are flat parts of stairs whose heights are determined by the Z component, the Z coordinate of each packed geometry is raised to the height of the stair on which which it is packed.
+
+    You can uses these controls to add or subtract an offset value for each island to further raise or lower them in the dimension orthogonal to the packing plane.
+
+    Island Offset Attribute:
+        A floating point primitive attribute that specifies how much to raise or lower the the polygon's island.
+
+        If polygons of the same island have different values, the node uses the value from polygon with the smallest index.
+
+    Overrides:
+        #id: offsetoverrides
+
+        A string of space-separated tokens `<<polygon>>:<<offset>>` mappings, where <<polygon>> is the primitive number of one of the polygons in the island you want to scale, and <<offset>> is a floating point value to offset the island's "height" by.
+
+
+Scale Island to Match Their Surface Areas:
+    Re-scales islands to their relative areas measured using the UV attribute match their 3D surface area measured using `P`. This means large 3D surfaces will get large UV islands, and small 3D surfaces will get small islands.
+
+    (The overrides above are applied after this rescaling.)
+
+Axis Alignment: 
+    How/whether to align islands before packing.
+
+    None:
+        Use the islands as they come with no pre-rotation.
+
+    By Island Symmetry (default):
+        Pre-rotate islands based on their shape to turn their "longest side" horizontal. This option tries to detect symmetries in the islands and respect them. 
+
+    By Island Position in 3D:
+        Pre-rotate islands so that the resulting horizontal and vertex UV lines on the surface best align with 3D coordinate axes.
+
+        For flat islands parallel to one of the coordinate planes, this should rotate the island for the UV axes to match those of the coordinate plane to which the island is parallel. For curved islands, this option considers the ideal alignment for each polygon of the island and picks one that best agrees with all polygons in the island. 
+
+
+== Packing ==
 
 Scale:
-    #id: scale
+    Controls how the node scales the islands for packing.
 
-    The scale parameter for the second packing method.
+    Largest packable:
+        Make islands as large as possible while still fitting them into the given targets.
 
-Correct Island Area Proportions:
-    #id: correctareas
-    
-    Resizes the islands before packing (maintaining their combined area) so that the relative areas of any two islands is the same as their corresponding surface areas on the 3D mesh. 
-    
-Axis Align Islands:
-    #id: axisalignislands
-    
-    Performs a computation of the oriented bounding boxes for each UV island and uses the information to axis align each island. This should produce much better packing results, especially for rectangular geometry.
+    Fixed:
+        Specific a fixed scaling factor to apply to all islands.
+
+    If you choose "Fixed", islands that fail to pack are lined up outside of the bounding box of the packing targets. You can get a primitive group consisting of the polygons of these "non-packed" islands in Output Groups and Attributes (see below).
+
+    When __Pack into__ is "UDIM Tiles", if you use a fixed scale, the node will fill as many tiles as can fit the scaled islands.
+
+Island Rotation Step:
+    The node can try different island rotations to get better packing (some islands may be able to fit into a smaller available space if they are rotated slightly). Setting this parameter is a tradeoff beween allowing rotations reducing axis alignment, trying more rotations giving more efficient packing, and trying lots of rotations being slow.
+
+    No rotation:
+        Packs islands using the rotation they get from the __Axis alignment__ parameter.
+
+    Rotation step:
+        Tries rotating the island by this number of derees around a full circle. For example, 180 tries the island two ways (right-side-up and upside-down). 90 tries the island four ways (right-side-up, rotated left, rotated right, and upside-down), and so on. Each choise halves the degrees and so doubles the number of rotations that must tried.
+
+    Custom:
+        Lets you enter a custom number of divisions of 360 degrees.
+
+        Bear in mind that 6 divisions of the circle may result in a packing inferior to 4 (90 degree steps) because only two of the attempted rotations are common and therefore one can not always expect the a tighter packing with 6 rotations compared to 4. 
+
+Avoid Packing Over Non-Group Island:
+    This controls what to do when you use the __Group__ field to apply this node to only a subset of the polygons in the input. When this is on, the node attempts to pack the polygons selected by the __Group__ field around the other polygons in the input. When this if off (the default), the node will ignore the other polygons, possibly giving overlaps in UV space.
+
+Pack Island in Cavities of Other Islands:
+    When this is on (the default), the node will attempt to pack islands inside "holes" and concave areas in other islands. Turning this off is faster but gives less efficient packing.
+
+Island Padding:
+    The amount of padding to use to separates islands.
+
+    This number is in "pixels" of the __Search resolution__ (under Advanced), so changing that number will change the padding distance in UV space.
+
+Apply Padding Between Island Target Boundary:
+    When this is on, padding is added between islands and the edges of the target space. When this is off (the default), islands are packed right up to the edges of the target space.
+
+Spread Island To All Available Space:
+    Attempts to automatically increase padding so islands spread to cover the target area.
+
+    (Normally the packing algorithm bunches up islands in tight corners as it progresses in order to leave as much space as possible for packing of subsequent islands. When this is on, once the packing is achieved, the padding is gradually increased to the maximum possible amount that still allows the same packing coverage. The effect of this is usually to spread the islands around in the available space. Note that this does not guarantee a uniform spreading as the fragmentation of the available space by the packing process can restrict free movement of the islands in some cases.)
 
 
-~~~ Packing optimizations ~~~
-
-Orientations:
-    #id: rotations
-    
-    Try this many orientations of each island when trying to pack islands tighter. For example, the default `4` tries each island at 0°, 90°, 180°, and 270°. Increasing this _may_ allow the algorithm to find a better packing, especially when you have some non-square islands, but will make packing slower.
-    
-    If you have fat and mostly convex polygons, there's little to achieve from rotating them in small increments. Elongated highly concave shapes on the other hand can benefit a lot.
+=== Advanced ===
+#display: collapsible collapsed
 
 Iterations:
-    #id: iterations
-    
-    How many times the algorithm will try packing the islands together in different ways to try to find the most efficient packing. Increasing this _may_ allow the algorithm to find a better packing, but will make packing slower. Note that the first iteration sorts islands by area and so represents the best possible "first guess". Additional iterations use random sorting, so 2 iterations isn't necessarily "twice as good" as 1, and you might need a lot more iterations to see any improvement over just `1`. 
+    The number of attempts at each scale. Each iteration randomizes the order in which it tries packing the islands, since different orderings can give different layouts. You can often achieve more efficient packing by increasing the iterations, at the cost of slower packing.
 
-Random Seed:
-    #id: randseed
-    
-    Iterations greater than `1` use random sorting. This number seeds the random order generator. You can change it to get different permutations with the same number of iterations.
+    The time increase for more iterations is "sub-linear", meaning the time to do 100 iterations is less (often much less) than 100x the time to do one iteration. However, the improvement given by additional iterations may be marginal. The shape of the islands, particularly long and narrow islands that are hard to pack, can put a hard limit on the packing efficiency.
 
+Search Resolution:
+    The packing algorithm works by building internal "images" of islands on a pixel grid. The algorithm then plays a complicated game of Tetris with the islands, packing them into the target areas. This parameter sets the maximum number of pixels on the longest side of the packing image (across all targets).
 
-~~~ Advanced ~~~
-
-Generally, you shouldn't need to change these values unless you're dealing with unusually detailed geometry. They may allow slightly finer placement of islands but the difference will probably be too small to matter.
-
-Frame Width:
-    The packing algorithm is based on a rasterization of the islands.
-    This controls the resolution of the rasterized bitmap.
-    Increasing this allows finer placement of islands but is slower.
+    NOTE:
+        If you are using UV Layout to pack UV islands for a specific texture coordinate, do not set the pixel resolution larger than that of your texture image. Otherwise, when the internal "image" is scaled down onto your texture, you may get islands which share pixels in your texture image.
 
 Connectivity Tolerance:
-    UV coordinates within this tolerance are considered to be at the same position and connected.
-    This is necessary because of the imprecision of floating-point math.
-    If islands come apart unexpectedly you can try increasing this slightly.
+    Controls how close values in the __UV Attribute__ must be to be considered the same value across an edge (and therefore combine the polygons on the two sides of the edge into the same island). If either of U or V value exceeds this limit at either endpoint of the edge, the node treats the edge as a seam. 
 
-Scale Error Tolerance:
-    When doing a binary search of sizes to find the largest island size that still fits in available space, the algorithm will stop when the difference between the size that doesn't fit and the size that does fit is within this tolerance.
-    Decreasing this allows finer placement of island but is slower.
+Scale Search Tolerance:
+    Controls when the node stops searching for a better scale. If the islands can be packed successfully at a given scale, but increasing the scale by less than this amount leads the packing to fail, then the algorithm stops searching for any larger packable scale. 
+
+Random Seed:
+    When the __Iterations__ is greater than 1, the node randomizes the order in which it tries packing the islands. Changing this seed generates different random numbers for the iterations. This can be useful, for example, if you use two different computers to search for a tighter packing, each using a large number of iterations, then you can avoid doing the same search by picking different random seeds for the two machines. 
+
+
+== Targets ==
+
+Pack into:
+    Controls how the 
+
+    Rectangles:
+        Lets you specify one or more square or rectangular areas in the UV plane to pack into.
+
+    UDIM Tiles:
+        Lets you specify tiles on the UV plane by their [UDIM number|#udim].
+
+    Islands from second input:
+        Packs into areas defined by "islands" in the geometry connected to this node's second input.
+
+Default Target:
+    If you leave this off, islands will be distributed to targets based on where they fit best. If you turn this on, islands will be packed into this target unless an [overridden|#overrides].
+
+    This is particularly useful when UDIM packing. 
+
+
+=== Target rectangles ===
+
+This section is visible when __Pack into__ is set to "Rectangles".
+
+Target rectangles:
+    #id: rects
+
+    When __Pack into__ is set to "Rectangles", this multiparm lets you add or remove rectangles. You can specify the position and size of the target area on the UV grid. The default is a single UV unit square from 0,0 to 1,1.
+
+
+=== Tile grid ===
+
+This section is visible when __Pack into__ is set to "UDIM".
+
+You can use __Starting UDIM__ if you need to pack around existing data.
+
+You should not change tile size or number of columns unless you have a good reason. Originally these were flexible (the number of columns was the U DIMension from which the convention gets its name) but they are considered standards and many software packages are hard-coded to use 1x1 tiles with 10 columns.
+
+Tile size:
+    The size of UDIM tiles in UV space. Do not change this value unless you have a good reason (for example, compatibility with old textures).
+
+Columns:
+    The number of columns in which to layout the tile grid. This has been standardized at 10 and is often hard-coded in other software packages. Do not change this value unless you have a very good reason.
+
+Starting UDIM:
+    The first tile to start packing into. You can use this pack around existing data lower-numbered tiles.
+
+
+=== Second input ===
+
+These parameters are visible when __Pack into__ is set to "Islands from second input".
+
+UV Attribute:
+    #id: targetuvattrib
+
+    Similar to UV Attribute for island specification. This is a point or vertex attribute on the second input.
+
+Group:
+    #id: targetgroup
+
+    If this is blank, the node works on all incoming geometry from the second input. You can enter the name of a primitive group, or specify primitives using [group syntax|/model/groups#manual] to operate on only a subet of primitives.
+
+==== Connectivity Overrides ====
+    #display: collapsible collapsed
+
+    Separator edges:
+        #id: targetseparatoredges
+        #contentfrom: #separatoredges
+
+    Island attribute:
+        #id: targetislandattr
+        #contentfrom: #islandattr
+
+
+== Island Stacking ==
+
+The controls in this section can detect islands that look the same and stack them over each other, which often saves texture space.
+
+NOTE:
+    Island stacking only works on connected islands. You cannot stack islands created by the __Island Attribute__. 
+
+Stack identical islands:
+    Detect and stack identical islands over each other.
+
+Match Mirrored Islands:
+    When __Stack identical islands__ is on, also detect islands that would be identical if reflected, mirror one and stanck them over each other.
+
+Allow Stacking on Non-Group islands:
+    When __Stack identical islands__ is on, also look at islands that are not selected in the __Group__ field, and if one matches a selected island, stack the selected island on the non-selected island.
+
+    This is useful if you have prototype island shapes already in place and want to put islands with similar shapes over them. 
+
+Shape tolerance:
+    When __Stack identical islands__ is on, how close the shapes need to be for them to be stacked. You can tweak this number until the islands you want to stack start stacking.
+
+
+== Output Groups and Attributes ==
+
+Nonpacked polygons:
+    Output a group containing the polygons of any islands that failed to pack because __Fixed__ scaling made them too big.
+
+Island number:
+    Add a primitive attribute to each polygon containing the number of the island it was a part of.
+
+Assigned target:
+    Add a primitive attribute to each polygon containing the number of the target it was packed into.
 
 
 @related
 
+- [Node:sop/uvautoseam]
+- [Node:sop/uvflatten]
 - [Node:sop/uvproject]
-- [Node:sop/uvquickshade]
-- [Node:sop/texture]
 - [Node:sop/uvpelt]
 - [Node:sop/uvunwrap]
 

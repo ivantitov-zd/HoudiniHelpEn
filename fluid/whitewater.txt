@@ -1,13 +1,119 @@
 = Whitewater =
 
-The [Whitewater|/shelf/whitewater] tool on the __Particle Fluids__ shelf creates spray, foam, and churn based on an underlying FLIP fluid simulation. It sets up the [source|Node:sop/whitewatersource] and [solver|Node:dop/whitewatersolver] for a whitewater simulation. Whitewater emission particles are created from a source  [FLIP|/shelf/flipfluidfromobject] or [liquid|/shelf/liquidbox] simulation based on several criteria including fluid acceleration, curvature, and vorticity. The simulation uses these emission particles and volumes from the fluid simulations as sources for simulating whitewater with foam, spray and bubble particles.
+The [Whitewater|/shelf/whitewater] tool on the __Particle Fluids__ shelf
+creates spray, foam, and churn based on an underlying FLIP fluid simulation. It
+sets up the [source|Node:sop/whitewatersource] and
+[solver|Node:dop/whitewatersolver] for a whitewater simulation. Whitewater
+is created from a source [FLIP|/shelf/flipfluidfromobject] simulation based on
+several criteria including fluid acceleration, curvature, and vorticity.
+Whitewater enhances the look of fluid animation with secondary effects such as
+spray, foam, and bubbles.
 
 TIP:
-        Do not try to set up a whitewater simulation from scratch.
+    Do not try to set up a whitewater simulation from scratch.
         
 For more information on how the tool sets up the network, see the [Whitewater|/shelf/whitewater] shelf help.
 
-[Include:/dyno/distribute#ww]
+:video:
+    #src: /videos/beach_small.mp4
+
+== Forces ==
+
+Dynamics of the whitewater particles are governed by several mechanisms.
+
+* Acceleration due to __Gravity__ is applied uniformly to all particles.
+* With default settings, __Buoyancy__ pushes particles in the opposite direction
+  of __Gravity__ and is responsible for surfacing of bubbles.
+* The particles move with the underlying liquid's flow as they are passively
+  advected through its velocity field.
+* Special repellant points on the surface push away nearby whitewater particles,
+  breaking up the foam structure and giving rise to a cellular pattern.
+* The liquid's surface tension and adhesion result in foam "sticking" to the
+  surface, not allowing it to submerge or peel away. These effects can be
+  simulated by enabling depth control.
+* Density control is responsible for maintaining local whitewater distribution,
+  preventing particles from clustering too closely. Additionally, this
+  mechanism gives rise to whitewater cohesion, as it fights dispersion.
+
+The [Whitewater Solver|Node:dop/whitewatersolver] allows for fine control of these forces at different depths. For instance, it may be desirable to strictly control density at the surface, but less so for airborne whitewater that should easily separate; this effect can be achieved by attenuating the strength of density control.
+
+== Whitewater Lifecycle ==
+
+The solver takes care of birthing new whitewater particles, using the emission
+volume created by the [Whitewater Source|Node:sop/whitewatersource] node to
+determine the amount. When __Limit Emission__ is enabled, the present
+distribution of whitewater particles is also considered, avoiding over-emission.
+
+Aging and killing of particles is likewise handled by the solver. As simulation
+progresses, whitewater ages in an ordinary manner; however, particles do not
+have a prescribed lifetime. Instead, a death chance is dynamically calculated
+for each particle, taking into account its current condition. The following
+factors are considered when determining a particle's dying probability:
+
+* age - Older particles are more likely to be killed.
+* depth - As depth varies, so does whitewater's chance of dying, per values of
+  the __Aging Rates__.
+* density - When erosion is enabled, whitewater density in a particle's
+  neighborhood is also used to augment its death chance.
+  
+Advanced users can further manipulate particle lives by accessing their
+`deathchance` point attributes.
+
+NOTE:
+    Ignoring other factors, __Lifespan__ is the statistical average for lifetime
+    of whitewater particles.
+    
+== Repellants ==
+
+In addition to storing the whitewater particles, a
+[Whitewater Object|Node:dop/whitewaterobject] also contains a `Repellants`
+geometry holding the system's repellant points. These points apply a repulsive
+force on the nearby whitewater, breaking up its structure and creating "bald"
+patches that form a larger cellular pattern. Aside from calculating and applying
+these forces, the solver also advects the repellants to ensure that the foam
+pattern moves with the liquid and tries to control their distribution by removing points from denser regions and reseeding points in scarce regions. On their birth frame, repellants are organizes into a group called `justborn`.
+
+The manner in which repellants affect whitewater and other repellants is largely
+controlled by their various point attributes, as outlined below.
+
+`action`:
+    Controls how strongly the repellant is currently pushing whitewater
+    particles; acts as a multiplier for the repellant's strength (`magnitude`).
+`magnitude`:
+    Contains the repellant's strength. In contrast to `action`, this attribute
+    is meant to be a permanent (or long-term) property, as opposed to a
+    temporary modifier.
+`noise`:
+    Governs the repellant's shape, value of 0 being perfectly circular and 1
+    being maximally "noisy".
+`phase`:
+    Repellants with the same `noise` attribute may still have different shapes,
+    depending on the value of their `phase`.
+`pulse`:
+    Holds rate of change of the `phase` attribute. As the `phase` attribute
+    changes, so does the repellant's shape. Value of 0 indicates that the shape
+    is static, while values further away from 0 cause the repellant to
+    continuously evolve its shape.
+`radius`:
+    Controls the repellant's size.
+
+By default, repellants are ageless and do not expire. However, if __Life Range__ on the
+[Whitewater Solver|Node:dop/whitewatersolver] is enabled, they will be given a random lifespan at birth (stored in the `life` point attribute) and will also contain
+the `age` attribute, which holds the elapsed time since the repellant's
+creation. In this case, repellants are destroyed once their `age` exceeds their
+`life`.
+
+[Image:/images/fluid/full.png]
+
+Image courtesy of Igor Zanic.
+
+=== Notes ===
+
+* Values of repellant properties can be visualized by enabling the appropriate settings on the [Whitewater Object|Node:dop/whitewaterobject] node.
+
+* Repellants also have a `crampedness` attribute, whose value is a measure of how tightly repellants are packed. This attribute is used by the solver for reseeding purposes. Range of `crampedness` values is 0-1.
+
+* Unless __Density Threshold__ is enabled, repellants are not affected by whitewater; thus, it is possible to examine their evolution throughout a simulation by temporarily disabling whitewater emission.
 
 == How to animate a wave tank with whitewater ==
 
@@ -23,11 +129,17 @@ This tutorial explains how to get a nice looking wave tank in the viewport and f
 
 # Navigate back to the OBJ level and click the [Whitewater|/shelf/whitewater] tool on the __Oceans__ shelf tab. Select the tank when prompted to add whitewater to the existing network.
 
-# On the __Guide__ tab of the [Whitewater Object|Node:dop/whitewaterobject], turn on the __Color Particles By Type__ checkbox. This will cause the foam particles to be displayed white, the spray particles to be displayed green, and the bubbles to be displayed red.
+# In the __Limits__ tab of the [Whitewater Solver|Node:dop/whitewatersolver], disable __Closed Boundaries__ to prevent particles from bouncing off simulation bounds.
 
         NOTE:
-                You can turn off the display red and green particles by diving into the [Icon:SHELF/whitewater][Whitewater Solver|Node:dop/whitewatersolver] and turning off the __Enable Spray__ checkbox on the __Spray__ tab, and __Enable Bubbles__ checkbox on the __Bubbles__ tab. 
+                This parameter is linked to fluid object. Delete the channel first using ((Ctrl)) + ((Shift)) + ((LMB)), then turn it off.
+
+# In the __Foam__ tab of [Whitewater Solver|Node:dop/whitewatersolver], change the repellants' __Feature Size Range__ to `0.1-0.2`. This will yield smaller features in the generated cellular foam pattern.
+
+        NOTE:
+                You can turn on __Repellants__ under the [Whitewater Object|Node:dop/whitewaterobject] to get a better visualization of the repellant particles that give rise to the cellular pattern.
         
-# Stay inside the `whitewater_sim` node and play your scene. If you leave the `whitewater_sim` node the particles will appear black.
+# Play the scene to perform the liquid and whitewater simulations.
 
 [Image:/images/howto/wavetank.png]
+

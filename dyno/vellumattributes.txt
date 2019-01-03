@@ -1,0 +1,178 @@
+= Vellum Attributes =
+
+== Setup Attributes ==
+
+Type ||
+    Name ||
+        Description ||
+
+`vector` |
+    `materialuv` |
+        (Point) Set by the [Planar Patch|Node:sop/planarpatch] or [Planar Patch from Curve|Node:sop/planarpatchfromcurves] SOPs. Used to determine warp/woof directions for anistropy.
+
+`float` |
+    `bend<<name>>`, `stretch<<name>>` |
+        __Scale by Attribute__ in [Vellum Constraints|Node:sop/vellumconstraints] defaults to these sorts to adjust the scale. Should be `0..1`, not exponential map.
+        
+== Sim Attributes: Geometry ==
+
+NOTE:
+    Geometry is also considered particles, so all of [POP Attributes|/dopparticles/attributes] apply.
+    
+=== Dynamics: parameters ===
+
+Type ||
+    Name ||
+        Description ||
+
+`float` |
+    `dragnormal`, `dragtangent` |
+        (Point) How much to scale wind effects when the face of the cloth is heading straight into the wind versus sliding parallel to it. For hair, `normal` is cross-wise to the hair and `tangent` is along the hair direction.
+        
+        NOTE:
+            This controls the innate behavior of the cloth property, the strength of the wind is controlled with `airresist`.
+            
+`float` |
+    `inertia` |
+        (Point) The resistance of a particle to rotational hair constraints. If this is zero, the particle will not rotate.
+        
+`integer` |
+    `weld`, `branchweld`, `collisionweld` |
+        (Point) Default -1.
+        
+        A value of 1 or a reference to itself means not welded, but something might be welded *to* this point.
+        The value is a point number, unless there is an `@id` attribute. Then it is a point id.
+        
+        `@weld` is the user accessible option. `@branchweld` is built by the hair constraints when it is forced to split points for hair simulation. `@collisionweld` is generated on demand to provide a single weld to the detangle algorithm.
+        
+`float` |
+    `friction`, `dynamicfriction` |
+        (Point, Detail) How much to scale the static friction (`friction`) and dynamic friction scale (`dynamicfriction`) settings by.
+
+	NOTE:
+	    These are combined by multiplication.  So if two objects have a `friction` of `0.5`, the applied friction will be `0.25`.
+        
+=== Dynamics: state ===
+
+Type ||
+    Name ||
+        Description ||
+
+`vector` |
+    `P`, `pprevious`, `plast`, `v`, `vprevious`, `vlast` |
+        (Point) For 2nd order we need the previous frames position and velocity (`pprevious`, `vprevious`), and the frame before that, two frames ago `(plast`, `vlast`).
+
+`point`, `vector` |
+    `orient`, `orientprevious`, `orientlast`, `w`, `wprevious`, `wlast` |
+        (Point) Hair requires point orientations and the corresponding angular velocity (w). Same previous/last.
+        
+`integer`|
+    `stopped` |
+        (Point) This is a standard POP attribute, but it is used and respected by Vellum. Auto-sleep and awaken will manipulate the stopped attribute. Pins that are to be released can be controlled using stopped rather than setting the mass to zero.
+
+        Stopped controls both orientation and position updates via bits 0 and 1.
+
+        * 0 - Particle is free.
+        * 1 - Particle can rotate, but is fixed in space.
+        * 2 - Particle can't rotate, but is free to move in space.
+        * 3 - Particle can't rotate or move.
+
+=== Collision ===
+
+Type ||
+    Name ||
+        Description ||
+
+`float` |
+    `pscale` |
+        (Point) Radius at each point. Triangles are fattened at their corners by spheres of the corner `pscales`, tapered tubes on edges, and sloped planes in center.
+        
+`integer` |
+    `layer` |
+        (Point) Controls soft priority of collisions. Only greater/less matters, not magnitude of difference.
+
+`integer` |
+    `disableself`, `disableexternal` |
+        (Point) A value of 0 means this point will use self collisions or external collisions. If an edge or tri has any disabled point, it is fully disabled.
+
+        Auto-disabling will "or" 2 to this value - 0 will become 2, 1 will become 3. Likewise, auto-enabling will clear out 2, 2 will become 0, 3 will become 1. Users should set to 1 to disable something independent of auto detection. But if you re-enable something and aren't sure if it is still tangled, you can set to 2 rather than 0, this will delay the enabling until it is detected clean.
+        
+`float` |
+    `overlap_self`, `overlap_external` |
+        (Point) The default value is 10000.
+
+        Stores how much of the original `pscale` is overlapped. So 0 means that the `pscale` is fully used. This avoids first-frame explosion by effectively reducing the effective `pscale` by `overlap_foo` for collisions, so points don't start overlapping. Visualizing thickness will draw cyan rather than green for points modified this way. As points separate, this will decrease to grab any exposed room. Thus a `pscale` that is too high will become unsteady as points grow and then fight distance constraints.
+        
+=== Targeting ===
+
+Type ||
+    Name ||
+        Description ||
+
+`string`, `integer` |
+    `target_path`, `target_pt`, `pintoanimation`, `gluetoanimation` |
+        (Point) The target path and point number for any pins when the __Target__ parameter is set in [Vellum Source|Node:dop/vellumsource]. If `pintoanimation` is 1, the pinned points' position will be updated to match the specified target point on the target path geometry. If `gluetoanimation` is 1, both the position and orientation will be updated.
+        
+=== Breaking ===
+
+Type ||
+    Name ||
+        Description ||
+
+`integer`, `string` |
+    `breakthreshold`, `breaktype` |
+        (Point) The threshold for breaking welds and branch welds, measured against the breaktype, which can be one of the following: `stretchstress`, `bendstress`, `stretchdistance`, `stretchratio`, or `bendangle`. If `breakthreshold` is less than zero, no breaking will occur.
+        
+=== Pressure ===
+
+Type ||
+    Name ||
+        Description ||
+
+`vector`, `integer` |
+    `pressuregradient`, `volumepts`, `volume` |
+        (Point) When a point is part of a Pressure constraint, these attributes hold values computed during constraint evaluation. The `pressuregradient` is a vector pointing outwards along the direction of greatest volume gain, usually very close to a point normal. The `volumepts` array contains the points needed to compute the volume attribute for each point, which are added together to compare against the Pressure constraint's `restlength`.
+        
+=== Internal worker variables ===
+
+Removing/adding attributes every frame is expensive, so we have a few internal things that leak out.
+
+Type ||
+    Name ||
+        Description ||
+
+`vector` |
+    `dP`, `dPw` |
+        (Point) Constraint displacements/weights. Likely of last iteration, so out of date.
+        
+`string` |
+    `patchname` |
+        (Point) Identifies each generated patch in a simulation so it can be updated/replaced.
+        
+== Sim Attributes: Constraints ==
+
+There are many types of constraints, so the meaning of these variables is often dependent on the constraint type. They usually live on the primitive.
+
+=== Dynamics: parameters ===
+
+Type ||
+    Name ||
+        Description ||
+
+`float` |
+    `dampingratio` |
+        (Prim) 0..1 damping ratio. 
+        
+        NOTE:
+            Higher than `0.1` likely stops the constraint from converging. Helps suck energy from system.
+            
+`float` |
+    `restlength`, `restlengthorig` |
+        (Prim) The initial "distance" of the constraint. The units are variable. Distance constraints use distance, bend constraints use angle in degrees, volume and pressure constraints use volume.
+
+        The actual dynamics use only `restlength`. `restlengthorig` is for convenience so you can animate scaling effects without extra math.
+        
+`point` |
+    `restvector` |
+        (Prim) Orientation constraints need a rest orientation, so store a quaternion here. This vector is also used to store target positions for pin constraints. 
+

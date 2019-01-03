@@ -2,6 +2,7 @@
 
 """Various places in Houdini where you can customize behavior using Python scripting."""
 
+
 == General tips ==
 
 * If you need to check whether some code ran, the easiest way is to call [Hom:hou.ui#displayMessage]:
@@ -34,6 +35,28 @@
 * _In general_, Houdini looks for "scripts" (usually callback scripts) on disk under `HOUDINIPATH/scripts/`, while modules you would import are under `HOUDINIPATH/python2.7libs/`. Unfortunately, this is not consistent, so for example Houdini looks for the `pythonrc.py` initialization script in `python2.7libs`.
 
 
+== How to refer to code in other locations in your scripts == (call)
+
+Python files on disk:
+    See [how to import modules on disk|#disk].
+
+In the current `.hip` file's [session module|#session]:
+    Use `hou.session` to refer to the current file's session module.
+
+In the current node's Python module:
+    You can [create a default Python module|#asset_modules] in a [custom node type|/assets/] to hold code related to the node type. Then elsewhere you can get a reference to the node type's Python module using [Hom:hou.Node#hdaModule] (or [Hom:hou.NodeType#hdaModule]).
+    
+    For example, in a [button parameter's callback script|#parameter_callback_scripts] or [asset event script|#asset_events]:
+    
+    {{{
+    #!python
+    # In a callback script, kwargs["node"] contains a reference to the current node
+    nodeutils = kwargs["node"].hdaModule()
+    
+    nodeutils.my_function()
+    }}}
+
+
 == Startup scripts == (startup)
 #index: document
 
@@ -61,7 +84,8 @@ Houdini will look for these directories/files in the directories specified on th
     
     This is the Python equivalent of the `456.cmd` Hscript file.
 
-`scripts/<<category>>/<<nodename>>_<<eventtype>.py` |
+`scripts/<<category>>/`
+`<<nodename>>_<<eventtype>>.py` |
     See [node event scripts|#events] below.
 
 NOTE:
@@ -135,25 +159,41 @@ See [Python parameter expressions|expressions].
 
 == Session module == (session)
 
-Houdini keeps a Python module associated with the scene file. You can edit it using __Window > Python source editor__. When the scene file is loaded (or when you edit the source code), the module source code is evaluated and the module is available to other Python code as `hou.session`. This gives you a convenient place to store functions, classes, and objects specific to the scene file, and automatically have them saved and loaded with the scene file.
+Houdini keeps a Python module associated with the scene file. You can edit it using __Window > Python source editor__. This gives you a convenient place to store functions, classes, and objects specific to the scene file, and automatically have them saved and loaded with the scene file.
+
+When the scene file is loaded (or when you edit the source code), the module source code is evaluated and the module is available to other Python code as `hou.session`.
+
+For example, you write a `log_deletion()` function in the Python source editor, then call it from an [asset deletion callback|#asset_events] like this:
+
+{{{
+#!python
+hou.session.log_deletion()
+}}}
 
 You can programmatically modify the `hou.session` source code using the [Hom:hou.appendSessionModuleSource] function.
 
 TIP:
-    If you directly modify `hou.session` in Python, for example `hou.session.x = "foo"`, the changes are _not_ saved with the scene file. You must edit the module source code to have the changes saved with the file.
+    If you directly modify `hou.session` in Python, for example `hou.session.x = "foo"`, the changes are _not_ saved with the scene file. (The module is recreated from source code every time the file loads.) To change the contents of the session module, you must edit the module's source code.
 
 
 == Asset modules == (asset_modules)
 
 Each [digital asset|/assets/] type has a Python module, similar to the scene file's `hou.session` module. You can use this module to store functions, classes, and objects specific to the asset type.
 
-The module source code is stored in a section of the asset named `PythonModule` (on the __Extra files__ tab of the [type properties window|/ref/windows/optype]). You can create this section manually. Houdini will create it automatically if you create a "Python Module" event handler on the __Scripts__ tab.
+The module source code is stored in a section of the asset named `PythonModule` (on the __Extra files__ tab of the [type properties window|/ref/windows/optype]). You can create this section manually, or Houdini will create it automatically if you create a "Python Module" event handler on the __Scripts__ tab.
+
+In the HDA module's code, you can get a reference to the HDA's node type using:
+
+{{{
+#!python
+nodetype = kwargs["type"]
+}}}
 
 You can access the module using the [Hom:hou.NodeType#hdaModule] method (if you have a `NodeType` object) or the [Hom:hou.Node#hdaModule] method (if you nave a `Node` object). For example, to call a `myfunc` function on the `myasset` object type:
 
 {{{
 #!python
-hou.nodeType(hou.objNodeTypeCategory(), "myasset").hdaModule().myfunc()
+hou.nodeType(hou.objNodeTypeCategory(), "myasset").hdaModule().my_function()
 }}}
 
 Python expressions on nodes inside the asset definition can access the `PythonModule`
@@ -170,9 +210,25 @@ foo = toolutils.createModuleFromSection('bar', kwargs['type'], 'FooModule')
 
 == Modules on disk == (disk)
 
-Houdini automatically adds any `$HOUDINI_PATH/pythonX.Xlibs` directories to the Python path, meaning packages and modules inside those directories can be imported in Python code. For example, the module `$HOUDINI_USER_PREF_DIR/python2.7libs/mystuff.py` can be imported in Python code using `import mystuff`.
+Houdini automatically adds any `$HOUDINI_PATH/pythonX.Xlibs` directories to the Python path, meaning packages and modules inside those directories can be imported in Python code.
 
 To make packages and modules in other locations available to python, use the `$PYTHONPATH` environment variable, or modify the `sys.path` list in Python.
+
+For example, to import the module in `$HOUDINI_USER_PREF_DIR/python2.7libs/mystuff.py`:
+
+{{{
+#!python
+import mystuff
+
+mystuff.my_function()
+}}}
+
+If you are trying to keep your script to a single line (for example, in a parameter expression or callback), you can use Python's built-in `__import__` function to return the module and immediately access its attributes:
+
+{{{
+#!python
+__import__("mystuff").my_function()
+}}}
 
 
 == Digital asset event handlers == (asset_events)
@@ -241,6 +297,16 @@ On Name Changed (`OnNameChanged`) |
     
     This can be useful, for example, if you are somehow indexing nodes by their names or paths in some external storage, to keep the external index up-to-date.
 
+On Install (`OnInstall`) |
+    Runs when this node type is installed into the session.
+    
+    Note that saving changes to an HDA node type triggers the On Uninstall and On Install scripts since the old HDA node type is uninstalled first before the new HDA node type with the latest changes is installed.
+
+On Uninstall (`OnUninstall`) |
+    Runs when this node type is uninstalled from the session.
+    
+    Note that saving changes to an HDA node type triggers the On Uninstall and On Install scripts since the old HDA node type is uninstalled first before the new HDA node type with the latest changes is installed.
+
 Sync Node Version (`SyncNodeVersion`) |
     This is part of the older versioning system, allowing you to write an "upgrade" handler that can automatically convert old versions of a node to the latest version. This system may be useful for small-scale, backwards-compatible changes such as adding new parameters. See [the two types of asset versioning|/assets/versioning_systems] for more information.
 
@@ -292,6 +358,10 @@ Houdini looks for files matching the following patterns:
 
 * Files matching the pattern `HOUDINIPATH/scripts/<<category>>/<<nodename>>_<<event>>.py` (for example, `$HOUDINI_USER_PREF_DIR/scripts/obj/geo_OnCreate.py`) will run when the given event type occurs to a node of the given type.
 
+    For complex node type names with namespaces and/or versions, replace any `::` separators in the name with *single hyphens*.
+
+    For example, if the node type name is `edu.toronto3d::foo::2.0`, you would use a filename like `edu.toronto3d-foo-2.0_OnCreate.py`.
+
 * Files matching the pattern `HOUDINIPATH/scripts/<<event>>.py` run when the given event type occurs to _any_ node.
 
 NOTE:
@@ -302,7 +372,7 @@ An event script file will run in an environment with a built-in `kwargs` global 
 NOTE:
     Houdini will also find files matching `HOUDINIPATH/scripts/<<category>>/<<nodename>>.py` (no event suffix, for example `$HOUDINI_USER_PREF_DIR/scripts/obj/geo.py`). This is a factory node's "creation script", which is (confusingly) not the same as a node's `OnCreated` handler.
 
-    Old documentation or tutorials may refer to this type of a file as a way to run code when a node is created. However, this does not work with digital assets. *You should now use an OnCreated event script instead*. Consider the "creation script" an internal implementation detail subject to change without notice.
+    Old documentation or tutorials may refer to this type of file as a way to run code when a node is created. However, this does not work with digital assets. *You should now use an OnCreated event script instead*. Consider the "creation script" an internal implementation detail subject to change without notice.
 
 
 == Individual node event handlers == (node_instance_events)

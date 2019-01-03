@@ -1,0 +1,244 @@
+= Python state |> creating and editing nodes =
+
+#flow: /hom/index#state
+
+"""How to implement a state that manipulates a node."""
+
+
+== Overview ==
+
+(See [Python states|python_states] for the basics of how to implement a custom viewer state.)
+
+It's possible for custom states to be "[nodeless|state_nodeless]", operating the same whatever node is current. However, often you want a state to be tied to a specific asset, for editing that asset.
+
+For example, you might have an asset that generates geometry showing a measuremeant in the scene (a line between two points and text showing the distance). The asset has two parameters for the positions of the measurement start and end points. You can make the asset easier to use by giving it a custom state that lets the user draw the measurement by dragging between two points in the viewer.
+
+As part of implementing your custom state, you will need to [write a tool script|#tool] that will create your node and enter your state, and have your state [manipulate parameters|#parms] on the node based on user interaction.
+
+In general, your should let the network inside your SOP asset do the work of creating/manipulating geometry. The HOM API does not currently have a lot of in-depth methods for working with geometry, whereas the SOP nodes represent an enourmous amount of highly sophisticated and efficient geometry code.
+
+NOTE:
+    The [state implementation interface|python_states#impl] has an `onGenerate()` method that in theory allows you to create a node from inside the state. However we strongly recommend you create the node in the [tool script|#tool] and _then_ enter the state.
+
+
+== Tool script == (tool)
+
+In the asset type properties window, you can define shelf tools associated with the asset on the __Tools__ tab. When the user installs your asset, this tools become available to add to the shelf.
+
+See [how to write a tool script|tool_script] for basic information on writing tool scripts. 
+
+* The tool script is used when the user clicks the tool in the shelf, chooses the tool from the ((Tab)) menu in a viewer, or chooses the asset from the ((Tab)) menu in a 
+
+* *Currently, custom Python states are only available for SOP nodes*. In your shelf tool script, you should check whether the viewer is already at the SOP level, and if not, prompt the user to select a Geometry object to create your asset inside, or create a new Geometry object to contain the asset.
+
+* The example below does not demonstrate asking for geometry selections as inputs for your SOP node. For information on selections, see [Python state selections|state_selectors].
+
+{{{
+#!python
+import stateutils
+import soptoolutils
+
+
+# Unlike asset event callbacks, the tool script does NOT get a reference
+# to the asset type in kwargs["type"] (it does get the tool name in
+# kwargs["toolname"]). So you either need to come up with a way to figure
+# out the node name from the tool name, or simply embed the node name
+# explicitly, like this.
+nodetypename = "mynamespace::myasset::2.0"
+# Use the "base" name of the asset to name new objects
+basename = "myasset"
+
+# Get a reference to the active pane; if this tool was launched from the tab
+# menu in a network edtitor, pane will be a NetworkEditor
+pane = stateutils.activePane(kwargs)
+if isinstance(pane, hou.SceneViewer):
+    network = pane.pwd()
+    if network.childTypeCategory() != hou.sopNodeTypeCategory():
+        # We're not already inside an object, so ask the user where they want
+        # the new SOP
+        objects = pane.selectObjects(
+            prompt='Select objects',
+            quick_select=False,
+            use_existing_selection=True,
+            allow_multisel=False,
+            allowed_types=['geo']
+        )
+        if objects:
+            # If the user selected more than one object, just take the first
+            network = objects[0]
+            # Jump into the object
+            pane.setPwd(network)
+        else:
+            # The user pressed Enter without selecting an object, so create
+            # a new object
+            cname = basename + "_object1"
+            network = hou.node("/obj").createNode("geo", node_name=cname)
+
+        # Dive into the network
+        pane.setPwd(network)
+
+    # Create the new node in the selected network (the empty list represents
+    # no component selections)
+    newnode = stateutils.createFilterSop(kwargs, nodetypename, network, [])
+    # Launch the default state associated with the node type (your custom
+    # Python state, if you set up the asset correctly)
+    pane.enterCurrentNodeState()
+    # Alternatively, you could set your custom state explicitly like this
+    # pane.setCurrentState("my_state_name")
+
+else:
+    # For interactions other than in a viewer, fall back to the low-level
+    # function
+    soptoolutils.genericTool(kwargs, nodetypename)
+
+}}}
+
+
+=== Context tab ===
+
+By default, the tool embedded in an asset is only available in contexts where that node is allowed. So when you have a SOP asset, by default the tool that creates that asset is only available in SOP networks.
+
+Even though it creates a SOP node in the end, the tool script above works at both the Object and SOP levels (because if it's launched at the Object level it uses user input to dive into and existing or new Geometry node).
+
+If your script can handle being called at the Object level in the viewer, you should change the tool's defaults to allow it in both Object and SOP contexts:
+
+# In the Type Properties window for your asset, click the __Tools__ tab.
+
+# With the default tool selected on the left, click the __Context__ sub-tab on the right.
+
+# Inside the Context tab, click the __Viewer Pane__ sub-tab.
+
+# Turn on __OBJ__ and __SOP__.
+
+
+== Working with parameters in the custom state == (parms)
+
+* In most callback methods on the [state implementation|python_states#impl], you can get the current node (as a [Hom:hou.Node] object) using the `"node"` key in the dictionary passed to the callback method.
+
+* Your state can read and set parameter values on your asset. This is how state allows the user tp edit the asset interactively in the viewer.
+
+* The standard way to let the user edit parameters interactively in your state is to [bind handles in your state|state_handles] to asset parameters. However, if you need to you can use the state's lower-level [UI event interface|state_events] to craft custom interfaces based on mouse moves, mouse buttons, tablet pressure, what's under the mouse pointer in the scene, and so on.
+
+    As a silly example, the following method belongs to a state where when the left mouse button is pressed, it sets the node's uniform scale parameter to `1.0`, while the middle mouse button sets the parameter to `2.0`.
+
+    {{{
+    #!python
+    def onMouseEvent(self, kwargs):
+        device = kwargs["uv_event"].device()
+        node = kwargs["node"]
+
+        if device.isLeftButton():
+            node.parm("scale").set(1.0)
+        elif device.isMiddleButton():
+            node.parm("scale").set(2.0)
+    }}}
+
+* You can add parameters to your asset that are invisible in the parameter interface, but your state can modify to drive interactive features in your asset network.
+
+
+== Customizing the operation toolbar ==
+
+The operation toolbar (across the top of the viewer) shows settings related to the current state. You can specify that certain parameters from your asset should appear in the toolbar when the asset's state is active. This lets you promote important/commonly used parameters up to a more prominent place in the interface, and make them available for interactive use even if the parameter editor is not visible.
+
+:task: Make a parameter appear in the operation toolbar:
+    # Open the Type Properties window for the asset.
+
+    # Click the __Parameters__ tab.
+
+    # Under __Existing parameters__, select the parameter.
+
+    # Under __Parameter description__, set the __Show parm in__ menu to "Main & Tool Dialogs + Toolbox".
+
+NOTE:
+    Native states can add controls to the operation toolbar that apply only to the interactive state (interactive settings), which don't correspond to parameters on the node. Currently this is not possible in a custom Python state, but we hope to add it in a future version.
+
+
+== Example: Draw Points == (draw_points)
+
+We'll create a simple SOP asset that lets you click geometry, or else the construction plane, to create a free point in space. The tool adds the point on mouse down, and lets you drag the point position while the button is held down.
+
+The asset simply contains an Add SOP with its __Points__ multiparm promoted up to the asset. The custom state then manipulates the multiparm (adding instances and setting their positions) to create the points.
+
+* As an exercise for the reaser: how would you modify the code below so it draws a trail of points as the user drags, instead of moving a single point? You could have a parameter that specifies the closest distance consecutive points in a "stroke" can be. Hint: you can get the distance between two position vectors using [Hom:hou.Vector3#distanceTo].
+
+* Note the use of `beginStateUndo()` and `endStateUndo()`. This makes each click/drag to add a point a single undo-able action, instead of each multiparm addition and each (re-)setting of the point coordinates being added as separate undo step. See [Python state undo|state_undo] for more information.
+
+{{{
+#!python
+from __future__ import print_function
+
+import stateutils
+
+
+class DrawPoints(object):    
+    def __init__(self, state_name, scene_viewer):
+        self.state_name = state_name
+        self.scene_viewer = scene_viewer
+        
+        self._node = None
+        self._pressed = False
+        self._index = 0    
+   
+    def _point_count(self):
+        multiparm = self._node.parm("points")
+        # This is how you get the number of instances in a multiparm
+        return multiparm.evalAsInt()
+            
+    def _insert_point(self):
+        index = self._point_count()
+        multiparm = self._node.parm("points")
+        multiparm.insertMultiParmInstance(index)
+        return index
+    
+    def _set(self, index, position):
+        self._node.parm("usept%d" % index).set(1)
+        self._node.parmTuple("pt%d" % index).set(position)
+            
+    def _start(self):
+        if not self._pressed:
+            self.scene_viewer.beginStateUndo("Add point")
+            self._index = self._insert_point()
+        self._pressed = True
+        
+    def _finish(self):
+        if self._pressed:
+            self.scene_viewer.endStateUndo()
+        self._pressed = False
+    
+    def onMouseEvent(self, kwargs):
+        node = self._node = kwargs["node"]
+        ui_event = kwargs["ui_event"]
+        device = ui_event.device()
+        origin, direction = ui_event.ray()
+        
+        # Find intersection with geometry or ground
+        intersected = -1
+        inputs = node.inputs()
+        # Only try intersecting geometry if this node has input
+        if inputs and inputs[0]:
+            geometry = inputs[0].geometry()
+            intersected, position, _, _ = stateutils.sopGeometryIntersection(geometry, origin, direction)
+        if intersected < 0:
+            position = stateutils.cplaneIntersection(self.scene_viewer, origin, direction)
+        
+        # Create/move point if LMB is down
+        if device.isLeftButton():
+            self._start()
+            self._set(self._index, position)
+        else:
+            self._finish()
+
+    def onInterrupt(self, kwargs):
+        self._finish()
+
+
+template = hou.ViewerStateTemplate(
+    "drawpoints.pystate",
+    "Draw Points",
+    hou.sopNodeTypeCategory()
+)
+template.bindFactory(DrawPoints)
+
+}}}
+
+

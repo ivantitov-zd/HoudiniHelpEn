@@ -1,0 +1,861 @@
+#type:     node
+#context:  sop
+#internal: vellumconstraints
+#icon:     DOP/vellumconstraints
+
+= Vellum Constraints =
+
+"""Configure constraints on geometry for the Vellum solvers."""
+
+
+The Vellum Constraints SOP creates constraints from the incoming
+geometry suitable for the Vellum solver.
+
+All Vellum material types, such as cloth, hair, or softbody, are described
+as a set of explicit constraints between points. A Vellum configuration
+is made of two geometries.  The display and collision geometry is the
+first input and first output. The constraint geometry is the second input
+and second output. The two should have one-to-one point correspondence,
+so are often processed as a pair by most Vellum nodes.
+
+Vellum Constraints can generate almost all constraint types since
+most constraints are defined by a common set of parameters.  But to
+make it easier to setup, many tab-menu macros are present to configure
+common constraint types.
+
+@parameters
+
+Constraint Type:
+    #id: constrainttype
+
+    The type of constraint to generate.   This affects the visibility of
+    many of the other parameters.   Usually this is set by using the
+    appropriate tab-menu macro.
+
+    None:
+	No constraints are generated.
+
+    Distance Along Edges:
+	Each edge in the display geometry is turned into a distance constraint
+	maintaining that edge length.
+
+    Bend Across Triangles:
+	Each pair of triangles (or implied triangles if input is quads or
+	higher) creates a constraint maintaining the initial dihedral
+	angle between the triangles.
+
+    Cloth:
+	Cloth constraints consist of both distance on edge and bend across
+	triangle constraints.
+
+    Hair:
+	Hair constraints consist of distance on edge and bend between
+	edges.  This bend also includes the twist of the edges, allowing
+	torsion effects.
+
+    String:
+	String constraints are a lighter weight hair constraint.  They
+	are a distance along the edge and the angle between edges.  But
+	no twist constraint is present, so the edges can spin freely.
+
+    Pin to Target:
+	The specified points will be pinned to the corresponding point
+	in the target geometry.  The target geometry for a Vellum
+	solver is usually the first input, so matches the animation,
+	but can be overridden.
+
+    Attach to Geometry:
+	The specified points will attach to the geometry in the third input.
+	They will store their closest point at the attach frame and
+	create a distance constraint tying them to it.
+
+    Stitch Points:
+	Stitch points within the same geometry together using distance
+	constraints. The points do not need to actually be connected by
+	geometry.  This is useful for keeping jackets closed or preventing
+	pockets from flapping.
+
+    Pressure:
+	Each piece, as determined by the __Define Pieces__ parameter, stores
+	its original volume and a many-point constraint is built to maintain
+	it.   The enforcement is global, so squishing one place will expand
+	another, like a balloon.
+
+    Tetrahedral Volume:
+	Each tetrahedra is turned into a constraint to maintain the volume
+	of the tetrahedra.  Note this does not include any shear or
+	stretch constraints - additional distance constraints need
+	to be added to make a proper softbody.
+
+    Weld Points:
+	While not a constraint per-se, this will edit the `weld` attribute
+	to cause the points to be logically fused into a single point
+	for the solve.   They will remain independent points otherwise,
+	however.   In addition, this can build bend constraints where
+	edges have become logically fused, ensuring the result acts
+	like a single flat piece.  The [Vellum Post Process|Node:sop/vellumpostprocess]
+	SOP can rewire the welded vertices after simulation so that the
+	geometry appears connected for rendering.
+
+    Glue:
+	Each point will search for a nearby point that is not a member of its
+	own piece.   It will construct a distance constraint holding it to
+	that point.  This is useful for building systems that automatically
+	glue together by proximity, especially when combined with breaking.
+
+    Struts:
+	Each point will search for a distant point that is of its own piece,
+	but which it has a straight line-of-sight to.  It will build a distance
+	constraint to that point.  This constructs a large number of toothpick
+	like internal struts that give an object stiffness and volume
+	without the expense of a fully FEM solve.
+
+
+== Geometry ==
+
+Group Type:
+    #id: grouptype
+
+    Controls the type used for the source points for the constraint.
+
+Group:
+    #id: group
+
+    The group for the source points of the constraint.  These are
+    the points or primitives that are turned into the constraint or
+    are used as the starting half of the constraint.
+
+
+Triangulation:
+    #id: triangulation
+
+    Distance and bend constraints are usually built on a triangle mesh.
+    Rather than forcing the input to be triangulated, it can be implicitly
+    triangulated.
+
+    None:
+	Do not triangulate the input implicitly.
+
+    Regular:
+	Consistently split into triangles.
+
+    Alternating:
+	Attempt to reverse the triangle splitting so a series of quads
+	have a less regular structure.
+
+Mass:
+    #id: mass
+
+    `mass` value for the points.  The mass affects how they interact with
+    POP forces and how strong the constraints are.
+
+Thickness:
+    #id: thickness
+
+    Thickness of the points, stored in `pscale`.  Used also for the
+    triangle thickness and curve thickness.
+
+Define Pieces:
+    #id: piecemode
+
+    Pressure constraints split the object into disjoint pieces to compute and
+    enforce the volume. Glue and Strut constraints also need a way to
+    define separate pieces.
+
+    From Attribute:
+	This attributes unique values are used to define each piece.
+
+    From Connectivity:
+	Connectivity of the input geometry is used to define the pieces.
+
+
+Piece Attrib:
+    #id: pieceattrib
+
+    The attribute used to define the pieces.
+    This can either be a point or a primitive attribute.
+
+Layer:
+    #id: layer
+
+    The points will be given this as their `layer` attribute, useful
+    in cloth simulations to define a stacking order for Layer Shock.
+
+Compute Missing Orientation:
+    #id: computeorient
+
+    For deforming hair geometry as input, the Vellum Solver requires an
+    `orient` attribute that provides a stable rotation basis over time.  This
+    attribute can be created with the [Guide Deform|Node:sop/guidedeform] SOP
+    using rest and animated skin, or if this parameter is enabled and `orient` is
+    missing, Vellum Constraints will calculate it by extracting a
+    per-hair transform relative to the specified __Rest Orientation Frame__.
+
+Rest Orientation Frame:
+    #id: orientframe
+
+    The reference frame used when computing hair orientations if
+    __Compute Missing Orientation__ is enabled.  This should usually be set
+    to the start frame of the simulation.
+
+Show Guide Geometry:
+    #id: showguide
+
+    The newly generated constraints are displayed as guide geometry,
+    which is useful to ensure points are connected in the order expected.
+    However, the guide display can become quite complex when many constraints
+    are created, especially when trying to select Vellum geometry in the
+    viewport in downstream nodes. This parameter allows hiding the guide
+    geometry if necessary.
+
+
+== Target Geometry ==
+
+Target Group Type:
+    #id: targetgrouptype
+
+    The type of group for the constraint targets.
+
+Target Group:
+    #id: targetgroup
+
+    The target group.  This group specifies the second half of
+    __Attach to Geometry__ and __Stitch__ constraints.
+
+Target Path:
+    #id: targetpath
+
+    For Attach to Geometry constraints, the SOP attached to the third
+    input will be read at solve time to get the current animation data.
+    Specifying a path here will override that, useful if a different
+    animation is desired at solve time than capture time.
+
+Attach Frame:
+    #id: attachframe
+
+    Controls which frame of the third input is used for attaching the
+    geometry.
+
+== Drag ==
+
+Normal Drag:
+    #id: dragnormal
+
+    Creates the `dragnormal` attribute and sets it to this value.  This
+    scales the drag of the point when wind forces are applied to it
+    in the normal direction of its surface, or perpendicular to the
+    curve.
+
+    Differing normal and tangent drag is essential for flapping flags.
+
+Tangent Drag:
+    #id: dragtangent
+
+    Creates the `dragtangent` attribute and sets it to this value.
+    This scales the drag of the point when wind forces are applied to it
+    in the tangent direction of its surface, or tangent to the curve.
+
+== Pin to Animation ==
+
+Pin Points:
+    #id: pingroup
+
+    Points to pin to the target animation.  Usually the target animation is
+    the first input of the Vellum solver, but it can be overridden on
+    the [Vellum Solver|Node:sop/vellumsolver] SOP or with the [Vellum Source|Node:dop/vellumsource]
+    DOP.
+
+Pin Type:
+    #id: pintype
+
+    How to pin the point position to the target animation.
+
+    Permanent:
+	The `mass` attribute is set to zero, making the point a hard constraint.  However, as no original value of `mass` is stored, it isn't possible to release this constraint later.
+
+    Stopped:
+	The `stopped` attribute is set to `1` to make the point a hard constraint.  `mass` is unaffected so a POP operation can restore the dynamics of the point later by resetting `stopped` to `0`.
+
+    Soft:
+	A zero length distance constraint is made between the point and its target location.  The Stretch __Stiffness__ and __Damping Ratio__ values are used for this constraint.
+
+
+Orientation Pin Type:
+    #id: pinrotation
+
+    In addition to holding the location of a point, for hair the orientation
+    often may also be constrained.
+
+    None:
+	Do not constrain the orientation to the target animation.
+
+    Same as Position:
+	Use the position constraint rules.  In case of Stopped, the `stopped`
+	attribute is set to 3 to reflect both types of update are suppressed.
+
+    Soft:
+	Add a bend/twist constraint to maintain the orientation of the pinned point to that of the target animation.  The Bend __Stiffness__ and __Damping Ratio__ values are used for this constraint.
+
+
+Match Animation:
+    #id: matchanimation
+
+    Controls if the target is updated from the animation during the solver or if only the initial
+    value is used.
+
+
+== Closest Point ==
+
+Constrain to Closest Point:
+    #id: useclosestpt
+
+    When finding a matching point to a source point, do not go through
+    the target points in order, but pick the point that is closest first.
+
+
+Use Closest Location on Primitive:
+    #id: useclosestprim
+
+    For Attach to Geometry constraints, do not just choose the closest point,
+    but the closest position on a primitive.  The primitive number and
+    barycentric coordinates are then stored.
+
+
+Max Distance:
+    #id: maxdist
+
+    Maximum distance to consider eligible for stitching points.
+
+
+== Glue Search ==
+
+Cluster Attrib:
+    #id: glue_clusterattrib
+
+    While glue constraints are made between points of different pieces,
+    they will only be made between points of the same cluster.   If
+    the cluster value is -1, no gluing will be done.
+
+
+Max Search Dist:
+    #id: glue_radius
+
+    Maximum distance to look for eligible glue points.
+
+
+Max Search Points:
+    #id: glue_numpt
+
+    Maximum number of points to consider for eligible glue points.
+
+
+Constraints Per Point:
+    #id: glue_constraintsperpt
+
+    Number of glue constraints to create for each point.
+
+
+Detach Object Chance:
+    #id: glue_detach_chance
+
+    Each piece has this chance to be marked ineligible for gluing
+    and receive and generate no glue constraints.  This allows
+    for stray hairs.
+
+
+Detach Point Chance:
+    #id: glue_point_chance
+
+    Each pair of points has this chance to be being marked ineligible for gluing.
+
+Seed:
+    #id: glue_seed
+
+    Random seed used to generate the detach chances.
+
+
+== Strut Search ==
+
+Max Strut Length:
+    #id: strut_maxlen
+
+    Maximum distance to create struts.   Must be large enough to cover the
+    diameter of the object, but avoiding extremely long struts can help
+    avoid artifacts.
+
+
+Direction Attribute:
+    #id: strut_dirattrib
+
+    Struts are created by sending a ray along the direction attribute in
+    search of the piece.  The default direction is to use the normal
+    of the surface.
+
+Invert Normals:
+    #id: strut_invertnormal
+
+    Invert the sense of the objects normals for sending rays, useful
+    if the incoming geometry has reversed normals.
+
+Test Normals:
+    #id: strut_testnormals
+
+    Verify the goal of the strut has a normal suggesting it was properly
+    hit from the inside.
+
+
+Direction Jitter:
+    #id: strut_jitter
+
+    Jitter the direction the strut is sent in to break symmetry in
+    the struts.
+
+Constraints Per Point:
+    #id: strut_constraintsperpt
+
+    Maximum number of struts to add for each point.
+
+
+Detach Point Chance:
+    #id: strut_point_chance
+
+    Chance of a point being marked ineligible for struts.
+
+
+Seed:
+    #id: strut_seed
+
+    Random seed to control the jitter and detach chances.
+
+
+Ray Offset:
+    #id: strut_rayoff
+
+    The initial ray for the strut needs an offset to avoid hitting
+    the surface it was sent from.
+
+
+== Stretch ==
+
+Stiffness:
+    #id: stretchstiffness
+
+    The stiffness of the constraint, which controls how strongly the constraint
+    pulls particles back towards its initial rest state.  To dial in initial values,
+    change by factors of 10.
+
+
+Stiffness Attribute:
+    #id: stretchstiffnessattrib
+
+    Point attribute to scale the stiffness by.
+
+    As effective changes in stiffness requires painting over orders of magnitude, this has
+    a logarithmic effect.
+
+
+Scale:
+    #id: stretchstiffnessscale
+
+    Single slider control over the stiffness.
+
+    As effective changes in stiffness requires painting over orders of magnitude, this has
+    a logarithmic effect.
+
+Damping Ratio:
+    #id: stretchdampingratio
+
+    Stiff constraints tend to vibrate or jitter unacceptably.   Damping reduces this by bleeding energy when evaluating the constraint.  Too much damping can prevent the constraint from being satisfied, however.   Values less than 1 must be used.
+
+
+Damping Attribute:
+    #id: stretchdampingattrib
+
+    Attribute to adjust damping, multiplied into the damping ratio.
+
+
+Scale:
+    #id: stretchdampingscale
+
+    Single slider to control damping, multiplied into the damping ratio.
+
+
+Rest Length Scale:
+    #id: stretchrestscale
+
+    The rest length of the distance constraints will be the original distance
+    between the points.   This scale can be used to increase or decrease
+    this.   Setting to `0` will try to collapse the points together.
+
+
+Compression Stiffness:
+    #id: compressstiffness
+
+    The stiffness of the constraint when being compressed below its initial rest
+    distance.  A very stiff low resolution cloth can become unbendable due to its
+    topology, rather than due to the bend constraints.  A network of triangles
+    has very few ways that it can bend if it is fully stiff.  By setting a
+    lower compression stiffness, the cloth is allowed to collapse and regain
+    its fluidity.  Usually this has to be raised with higher resolution cloth.
+
+
+Enable Warp/Weft:
+    #id: stretchanisotropy
+
+    Enables an adjustment to the stiffness based on orientation, allowing
+    a cloth network to stretch more on one axis than another.
+
+
+=== Anisotropy ===
+
+Warp Scale:
+    #id: stretchwarpscale
+
+    Scale factor for cloth lined up with the material u axis.   This is a logarithmic multiplier.
+
+
+Weft Scale:
+    #id: stretchweftscale
+
+    Scale factor for cloth lined up with the material v axis.   This is a logarithmic multiplier.
+
+Shear Scale:
+    #id: stretchshearscale
+
+    Scale factor for cloth lined up with the diagonal material uv axis.   This is a logarithmic multiplier.
+
+Material UV:
+    #id: materialuv
+
+    Point attribute to use to specify the coordinate frame for warp and weft computations.
+
+
+Enable Plasticity:
+    #id: stretchplasticity
+
+    Plasticity allows an object to flow to a new rest position.  Under
+    sufficient stress, the rest coordinates are blended to the current dynamic
+    coordinates, so the object will retain its new shape.
+
+
+=== Plasticity ===
+
+Threshold:
+    #id: stretchplasticthreshold
+
+    Below this threshold the material will return to its original shape.
+    When deformed past the threshold, it will begin to creep into
+    its new configuration.
+
+
+Threshold Attribute:
+    #id: stretchplasticthresholdattrib
+
+    Attribute to scale the stretch threshold by.
+
+Scale:
+    #id: stretchplasticthresholdscale
+
+    Single scale slider for the threshold.
+
+
+Ratio of Current Rest Length:
+    #id: stretchplasticthresholdratio
+
+    The threshold can either be an absolute distance, or be a percentage distance.   A value of 0.1 as a ratio would mean stretching of 110% of compression of 90% will trigger plastic flow.
+
+
+Rate:
+    #id: stretchplasticrate
+
+    The speed at which the the material adopts its new rest lengths when
+    it begins to flow.
+
+Rate Attribute:
+    #id: stretchplasticrateattrib
+
+    Attribute to scale the plastic rate by.
+
+Scale:
+    #id: stretchplasticratescale
+
+    Single scale slider for the plastic rate.
+
+Hardening:
+    #id: stretchplastichardening
+
+    Some plastic materials become stiffer after they've undergone deformation. These will have a hardening greater than 1.  Some become softer so will have hardening less than 1. This is a logarithmic multiplier on stiffness.
+
+Hardening Attribute:
+    #id: stretchplastichardeningattrib
+
+    Attribute to scale the plastic hardening by.
+
+Scale:
+    #id: stretchplastichardeningscale
+
+    Single scale slider for plastic hardening.
+
+
+Output Group:
+    #id: stretchgrp
+
+    The generated stretch constraints are all added to this primitive group.  This is useful to edit them later with a [Vellum Constraint Property|Node:dop/vellumconstraintproperty] DOP.
+
+
+Keep Unique within Output Group:
+    #id: keepuniquestretch
+
+    Ensures that a particular point can only be constrained once by the constraints in the __Output Group__.  When dynamically creating constraints it can be common to re-create constraints between the same points every frame.  Keeping the points unique within the output group prevents a constant accumulation of constraints.
+
+== Bend ==
+
+Add Bend across Welds:
+    #id: bendweld
+
+    When welding points together, two outside edges may become an inside edge.
+    If they do not gain any bend constraints the seam will be weak and
+    noticeably fold or kink.  This option generates bend constraints where
+    this is detected.
+
+
+Copy Neighboring Stiffness:
+    #id: bendcopystiffness
+
+    The value of the generated bend constraints can be copied from the bend
+    of surrounding triangles, ensuring a consistent piece of cloth is
+    built without having to channel link parameters.
+
+
+Stiffness:
+    #id: bendstiffness
+
+    The stiffness of bend constraints.  To dial in initial values,
+    change by factors of 10.
+
+    Note that bend constraints are based on angle differences, so higher
+    resolution cloths will require higher stiffness to exhibit similar radii
+    of curvature.   Note that very high bend stiffness on high resolution
+    models will require a very large number of iterations to converge.
+
+Stiffness Attribute:
+    #id: bendstiffnessattrib
+
+    Point attribute to scale the stiffness by.
+
+    As effective changes in stiffness requires painting over orders of magnitude, this has
+    a logarithmic effect.
+
+
+Scale:
+    #id: bendstiffnessscale
+
+    Single slider control over the stiffness.
+
+    As effective changes in stiffness requires painting over orders of magnitude, this has
+    a logarithmic effect.
+
+
+Damping Ratio:
+    #id: benddampingratio
+
+    Stiff constraints tend to vibrate or jitter unacceptably.   Damping reduces this by bleeding energy when evaluating the constraint.  Too much damping can prevent the constraint from being satisfied, however.   Values less than 1 should be used.
+
+Damping Attribute:
+    #id: benddampingattrib
+
+    Attribute to adjust damping, multiplied into the damping ratio.
+
+Scale:
+    #id: benddampingscale
+
+    Single slider to control damping, multiplied into the damping ratio.
+
+Rest Angle Scale:
+    #id: bendrestscale
+
+    The rest angle of the bend constraints will be the original dihedral
+    angle between the triangles.   This scale can be used to increase or
+    decrease this.   Setting to `0` will treat the original configuratoin as a
+    flat sheet.
+
+Max Branch Angle:
+    #id: maxbranchangle
+
+    When adding torsion-free string bend constraints, they work best when
+    the rest angle is close to straight.  Setting the max branch angle allows
+    something like a net of ropes to only have the bend constraints along
+    the straight ropes, not on the perpendicular sections.
+
+
+Enable Plasticity:
+    #id: bendplasticity
+
+    Plasticity allows an object to flow to a new rest position.  Under
+    sufficient stress, the rest coordinates are blended to the current dynamic
+    coordinates, so the object will retain its new shape.
+
+=== Plasticity ===
+
+Threshold:
+    #id: bendplasticthreshold
+
+    Below this threshold the material will return to its original shape.
+    When deformed past the threshold, it will begin to creep into
+    its new configuration.
+
+    This is an absolute angle measurement.  Because rest angles are often
+    flat, the idea of a ratio that exists for stretch constraints does not
+    apply to bend constraints.
+
+Threshold Attribute:
+    #id: bendplasticthresholdattrib
+
+    Attribute to scale the bend threshold by.
+
+Scale:
+    #id: bendplasticthresholdscale
+
+    Single scale slider for the threshold.
+
+Rate:
+    #id: bendplasticrate
+
+    The speed at which the the material adopts its new rest angles when
+    it begins to flow.
+
+Rate Attribute:
+    #id: bendplasticrateattrib
+
+    Attribute to scale the plastic rate by.
+
+Scale:
+    #id: bendplasticratescale
+
+    Single scale slider for the plastic rate.
+
+Hardening:
+    #id: bendplastichardening
+
+    Some plastic materials become stiffer after they've undergone deformation. These will have a hardening greater than 1.  Some become softer so will have hardening less than 1.
+
+Hardening Attribute:
+    #id: bendplastichardeningattrib
+
+    Attribute to scale the plastic hardening by.
+
+Scale:
+    #id: bendplastichardeningscale
+
+    Single scale slider for plastic hardening.
+
+Output Group:
+    #id: bendgrp
+
+    The generated stretch constraints are all added to this primitive group.  This is useful to edit them later with a [Vellum Constraint Property|Node:dop/vellumconstraintproperty] DOP.
+
+Keep Unique within Output Group:
+    #id: keepuniquebend
+
+    Ensures that a particular point can only be constrained once by the constraints in the __Output Group__.  When dynamically creating constraints it can be common to re-create constraints between the same points every frame.  Keeping the points unique within the output group prevents a constant accumulation of constraints.
+
+== Breaking ==
+
+Enable Breaking:
+    #id: dobreaking
+
+    Constraint primitives can be removed by the solver when sufficient deformation or stress is applied, effectively breaking those constraints.   You can also manually break constraints by deleting them during the solve to gain full control of the timing.
+
+    Running the simulation first with visualization enabled can be useful to find what are good values for the thresholds.
+
+
+Threshold:
+    #id: breakthreshold
+
+    The amount of stress or displacement on a constraint to trigger a break.
+
+
+Threshold Attribute:
+    #id: breakscaleattrib
+
+    Point attribute to scale the threshold by.
+
+
+Scale:
+    #id: breakscale
+
+    Single slider to scale the threshold.
+
+
+Type:
+    #id: breaktypeall
+
+    This controls how the solver decides to break weld and hair constraints.
+
+    None:
+	No automated tests are performed.
+
+    Stretch Stress:
+	The stretch stress must exceed the threshold.
+
+    Bend Stress:
+	The bend stress must exceed the threshold.
+
+    Stretch Distance:
+	The total distance from the goal location and the current location must exceed the threshold.
+
+    Stretch Ratio:
+	The ratio between the current distance and the rest distance must exceed the threshold.
+
+    Bend Angle:
+	The difference between the current angle and the rest angle must exceed the threshold.  This value is specified in degrees.
+
+
+Type:
+    #id: breaktypestretch
+
+    This controls how the solver decides to break distance constraints.
+
+    None:
+	No automated tests are performed.
+
+    Stretch Stress:
+	The stretch stress must exceed the threshold.
+
+    Stretch Distance:
+	The total distance from the goal location and the current location must exceed the threshold.
+
+    Stretch Ratio:
+	The ratio between the current distance and the rest distance must exceed the threshold.
+
+
+== Attributes ==
+
+Promotion Method:
+    #id: attribpromote
+
+    The scale-by-attribute functions have to apply the possible different scale attribute values on the points involved in the constraint to a single constraint.  This controls how they are blended together.
+
+    Maximum:
+	The maximum scale factor is used.
+
+    Minimum:
+	The minimum scale factor is used.
+
+    Average:
+	The average of the points scale factors is used.
+
+    Use Source:
+	The source points scale factor is used, such as in a stitch constraint.
+
+    Use Target:
+	The target points scale factor is used, such as in a stitch constraint.
+
+@related
+    - [Node:sop/vellumsolver]
+    - [Node:sop/vellumpostprocess]
+    - [Node:sop/vellumdrape]
+    - [Node:sop/vellumconstraints_grain]
+    - [Node:sop/vellumio]
+
+

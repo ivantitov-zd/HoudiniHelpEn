@@ -1,0 +1,389 @@
+= Python state |> handles =
+
+#flow: /hom/index#state
+
+"""How to bind handles to your state and react to user interaction with the handles."""
+
+
+== Overview ==
+
+The standard way to allow the user to interactively edit parameters by working in a node's viewer state is by binding _handles_ to node parameters.
+
+Even though it's possible to interpret lower-level [input device events|python_events], handles are likely still the main way you will set up user interaction in your state. Handles can be very powerful on their own, letting you specify a ready-made user interface for a wide variety of parameter setups. You can choose from a large library of different handles.
+
+You _bind_ handles to your state when the state template is created. Currently, you cannot dynamically create or destroy handles -- you must specify ahead of time all the handles your state will need. However you can dynamically [show and hide|Hom:hou.SceneViewer#showHandle] handles.
+
+
+== Static handles ==
+
+A _static_ handle binding supports a simple 1:1 mapping of handle parameters to node parameters. This is often all you need, since handle parameters such as translate, rotation, scale, length, and so on, often correspond exactly to parameters you have on your node.
+
+For each static handle you want to add to your state, call [Hom:hou.ViewerStateTemplate#bindHandleStatic] with the name of the handle type, an internal name for the handle (each handle's name must be unique amongst other handles in the tool), and a list of `("node_parm_name", "handle_parm_name")` tuples mapping node parameters to handle parameters.
+
+{{{
+#!python
+class PythonMeasureState():
+    def __init__(self, state_name, scene_viewer):
+        self.state_name = state_name
+        self.scene_viewer = scene_viewer
+
+
+template = hou.ViewerStateTemplate(
+    "pythonmeasure.pystate",
+    "Python Measure",
+    hou.sopNodeTypeCategory()
+)
+template.bindFactory(PythonMeasure)
+
+# Assume the asset this state is for has two translate
+# parameters, "start" and "end"
+template.bindHandleStatic(
+    "xform", "start_handle",
+    [("startx", "tx"), ("starty", "ty"), ("startz", "tz")]
+)
+template.bindHandleStatic(
+    "xform", "end_handle",
+    [("endx", "tx"), ("endy", "ty"), ("endz", "tz")]
+)
+}}}
+
+
+== Dynamic handles ==
+
+Dynamic handle bindings let you decide in a callback function how changes to a handle affect parameters on the node, or how changes to parameters on the node affect handle parameters.
+
+For each static handle you want to add to your state, call [Hom:hou.ViewerStateTemplate#bindHandle] with the name of the handle type, and an internal name for the handle (each handle's name must be unique amongst other handles in the tool).
+
+NOTE:
+    [Hom:hou.ViewerStateTemplate#bindHandle] takes a `cache_previous_parms` boolean argument.
+
+    If you pass `cache_previous_parms=True`, Houdini keeps track of the handle values and in the [handle callback|#handle_to_state] gives you both the _previous_ and the _new_ handle values. This can be useful if you want to track deltas, for example to see how fast the user is moving the handle.
+
+    If you pass `False` (the default), Houdini does not pass the previous values to the [handle callback|#handle_to_state].
+
+{{{
+#!python
+from __future__ import print_function
+import hou
+
+class PythonTwistState():
+    def __init__(self, state_name, scene_viewer):
+        self.state_name = state_name
+        self.scene_viewer = scene_viewer
+
+    def onHandleToState(self, kwargs):
+        # Called when the user manipulates a handle
+
+        handle_name = kwargs["handle"]
+        parms = kwargs["parms"]
+        prev_parms = kwargs["prev_parms"]
+
+        print("User edited handle:", handle_name)
+        for parm_name in kwargs["mod_parms"]:
+            old_value = prev_parms[parm_name]
+            new_value = parms[parm_name]
+            print("%s was: %s now: %s" % (parm_name, old_value, new_value))
+
+    def onStateToHandle(self, kwargs):
+        # Called when the user changes parameter(s), so you can update
+        # dynamic handles if necessary
+
+        parms = kwargs["parms"]
+        print("Parameters are now:", parms)
+        for p in parms:
+            print(p)
+
+
+template = hou.ViewerStateTemplate(
+    "pythontwist.pystate",
+    "Python Twist",
+    hou.sopNodeTypeCategory()
+)
+template.bindFactory(PythonTwistState)
+template.bindHandle("xform", "twist_handle", cache_previous_parms=True)
+}}}
+
+The dictionary passed to the dynamic handle event methods contains the following standard items:
+
+[Include:python_states#standard_dict_items/]
+
+
+=== onHandleToState === (handle_to_state)
+
+This lets you update node parameters (and/or the state/display) when a handle changes.
+
+The dictionary passed to this method contains the following extra items:
+
+`handle`:
+    The string ID of the handle.
+
+`parms`:
+    A dictionary containing the new handle parameter values.
+
+`mod_parms`:
+    A list of of the names of parameters that changed.
+
+`prev_parms`:
+    This key is *only present* if you passed `cache_previous_parms=True` to the [Hom:hou.ViewerStateTemplate#bindHandle] method.
+
+    This is a dictionary containing the previous handle parameter values.
+    This can be useful for computing deltas.
+
+
+=== onStateToHandle === (state_to_handle)
+
+This method is called separately _for each dyanmic handle_ bound to your state _whenever a parameter on the node changes_. It lets you update handle parameters to match changed node parameters.
+
+The dictionary passed to this method contains the following extra items:
+
+`handle`:
+    The name of the handle.
+
+`parms`:
+    A dictionary mapping the handle's parameter names to values. *You can change the values in this dictionary to edit the handle parameters*.
+
+In this method you would read parameters from the node's parameters, and do whatever dynamic updates of the handle's parameters in `kwargs["parms"]` you want:
+
+{{{
+#!python
+def onStateToHandle(self, kwargs):
+    node = kwargs["node"]
+    handle_parms = kwargs["parms"]
+    if kwargs["handle"] == "my_angle":
+        node_tx = node.parm("tx").evalAsFloat()
+        handle_parms["tx"] = node_tx * 2
+}}}
+
+
+== Handle types ==
+
+Name ||
+    Description ||
+        Parameters ||
+
+`angle` |
+    A position and rotation handle. |
+        `input, onoff, px, py, pz, rx, ry, rz, scale, trs_order, tx, ty, tz, xyz_order`
+
+`bboxvector` |
+    Bounding Box Vector |
+        `input, onoff, scale, twist, tx, ty, tz, vx, vy, vz`
+    
+`boundingbox`	|
+    Bounding Box |
+        `bound_type, centerx, centery, centerz, constant_scale, onoff, rx, ry, rz, sizex, sizey, sizez, uniform_scale`
+
+`boundingrect` |
+    Bounding Rectangle |
+        `centerx, centery, centerz, constant_scale, onoff, orient, rx, ry, rz, sizex, sizey, sizez, uniform_scale`
+
+`boundboundingbox` |
+    Bounder Bounding Box |
+        `centerx, centery, centerz, constant_scale, onoff, orient, rx, ry, rz, sizex, sizey, sizez, uniform_scale`
+	 
+`circle` |
+    Circle Transform |
+        `onoff, orient, rx, ry, rz, sx, sy, tx, ty, tz`
+
+`clayxlate` |
+    Clay Translate |
+        `input, onoff, tx, ty, tz, u, v`
+
+`curvepoint` |
+    Curve Point Options |
+        `keepingeo, pointlist`
+
+`distance` |
+    Distance |
+        `dist, input, onoff, px, py, pz, vx, vy, vz`
+
+`domain` |
+    Domain |
+        `input, onoff, u0, u1, v0, v1`
+
+`edit` |
+    Edit |
+        `brushswitcher, dist, handle_group_pivot, input, inputtype, localspace, onoff, pivot_comp_rx, pivot_comp_ry, pivot_comp_rz, pivot_comp_shear_xy, pivot_comp_shear_xz, pivot_comp_shear_yz, pivot_comp_sx, pivot_comp_sy, pivot_comp_sz, pivot_comp_trs_order, pivot_comp_tx, pivot_comp_ty, pivot_comp_tz, pivot_comp_xyz_order, pivot_rx, pivot_ry, pivot_rz, px, py, pz, rx, ry, rz, shear_xy, shear_xz, shear_yz, switcher, sx, sy, sz, trs_order, tx, ty, tz, upx, upy, upz, xyz_order`
+
+`extrude` |
+    Extrude |
+        `roup_pivot, grst_order	, grx	, gry	, grz	, gshear_xy	, gshear_xz	, gshear_yz	, gsx	, gsy	, gsz	, gtx	, gty	, gtz	, gxyz_order	, input, onoff, pivot_comp_in_obj_prexform, pivot_comp_rx, pivot_comp_ry, pivot_comp_rz, pivot_comp_shear_xy, pivot_comp_shear_xz, pivot_comp_shear_yz, pivot_comp_sx, pivot_comp_sy, pivot_comp_sz, pivot_comp_trs_order, pivot_comp_tx, pivot_comp_ty, pivot_comp_tz, pivot_comp_xyz_order, pivot_rx, pivot_ry, pivot_rz, px, py, pz, roffsetx, roffsety, roffsetz, rpivotx, rpivoty, rpivotz, rpostx, rposty, rpostz, rprex, rprey, rprez, rx, ry, rz, shear_xy, shear_xz, shear_yz, soffsetx, soffsety, soffsetz, spivotx, spivoty, spivotz, sx, sy, sz, trs_order, tx, ty, tz, uniform_scale, xyz_order`
+        
+`extrude2` |
+    Extrude v2 |
+        `input, onoff, pivot_comp_in_obj_prexform, pivot_comp_rx, pivot_comp_ry, pivot_comp_rz, pivot_comp_shear_xy, pivot_comp_shear_xz, pivot_comp_shear_yz, pivot_comp_sx, pivot_comp_sy, pivot_comp_sz, pivot_comp_trs_order, pivot_comp_tx, pivot_comp_ty, pivot_comp_tz, pivot_comp_xyz_order, pivot_rx, pivot_ry, pivot_rz, px, py, pz, roffsetx, roffsety, roffsetz, rpivotx, rpivoty, rpivotz, rpostx, rposty, rpostz, rprex, rprey, rprez, rx, ry, rz, shear_xy, shear_xz, shear_yz, soffsetx, soffsety, soffsetz, spivotx, spivoty, spivotz, sx, sy, sz, trs_order, tx, ty, tz, uniform_scale, xform_front, xyz_order`
+
+`fallbackvector` |
+    Vector with Fallback |
+        `onoff, scale, useval, vx, vy, vz`
+
+`hudintslider` |
+    HUD Int Slider |
+        `value, onoff`
+        
+        [settings|#hudintslider]
+
+`hudslider` |
+    HUD Slider |
+        `value, onoff`
+        
+        [settings|#hudslider]
+
+`isosegment0`	|
+    Isoparm Segment |
+        `input , knotu, knotv, onoff, scale, useu, width`
+	
+`isosegment1`	|
+    Isoparm Segment |
+        `input, onoff, knotu, knotv, scale, useu, width`
+
+`mousewheelbump` |
+    Mouse Wheel Bump |
+        `onoff, value`
+
+`mousewheelradius` |
+    Mouse Wheel Radius |
+        `radius`
+
+`pasterange` |
+    Paste Range |
+        `input1, input2, onoff, u0, u1, v0, v1`
+	
+`peak` |
+    Peak |
+        `dist, input, onoff, radius`
+
+`pill` |
+    Pill |
+        `botheight, botrx, botry, botrz, cbotheight, cbotrx, cbotry, cbotrz, colorb, colorg, colorr, corient, crx, cry, crz, csx, csy, csz, ctopheight, ctoprx, ctopry, ctoprz, ctx, cty, ctz, czfactor, orient, onoff, rigadjrx, rigadjry, rigadjrz, rigadjsx, rigadjsy, rigadjsz, rigadjtx, rigadjty, rigadjtz, rigadjzfactor, rx, ry, rz, topheight, toprx, topry, toprz, tx, ty, tz, x, y, z, zfactor`
+
+`pivot` |
+    Pivot |
+        `input, onoff, tx, ty, tz`
+
+`project` |
+    Project |
+        `axis, input, onoff, scale, twist, vx, vy, vz`
+
+`softxform` |
+    Soft Transformer |          
+        `input, localspace, onoff, pivot_comp_in_obj_prexform, pivot_comp_rx, pivot_comp_ry, pivot_comp_rz, pivot_comp_shear_xy, pivot_comp_shear_xz, pivot_comp_shear_yz, pivot_comp_sx, pivot_comp_sy, pivot_comp_sz, pivot_comp_trs_order, pivot_comp_tx, pivot_comp_ty, pivot_comp_tz, pivot_comp_xyz_order, pivot_rx, pivot_ry, pivot_rz, px, py, pz, roffsetx, roffsety, roffsetz, rpivotx, rpivoty, rpivotz, rpostx, rposty, rpostz, rprex, rprey, rprez, rx, ry, rz, shear_xy, shear_xz, shear_yz, soffsetx, soffsety, soffsetz, spivotx, spivoty, spivotz, sx, sy, sz, trs_order, tx, ty, tz, uniform_scale, upx, upy, upz, xyz_order`
+
+`sphere` |
+    Sphere Transformer |      
+        `onoff, orient, rx, ry, rz, sx, sy, sz, tx, ty, tz`
+
+`translate` |
+    Translate |     
+        `input, onoff, tx, ty, tz`
+
+`torus` |
+    Torus Transformer |
+        `onoff, orient, rx, ry, rz, sx, sy, tx, ty, tz`
+
+`tube` |
+    Tube Transformer |
+        `onoff, orient, rx, ry, rz, sx, sy, sz, tx, ty, tz`
+
+`uisoparm` |
+    U Isoparm |
+        `input, k, onoff`
+
+`uvedit` |
+    UV Edit Manipulator |
+        `input, onoff, px, py, rz, shear_xy, sx, sy, trs_order, tx, ty, xyz_order`
+	
+`uvedit_reversez`	|
+    Texture Transformer |
+        `input, onoff, rz, sx, sy, tx, ty`
+
+`uvpoint` |
+    UV Point |
+        `input, onoff, px, py, pz, rx, ry, rz, sx, sy, sz, u, v`
+	
+`uvproject` |
+    UV Project Manipulator |
+        `onoff, projtype, px, py, pz, rx, ry, rz, sx, sy, sz, torrad, trs_order, tx, ty, tz, xyz_order`
+	
+`uvrange` |
+    UV Range Manipulator |
+        `onoff, projtype, px, py, pz, rx, ry, rz, sx, sy, sz, torrad, trs_order, tx, ty, tz, u0, u1, v0, v1, xyz_order`
+	
+`uvxform` |
+    UV Transform Manipulator |
+        `group_pivot, input, onoff, px, py, rz, shear_xy, sx, sy, trs_order, tx, ty, xyz_order`
+	
+`uvunwrap` |
+    UV Unwrap Manipulator |
+        `input, onoff, projplanes, px, py, pz, ref_input, rx, ry, rz, trs_order, tx, ty, tz, xyz_order`
+
+`vector` |
+    Vector |
+        `input, onoff, scale, twist, tx, ty, tz, vx, vy, vz`
+
+`visoparm` |
+    V Isoparm |
+        `input, k, onoff`
+
+`xform` |
+    Transformer |
+        `input, onoff, pivot_comp_in_obj_prexform, pivot_comp_rx, pivot_comp_ry, pivot_comp_rz, pivot_comp_shear_xy, pivot_comp_shear_xz, pivot_comp_shear_yz, pivot_comp_sx, pivot_comp_sy, pivot_comp_sz, pivot_comp_trs_order, pivot_comp_tx, pivot_comp_ty, pivot_comp_tz, pivot_comp_xyz_order, pivot_rx, pivot_ry, pivot_rz, px, py, pz, roffsetx, roffsety, roffsetz, rpivotx, rpivoty, rpivotz, rpostx, rposty, rpostz, rprex, rprey, rprez, rx, ry, rz, shear_xy, shear_xz, shear_yz, soffsetx, soffsety, soffsetz, spivotx, spivoty, spivotz, sx, sy, sz, trs_order, tx, ty, tz, uniform_scale, xyz_order`
+
+
+=== HUD integer slider settings === (hudintslider)
+
+`hudh`: Height             
+
+`hudharbourname('name')` Assigns the slider to a group. Sliders in the same group will dock together.
+
+`hudharbourx(int)` Slider group X position.
+
+`hudharboury(int)` Slider group Y position.
+
+`hudnameside(int)` Label position: top(1), left(2), right(3), bottom(4)
+
+`hudrangehigh(int)` Slider range high value.
+
+`hudrangelow(int)` Slider range low value.
+
+`hudlockhigh(int)` High value limits.
+
+`hudlocklow(int)` Low value limits.
+
+`hudvalueside(int)` Value position: top(1), left(2), right(3), bottom(4)
+
+`hudx(int)` X position in the viewer pane.
+
+`hudw(int)` Y position in the viewer pane.
+
+`hudw(int)` Width
+
+
+=== HUD slider settings === (hudslider)
+
+`hudh`: Height 
+
+`hudharbourname('name')` Assigns the slider to a group. Sliders in the same group will dock together.
+
+`hudharbourx(int)` Slider group X position.
+
+`hudharboury(int)` Slider group Y position.
+
+`hudnameside(int)` Label position: top(1), left(2), right(3), bottom(4)
+
+`hudrangehigh(float)` Slider range high value.
+
+`hudrangelow(float)` Slider range low value.
+
+`hudlockhigh(float)` High value limits.
+
+`hudlocklow(float)` Low value limits.
+
+`hudvalueside(int)` Value position: top(1), left(2), right(3), bottom(4)
+
+`hudx(int)` X position in the viewer pane.
+
+`hudw(int)` Y position in the viewer pane.
+
+`hudw(int)` Width
+

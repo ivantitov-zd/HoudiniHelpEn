@@ -3,11 +3,11 @@
 #type: node
 #context: sop
 #internal: blendshapes
+#version: 2.0
 #icon: SOP/blendshapes
-#tags: reshape, morph
+#tags: reshape, blend, morph
 
-"""Computes a 3D metamorphosis between shapes with the same
-topology."""
+"""Computes a 3D metamorphosis between shapes with the same topology."""
 
 Blend Shapes can blend between its inputs using average weights of each
 input's respective channel. It interpolates point colors and/or texture
@@ -15,58 +15,89 @@ co-ordinates between shapes.
 
 
 @parameters
-    Group:
-        Points or primitives in the first input to be blended.
-    Differencing:
-        Exaggerates blends between objects where values above 1 or less
-        than 0 will result in over-scaled shapes.
-    Selection Index:
-        #channels: /selectionidx
+Group:
+    #id: group
 
-        Specifies which input to use when generating the cooked
-        selection.
-    Blend Position:
-        Enables blending of point positions.
-    Blend Colors:
-        Enables blending of point colors and alphas.
-    Blend Normals:
-        Enables blending of point normals.
-    Blend Texture:
-        Enables blending of texture coordinates.
-    Blend Voxel Data:
-	Matching volumes will blend their data.  This is not done by spatial
-	position, but by absolute voxel index.
-    Shortest Path Transform Blending:
-	Enables use of spherical linear interpolation to blend primitive
-	transforms.
-    Point Id Attribute:
-	If this attribute exists, it will be used to find corresponding points
-	in the different blend shapes.  For example, using id will allow
-	particle systems to find matching points even if particles are deleted.
-	If it does not exist or is blank, point numbers will be used for the
-	matching.
-    Primitive Id Attribute:
-	If this attribute exists, it will be used to find corresponding
-	primitives in the different blend shapes.  For example, using name
-	will allow fluid systems to find matching volumes even if volumes
-	are reordered.  If it does not exist or is blank, primitive numbers
-	will be used for the matching.
-    Assume Only Coordinate Changes In Input:
-        This accelerates the blend speed when there exists an animated
-        input that only has changing point positions. Unpredictable
-        results will occur with this enabled if attributes or topology
-        changes.
-    Assume Morph Network Setup:
-        This accelerates the blend speed when the inputs have the
-        particular wiring the Morph tool creates. The blend speed can be
-        accelerated when the following three properties are true: 
-        # All of the inputs to the BlendShapes SOP after the first input are Edit SOPs. 
-        # The first input to the BlendShapes SOP is the same as the first input to all of the Edit SOPs. 
-        # If the Edit SOPs have a second input, they must all be the same.
-    Blends:
-        #channels: /shape0 /shape1 /shape2 /...
+    Subset of the input geometry to be blended.
 
-        Controls contribution of geometry inputs.
+Group Type:
+    #id: grouptype
+
+    The type of the specified group.  If this is not __Guess from group__,
+    the group must be the indicated type.
+
+Selection Index:
+    #channels: /selectionidx
+
+    Specifies which input to use when generating the cooked
+    selection.
+
+Differencing:
+    #id: diff
+
+    Exaggerates blends between objects where values above 1 or less
+    than 0 will result in over-scaled shapes.
+
+Cache Input Deltas:
+    #id: cachedeltas
+
+    Compute and cache differences between attributes to speed up subsequent cooks if input geometry does not change, for example when only blend weights are changing. This is only an option when __Differencing__ is on.
+
+Treat Packed Primitives As Inputs:
+    #id: pack
+
+    When enabled, any packed primitives in inputs other than the first will be
+    treated as if they are the inputs. The weights used for each packed
+    primitive is taken from a float attribute named `weight` in the input and
+    multiplied with its corresponding __Blend__ parameter value. The `weight`
+    attribute is typically a primitive attribute but it can also be a vertex or
+    point attribute for the corresponding packed primitive. If it is a global
+    attribute on the input, then that single value is used for all of its
+    packed primitives.
+
+Attributes:
+    #id: attribs
+
+    A space-separated list of names/patterns for attributes to interpolate. Attributes that don't match here are switched instantly when the whole part of the input number changes, rather than smoothly interpolated. The default is `*`, meaning interpolate all attributes.
+
+Point ID Attribute:
+    #id: ptidattr
+
+    If you enter the name of a (string or integer) point attribute here, the node will use the value of this attribute to match up points between the different inputs. For example, using `id` will match particle points even if some particles are deleted. If this field is blank (or the attribute doesn't exist), the node uses point numbers to match up points.
+
+Primitive ID Attribute:
+    #id: primidattr
+
+    If you enter the name of a (string or integer) primitive attribute here, the node will use the value of this attribute to match up primitives (for example, volumes) between the different inputs. For example, using `name` will match volumes in a fluid system even if volumes are reordered. If this field is blank (or the attribute doesn't exist), the node uses primitive numbers to match up points.
+
+Voxel Blend:
+    #id: voxelblend
+
+    Optionally blend voxel data between volumes or VDBs.
+
+    None:
+        Do not blend volume data.
+
+    By Grid Index:
+        The voxels are matched by absolute voxel number (not spatial position) so matching volumes should have the exact same dimensions.
+
+    By Voxel Position:
+        The voxels are matched by their spatial position. The grid of one volume will be extended to include the other volume, which might change the resolution of the grid.
+
+Interpolate Rotation of Normals, Quaternions, and Transforms:
+    #id: doslerp
+
+    Use spherical linear interpolation for smoother transitions of attributes marked as normals, quaternions, and transforms, and for primitive transforms. When this is off, all blends are component-wise, meaning the transition can be abrupt when the input changes.
+
+Update Channel Names From Inputs:
+    #id: updatechannels
+
+    Updates __Blends__ based on the input nodes and their names.
+
+Blends:
+    #channels: /shape0 /shape1 /shape2 /...
+
+    Controls contribution of geometry inputs.
 
 @related
     - [Node:sop/sblend]

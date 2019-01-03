@@ -1,0 +1,78 @@
+= Overview =
+HQueue is a general-purpose job management system that distributes, monitors and manages tasks across a collection of computing nodes, or client machines.  It specializes in managing render and dynamic simulation jobs submitted from Houdini however it can be customized to work with any job from any application.
+
+
+
+== Components == (components)
+
+A typical HQueue farm looks like the following:
+
+<center>
+[Image:/images/hqueue/hqueue_overview.png]
+</center>
+
+The main components in an HQueue farm are the:
+* *HQueue Server*
+
+    This machine runs the HQueue server process which is the heart-and-soul of the entire system.  The server distributes jobs to the other machines, hosts the web interface and stores the job scheduling data.
+
+* *HQueue Clients*
+
+    These are the machines that run the HQueue client processes.  They receive and execute jobs assigned by the server.  The HQueue clients are also known as client machines, compute nodes, or render nodes.
+
+* *Workstations*
+
+    These are the machines that users submit jobs from using interactive Houdini.  The jobs are sent to the HQueue server which are then distributed to the clients.
+
+* *Shared Folder Server*
+
+    This machine hosts a folder (or drive) which is shared on the network.  The workstations transfer input files onto the shared folder which are read by the client machines when executing jobs.  The client machines additionally write the output files onto the shared folder which can be accessed by the workstations.
+
+* *Houdini License Server*
+
+    This machine hosts the licenses that are needed to run interactive Houdini on the workstations and non-interactive Houdini and Mantra on the client machines.
+
+
+
+== How It Works == (howitworks)
+
+The easiest way to describe how HQueue works is to go through a typical workflow -- distributing a Mantra render job:
+
+# *The workstation submits a job to the HQueue Server.*
+
+    The workflow starts on the workstation.  The artist creates a scene in Houdini and when the scene is ready for rendering, the artist uses an HQueue Render ROP to submit a render job to the HQueue Server.   The HQueue Render ROP also copies the scene (.hip) file and its file dependencies to the shared folder.
+
+    At this point, the artist can now open the HQueue web interface in a web browser to monitor the job's progress.
+
+# *The HQueue Server assigns the job to a client machine.*
+
+    The HQueue Server analyzes the job and assigns it to the next available client machine.  The client machine contacts the HQueue Server and retrieves the job.
+
+# *The client machine executes the job and breaks the work into smaller tasks.*
+
+    The client machine begins executing the job and reads the input files from the shared folder.  Specifically for Mantra render jobs, the client reads the .hip file and generates IFD (scene description) files in preparation for the renders.  At the same time, it also creates sub-jobs, or child jobs, that will do the actual rendering work.
+
+    The number of child jobs created is typically based on the number of frames requested to be rendered.  For example, suppose the render job is for frames 1 to 240, then 240 child jobs are created with each job instructed to render a single frame from the corresponding IFD file.
+
+# *The smaller tasks are sent back to the HQueue Server and distributed to the rest of the farm.*
+
+    The client machine submits the new child jobs back to the HQueue Server where they are queued up and assigned to other available client machines on the farm.  This is how multiple machines are able to work on the same render job.
+
+    At the same time, the first client machine continues to generate IFDs for the remaining frames and create new child jobs for those frames.
+
+# *The smaller tasks are executed.*
+
+    The other client machines execute the child jobs in parallel and write the output images to the shared folder.
+
+# *The job is finished.*
+
+    When all of the jobs complete, the final rendered images appear in the shared folder.  The artist can view the rendered images and re-submit the child jobs for any frames that have failed.  If changes to the scene are made, then the artist can re-submit the entire render job.
+
+
+
+== Licensing == (licensing)
+
+The HQueue Server does not require a license to operate.
+
+The HQueue Clients do require licenses in order to run Houdini jobs.  Houdini simulation jobs and IFD generation jobs require Houdini Engine (or equivalent, i.e. Houdini FX) licenses.  Mantra render jobs require Render licenses.  All other render jobs that cook .hip files require Houdini Engine (or equivalent) licenses.
+

@@ -1,138 +1,386 @@
 = Tool scripts =
 
-"""How to write Python scripts for shelf tools."""
+"""How to write Python scripts for shelf/asset tools."""
 
-You can write a script that acts like a _tool_ (that is, uses the current selection or asks the user for a selection, or lets the user place something in the viewer), or a simple _action_ that's performed immediately when the user clicks the item and doesn't require any interaction.
 
-You may not need to write a script at all, if all you want is a shelf item that creates a certain node/asset. When you drag a node onto the shelf, Houdini automatically creates a shelf item with a generic script to create that type of node. See [how to customize the shelf|/shelf/customize] for more information.
+== Overview ==
 
-While running shelf scripts Houdini is still "Live".  This is most
-noticeable if you acquire DOP Objects and then change the DOP
-Network.  After changing the DOP Network, the current frame will
-recook and invalidate your DOP Objects.
+A tool script runs when you click a shelf tool or choose a tool from a tab menu in a viewer or network editor. Tools can do something simple, like change a setting, or perform complex actions like running scripted interactions with the user and using the results to create nodes.
 
-To avoid recooking the current frame, you can call
-[Hom:hou.setSimulationEnabled] to disable the simulation for the
-duration of your operation.  Make sure you record the initial
-simulation state ([Hom:hou.simulationEnabled]) and restore it,
-however.
+There are two places in Houdini you can write tool scripts:
+
+* In an asset, you can embed tools for creating and/or editing the asset inside the asset. The user can add custom tools to their shelf tabs. The tool script is also used to create the asset node in the viewer or the network editor.
+
+* You can create custom tools directly on the shelf (not embedded in an asset). This script may create or a node or perform any other actions possible through Python scripting.
+
+
+== Notes ==
+
+* When you create an asset, Houdini gives it a default tool with a generic script that handles basic interaction. You don't need to modify the script unless you want to customize how the tool interacts with the user (see also [Python states|python_states]).
+
+* When you drag a node onto the shelf, Houdini automatically creates a shelf item to create that type of node. It does *not* use your default tool script in the new shelf tool, but instead uses a generic script. If your asset has a tool with custom interaction, you should add that tool to the shelf instead of dragging the node. See [how to customize the shelf|/shelf/customize] for more information.
+
+* While running shelf scripts Houdini is still "Live".  This is most noticeable if you acquire DOP Objects and then change the DOP Network.  After changing the DOP Network, the current frame will recook and invalidate your DOP Objects.
+
+    To avoid recooking the current frame, you can call [Hom:hou.setSimulationEnabled] to disable the simulation for the duration of your operation.  Make sure you record the initial simulation state ([Hom:hou.simulationEnabled]) before turning it off, and restore it at the end of the script.
 
 
 == Arguments ==
 
-The tool script can access extra information in a global dictionary variable called `kwargs`. For example, to check if the user selected the tool in a viewport, use `kwargs["viewport"]`.
+When Houdini calls your script, it adds a dictionary variable named `kwargs` to the script's context. This dictionary contains the following keys:
 
-Houdini's shelf uses a convention where clicking a tool with the ((Ctrl)) key held turns the tool into an immediate action. For example, the Camera tool on the __Lights and Cameras__ shelf tab lets you place a camera in the scene, but ctrl-clicking it immediately creates a camera from the current view, instead of asking you to place the camera. Similarly, ctrl-clicking the Sphere tool on the __Create__ shelf tab immediately places the sphere at the origin instead of asking you to place it.
+Key ||
+    Type ||
+        Description ||
 
-If you want to use this convention in your own tool, you can use the value of `kwargs["ctrlclick"]` to see if the user ctrl-clicked your tool.
+`pane` |
+    #width: 20%
+    [Hom:hou.PathBasedPaneTab] subclass |
+        #width: 20%
+        The pane in which the tool was invoked.
 
-When Houdini calls your script, it sets a special dictionary variable named `kwargs` in the script's context. This dictionary contains useful information. You can see its contents by creating a tool and giving it the following script...
+        * If the tool was invoked in a Scene Viewer, this will be [Hom:hou.SceneViewer].
+
+        * You must also handle the case where the user invoked the tool from a _Context_ Viewer (a viewer type that adapts to the current network). In that case
+
+        * If the tool was invoked from the shelf, this is `None`. In this case, if you need a viewer your script will have to find one, for example with `hou.ui.paneTabOfType(hou.paneTabTypes.SceneViewer)`.
+
+        See the `scene_viewer()` [utility function|#scene_viewer] below for a function to get a scene viewer no matter what the value of `pane` is.
+
+`viewport` |
+    [Hom:hou.GeometryViewport] |
+        The viewport in which the tool was invoked. If the tool was not invoked in a Scene Viewer (or Context Viewer viewing geometry), this will be `None`.
+
+`panename` |
+    `str` |
+        The name of the pane in which the tool was invoked (see `pane` above).
+
+`toolname` |
+    `str` |
+        The internal name of this tool.
+
+        ~~~~~~
+
+`shiftclick` |
+    `bool` |
+        Whether the user was holding ((Shift)) when they clicked the tool (or selected it from the ((Tab)) menu).
+
+`ctrlclick` |
+    `bool` |
+        Whether the user was holding ((Ctrl)) when they clicked the tool (or selected it from the ((Tab)) menu).
+
+`altclick` |
+    `bool` |
+        Whether the user was holding ((Alt)) (((Option)) on Mac) when they clicked the tool (or selected it from the ((Tab)) menu).
+
+`cmdclick` |
+    `bool` |
+        *Mac only*. Whether the user was holding ((Command)) when they clicked the tool (or selected it from the ((Tab)) menu).
+
+        ~~~~~
+
+`requestnew` |
+    `bool` |
+        Indicates whether the tool should create a new instance of the node (the usual), or re-use an existing node (for example, the [Edit SOP|Node:sop/edit] and [UV Edit SOP|Node:sop/uvedit] nodes are capable of this).
+
+`branch` |
+    `bool` |
+        Whether to create the new node in a branch instead of appending to the current display node.
+
+`autoplace` |
+    `bool` |
+        If this is `True`, the tool should place the node in the network without asking the user for a position. (This is separate from checking if ((Ctrl))/((Command)) were pressed.)
+
+        This is set when a tool is invoked in way that has no concept of placement or modifier clicks, for example dragging a node from the Tool Palette in the network editor.
+
+`bbox` |
+    [Hom:hou.BoundingBox] |
+        *May not be present*. If this value is in the dictionary, it contains a bounding box you can use to represent an object, for the purpose of [placing|#get_position].
+
+        This value does not come from Houdini but instead is set for a tool by the `bbox` attribute in a `.shelf` file. (Houdini uses this internally to record a `bbox` value for the shape tools based on the geometry they create.)
+
+        ~~~~~
+
+`inputs` |
+    `list` of `tuples` of [Hom:hou.Node] and `int` |
+        A list of nodes and output connector indices that should be wired into the inputs of the new node. This list will be non-empty if the user presses ((MMB)) or ((RMB)) on a node output, which lets the user choose a node to wire from that output.
+
+        For backwards compatibility, the `kwargs` dict also has `inputnodename` and `outputindex`, which were used previously when only one input node could be specified.
+
+`inputnodename` |
+    `str` |
+        The name of a node to wire into the new node's input, or `""` (the empty string). See `inputs` above.
+
+`outputindex` |
+    `int` |
+        The index of a the output on `inputnodename` to wire into the new node's input, or `-1`. See `inputs` above.
+
+        ~~~~~
+
+`outputs` |
+    `list` of `tuples` of [Hom:hou.Node] and `int` |
+        A list of nodes and input connector indices that should be wired into the output of the new node. This list will be non-empty if the user presses ((MMB)) or ((RMB)) on a node input, which lets the user choose a node to wire into that input.
+
+        For backwards compatibility, the `kwargs` dict also has `outputnodename` and `inputindex`, which were used previously when only one output node could be specified.
+
+`outputnodename` |
+    `str` |
+        The name of a node to wire into the new node's output, or `""` (the empty string). See `outputs` above.
+
+`inputindex` |
+    `int` |
+        The index of a the input on `outputnodename` to wire into the new node's input, or `-1`. See `inputs` above.
+
+
+== Utility functions == (utils)
+
+The current API for building tool scripts is very low level (for example, each script is responsible for manually checking the world up, orienting to the construction plane, checking modifier keys, wiring nodes into the correct place, and more). We want to make this much easier though a higher-level HOM API in future versions of Houdini.
+
+For now, we provide the `stateutils` module in an attempt to abstract some of the details. You can see usages of the functions in the [how to|#howto] section. The functions in `stateutils` are geared toward scripting SOP assets.
+
+"Factory" Houdini shelf tools use a variety of internal libraries (`toolutils`, `soputils`, `doputils`, and others). These libraries are undocumented, do not provide good examples of Python usage, and are subject to change/deletion without notice. The plan is to replace them with a higher-level HOM API as mentioned above. However, currently it is sometimes necessary to call functions from those libraries. In the "how to" section below, the code snippets will sometimes call these functions when the user is not interacting in a viewer.
+
+
+== How to == (howto)
+
+=== Get a scene viewer === (scene_viewer)
+
+There are a few utility functions for getting a reference to the active pane or a [Hom:hou.SceneViewer] instance. These account for edge cases like context viewers that are viewing the scene.
 
 {{{
 #!python
-# Convert kwargs to a string and pass it
-# to the displayMessage function.
+# In a tool script
+import stateutils
 
-hou.ui.displayMessage(str(kwargs))
+
+# Get the currently active pane. If kwargs["pane"] is None (like if the script
+# is run from a shelf tool), this will call findSceneViewer() to find a
+# SceneViewer. Otherwise this might be another pane type, such as a
+# hou.NetworkEditor if the tool was selected in the network editor. You should
+# check the type before assuming it's a SceneViewer.
+pane = stateutils.activePane(kwargs)
+
+# Get a hou.SceneViewer. If kwargs["pane"] is a SceneViewer, this returns
+# that, otherwise it uses findSceneViewer() to find any SceneViewer it can.
+scene_viewer = stateutils.activeSceneViewer(kwargs['pane'])
+
+# This looks for visible scene viewers first, then falls back to finding a
+# viewer that is not visible and making it the current tab. May raise
+# hou.NotAvailble if there really is no SceneViewer in the desktop.
+scene_viewer = stateutils.findSceneViewer()
 }}}
 
 
-Key ||
-    Value ||
+=== Put down a generator SOP node ===
 
-`shiftclick`
-    Whether or not Shift was pressed when the tool was invoked
+A _generator_ SOP is one which generates data without any input (as opposed to modifying an incoming node).
 
-`altclick`
-    Whether or not Alt was pressed when the tool was invoked
-
-`ctrlclick`
-    Whether or not Ctrl was pressed when the tool was invoked
-
-`cmdclick`
-    Whether or not Command or Windows key was pressed when the tool was invoked
-
-`inputindex`
-    If invoked by right-clicking on a node's input connector in the
-    network editor, this is the index of that node's input.  Otherwise,
-    it is -1.
-
-`outputnodename`
-    If invoked by right-clicking on a node's input connector in the
-    network editor, this is the name of that node.  (It will presumably
-    be the output of a newly created node.)  Otherwise, it is ''.
-
-`outputindex`
-    If invoked by right-clicking on a node's output connector in the
-    network editor, this is the index of that node's output.  Otherwise,
-    it is -1.
-
-`inputnodename`
-    If invoked by right-clicking on a node's output connector in the
-    network editor, this is the name of that node.  (It will presumably
-    be the input of a newly created node.)  Otherwise, it is ''.
-
-`branch`
-    If invoked by middle-clicking on a node's output connector in the
-    network editor, this is True.  Otherwise, it is False.
-
-`toolname`
-    The name of the tool that was invoked.
-
-`pane`
-    If the tool was invoked from the shelf, it is None.  If it was
-    invoked from a viewer, it will be a [Hom:hou.SceneViewer] or
-    other viewer pane tab instance.  If it was invoked from the network
-    editor, it will be a [Hom:hou.NetworkEditor].
-
-`viewport`
-    If the tool was invoked from the viewer, this is set to the
-    [Hom:hou.GeometryViewport] where the tool was chosen.
+{{{
+#!python
+# In a tool script
+import soptoolutils
+import stateutils
 
 
-== General tips ==
+pane = stateutils.activePane()
+if isinstance(pane, hou.SceneViewer):
+    # This function asks for a position (or auto-places if the user ctrl/cmd-
+    # clicked), then creates a Geometry object and puts your SOP inside (also
+    # handles "create in context" setting)
+    stateutils.createGeneratorSop(
+        kwargs, "$HDA_NAME", prompt="Select where to put the new thing"
+    )
+else:
+    # For interactions other than in a viewer, fall back to the low-level
+    # function
+    soptoolutils.genericTool(kwargs, "$NODE_NAME")
+}}}
 
-- While you're debugging a script, you can display alert windows using... 
+
+=== Put down a filter node === (filter)
+
+A _filter_ node is one which takes one or more inputs, modifies them, and outputs the result.
+
+The following shows how you could implement a tool script for the traditional `Copy to Points` SOP.
+
+{{{
+#!python
+# In a tool script
+import soptoolutils
+import stateutils
+
+
+pane = stateutils.activePane()
+if isinstance(pane, hou.SceneViewer):
+    # First we'll ask for the primitive(s) to copy
+    source = stateutils.Selector(
+        name="select_polys",
+        geometry_types=[hou.geometryType.Primitives],
+        prompt="Select primitive(s) to copy, then press Enter",
+        primitive_types=[hou.primType.Polygon],
+        # Which paramerer to fill with the prim nums
+        group_parm_name="sourcegroup",
+        # Which input on the new node to wire this selection to
+        input_index=0,
+        input_required=True,
+    )
+    # Then, we'll ask for the points to copy onto
+    target = stateutils.Selector(
+        name="select_points",
+        geometry_types=[hou.geometryType.Points],
+        prompt="Select points to copy onto, then press Enter",
+        group_parm_name="targetgroup",
+        # Remember to wire each selection into the correct input :)
+        input_index=1,
+        input_required=True,
+    )
+
+    # This function takes the list of Selector objects and prompts the user for
+    # each selection
+    container, selections = stateutils.runSelectors(
+        pane, [source, target], allow_obj_selection=True
+    )
+
+    # This function takes the container and selections from runSelectors() and
+    # creates the new node, taking into account merges and create-in-context
+    newnode = stateutils.createFilterSop(
+        kwargs, "$HDA_NAME", container, selections
+    )
+    # Finally enter the node's state
+    pane.enterCurrentNodeState()
+
+else:
+    # For interactions other than in a viewer, fall back to the low-level
+    # function
+    soptoolutils.genericTool(kwargs, "$HDA_NAME")
+}}}
+
+Here's a simpler example where the script prompts the user to select an object (or proceeds if the viewer is already inside an object), and then creates the new node in that object, without any component selection. If the user presses ((Enter)) without selecting a Geometry object, the tool creates a new object for itself. This might be useful for a node that can add geometry to its input but doesn't modify a selection.
+
+{{{
+#!python
+# In a tool script
+import soptoolutils
+import stateutils
+
+
+_, _, basename, _ = hou.hda.componentsFromFullNodeTypeName("$HDA_NAME")
+
+
+pane = stateutils.activePane()
+if isinstance(pane, hou.SceneViewer):
+    # Instead of using runSelectors(), which lets the user select components,
+    # we'll just ask for an object if needed
+    container = pane.pwd()
+    if container.childTypeCategory() != hou.sopNodeTypeCategory():
+        # We're not already inside an object, so ask the user where they want
+        # the new SOP
+        objects = pane.selectObjects(
+            prompt='Select objects',
+            quick_select=False,
+            use_existing_selection=True,
+            allow_multisel=False,
+            allowed_types=['geo']
+        )
+        if objects:
+            # If the user selected more than one object, just take the first
+            container = objects[0]
+            # Jump into the object
+            pane.setPwd(container)
+        else:
+            # The user pressed Enter without selecting an object, so create
+            # a new object
+            cname = basename + "_object1"
+            container = hou.node("/obj").createNode("geo", node_name=cname)
+
+        # Dive into the container
+        pane.setPwd(container)
+
+    # Create the new node in the selected container (the empty list represents
+    # no component selections)
+    newnode = stateutils.createFilterSop(kwargs, "$HDA_NAME", [])
+    # Finally enter the node's state
+    pane.enterCurrentNodeState()
+
+else:
+    # For interactions other than in a viewer, fall back to the low-level
+    # function
+    soptoolutils.genericTool(kwargs, "$HDA_NAME")
+}}}
+
+Notes:
+
+* If the `allow_obj_selection` argument to `stateutils.runSelectors()` is `True` (the default), and the user starts the tool at the object level, the script will allow the user to select whole objects (rather than components). If the argument is `False`, if the user starts at the object level, the script will prompt the user to select an object and then dive inside and request a component selection.
+
+* If you want to run the selectors associated with a traditional Houdini node (for example, a node inside your asset), you can get a list of its selectors using [Hom:hou.NodeType#selectors].
 
     {{{
-    #!python
-    hou.ui.displayMessage("Hello World")
+    selectors = nodetype.selectors()
+    container, selections = runSelectors(scene_viewer, selectors)
     }}}
 
-- The default shelf items created when you drag nodes onto the shelf are generated by the code in `$HFS/houdini/python2.7libs/defaulttools.py` and generally just call `<<xxx>>toolutils.genericTool()`. You may want to look at these scripts to learn how to write a simple tool script.
+* When writing your own custom prompt text, remember to tell the user to press Enter to finish the selection.
 
-- The `<<xxx>>toolutils` modules in `$HFS/houdini/python2.5libs/defaulttools.py` contain some useful high-level functions that might make writing tool scripts easier.
-
-- View the scripts of stock items on the shelf, such as the [Icon:COMMON/delete] [Delete|/shelf/delete] action on the __Modify__ shelf tab, for useful techniques and bits of code.
-
-- To get the scene viewer pane object...
-
-    {{{
-    #!python
-    import toolutils
-    
-    scene_view = toolutils.sceneViewer()
-    }}}
-
-- To get the current viewport in the active viewer:
-
-    {{{
-    #!python
-    active_pane.curViewport()
-    }}}
-
-- To get the network location of the scene viewer:
-
-    {{{
-    #!python
-    import toolutils
-    
-    scene_viewer = toolutils.sceneViewer()
-    path = scene_viewer.pwd()
-    }}}
+* If you try to test the scene_viewer.selectXXX methods in the Python Shell window, it may seem to freeze or not do anything. This is because the prompt only appears when the mouse is over the viewer.
 
 
-== Detecting what network context the tool is called in ==
+=== Prompt the user for a position, multiple positions, or a path === (get_position)
+
+To ask the user for a location, as when you place new geometry using the tools on the __Create__ shelf tab.
+
+For tools with a "placement" phase (for example, the Sphere tool which lets you place a new sphere in the scene), whether to skip placement and just pick a "natural" placement. (For example, for the sphere tool, this places the sphere at the origin. For the Camera tool, this positions the camera to match the current view). The user invokes "auto-placement" by ((Ctrl))-clicking on Linux/Windows or ((Command))-clicking on Mac. You should check both:
+
+{{{
+#!python
+import stateutils
+
+
+# The selectPositions() method of the hou.SceneViewer object lets you prompt
+# the user for one or more positions (using the number_of_positions keyword),
+# optionally connecting multiple positions (for example when prompting for a
+# path), displaying a bounding box (when prompting to place geometry), etc.
+
+scene_viewer = stateutils.activeSceneViewer(kwargs['pane'])
+if kwargs['ctrlclick'] or kwargs['cmdclick']:
+    position, orientation = \
+        stateutils.defaultPositionAndOrientation(scene_viewer)
+else:
+    # The result is a tuple of Vector3 objects.
+    positions = scene_viewer.selectPositions(
+        prompt='Click to specify a position',
+        number_of_positions=1,
+        connect_positions=True,
+        show_coordinates=True,
+        bbox=kwargs.get("bbox", BoundingBox()),
+        position_type=positionType.WorldSpace,
+        icon=None,
+        label=None
+    )
+    position = positions[0]
+}}}
+
+See the help for [Hom:hou.SceneViewer#selectPositions], [Hom:hou.BoundingBox], and [Hom:hou.positionType].
+
+
+=== Modify node parameters ===
+
+{{{
+#!python
+# Get a list of all parameters on a node
+all_parms = my_cam.parms()
+
+# Get the current value of a parameter
+current_lookat = my_cam.parm("lookat").get()
+
+# Set the value of a parameter
+my_cam.parm("lookat").set("/obj/torus1")
+}}}
+
+TIP:
+    The argument to the `Node.parm()` method is the _internal_ name of the parameter. To find out the internal name of a parameter, hover over its label in the parameter editor. The internal name appears in a tooltip.
+
+
+=== Detect what network context the tool is called in ===
 
 You might want to make a tool that works inside two or more different network types. For example, the [Icon:COMMON/delete] Delete action on the __Modify__ shelf tab works at both the object level, where it deletes the selected object, and at the geometry level, where it creates a [Blast surface node|Node:sop/blast].
 
@@ -140,28 +388,20 @@ There are a few ways you could write this part of your script. One is to follow 
 
 {{{
 #!python
-import toolutils
+# In a tool script
+import stateutils
 
-# Find out current context.
-# Returns the active pane when the tool/action was called.
-# If there is not an active pane when the tool/action is called,
-# this returns None.
 
-active_pane = toolutils.activePane(kwargs)
+# Find out current context. Returns the active pane when the tool/action was
+# called. If there is not an active pane when the tool/action is called, this
+# returns None.
+scene_viewer = stateutils.active_scene_viewer(kwargs['pane'])
 
-# If the pane is a context viewer, treat it like a scene viewer.
-
-if active_pane is not None and active_pane.type() == hou.paneTabType.ContextViewer:
-    active_pane = active_pane.sceneViewer()
-
-# If there is no active pane, or the active pane is not a
-# scene viewer, raise an error.
-
-if active_pane is None or active_pane.type() != hou.paneTabType.SceneViewer:
+# If the active pane is not a scene viewer, raise an error
+if not scene_viewer
    raise hou.Error("The tool was not invoked in the scene viewer.")
 
 # Get the network context of the viewer.
-
 child_type = active_pane.pwd().childTypeCategory()
 
 if child_type == hou.objNodeTypeCategory():
@@ -170,108 +410,22 @@ elif child_type == hou.sopNodeTypeCategory():
     ...
 elif child_type == hou.dopNodeTypeCategory():
     ...
-elif child_type == hou.popNodeTypeCategory():
-    ...
 }}}
 
 
-== Getting a selection ==
-
-You can use methods on the scene viewer pane object to get a selection. If the current selection matches the selection type you're asking for, the method will return immediately. Otherwise, it will prompt the user for a new selection.
-
-{{{
-#!python
-import toolutils
-
-# The toolutils.selectionPrompt() utility function
-# gets the standard prompt string for a given node type.
-# For example, this...
-
-prompt = toolutils.selectionPrompt(hou.dopNodeTypeCategory())
-
-# will return something like
-# "Select dynamic objects. Press Enter to accept selection."
-
-# The selectXXX methods of the hou.SceneViewer class
-# prompt the user for a selection in the viewer.
-# The argument is the text of the prompt that appears in
-# the status line.
-
-# The result is usually a tuple of nodes, but the
-# selectGeometry() method returns a GeometrySelection object.
-
-scene_viewer = toolutils.sceneViewer()
-selected_objects = scene_viewer.selectObjects(prompt)
-}}}
-
-TIP:
-    If you try to test the scene_viewer.selectXXX methods in the Python Shell window, it may seem to freeze or not do anything. This is because the prompt only appears when the mouse is over the viewer.
-    
-NOTE:
-    If you're writing your own custom prompt text, remember to tell the user to press Enter to finish the selection.
-
-
-== Limiting which objects the user can select ==
-
-The [Hom:hou.SceneViewer#selectObjects] method has an optional `allowed_types` keyword argument that lets you supply a list of object type names. If you supply this argument, the method will only accept selections of these types, and during interactive selection the user won't be able to select objects that aren't of the allowed type(s).
-
-The list of allowed types uses the _internal_ names of nodes. To see a node type's internal name, right-click an instance of the node type in the network editor and choose __Type properties__. At the top of the window the internal name is listed after *Operator type:*.
-
-For example, to ask for a camera selection...
-
-{{{
-#!python
-
-# Note: internal name of the Camera object is "cam"
-
-selected_objects = scene_viewer.selectObjects("Select a camera and press Enter",
-                                              allowed_types = ["cam"])
-}}}
-
-
-== Prompting the user for a position, multiple positions, or a path ==
-
-To ask the user for a location, as when you place new geometry using the tools on the __Create__ shelf tab:
-
-{{{
-#!python
-import toolutils
-
-# The selectPositions() method of the hou.SceneViewer object lets
-# you prompt the user for one or more positions (using the
-# number_of_positions keyword), optionally connecting multiple
-# positions (for example when prompting for a path), displaying
-# a bounding box (when prompting to place geometry), etc.
-
-# The result is a tuple of Vector3 objects.
-
-scene_viewer = toolutils.sceneViewer()
-positions = scene_viewer.selectPositions(prompt='Click to specify a position',
-                                         number_of_positions = 1,
-                                         connect_positions = True,
-                                         show_coordinates = True,
-                                         bbox = BoundingBox(),
-                                         position_type = positionType.WorldSpace,
-                                         icon = None,
-                                         label = None)
-}}}
-
-See the help for [Hom:hou.SceneViewer#selectPositions], [BoundingBox|Hom:hou.BoundingBox], and [positionType|Hom:hou.positionType].
-
-
-== Manipulating the current viewport ==
+=== Manipulate the current viewport ===
 
 To get the current viewport...
 
 {{{
 #!python
-import toolutils
+import stateutils
 
 # Get the scene viewer
-scene_view = toolutils.sceneViewer()
+scene_viewer = stateutils.find_scene_viewer()
 
 # Get the current viewport
-viewport = scene_view.curViewport()
+viewport = scene_view.ercurViewport()
 }}}
 
 Calling the `settings()` method on the [GeometryViewport|Hom:hou.GeometryViewport] object returns a [GeometryViewportSettings|Hom:hou.GeometryViewportSettings] object. This object has a ton of methods for getting and setting information about the viewport.
@@ -307,32 +461,5 @@ viewport.saveViewToCamera(cam_or_light_object)
 }}}
 
 
-== Modifying node parameters ==
-
-- To modify the current selection, first get the selection as shown above. If the user already has an appropriate selection, you'll get that, or Houdini will prompt her for a selection.
-
-- If you want to make an item that always modifies the same node, instead of the currently selected one (for example, a button that toggles the Activate parameter on an important node), just use the standard function to get a node by name...
-
-    {{{
-    #!python
-    my_cam = hou.node("/obj/cam1")
-    }}}
-
-To modify a node's parameters...
-
-{{{
-#!python
-# Get a list of all parameters on a node
-all_parms = my_cam.parms()
-
-# Get the current value of a parameter
-current_lookat = my_cam.parm("lookat").get()
-
-# Set the value of a parameter
-my_cam.parm("lookat").set("/obj/torus1")
-}}}
-
-TIP:
-    The argument to the `Node.parm()` method must be the _internal_ name of the parameter. To find out the internal name of a parameter, hover over its label in the parameter editor. The internal name appears in a tooltip.
 
 

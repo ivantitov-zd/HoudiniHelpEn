@@ -2,17 +2,15 @@
 
 """How to set up and edit a crowd simulation."""
 
+
 == Overview ==
 
 Crowd simulations require a few different node networks to set up. Most of these have [shelf tools|/shelf/crowds] that set up the networks for you.
 
-* A render network to render out [agent files|agents] from a character.
-
-* A geometry network to load an agent from disk.
-
-* A geometry network to source agent primitives.
+* A geometry network to define agent primitives.
 
 * A simulation network to run the crowd simulation.
+
 
 == Quick start ==
 
@@ -22,37 +20,132 @@ It's possible to use the [Simulate shelf tool|/shelf/crowds_simulate] to get a "
 
 # If you have terrain geometry you want the agents to walk across, select it and click [Icon:CROWDS/agentterrainprojection] Terrain on the __Crowds__ shelf tab.
 
-== Bake out an agent ==
 
-It's possible to build a quick simulation that gets agent data directly from a character in the same scene file. But it's much more efficient to "bake out" the agent data into files and use those for simulation.
-    
-See [baking an agent|baking] for how to write out agent files for a character.
+== Define an agent == (defn)
 
-== Load an agent ==
+Crowds assume your character is encapsulated as a [digital asset|/assets/] or in an FBX file.
 
-Once you've baked agent files, you can load them into a scene for simulation using an _agent setup_ network.
+:task: Create an agent from a character using the shelf tool:
+    # At the Object level, select the character asset you want to turn into an agent.
 
-# At the scene level, create a [Geometry object|Node:obj/geo] for the agent.
+    # On the __Crowds__ shelf tab, click the [Icon:SHELF/bake_character] Agent tool.
 
-# Inside the geometry network, create an [Agent node|Node:sop/agent].
+        A dialog box appears asking for additional information about the new agent:
 
-    * Set __Agent name__ to the name you used when you baked out the agent.
+        * Choose whether you are importing from a character rig asset or an FBX file.
 
-    * If you stored the agent files somewhere other than in an `agents` folder beside the scene file, set the __Cache directory__ parameter to the path containing the agent files.
+        * Specify the character asset node's path (or the file path of the FBX file).
 
-# If you're going to do _terrain adaptation_ (where Houdini adjusts the agent's animation so its feet plant properly on the terrain geometry), or _look at_ (where Houdini edits the agent's neck joint to point its head at something), or other features that require Houdini know which joints represent which body parts, you need to add an [Agent Prep node|Node:sop/agentprep] after the Agent node.
+        * Set the __Agent name__.
 
-    In the Agent Prep parameters, you can associate joints in the character with specific body parts.
+        * Set the __Clip name__ for the character's animation. If you are importing the rest pose, you can use a clip name such as `rest`.
+       
+:task: Set up an agent network manually:
+    # At the Object level, create a [Geometry object|Node:obj/geo] for the agent.
 
-# Add a [Null|Node:sop/null] at the end of the network and give it the display flag. This will serve as a convenient node to reference for the output of the network which doesn't change even if you add other nodes before it.
+    # Inside the geometry network, create an [Agent node|Node:sop/agent].
 
-    The usual convention is to name this node `OUT`.
+        * Set the __Agent name__.
 
-# If you're going to do [ragdoll simulation|ragdoll] of agents, you need to set up _collision geometry_ and _joint limits_ on the agent. See [how to set up agents for ragdoll|ragdoll#setup].
+        * Set the __Input__ to "Character Rig", then set the __Character rig__ field to the path to your character node.
 
-== Create a crowd source ==
+        * Click __OK__.
 
-The _agent setup_ network loads the agent files from disk, representing the "definition" of an agent. To create a crowd, you need a _crowd source_ network that creates a crowd of _agent primitives_.
+    # Add a [Null|Node:sop/null]. Name this node `AGENT_DEFINITION`.
+
+    # If you want the option to evenually cache the agent definition to disk to speed it up, you can append an [Agent Definition Cache|Node:sop/agentdefinitioncache] node.
+
+    # If you're going to do _terrain adaptation_ (where Houdini adjusts the agent's animation so its feet plant properly on the terrain geometry), or _look at_ (where Houdini edits the agent's neck joint to point its head at something), or other features that require Houdini know which joints represent which body parts, you need to append an [Agent Prep node|Node:sop/agentprep].
+
+        In the Agent Prep parameters, you can associate joints in the character with specific body parts.
+
+    # If you're going to do [ragdoll simulation|ragdoll] of agents, you need to set up _collision geometry_ and _joint limits_ on the agent. See [how to set up agents for ragdoll|ragdoll#setup].
+
+    # Finally, append another [Null|Node:sop/null] at the end of the network and give it the display flag. This will serve as a convenient node to reference for the output of the network which doesn't change even if you add other nodes before it.
+
+        The usual convention is to name this node `OUT`.
+
+
+=== Agent definition network === (agent_setup)
+
+This network is where you (or the shelf tools) add nodes to modify the agent primitive before simulation, such as [adding layers|diversity#layers], and adding collision and rotation information for [ragdoll simulation|ragdoll].
+
+[Image:/images/crowds/sop_network.png]
+
+[Icon:CROWDS/agent] |
+    [Agent node|Node:sop/agent] |
+        #width: 20%
+        Creates an agent primitive, and sets basic information such as its name, the current layer, and the current animation clip.
+
+[Icon:CROWDS/agent] |
+    [Agent Prep node|Node:sop/agentprep] |
+        Sets up additional information on the agent, such as specifying transforms to use for different limbs, so the solver knows how to do foot placement and other procedural changes.
+
+[Icon:CROWDS/agentclip] |
+    [Agent Clip node|Node:sop/agentclip] |
+        Adds one or more animation clips to the agent definition.
+
+[Icon:COMMON/null] |
+    [AGENT_DEFINITION node|Node:sop/null] |
+        This node exists as a reference target for the simulation network to grab the agents using a [POP Source node|Node:dop/popsource].
+
+[Icon:COMMON/null] |
+    [OUT node|Node:sop/null] |
+        Marker for the end of the "cache-able" section of the agent definition.
+
+[Icon:SOP/agentdefinitioncache] |
+    [Agent Definition Cache|Node:sop/agentdefinitioncache] |
+        Can write out the agent definition to disk and then in subsequent cooks read the definition from the cached files instead of the input. You can use this to speed up the agent definition network if cooking the character is slow.
+
+[Icon:CROWDS/agent] |
+    [Agent Prep|Node:sop/agentprep] |
+        Adds more information to the agent definition such as the names of important joints. This is after the Agent Definition Cache node because it's always fast to compute so it doesn't need to be cached.
+
+[Icon:COMMON/null] |
+    [OUT node|Node:sop/null] |
+        A convenient target for importing the final agent definition into other networks.
+
+
+== Adding animation clips to an agent == (clips)
+
+A clip is a bit of animation (for example, standing, walking, running) on a character. You can add clips to the agent definition, so the agent can perform different animations in different states.
+
+:task: Set up animation sources:
+    Before you can add clips to an agent, you need to *set up individual instances of the source character performing each animation*.
+
+    For example, say you have an agent based on `character1` which has animations for walking and running. You would set up an instance of `character1` performing the walk (called, for example, `character1_walk`), and another instance performing the run (`character1_run`).
+
+    The most convenient way to do this is if your character has embedded animation you can switch to using a pop-up menu on the character asset itself. Then you can simply create as many instances as you need and set the menu differently on each one.
+
+:task: Add an animation clip to an agent using the shelf tool:
+    # Select the Geometry object containing the [agent definition network|#defn] (see above).
+
+    # A dialog box appears asking for information about the clip:
+
+        * Choose whether you are importing animation from a character rig asset or an FBX file.
+
+        * Specify the character asset node's path (or the file path of the FBX file).
+
+        * Set the __Clip name__ for this animation.
+
+        * Click __OK__.
+
+:task: Add an animation clip to an agent manually:
+    # Go into the geometry network containing the agent definition SOP chain.
+
+    # After the Agent/Agent Prep node(s), add an [Agent Clips|Node:sop/agentclip] node.
+
+    # 
+
+NOTE:
+    In previous versions of Houdini's crowd system, where agent information was always baked to disk, you could have a single instance of your character, set it to play an animation clip, bake out that clip, edit the same instance to play a different clip, bake out that clip, and so on.
+
+    The current system is much more convenient and no longer requires baking files to disk. The system simply cooks the character information it needs directly in Houdini. However, this means you need *separate instances* of the character asset performing each animation clip, so the crowd system can cook them when necessary.
+
+
+== Create a crowd source == (populate)
+
+To create a crowd, you need a _crowd source_ network that creates a crowd of _agent primitives_. This network scatters points and then instances agent primitives onto the points.
 
 # On the __Crowds__ shelf tab, click [Icon:CROWDS/populate] Populate.
 
@@ -61,6 +154,50 @@ The _agent setup_ network loads the agent files from disk, representing the "def
 # If you have terrain geometry, select it and press ((Enter)), or just press ((Enter)) if you don't have terrain.
 
     (With no terrain geometry, the node will simply scatter agents across an area defined by parameters on the node).
+
+TIP:
+    You can edit the resulting network and use whatever SOPs you want to set up the points before copying agents onto them. For example, instead of scatting the points, you could use SOPs to set them up in ordered rows if that's what you need.
+
+
+=== Crowd source network === (crowd_source)
+
+[Image:/images/crowds/crowd_source_network.png]
+
+[Icon:SOP/object_merge] |
+    Object merge |
+        #width: 20%
+        These nodes "import" the agent primitive from a [setup networks|#agent_setup].
+
+[Icon:CROWDS/crowdsource] |
+    [Crowd Source node|Node:sop/crowdsource] |
+        This node copies agent primitives onto points. It has options for automatically scattering agents across a surface or within a defined area, as well as for randomizing their initial states.
+
+[Icon:SOP/agentconstraintnetwork] |
+    [Agent Constraint Network|Node:sop/agentconstraintnetwork] |
+        This node sets up the constraint networks between agent parts, for [ragdoll simulation|ragdoll].
+
+[Icon:SOP/merge] |
+    `merge_crowdsources` |
+        This node merges the separate import -> crowd source -> constraints branches for each agent class in the simulation.
+
+        Below this is a null node to act as a target for importing the agents into the [crowd simulation DOP network|#dops]. You can wire nodes you want to apply to all agents between these two nodes.
+
+[Icon:SOP/dopimport] |
+    `crowd_sim_import` |
+        This [DOP IO node|Node:sop/dopio] node imports the results of the DOP crowd simulation back into this object so it can be rendered.
+
+You can wire geometry into the second input of the crowd source node to control the scattering of agents.
+
+* If you wire in point geometry, it will create agents at those points.
+
+    If the input points have [agent related attributes|attributes] on them, the attributes will be copied onto the new agent primitives. This is a very effective way of manually or randomly specifying different starting conditions, looks, etc. across agents.
+
+* If you wire in surface geometry, it will use the dimensions of the of the surface as the area across which to randomly scatter a number of agents controlled by a parameter.
+
+    If the surface has a `density` attribute, the node will only create agents where the attribute is non-zero.
+
+* If you don't wire in any geometry, it will use its parameters to decide the area and number of agents to randomly scatter.
+
 
 == Create a crowd simulation ==
 
@@ -74,14 +211,59 @@ The _crowd source_ network generates agent primitives representing the individua
     
     See [dynamics network|#dops] below for information on the general structure of this network.
 
+
+=== DOP network === (dops)
+
+The Simulate shelf tool creates the geometry network above as well as a simulation network with some sample nodes for simulating the crowd.
+
+[Image:/images/crowds/dop_network.svg]
+
+[Icon:CROWDS/state] |
+    [States and behaviors|states] |
+        #width: 20%
+        Each branch leading into the `merge_states` node starts with a [Crowd State node|Node:dop/crowdstate], which specifies the state name.
+
+        The state node is followed by [behavior nodes|states] specific to that state, between the state node and the `merge_states` node. These behaviors do *not* execute in sequence, they are [normalized|weights] and applied simultaneously to the agents in that state.
+
+        You can wire behavior nodes _after_ the `merge_states` node. Those behaviors will apply to _all states_. This is useful for things like [avoiding obstacles|obstacles].
+
+        The state name should correspond to an [animation clip|clips] of the same name that agents will play while in that state.
+
+[Icon:CROWDS/trigger] [Icon:CROWDS/transition] |
+    [Triggers and transitions|triggers] |
+        Each branch leading into the `merge_transitions` starts with a [Crowd Trigger node|Node:dop/crowdtrigger] specifying a condition that will cause an agent to change state. You can combine multiple conditions using the [Crowd Trigger Logic node|Node:dop/crowdtriggerlogic], which lets you specify "And", "Or", and "Not" relations between two triggers.
+
+        The trigger node(s) is/are followed by a [Crowd Transition node|Node:dop/crowdtransition] which specifies that agents in one state should switch to another state when the trigger condition is met.
+
+        (You can wire multiple Transition nodes between a trigger and the `merge_transitions` if you want a trigger to cause multiple state changes.)
+
+[Icon:POP/source] |
+    [Crowd source|Node:dop/popsource] |
+        This is a [POP Source DOP|Node:dop/popsource] that references [agent primitives|agents] created in the [crowd source network|#crowd_source].
+
+[Icon:CROWDS/crowdsolver] |
+    [Crowd solver node|Node:dop/crowdsolver] |
+        Implements the crowd system. The solver has controls for several optional default behaviors that can apply to all agents, such as agent-to-agent collision avoidance, and terrain following.
+
+[Icon:DOP/popobject] [Icon:DOP/popsolver] |
+    Crowd Object and POP solver |
+        These nodes are used by the particle (POP) foundation on which the crowd system is built. You will not usually need to modify these nodes.
+
+TIP:
+    Houdini automatically color codes certain nodes to make it easier to keep them straight in the network editor (Crowd State pink, Crowd Trigger orange, Crowd Trigger Logic green). If you want to, you can change a node's color after it is created.
+
+
 == Shelf tools == (shelf)
 
 The following tools are on the __Crowds__ tab of the shelf.
 
-[Icon:SHELF/bake_character] |
-    [Bake Agent|/crowds/clips] |
-        #width: 20%
-        Set up the networks to create an agent and bake out [animation clip|/crowds/clips] for the selected character.
+[Icon:SHELF/bake_character]
+    [Agent|#defn] |
+        Create an [agent definition network|#agent_setup] based on a character.
+
+[Icon:SOP/agentclip] |
+    [Add Clip|#clips] |
+        Add an animation clip to an agent definition by referencing a character instance performing that animation.
 
 [Icon:SOP/agentcollisionlayer] |
     [Collision Layer|Node:sop/agentcollisionlayer] |
@@ -127,104 +309,7 @@ The following tools are on the __Crowds__ tab of the shelf.
     [Agent Cam|Node:obj/agentcam] |
         Create an attach cameras to the head transform of the selected agents.
 
-== Geometry networks == (geo)
 
-Crowd simulations have separate _agent setup_ networks for each separate class of agent, and a _crowd source_ network to generate the crowd.
 
-=== Agent setup networks === (agent_setup)
 
-This network is where you (or the shelf tools) add nodes to modify the agent primitive before simulation, such as [adding layers|diversity#layers], and adding collision and rotation information for [ragdoll simulation|ragdoll].
 
-[Image:/images/crowds/sop_network.png]
-
-[Icon:CROWDS/agent] |
-    [Agent node|Node:sop/agent] |
-        #width: 20%
-        Creates an agent primitive, and sets basic information such as its name, the current layer, and the current animation clip.
-
-[Icon:CROWDS/agent] |
-    [Agent Prep node|Node:sop/agentprep] |
-        Sets up additional information on the agent, such as specifying transforms to use for different limbs, so the solver knows how to do foot placement and other procedural changes.
-
-[Icon:COMMON/null] |
-    [OUT node|Node:sop/null] |
-        This node exists as a reference target for the simulation network to grab the agents using a [POP Source node|Node:dop/popsource].
-
-=== Crowd source network === (crowd_source)
-
-[Image:/images/crowds/crowd_source_network.png]
-
-[Icon:SOP/object_merge] |
-    Object merge |
-        #width: 20%
-        These nodes "import" the agent primitive from a [setup networks|#agent_setup].
-
-[Icon:CROWDS/crowdsource] |
-    [Crowd Source node|Node:sop/crowdsource] |
-        This node copies agent primitives onto points. It has options for automatically scattering agents across a surface or within a defined area, as well as for randomizing their initial states.
-
-[Icon:SOP/agentconstraintnetwork] |
-    [Agent Constraint Network|Node:sop/agentconstraintnetwork] |
-        This node sets up the constraint networks between agent parts, for [ragdoll simulation|ragdoll].
-
-[Icon:SOP/merge] |
-    `merge_crowdsources` |
-        This node merges the separate import -> crowd source -> constraints branches for each agent class in the simulation.
-
-        Below this is a null node to act as a target for importing the agents into the [crowd simulation DOP network|#dops]. You can wire nodes you want to apply to all agents between these two nodes.
-
-[Icon:SOP/dopimport] |
-    `crowd_sim_import` |
-        This [DOP IO node|Node:sop/dopio] node imports the results of the DOP crowd simulation back into this object so it can be rendered.
-
-You can wire geometry into the crowd source nodes to control the scattering of agents.
-
-* If you wire in point geometry, it will create agents at those points.
-
-    If the input points have [agent related attributes|attributes] on them, the attributes will be copied onto the new agent primitives. This is a very effective way of manually or randomly specifying different starting conditions, looks, etc. across agents.
-
-* If you wire in surface geometry, it will use the dimensions of the of the surface as the area across which to randomly scatter a number of agents controlled by a parameter.
-
-    If the surface has a `density` attribute, the node will only create agents where the attribute is non-zero.
-
-* If you don't wire in any geometry, it will parameters to decide the area and number of agents to randomly scatter.
-
-== DOP network == (dops)
-
-The Simulate shelf tool creates the geometry network above as well as a simulation network with some sample nodes for simulating the crowd.
-
-[Image:/images/crowds/dop_network.png]
-
-[Icon:CROWDS/state] |
-    [States and behaviors|states] |
-        #width: 20%
-        Each branch leading into the `merge_states` node starts with a [Crowd State node|Node:dop/crowdstate], which specifies the state name.
-
-        The state node is followed by [behavior nodes|states] specific to that state, between the state node and the `merge_states` node. These behaviors do *not* execute in sequence, they are [normalized|weights] and applied simultaneously to the agents in that state.
-
-        You can wire behavior nodes _after_ the `merge_states` node. Those behaviors will apply to _all states_. This is useful for things like [avoiding obstacles|obstacles].
-
-        The state name should correspond to an [animation clip|clips] of the same name that agents will play while in that state.
-
-[Icon:CROWDS/trigger] [Icon:CROWDS/transition] |
-    [Triggers and transitions|triggers] |
-        Each branch leading into the `merge_transitions` starts with a [Crowd Trigger node|Node:dop/crowdtrigger] specifying a condition that will cause an agent to change state. You can combine multiple conditions using the [Crowd Trigger Logic node|Node:dop/crowdtriggerlogic], which lets you specify "And", "Or", and "Not" relations between two triggers.
-
-        The trigger node(s) is/are followed by a [Crowd Transition node|Node:dop/crowdtransition] which specifies that agents in one state should switch to another state when the trigger condition is met.
-
-        (You can wire multiple Transition nodes between a trigger and the `merge_transitions` if you want a trigger to cause multiple state changes.)
-
-[Icon:POP/source] |
-    [Crowd source|Node:dop/popsource] |
-        This is a [POP Source DOP|Node:dop/popsource] that references [agent primitives|agents] created in the [crowd source network|#crowd_source].
-
-[Icon:CROWDS/crowdsolver] |
-    [Crowd solver node|Node:dop/crowdsolver] |
-        Implements the crowd system. The solver has controls for several optional default behaviors that can apply to all agents, such as agent-to-agent collision avoidance, and terrain following.
-
-[Icon:DOP/popobject] [Icon:DOP/popsolver] |
-    Crowd Object and POP solver |
-        These nodes are used by the particle (POP) foundation on which the crowd system is built. You will not usually need to modify these nodes.
-
-TIP:
-    Houdini automatically color codes certain nodes to make it easier to keep them straight in the network editor (Crowd State pink, Crowd Trigger orange, Crowd Trigger Logic green). If you want to, you can change a node's color after it is created.

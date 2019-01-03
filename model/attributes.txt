@@ -21,28 +21,27 @@ To see the attributes on the geometry in a node, press ((RMB)) on the node's til
 
 == Geometry components ==
 
-You can create/set attributes using the generic [Attribute Create|Node:sop/attribcreate] surface node, or the [Vertex|Node:sop/vertex], [Point|Node:sop/point], [Primitive|Node:sop/primitive] nodes. You can attach attributes to vertices, points, primitives (e.g. polygon faces), or the entire piece of geometry (called the "detail" level).
+:fig:[Image:images/geo_detail.png]
+    You can create/set attributes using the generic [Attribute Create|Node:sop/attribcreate] surface node, or the [Vertex|Node:sop/vertex], [Point|Node:sop/point], [Primitive|Node:sop/primitive] nodes. You can attach attributes to vertices, points, primitives (e.g. polygon faces), or the entire piece of geometry (called the "detail" level).
 
-[Image:images/geo_detail.png]
-
-NOTE:
-    When you merge two or more branches in a geometry network, if a detail attribute with the same name exists in multiple branches, Houdini uses the value in the first branch. If the attribute is a string array, Houdini merges the arrays.
+    NOTE:
+        When you merge two or more branches in a geometry network, if a detail attribute with the same name exists in multiple branches, Houdini uses the value in the first branch. If the attribute is a string array, Houdini merges the arrays.
 
 
 == Attribute precedence ==
 
 When two components in the same geometry have an attribute with the same name, the attribute on the "lower level" of geometry is used, so:
 
-* *Vertex* attributes override
+* *Vertex* attributes, which override:
 
-    * *Point* attributes override
+    * *Point* attributes, which override:
 
-        * *Primitive* attributes override
+        * *Primitive* attributes, which override:
 
             * *Detail* (whole geometry) attributes
 
 
-== Applying nodes to components based on attribute values ==
+== Applying nodes based on attribute values ==
 
 Most surface nodes have a __Group__ field that lets you enter a named group or a pattern to select which components the node should apply to. This field recognizes special syntax that lets you select components by the value of an attribute. For example, in a [Point node|Node:sop/point]'s __Group__ field, `@foo>5` selects all points whose `foo` attribute is greater than `5`.
 
@@ -105,74 +104,214 @@ You can choose the numeric precision of attributes you create with the [Attribut
 See [the help for Attrib Cast|Node:sop/attribcast] for information on the available storage types and limitations.
 
 
+== Indexing and limit variables ==
+
+You may see the following "pseudo-attributes" in [VEX snippets|/vex/snippets]. They represent the number of the current element being processed (for example, the point number), and the total number of elements in the geometry/list. See [indexing and limit variables in VEX snippets|/vex/snippets#indexing] for more information.
+
+`@elemnum`, `@ptnum`, `@primnum`, `@vtxnum`:
+    Represent the number of the current element when a VEX snippet is run.
+
+`@numelem`, `@numpt`, `@numprim`, `@numvtx`:
+    Represent the total number of elements in the geometry/list when a VEX snipped is run.
+
+
 @attributes Common attributes
 
-The following attributes are commonly set by Houdini and/or used by Houdini if set by the user.
+Each type of node will use certain attributes if they exist (or in some cases require them to exist), and may create/set attributes as part of their operation. See the documentation for individual nodes to see what attributes they use/set.
 
-== Geometry ==
+The following lists a number of attributes that by convention are read/written by multiple node types.
+
+
+~~~~ Geometry attributes ~~~~
 
 `P`:
-    #type: vec3
     #on: point
-    #default: (0,0,0)
+    #type: vector
     
-    Point position. The viewport uses this to lay out the points of the model in 3D space.
+    Point position. The viewport uses this to lay out the points of the model in 3D space. You can overwrite this attribute to move the point.
 
 `N`:
-    #type: vec3
+    #type: vector
     
-    Surface or curve normal direction. Houdini will compute the normal if this attribute does not exist.
+    Normal direction. You can overwrite this attribute to change the normal.
 
 `v`:
-    #type: vec3
+    #type: vector
     
-    Velocity (used for rendering blur).
+    Velocity. The renderer uses this attribute to know where to add motion blur. This attribute is not computed automatically, but several nodes, especially particle DOPs, can set/use it. You can add velocity to points using the [Trail SOP|Node:sop/trail].
 
-`uv`:
-    #type: vec3
-    #on: point, vertex
+`id`:
+    #type: int
     
-    UV coordinates for this point/vertex.
+    A unique element ID. This is not the same as the element number (for example, the point number). This is an attribute you can, for example, assign to points to keep track of them even if the point numbers change (which can happen if the number of points changes). Particle DOPs often set/use this attribute.
+
+`name`:
+    #type: string
+    
+    This is a value you can set on primitives, such as volumes or packed primitives, to be able to find them in code by name. Some nodes set/read this attribute.
+    
+`piece`:
+    #type: int
+    
+    Nodes the break up geometry into pieces will often set this attribute so you can tell which polygonal faces are part of the same piece. Faces in the same piece will share the same value in their `piece` attribute. Other nodes may use this attribute to operate on pieces.
+
+
+~~~~ Sizes and rotations ~~~~
+
+`pscale`:
+    #type: float
+    
+    Uniform scaling factor. This is used in different ways in different places. For particle/point rendering, it controls the size of the particle/point (in world space units) at render time. For instancing, you can use it to uniformly scale the instanced geometry.
+
+`scale`:
+    #type: vector
+    
+    Whereas `pscale` is a single uniform scaling factor in all axes, this attribute lets you scale non-uniformly along each axis separately. See [the pscale attribute|#pscale] for more information.
+
+`width`:
+    #type: float
+    #on: point
+    
+    When rendering open curves, sets the line width (in world space units) at render time. If this attribute does not exist, Mantra renders the open curve a thin line instead of as a ribbon with thickness.
 
 `lod`:
     #type: float
     #on: detail, prim
     
-    Level of detail.
+    Level of detail. This may be used in instancing.
 
-`rest`:
-    #type: vec3
+`spritescale`:
+    #type: vector
+    #default: (1, 1, 1)
     #on: point
     
-    Rest position of this point.
+    When displaying particles using sprint images, this gives additional sprite scaling over `pscale`.
 
-
-== Shading ==
-
-`shop_materialpath`:
-    #type: string
-    #on: detail, prim
+`spriterot`:
+    #type: float
+    #default: 0
+    #on: point
     
-    The path to a material to use to shade the surface when rendering. Overrides the object's material is present on primitives.
+    When displaying particles using sprint images, this gives sprite rotation (around camera angle) in degrees.
 
-`shop_oglpath`:
-    #type: string
+
+~~~~ Viewport display attributes ~~~~
+
+`gl_wireframe`:
+    #type: int
+    #default: 0
+    #on: detail
     
-    The path to an OpenGL shader to use to shade the surface in the viewport.
+    If this detail attribute is 1, the geometry always appears as wireframe in the viewport.
 
-`rishade`:
-    #type: string
-    #on: detail, prim
+    If this detail attribute is -1, the geometry always appears as shaded in
+    the viewport. For guide geometry, which are normally only drawn as
+    wireframe, this allows them to also be drawn as shaded when using any of
+    the shaded viewport modes.
+
+`gl_lit`:
+    #type: int
+    #default: 0
+    #on: detail
     
-    Detail/primitive. The name of a RenderMan shader.
+    If this detail attribute is not 0, the geometry always appears without lighting. This is currently ignored for guide geometry.
+
+`gl_showallpoints`:
+    #type: int
+    #default: 0
+    #on: detail
+
+    If this detail attribute is not 0, all points will be rendered as sprites, even if they are connected to geometry.  Normally only unconnected points are rendered. This is currently ignored for guide geometry.
+
+`vm_cuspangle`:
+    #type: float
+    #default: 60
+    #on: detail
+
+    Controls the cusp angle used for generating normals when the geometry doesn't have any.  180 will produce entirely smooth point normals.
 
 
-== Shader overrides ==
+~~~~ Particle attributes ~~~~
 
-Most shaders will use the override attributes to change how elements with the attributes are shaded.
+`force`:
+    #type: vector
+    
+    The `force` attribute on the current point. This is set/used by some particle DOPs. It represents a change to the particle's position computed by adding up all the forces acting on the particle.
+
+`rest`:
+    #type: vector
+    #on: point
+    
+    Conventional name for an attribute containing each point's rest position, used by various nodes.
+    Some shaders can use this rather than `P`, so procedural textures will stick even if you deform your geometry.
+
+`torque`:
+    #type: vector
+    
+    The `torque` attribute on the current point. This is set/used by the [Torque DOP|Node:dop/poptorque] to spin particles.
+
+`up`:
+    #type: vector
+    
+    Represents the up vector of a particle's local space. This is used for instancing geometry onto a point. You can overwrite this attribute to change the particle's orientation.
+
+`accel`:
+    #type: vector
+    
+    Obsolete, used by old POPs. The new DOP particle nodes use the `force` attribute instead.
+
+`backtrack`:
+    #type: vector4
+    
+    Obsolete. Used by old POPs to store the particle's previous position.
+
+`orient`:
+    #type: vector4
+    
+    Quaternion orientation of a particle. Allows fully specifying rotation, whereas `up` only orients along a single axis. If this exists, it is used for instancing geometry onto a point.
+
+`rot`:
+    #type: vector4
+    
+    An additional offset-quaternion applied after all other attributes, used when instancing geometry onto a point.
+
+`nextid`:
+    #type: int
+    
+    Detail attribute storing the largest particle ID, allowing Houdini to create new particle ids efficiently.
+
+`pstate`:
+    #type: int
+    
+    A bit field encoding different pieces of information about a particle's state (for example, whether it's alive, whether it's stopped, whether it collided in the previous frame, and so on). Various particle DOPs read and write this attribute.
+    
+    The `pstate` value is the sum of the following flags:
+    
+    `0x01` |
+        Is a "primary" particle (not birthed from an existing
+        particle).
+    `0x02` |
+        Will die before the next frame.
+    `0x04` |
+        Stopped.
+    `0x08` |
+        Has collided.
+    `0x10` |
+        Stuck to static or moving geometry.
+    `0x20` |
+        Is associated with a rigid body dynamic simulation.
+    `0x40` |
+        Active.
+    `0x80` |
+        Motion is overridden by a CHOP.
+
+
+~~~~ Shader overrides ~~~~
+
+Most shaders will use the override attributes to change how elements with these attributes are shaded.
 
 `Cd`:
-    #type: vec3
+    #type: vector
     
     Diffuse color override. The viewport uses this to color OpenGL geometry.
 
@@ -182,22 +321,22 @@ Most shaders will use the override attributes to change how elements with the at
     Alpha transparency override. The viewport uses this to set the alpha of OpenGL geometry.
 
 `Cs`:
-    #type: vec3
+    #type: vector
     
     Specular color override.
 
 `Cr`:
-    #type: vec3
+    #type: vector
     
     Reflect color override.
 
 `Ct`:
-    #type: vec3
+    #type: vector
     
     Transmit color override.
 
 `Ce`:
-    #type: vec3
+    #type: vector
     
     Emission color override.
 
@@ -222,68 +361,30 @@ Most shaders will use the override attributes to change how elements with the at
     Shadow bias override.
 
 
-== Point and line display ==
+~~~~ Rendering attributes ~~~~
 
-The viewport uses the `pscale` attribute to scale sprites and points. The __Disc scale__ display options lets you further scale discs.
+`uv`:
+    #type: vector
+    #on: point, vertex
+    
+    The UV coordinates of the point/vertex. The first two elements of this vector contain the current U and V coordinates. Note that `uv` is Houdini's conventional attribute name for storing texture coordinates. You can store texture coordinates in other attributes, so you can have multiple UV layouts on the same geometry. Most texture-related nodes have a field to let you specify the name of the UV attribute to use.
 
-`spriteshop`:
+`material`:
     #type: string
-    #on: point
     
-    Path to a material node for shading sprites.
+    The node path to the material to use to shade this primitive. Overrides the object's material.
 
-`spritescale`:
-    #type: vec3
-    #default: (1, 1, 1)
-    #on: point
+`instance`:
+    #type: string
+    #on: detail, prim
     
-    Additional sprite scaling.
+    The `instance` attribute on the current point, containing a path to the geometry instanced on the point. This can be a file path to a geometry file, or an `op:` path to a Geometry object or geometry node. You can overwrite this attribute to change the instanced geometry.
 
-`spriterot`:
-    #type: float
-    #default: 0
-    #on: point
+`rishade`:
+    #type: string
+    #on: detail, prim
     
-    Sprite rotation (around camera angle) in degrees.
-
-`width`:
-    #type: float
-    #on: point
-    
-    Line width (in world space units), for drawing open curves. If this attribute does not exist, the curve is drawn as a thin line instead of as a ribbon with thickness.
-
-
-== Viewport ==
-
-`gl_wireframe`:
-    #type: int
-    #default: 0
-    #on: detail
-    
-    If this detail attribute is 1, the geometry always appears as wireframe in the viewport.
-
-    If this detail attribute is -1, the geometry always appears as shaded in the viewport.
-
-`gl_lit`:
-    #type: int
-    #default: 0
-    #on: detail
-    
-    If this detail attribute is not 0, the geometry always appears without lighting.
-
-`gl_showallpoints`:
-    #type: int
-    #default: 0
-    #on: detail
-
-    If this detail attribute is not 0, all points will be rendered as sprites, even if they are connected to geometry.  Normally only unconnected points are rendered.
-
-`vm_cuspangle`:
-    #type: float
-    #default: 60
-    #on: detail
-
-    Controls the cusp angle used for generating normals when the geometry doesn't have any.  180 will produce entirely smooth point normals.
+    Detail/primitive. The name of a RenderMan shader.
 
 
 @related

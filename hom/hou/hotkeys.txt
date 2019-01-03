@@ -1,0 +1,361 @@
+= hou.hotkeys =
+#type: hommodule
+#cppname: HOM_hotkeys
+#group: general
+
+"""Module containing hotkey related functions."""
+
+See [hotkeys|/basics/hotkeys] for information about hotkeys in Houdini.
+
+
+@functions
+
+== Hotkeys ==
+
+::`addCommand(hotkey_symbol, label, description, assignments)` -> `bool`:
+    #cppname: HOM_hotkeys::addCommand
+
+    Registers a new configurable hotkey command with Houdini. The context it belongs to should already exist, see [Hom:hou.hotkeys#addContext]. 
+
+    A hotkey symbol represents an action, for example deleting the selected geometry when a certain tool is active. The user can change the actual key assigned to the action using the hotkey editor. After registering the symbol you can programmatically assign a default key using [Hom:hou.hotkeys#addAssignment].
+
+    To add a `delete` action to the `demo` python state, you would do something like this:
+
+    {{{
+    #!python
+    # Add a hotkey context for the demo python state
+    demo_context = "h.pane.gview.state.sop.demo"
+    hou.hotkeys.addContext(demo_context, "demo Operation", "These keys apply to the demo operations")
+
+    # Add hotkeys to the "demo" state
+    delete_symbol = demo_context + ".delete"
+    hou.hotkeys.addCommand(
+        delete_symbol,
+        "Delete Selected",
+        "Delete the selected geometry"
+    )
+    commit_symbol = demo_context + ".commit"
+    hou.hotkeys.addCommand(
+        commit_symbol,
+        "Commit Changes",
+        "Save changes to parameters and start a new cache"
+    )
+    cancel_symbol = demo_context + ".cancel"
+    hou.hotkeys.addCommand(
+        cancel_symbol,
+        "Cancel Changes",
+        "Discard any  changes and return to an empty cache"
+    )
+    }}}
+
+    `hotkey_symbol`:
+        A string containing a full dotted hotkey symbol.
+
+    `label`:
+        A human readable title for the action. For example, "Delete Selected".
+
+    `description`:
+        A human readable description of the action. This should generally be one to three sentences of help text for the action.
+
+    `assignments`:
+        An optional list of shortcut strings to be used as the default assignments for this command.
+
+::`addContext(hotkey_symbol, label, long_description )` -> `bool`:
+    #cppname: HOM_hotkeys::addContext
+
+    Registers a new hotkey context with Houdini.  A context should be created before creating contexts or commands within that context.
+
+    Currently this is only useful for adding hotkeys to [Python states|/hom/python_states]. 
+
+    `hotkey_symbol`:
+        A string containing a full dotted hotkey symbol representing the context. Currently the only useful value for `hotkey_symbol` is:
+
+        {{{
+        h.pane.gview.state.sop
+        }}}
+
+    `label`:
+        A human readable title for the context. For example, "Demo State Operation".
+
+    `description`:
+        A human readable description of the context. This should generally be one to three sentences of help text for the action.
+
+::`removeHotkeySymbol(hotkey_symbol)`:
+    #cppname: HOM_hotkeys::removeHotkeySymbol
+
+    Removes an existing hotkey previously created with [#addCommand].
+
+    `hotkey_symbol`:
+        A string containing a full dotted hotkey symbol.
+
+        Currently this is only useful for removing hotkeys of [Python SOP states|/hom/python_states], so `symbol` will be in the form:
+
+        `h.pane.gview.state.sop.<<state_name>>.<<action_name>>`
+
+    {{{
+    #!python
+    hou.hotkeys.removeHotkeySymbol("h.pane.gview.state.sop.demo.delete")
+    }}}
+        
+::`hotkeySymbol(context_label_path, command_label=None)` -> `str` or None:
+    #cppname: HOM_hotkeys::hotkeySymbol
+
+    Does a "reverse-lookup" to retrieve the hotkey symbol given the human-readable context label(s). If you supply only a context label, the function returns the context's prefix symbol. If you also supply a command label, the function returns the command's hotkey symbol.
+    
+
+    `context_label_path`:
+        A string containg a "path" through the hierarchy of human-readable context labels, starting with and separated by slashes. For example, `"/Houdini/Panes/Geometry Viewers"`.
+
+    `command_label`:
+        An optional human-readable command label, for example `"Box Selection"`.
+
+    {{{
+    #!python
+    hou.hotkeySymbol("/Houdini/Panes/Geometry Viewers", "Box Selection")
+    # "h.pane.gview.selectstylebox"
+    }}}
+
+
+== Keyboard Shortcut Assignments ==
+
+::`addAssignment(hotkey_symbol, key)` -> `bool`:
+    #cppname: HOM_hotkeys::addAssignment
+
+    Assigns a key (or key combination) to a hotkey symbol.
+
+    {{{
+    #!python
+    hou.hotkeys.addAssignment("h.pane.gview.state.sop.demo.delete", "alt+k")
+    hou.hotkeys.addAssignment("h.pane.gview.state.sop.demo.delete", "shift+del")
+    }}}
+
+    Returns `True` if the assignment succeeds, or `False` if the symbol is
+    unknown or the key string is not valid.
+
+    `hotkey_symbol`:
+        The symbol string for the action you want to assign a hotkey to.
+
+    `key`:
+        A string specifying the key (or key combination) to assign to the action. For example, `"shift+del"`.
+
+::`clearAssignments(hotkey_symbol)` -> `bool`:
+    #cppname: HOM_hotkeys::clearAssignments
+
+    Removes any keys assigned to the given action.
+
+    {{{
+    #!python
+    hou.hotkeys.clearAssignments("h.pane.gview.state.sop.demo.delete")
+    }}}
+
+    `hotkey_symbol`:
+        The symbol string for the action you want to remove hotkeys from.
+
+    @related
+    [Hom:hou.hotkeys.addCommand]
+
+::`removeAssignment(hotkey_symbol, key)` -> `bool`:
+    #cppname: HOM_hotkeys::removeAssignment
+
+    Removes a key (or key combination) from a hotkey symbol.
+
+    {{{
+    #!python
+    hou.hotkeys.removeAssignment("h.pane.gview.state.sop.demo.delete", "alt+k")
+    }}}
+
+    `hotkey_symbol`:
+        The target hotkey symbol name.
+
+    `key`:
+        The key string identifier to remove. For example, `"shift+del"`.
+
+::`findConflicts(symbol, key)` -> `tuple` of `str`:
+    #cppname: HOM_hotkeys::findConflicts
+
+    Returns a sequence of symbol strings in ancestor and/or descendent contexts relative to `symbol` (including the symbol you passed in itself) that use the given `key`. This lets you see existing or potential conflicts.
+
+    An example of a conflict would be if a high level action (for example, `h.copy`) has hotkey ((Ctrl + C)), and a lower-level action (for example, `h.panes.gview.state.sop.demo.duplicate`) also uses ((Ctrl + C)), then where you're in that state, the higher-level Copy key won't be available because it's overriden by the lower-level key.
+
+   {{{
+   #!python
+   # Find potential conflicts with K on the top-level Add Keyframe command
+   symbols = hou.findConflicts("h.add_key", "k")
+   # Returns ('h.pane.gview.state.sop.topobuild.bridge', 'h.add_key'),
+   # meaning K is assigned to both h.add_key and
+   # h.pane.gview.state.sop.topobuild.bridge
+   # in the same hierarchy
+
+   # Find potential conflicts with Ctrl + C on the top-level Copy command
+   symbols = hou.findConflicts("h.copy", "ctrl+c")  # (Use cmd+c on Mac)
+   # Returns ("h.copy",) meaning there are no conflicts (the symbol
+   # you checked is the only symbol in that hierarchy using that key)
+   }}}
+
+::`changeIndex()` -> `int`:
+    #cppname: HOM_hotkeys::changeIndex
+
+    Return the monotonically increasing change index from the hotkey manager.  This number increases by one whenever any change is made to the hotkey manager.  If a module is caching any information from the hotkey manager it should check this change index to see if any changes have been made and thus the cache should be refreshed.
+
+== Hotkey information ==
+
+::`assignments(hotkey_symbol)` -> `tuple` of `str`:
+    #cppname: HOM_hotkeys::hotkeys
+
+    Return a list of shortcuts assigned to the specified hotkey symbol.
+
+    `hotkey_symbol`:
+        The target hotkey symbol name.
+
+::`hotkeyLabel(hotkey_symbol)` -> `str`:
+    #cppname: HOM_hotkeys::hotkeyLabel
+
+    Return the human-readable label for a symbol string.
+
+    `hotkey_symbol`:
+        The target hotkey symbol name.
+
+    {{{
+    #!python
+    label = hou.hotkeys.hotkeyLabel("h.open")
+    # "Open"
+    }}}
+
+::`hotkeyDescription(hotkey_symbol)` -> `str`:
+    #cppname: HOM_hotkeys::hotkeyDescription
+
+    Returns the long description/help for a the given symbol string.
+
+    {{{
+    #!python
+    desc = hou.hotkeys.hotkeyDescription("h.open")
+    # "Open a file"
+    }}}
+
+::`isKeyMatch(key, hotkey_symbol)` -> `bool`:
+    #cppname: HOM_hotkeys::isKeyMatch
+
+    Return True is `key` is a match for the given hotkey symbol.  If `key` is a keyvoard shortcut string then it must match one of the keyboard shortcuts assigned to the hotkey.  If `key` is a hotkey symbol then it must be a string match to `hotkey_symbol`.
+    
+    `key`:
+        Either a keyboard sequence string or a hotkey symbol.  This is typically something given to us by an event processing system which would either know the hotkey invoked (like when a button is clicked) or just the key sequence pressed.
+
+    `hotkey_symbol`:
+        The hotkey to check for a match against.
+
+::`commandsInContext(context)` -> `tuple` of `dict`:
+    #cppname: HOM_hotkeys::commandsInContext
+
+    Return all hotkey commands at the given parent hotkey context.
+
+    Each command is a dict with the following keys: "symbol", "label", and "help".
+
+    `context`:
+        The hotkey symbol of the context.
+
+::`contextsInContext(context)` -> `tuple` of `dict`:
+    #cppname: HOM_hotkeys::contextsInContext
+
+    Return all hotkey contexts at the given parent hotkey context.
+
+    Each command is a dict with the following keys: "symbol", "label", and "help".
+
+    `context`:
+        The hotkey symbol of the context.
+
+== Backup / Restore / Save ==
+
+::`revertToDefaults(hotkey_symbol, one_level_only)`:
+    #cppname: HOM_hotkeys::revertToDefaults
+
+    Revert the specified hotkey to its defaults from the keymap.
+
+    `hotkey_symbol`:
+        The hotkey symbol (command or context) to reset.
+
+    `one_level_only`:
+        When False, this item and its children are all set to their default.
+        When True, only this context or command is reset.
+        This only has an effect for contexts since commands have no children.
+
+::`saveOverrides()` -> `bool`:
+    #cppname: HOM_hotkeys::saveOverrides
+
+    Save changes to the hotkeys as overrides to the current keymap.  Changes are things that are different from their default value e.g. modifying a shortcut key assignment.  Note that adding a new hotkey command with `addHotkey` will treat it as a new default so that it won't be saved unless a change is made to it after it is added.
+
+
+== Keymaps ==
+
+::`saveAsKeymap(name, path=None)` -> `bool`:
+    #cppname: HOM_hotkeys::saveAsKeymap
+
+    Save the currently defined hotkeys as a keymap.  This combines the loaded keymap with all of the defined overrides into a single new keymap.  Returns True upon successful save.
+
+    `name`:
+        The name of the new keymap.
+
+    `path`:
+        Optional save path for the new keymap.  If None then it will be saved into the user prefs dir with a filename derived from the keymap name.
+
+::`loadKeymap(name, path=None)` -> `bool`:
+    #cppname: HOM_hotkeys::loadKeymap
+
+    Save the currently defined hotkeys as a keymap.  This combines the loaded keymap with all of the defined overrides into a single new keymap. Returns True upon successful load.
+
+    `name`:
+        The name of the keymap to load.
+
+    `path`:
+        Optional path for the keymap to load.  If None then it will be searched in the search path.
+
+::`importKeymap(name, path=None)` -> `bool`:
+    #cppname: HOM_hotkeys::importKeymap
+
+    Copy the specified keymap into the user preferences directory and save it with an appropriate name.
+    Returns True upon successful import.
+
+    `name`:
+        The new name of the keymap.
+
+    `path`:
+        The path of the keymap to import.
+
+::`keymaps()` -> `tuple` or `str`:
+    #cppname: HOM_hotkeys::keymaps
+
+    Return a list of tuples of all the keymaps found.  The tuple has the keymap's name and path.
+    
+::`currentKeymap()` -> `str`:
+    #cppname: HOM_hotkeys::currentKeymap
+
+    Return the name of the currently loaded keymap.
+
+
+== Key information ==
+
+::`availableKeycodes(hotkey_symbol, modifiers=0)` -> `tuple` of `int`:
+    #cppname: HOM_hotkeys::availableKeycodes
+
+    Return all available shortcut keycodes with their conflict status bits set w.r.t. the specified hotkey symbol.  A keycode is considered available if it isn't assigned to another hotkey within this context.
+
+    `hotkey_symbol`:
+        The target hotkey symbol name.
+
+    `modifiers`:
+        UI_KeyBindings modifier key bits to be applied.  Only keycodes with these modifier bits are returned.
+
+::`stringToKeycode(key, modifiers=0)` -> `int`:
+    #cppname: HOM_hotkeys::stringToKeycode
+
+    Convert a keystring to a hotkeymanager keycode.
+
+    `modifiers`:
+        UI_KeyBindings modifier key bits to be applied.
+
+::`keycodeToString(keycode, modifiers=0)` -> `str`:
+    #cppname: HOM_hotkeys::keycodeToString
+
+    Convert a hotkeymanager keycode to a key string.
+
+    `modifiers`:
+        UI_KeyBindings modifier key bits to be applied.

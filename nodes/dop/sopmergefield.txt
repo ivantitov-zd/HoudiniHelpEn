@@ -1,0 +1,236 @@
+#type: node
+#context: dop
+#internal: sopmergefield
+#icon: DOP/sopmergefield
+
+= SOP Merge Field =
+
+"""A microsolver that performs general calculations on a pair consisting of
+a DOP field and a SOP volume/VDB."""
+
+The SOP Merge Field DOP performs calculations on a pair consisting of the
+destination DOP field and a source SOP volume or VDB. This node supports the
+majority of the operations that can be performed with
+[Gas Calculate|Node:dop/gascalculate], but doesn't require the source volume
+to be imported into a DOP field before merging can be carried out. In addition,
+SOP Merge Field allows for length-wise comparison of vector fields as well as
+activity region-aware combining.
+
+The destination field can be a scalar, vector, or a matrix field. A scalar
+field can be combined with either a volume or a VDB primitive. A vector field
+can be merged with a triplet of volumes, a triplet of scalar VDBs, or a single
+vector VDB. Lastly, a matrix field can be combined with 9 volume primitives or
+9 scalar VDBs (mixing of types is not allowed).
+
+@parameters
+
+Dest Field:
+    #id: fielddest
+    Result of the operations is stored in this DOP field.
+
+Source SOP:
+    #id: soppath
+    Path to the SOP that contains volume or VDB primitives to be merged.
+
+Volume Name:
+    #id: srcname
+    List of names of the primitives to be merged. If __Dest Field__ is
+    scalar, this has to be a single volume or VDB; if it is a vector field,
+    then the list must consist of three volume names, three scalar VDB
+    names, or one vector VDB name. This list must contain nine volume names
+    or nine scalar VDB names if __Dest Field__ corresponds to a matrix
+    field.
+
+SOP Mask:
+    #id: sopmask
+    Name of the SOP scalar volume or VDB by which source volume is multiplied
+    before merging with the __Dest Field__.
+
+DOP Mask:
+    #id: dopmask
+    Name of the DOP field by which the source volume is multiplied before
+    merging with the __Dest Field__.
+
+Absolute:
+    #id: sabsolutemask# dabsolutemask#
+    When this option is enabled, negative mask values are interpreted as 0 and
+    positive values are interpreted as 1.
+
+SDF:
+    #id: ssdfmask# dsdfmask#
+    When this option is enabled (along with __Absolute__), negative mask values
+    are interpreted as 1 and positive values are interpreted as 0.
+
+Calculation:
+    #id: calculationtype
+    The merging operation.
+
+    Copy:
+        Values in the __Dest Field__ will be overwritten by those in the source
+        volume.
+    Add:
+        Result is the sum of values in __Dest Field__ and source volume.
+    Subtract:
+        Result is the difference between values in __Dest Field__ and source
+        volume.
+    Multiply:
+        Result is the product of values in __Dest Field__ and source volume.
+    Divide:
+        Values in the __Dest Field__ will be divided by the corresponding
+        values in the source volume.
+    Maximum:
+        Result is the larger of the values in __Dest Field__ and source volume.
+        For vector fields, comparison can be performed length-wise by enabling
+        __Use Vector Norm__.
+    Minimum:
+        Result is the smaller of the values in __Dest Field__ and source
+        volume. For vector fields, comparison can be performed length-wise by
+        enabling __Use Vector Norm__.
+    Average:
+        Result is the average of values in __Dest Field__ and source volume.
+    Guide:
+        Values in the __Dest Field__ are pushed towards the corresponding
+        entries in source volume, in accordance to settings of __Acceleration
+        Guide Strength__, __Deceleration Guide Strength__, and __Direction
+        Guide Strength__.
+
+Use Vector Norm:
+    #id: usevectornorm
+    If __Calculation__ is set to Maximum or Minimum and destination is a
+    vector field, enabling this option forces length-wise comparison of
+    values (as opposed to component-wise).
+
+Guide Direction Independently:
+    #id: guidedir
+    When __Calculation__ is set to `Guide`, this option can be enabled to guide
+    a vector field's length and direction independently. Guiding is performed
+    component-wise if this option is disabled.
+
+    NOTE:
+        __Acceleration Guide Strength__ and __Deceleration Guide Strength__
+        apply to the vector lengths when this option is enabled, and
+        __Direction Guide Strength__ applies to to the vector directions.
+
+Acceleration Guide Strength:
+    #id: mastrength
+    Controls how strongly the __Dest Field__'s values are pushed towards the
+    source volume. Applies for the voxels in which the source volume has larger
+    values than the __Dest Field__.
+
+Deceleration Guide Strength:
+    #id: mdstrength
+    Controls how strongly the __Dest Field__'s values are pushed towards the
+    source volume. Applies for the voxels in which the source volume has
+    smaller values than the __Dest Field__.
+
+Direction Guide Strength:
+    #id: dirstrength
+    When __Guide Direction Independently__ is enabled, controls how strongly
+    the __Dest Field__'s vectors are pushed to align with source volume's. This
+    option only has an effect with vector fields.
+
+Clamped:
+    #id: clamped
+    When enabled, only parts of the __Dest Field__ that fall within the active
+    region of the source volume are modified.
+
+    NOTE:
+        Active region for a native Houdini volume is defined to be the area
+        inside its bounding box. VDBs, on the other hand, may have an arbitrary
+        active region. The [VDB Visualize Tree|Node:sop/vdbvisualizetree] SOP
+        can be used to visualize the active voxels of a VDB primitive.
+
+Dest, Source, Post Time Scale:
+    #id: dsttimescale srctimescale posttimescale
+    The relevant add and/or multiply operand is scaled according to the current
+    timestep.  If `a` is the addition operand and `m` the multiplication
+    operand and `t` the timestep, the operands are changed as follows.
+
+    None:
+        `a = a`
+
+        `m = m`
+    Add:
+        `a = a * t`
+
+        `m = m`
+    Multiply:
+        `a = a`
+
+        `m = e ^ (ln(m) * t)`
+    Both:
+        `a = a * t`
+
+        `m = e ^ (ln(m) * t)`
+    Divide:
+        `a = a`
+
+        `m = m / t`
+    Linearly Scale Multiply:
+        `a = a`
+
+        `m = m * t`
+
+Dest Pre-Add, Dest Pre-Mult:
+    #id: dstpreadd dstpremul
+    Before performing the __Calculation__, destination value is set to
+    `A * m + a`, where `A` is the value of the __Dest Field__, `m` is __Dest
+    Pre-Mult__ and `a` is __Dest Pre-Add__.
+
+Source Pre-Add, Source Pre-Mult:
+    #id: srcpreadd srcpremul
+    Before performing the __Calculation__, source value is set to `A * m + a`,
+    where `A` is the value of the source volume, `m` is __Source Pre-Mult__ and
+    `a` is __Source Pre-Add__.
+
+Post-Add, Post-Mult:
+    #id: postadd postmul
+    After performing the __Calculation__, result is changed to `A * m + a`,
+    where `A` is the pre-transformed result, `m` is __Post-Mult__ and `a` is
+    __Post-Add__.
+
+Dest, Source, Post Conversion:
+    #id: dstconvert srcconvert postconvert
+    After the add and multiply operations, the specified conversion is applied.
+
+    None:
+        No conversion is performed.
+    SDF to Fog:
+        Maps negative values to 1 and positive values to 0 with values lying
+        within the one cell boundary getting linearly interpolated values.
+    SDF to Surface:
+        Map cells on the zero boundary to 1 and those more than one cell away
+        from the boundary to 0.
+    Absolute:
+        Takes the absolute value.
+
+Dest, Source, Post Scale:
+    #id: dstscale srcscale postscale
+    The scaling factor is applied after conversion. A length scale will
+    multiply by the voxel size, area by the size squared, and volume by the
+    size cubed.
+
+Warn on Missing SOP Primitives:
+    #id: warnmissing
+    When enabled, this DOP will generate a warning if a named volume to be used
+    for merging cannot be located. When disabled, the merging operation is
+    silently skipped.
+
+[Include:standard_gas_timestep]
+
+[Include:standard_solver_parms]
+
+@inputs
+
+[Include:standard_microsolver_inputs]
+
+@outputs
+
+[Include:standard_data_outputs]
+
+@locals
+
+[Include:standard_data_locals]
+
+[Include:standard_locals]
+

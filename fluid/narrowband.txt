@@ -1,0 +1,88 @@
+= Narrow Band =
+
+== Initializing a FLIP simulation with narrow band ==
+
+A standard FLIP fluid simulation begins with the liquid volume entirely filled with particles.
+Even with narrow band enabled in the __FLIP Solver__, the particles will only be removed
+once the simulation begins. For large simulations, these particles can occupy a large amount
+of memory, only to be destroyed immediately after. Instead, the FLIP simulation can
+be initialized directly as a narrow band. 
+
+:col:
+    [Image:/images/fluid/narrow_band_full_flip_example.png]
+    
+:col:
+    [Image:/images/fluid/narrow_band_flip_example.png]
+
+The following example describes how to generate a fluid simulation with the narrow band initialized from the start.
+
+# Create a [Icon:SOP/testgeometry_rubbertoy][Rubber Toy|Node:sop/testgeometry_rubbertoy] using the [tab menu|/basics/tabmenu] in the viewport. This will be the object used to create the narrow band simulation.
+
+# Use the [Icon:SHELF/convert_to_fluid][FLIP Fluid from Object|/shelf/flipfluidfromobject] tool on the __Particle Fluids__ shelf to create a FLIP simulation, selecting the [Rubber Toy|Node:sop/testgeometry_rubbertoy] as the object to convert to FLIP fluid.
+
+# In the `testgeometry_rubbertoy_object1` node, create a [VDB from Polygons SOP|Node:sop/vdbfrompolygons] and set the __Voxel Size__ to match the FLIP simulation. For example, an expression that multiplies the [FLIP Object|Node:dop/flipobject]'s particle separation by its grid scale. 
+
+# Set the [VDB from Polygons|Node:sop/vdbfrompolygons]'s input to the __Rubber Toy__'s output.
+
+# Add a [Null SOP|Node:sop/null] node after the [VDB from Polygons|Node:sop/vdbfrompolygons] named __SURFACE__.
+
+# Add a [VDB Reshape SDF SOP|Node:sop/vdbreshapesdf] after the [Null|Node:sop/null], set __Operation__ to __Erode__, and __Offset__ to match the narrow band's __Bandwidth__ parameter in the [FLIP Solver|Node:dop/flipsolver].
+
+# Add a [VDB Combine SOP|Node:sop/vdbcombine] and connect the the first input to the __SURFACE__ [Null|Node:sop/null]'s output and the second input to the [VDB Reshape|Node:sop/vdbreshapesdf]'s output. This creates the narrow band volume to seed particles into.
+
+# On the [VDB Combine|Node:sop/vdbcombine] node, set the __Operation__ to __SDF Difference__.
+
+# To seed particles in the narrow band, create a [FLIP Source SOP|Node:sop/flipsource] and connect the input to the output of the [VDB Combine|Node:sop/vdbcombine] node. 
+
+# Set the __Voxel Size__ to match to the [VDB from Polygons|Node:sop/vdbfrompolygons] node, __Particle Separation__ to match the [FLIP Object|Node:dop/flipobject], and the oversampling settings to match the [FLIP Solver|Node:dop/flipsolver].
+
+# Add a [Null SOP|Node:sop/null] node after the [FLIP Source|Node:sop/flipsource] and name it __PARTICLES__.
+
+# Set __Input Type__ in the [FLIP Object|Node:dop/flipobject] to __Narrow Band__, the __SOP Path__ to the __PARTICLES__ node path, and the __Surface Volume__ to the __SURFACE__ node path.
+
+# Activate __Enable Particle Narrow Band__ in the [FLIP Solver|Node:dop/flipsolver].
+
+NOTE:
+    If you want a custom initial velocity field, it can be connected into the FLIP simulation by adding the velocity volume path to the __Velocity Volume__ parameter in the [FLIP Object DOP|Node:dop/flipobject]. The particles that have been generated above must be initialized by the same velocity field.
+
+== Pairing particle attributes and volumetric fields ==
+
+It is not possible to set variable liquid parameters such as `viscosity`, `density`, `temperature` or `color` using particle attributes, because any particles deeper inside the liquid volume than the narrow band are removed during each simulation step. Instead, you can bind particle attribute data
+to volumetric fields using the __Attribute/Field Pair__ option.
+
+The following example describes how to create a simulation where colored liquid pours into a clear container. The particles that sink into the container and past the narrow band are removed from the simulation, but the color persists on the volumetric field. The `color` attribute is advected through the simulation via this volumetric field.
+
+
+:video:
+    #src: /videos/narrowband.mp4
+
+# Click the [Icon:SHELF/flip_tank][FLIP Tank|/shelf/fliptank] tool on the __Particle Fluids__ shelf to create a FLIP Tank to pour the colored liquid into.
+
+# At the Object level, dive into the `fliptank_initial` node, and create an [Attribute Create|Node:sop/attribcreate] node between the `initial_particles` and `OUT_INITIAL_PARTICLES` nodes.
+
+# Set the __Name__ to `Cd` and __Type__ to `Vector`.
+
+# In the __AutoDopNetwork__, add a [Vector Field DOP|Node:dop/vectorfield] between the [FLIP Object|Node:dop/flipobject] and the [FLIP Solver|Node:dop/flipsolver] and set __Data Name__ to `Cd`.
+
+# Create an [Enable Solver DOP|Node:dop/enablesolver] and connect its output to the __Volume Velocity__ (3rd) input of the [FLIP Solver|Node:dop/flipsolver]. 
+
+# Add the expression `$FF==2` to the __Enable Solvers__ parameter in the [Enable Solver|Node:dop/enablesolver] node in order to initialize the custom field at the beginning of the first simulated frame. This is the second frame by default.
+
+# Create a [Gas Match Field DOP|Node:dop/gasmatchfield] and connect its output to the input of the __Enable Solver__. 
+
+# Set __Field__ to `Cd`, __Reference Field__ to `surface`, and __Rank__ to `Vector`.
+
+# Navigate back to the Object level and click the [Icon:SOP/sphere][Sphere|Node:sop/sphere] tool on the __Create__ shelf. Move it above the water level of the tank and scale to your desired size.
+
+# Click the [Icon:DOP/particlefluidemitter][Emit Particle Fluid tool|/shelf/emitparticlefluid] tool on the __Particle Fluids__ shelf, select the sphere as the object to emit fluid from, and select the FLIP particles to emit fluid into.
+
+# At the Object level, dive into the Sphere object and place an [Attribute Create SOP|Node:sop/attribcreate] node between the [FLIP Source|Node:sop/flipsource] node and the [Null|Node:sop/null] node.
+
+# Set __Name__ to `Cd`, __Type__ to `Vector` and __Value__ to `1,0,0,0`.
+
+# Navigate back to the [FLIP Solver|Node:dop/flipsolver] in the AutoDopNetwork and make sure __Enable Particle Narrow Band__ is turned on.
+
+# Click the ((+)) button next to __Attribute-Field Pairs__ parameter and set `Cd` for both __Attribute__ and __Field__.
+
+NOTE:
+    In order to save the color fields during the simulation, add `Cd` to __Fields__ in the [DOP I/O|Node:sop/dopio] node (`import_fliptank`) inside of the `fliptank_fluid` object.

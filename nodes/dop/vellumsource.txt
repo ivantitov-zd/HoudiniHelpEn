@@ -1,0 +1,128 @@
+#type:     node
+#context:  dop
+#internal: vellumsource
+#icon:     DOP/vellumsource
+
+= Vellum Source =
+
+"""A Vellum node that creates Vellum patches."""
+
+Vellum Source emits new patches of Vellum geometry into a Vellum solver.
+Vellum patches consist of both the geometry of the patch and the geometry
+describing the constraints on the patch, so some bookkeeping is required
+to update everything properly.
+
+A Vellum simulation object has Geometry data which describes the surface
+of the patch.  It has ConstraintGeometry data which describes the
+constraints holding the patch together, and should be a one-to-one
+matching of points with the Geometry data.  Finally, a PatchGeometry
+data stores the names of all the patches to tell if they have
+been emitted or not.
+
+@parameters
+
+Activation:
+    #id: activate
+
+    Controls if the Vellum source will emit or not.
+
+
+Emission Type:
+    #id: emittype
+
+    How patches will be emitted from the source geometry.
+
+    Only Once:
+	The geometry will only be added once to the Vellum object.  Note
+	the patch name is used to detect if it has been added.
+
+    Continuous:
+	Geometry is added every frame that this DOP is active.   Does
+	not add during substeps, only on new frames.
+
+    Instance on Points:
+	Like continuous emission, geometry is added every frame the
+	DOP is active.  However, a point geometry is also provided
+	to instance the patches on.   The point geometry's instance
+	attributes (like `orient` and `N`) are used to instance the
+	patch; matching the Copy to Points behavior.
+
+== Source ==
+
+SOP Path:
+    #id: soppath
+
+    Path to a SOP to fetch the surface geometry of the Vellum patch.
+
+
+Target Path:
+    #id: targetpath
+
+    SOP Path to use as the target for the Vellum patch.  When points
+    are set to follow the target animation, this is the path used.
+    Note that the path will be re-evaluated at every substep.
+
+
+Constraint SOP Path:
+    #id: constraintpath
+
+    Path to a SOP to fetch the constraint geometry of the Vellum patch.
+    Should be in a one-to-one point correspondence of the surface geometry.
+    Note that because you cannot point to an extra output, you may need
+    a Null SOP to act as a target to a Vellum Constraint SOP.
+
+Instance Points:
+    #id: instancepath
+
+    In instance mode, this SOP's geometry will be used to instance
+    Vellum patches.   A patch will be created for every point in this
+    geometry and positioned and oriented according to the point's attributes.
+
+
+Vellum Patch Name:
+    #id: vellumname
+
+    All the points of the Vellum patch will gain a `patchname` attribute
+    with this value.  This is used to recognize if a patch already exists
+    for the Emit Once mode, and can be used to separate out the different
+    patches after the simulation is complete.
+
+== Stream ==
+
+Stream Name:
+    #id: streamname
+
+    POP forces can be applied to a Vellum patch by wiring them after
+    the Vellum Source node.   The streamname allows the POP forces
+    to properly isolate their behavior to a single patch.
+
+== Bindings ==
+
+Transform:
+    #id: importxform
+
+    When fetching the geometry from other SOPs, the other SOPs
+    world transform usually must be applied to transform to
+    the right space.   This is the Into This Object mode.
+
+    However, if the DOP solver is inside a sop, and the source
+    are other sops at the same level, using the world transform
+    will double apply it and the None mode should be used.
+
+Geometry:
+    #id: bindgeo
+
+    Name of the data on the simulation object to use for the surface
+    geometry.
+
+
+Constraint Geometry:
+    #id: bindconstraint
+
+    Name of the data on the simulation object to store the constraint geometry.
+
+
+Patch Index Geometry:
+    #id: bindpatch
+
+    Name of the data on the simulation object to store the list of patches.

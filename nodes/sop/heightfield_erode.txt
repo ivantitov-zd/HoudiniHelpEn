@@ -3,6 +3,7 @@
 #type:     node
 #context:  sop
 #internal: heightfield_erode
+#version: 2.0
 #icon:     SOP/heightfield_erode
 
 """Calculates thermal and hydraulic erosion over time (frames) to create more realistic terrain."""
@@ -18,66 +19,229 @@ For an example of erosion, create the Mountain preset from the __Terrain FX__ sh
 
 @parameters
 
-== Erosion ==
+Reset Simulation:
+    #id: resimulate
+    
+    Click to clear the simulation cache. Be careful clicking this if you are not viewing the first frame. Houdini will have to re-simulate every frame up to the one you are viewing, which can be slow if you are on a high frame number.
 
-Mask:
-    #id: maskerodelayer
+Freeze:
+    #id: dofreeze
     
-    The name of a mask layer to use as the erodibility value for each point on the terrain. A value of `0` allows no erosion (use this to represent something like granite). A value of `1` means easy erosion (use this to represent loose dirt).  This is read from the second input.
+    Freeze the output at the specified frame. This can be used to fix the output once the number of desired frames is determined.
+	
+Freeze at Frame:
+	#id: feezeframe
+	
+	The number of frames to feeze the output at.
 
-Amount:
-    #id: erode_amount
+== Main ==
     
-    A scale on the effect of the erosion at each frame. The default value of `1` represents a realistic amount. A value of `3` would do 3 times a realistic amount. You can increase or decrease this number to do more or less erosion overall.
+Global Erosion Rate:
+    #id: globalerosionrate
     
-Noise:
-    #id: erode_variability
-    
-    Scatters the location of erosion. Some noise is desirable to simulate natural variations.
-    
-Max Debris Depth:
-    #id: erode_maxdepth
-    
-    Stop erosion when the debris layer reaches this depth.
+    Controls how many meters of bedrock or debris (here entrained material) is eroded every iteration.
+
+These options control erosion from rainfall, where the flow of water downhill weathers the terrain. You can control the amount of rainfall using the controls on the __Precipitation__ tab and the water flow using the controls on the __Flow__ tab.
 
 ~~~ Hydro ~~~
-
-These options control erosion from rainfall, where the flow of water downhill weathers the terrain. You can control the amount of rainfall using the controls on the __Precipitation__ tab and the water flow using the controls on the __Water flow__ tab.
-
-Hydro:
-    #id: contrib_hydro
     
-    Scale on the __Amount__ value for water flow.
+Erodability:
+    #id: erodability
     
-Dissolution Rate:
-    #id: dissolve_hydro
+    Controls the softness of bedrock or debris (here entrained material). Higher values would make the terrain easier to erode, causing deeper incisions, more sediment, and more debris being deposited as a result.
+
+erodabilitymaskmode:
+	#id: erodabilitymaskmode
+	
+	Controls whether to use a mask for erodability or not.
+	
+Erodability Mask:
+	#id: erodabilitymasklayer
+	
+	The name of the erodability mask.
+	
+Erosion Rate:
+    #id: erosionrate
     
-    Rate at which soil breaks down and flows down the terrain.
+    Controls the rate at which erosion happens. This is a multiplier on `Erodability`.
+	
+Bank Angle:
+    #id: bankangle
+    
+    Sets the angle at which the riverbank rests relative to the riverbed. Lowre values would make wider and flatter river channels.
 
+bankanglemaskmode:
+	#id: bankanglemaskmode
+	
+	Controls whether to use a mask for bank angle or not.
+	
+Bank Angle Mask:
+	#id: bankanglemasklayer
+	
+	The name of the bank angle mask.
 
+Spread Iterations:
+    #id: water_spreaditers
+    
+    The number of iterations of water spreading simulation to do. More iterations result in longer and less dense incisions.
+	
 ~~~ Thermal ~~~
 
 Thermal weathering is caused by frozen rocks thawing and breaking, causing features to wear down and smooth out, and material to pile up on the bottom of inclines.
 
-Thermal erosion is computed by comparing the height field (including debris) against a blurred version of the height field. If the current height is greater than the blurred height, it is considered exposed and subject to erosion. Thermal erosion is a relaxation process.
-
-Thermal:
-    #id: contrib_thermal
+Erodability:
+    #id: erodability
     
-    Scale on the __Amount__ value for thermal weathering.
-    
-Wind Removal Rate:
-    #id: dissolve_thermal
-    
-    Proportion of debris from thermal erosion that is deleted. This simulates wind carrying away a certain amount of debris rather than it all accumulating. The default is `0` (no deletion).
+    Controls the softness of the eroding layer or material layer. Higher values would make the terrain easier to erode, causing deeper incisions, more sediment, and more debris being deposited as a result.
 
-Thermal Feature Size:
-    #id: thermalsize
+erodabilitymaskmode:
+	#id: erodabilitymaskmode
+	
+	Controls whether to use a mask for erodability or not.
+	
+Erodability Mask:
+	#id: erodabilitymasklayer
+	
+	The name of the erodability mask.
+	
+Erosion Rate:
+    #id: erosionrate
     
-    Controls the amount of blur used when computing which areas get weathering. This essentially controls the amount of weathering.
+    Controls the rate at which erosion happens. This is a multiplier on `Erodability`.
 
+Cut Angle:
+    #id: cutangle
+    
+    Set the angle at which the thermal erosion would stop cutting beyond. A lower angle would make the cuts flatter and allow for more erosion to take place.
 
-== Precipitation ==
+cutanglemaskmode:
+    #id: cutanglemaskmode
+	
+    Controls whether to use a mask for cut angle or not.
+	
+Cut Angle Mask:
+    #id: cutanglemasklayer
+	
+    The name of the cut angle mask.
+
+Global Seed:
+    #id: seed 
+	
+    Random seed to make erosion vary for the same set of variables on the same input.
+
+== Advanced ==
+
+~~~ Hydro Erosion ~~~
+
+Removal Rate:
+    #id: hydro_removalrate
+    
+    Proportion of debris from thermal erosion that is deleted. This simulates wind carrying away a certain amount of debris rather than it all accumulating. The default is `0` (no deletion). Negative values correspond to the debris being less dense than the rock, so one unit of eroded rock produces more than one unit of debris.
+
+Max Debris Depth:
+    #id: hydro_maxdebrisdepth
+    
+    Stop erosion when the debris layer reaches this depth.
+
+Grid Bias:
+	#id: hydro_gridbias
+	
+	Controls how biased the movement of material is. Setting it to positive values would bias the movement in the direction of the principal axes, and when set to negative values, it would bias the movement at angles of 45 degree relative to the principal axes. The default value of zero would mean no bias in any direction.
+
+gridbiasmaskmode:
+	#id: hydro_gridbiasmaskmode
+	
+	Controls whether to use a mask for grid bias or not.
+	
+Grid Bias Mask:
+	#id: hydro_gridbiasmasklayer
+	
+	The name of the grid bias mask.
+
+~~~~ Erodability ~~~~
+
+Ramp-up Iterations:
+	#id: hydro_erodability_rampupiters
+	
+	The iteration where erodability would get to its maximum value.
+	
+Initial Factor:
+	#id: hydro_erodability_initialfactor
+	
+	Controls how much of the set erodability would the material have on its initial movement. It would increase over the set spread iterations until the max iteration, where it would stay at maximum set value.
+	
+Slope Factor:
+	#id: hydro_erodability_slopefactor
+	
+	Control how much the slope of the terrain would affect the erosion amount. Higher values would increase the slope effecting the erosion, and lower values would decrease it. Lowing this value would increase erodability as a result.
+
+~~~~ Riverbed ~~~~
+
+Erosion Rate Factor:
+	#id: hydro_bed_erosionratefactor
+	
+	A multiplier on `Erosion Rate` that would cause a change on the riverbed only. Increasing this value would cause a more aggresive erosion on the bed, and as a result, it would increase the depth of the incisions.
+
+Deposition Rate:
+    #id: hydro_bed_depositionrate
+    
+    Controls the rate at which the excess sediment turns into debris. A value of zero means no sediment is turned into debris, while a value of one will convert all created sediment into debris, and the bedrock would in turn be protected more by the created debris.
+
+depositionratemaskmode:
+	#id: hydro_bed_depositionratemaskmode
+	
+	Controls whether to use a mask for deposition rate or not.
+	
+Deposition Rate Mask:
+	#id: hydro_bed_depositionratemasklayer
+	
+	The name of the deposition rate mask.
+
+Sediment Capacity:
+    #id: hydro_bed_sedimentcap
+    
+    The amount of sediment that can be carried per unit of moving water. The higher the capacity, the longer the material can erode before it starts depositing its excess sediment.
+
+~~~~ Riverbank ~~~~	
+
+Erosion Rate Factor:
+	#id: hydro_bank_erosionratefactor
+	
+	A multiplier on `Erosion Rate` that would cause a change on the riverbank only. Increasing this value would cause a more aggresive erosion on the bank, and as a result, it would increase the width of the incisions.
+	
+Max Bed to Bank Water Ratio:
+	#id: hydro_bank_maxbankbedwaterratio
+	
+	The maximum of bank to bed water column height ratio that will be considered as river bank bank. Ratios higher than this number will not be considered as bank during erosion.
+
+~~~ Thermal Erosion ~~~
+
+Removal Rate:
+    #id: thermal_removalrate
+    
+    Proportion of debris from thermal erosion that is deleted. This simulates wind carrying away a certain amount of debris rather than it all accumulating. The default is `0` (no deletion). Negative values correspond to the debris being less dense than the rock, so one unit of eroded rock produces more than one unit of debris.
+
+Max Debris Depth:
+    #id: thermal_maxdebrisdepth
+    
+    Stop erosion when the debris layer reaches this depth.
+
+Grid Bias:
+	#id: thermal_gridbias
+	
+	Controls how biased the movement of material is. Setting it to positive values would bias the movement in the direction of the principal axes, and when set to negative values, it would bias the movement at angles of 45 degree relative to the principal axes. The default value of zero would mean no bias in any direction.
+
+gridbiasmaskmode:
+	#id: thermal_gridbiasmaskmode
+	
+	Controls whether to use a mask for grid bias or not.
+	
+Grid Bias Mask:
+	#id: thermal_gridbiasmasklayer
+	
+	The name of the grid bias mask.
+	
+~~~ Precipitation ~~~
 
 Mask:
     #id: maskpreciplayer
@@ -99,57 +263,74 @@ Evaporation Rate:
     
     The rate of evaporation. A higher rate will leave less pooled water in each frame. If you want more water to pool you can increase __Amount__ and/or decrease the evaporation rate.
 
+~~~~ Raindrop Settings ~~~~
 
-=== Water Flow ===
+These settings can be used to control the size of raindrops. As you expand the radius of each raindrop you will have fewer drops to ensure the density of precipitation will stay constant.
+
+Expand Radius:
+    #id: rain_expandradius
+
+    This parameter can be used to expand the radius of each raindrop to cover more cells. This produces larger drops, which could make the incisions on the terrain more sparse and increase their width.
+
+Blur Radius:
+   #id: rain_blurradius
+
+    This parameter can be used to blur the column of water to make a smoother transition for each drop from a water cell to a dry cell. This parameter can be used to increase the width of the incisions on the terrain, while also making them smoother.
+
+~~~ Water Flow ~~~
+
+Quantization:
+    #id: water_quant
+
+	Controls the chunkiness of the water flow. A lower value would make the flow more continuous and a higher value would make the flow more chunky.
+	
+Post Smooth:
+	#id: water_postsmooth
+	
+	Smooth the water on the terrain as a post processing step.
+
+~~~ Debris Flow ~~~
 
 Spread Iterations:
-    #id: rainflow_spreaditers
-    
-    The number of iterations of water spreading simulation to do. More iterations give more realistic results but are slower.
-    
-Spread Rate:
-    #id: rainflow_spreadrate
-    
-    How quickly water spreads over the terrain with each iteration.
-    
-Smooth Iterations: 
-    #id: rainflow_smoothiters
-    
-    Run this many iterations of the waterflow algorithm each frame.
-    
-Smooth Rate:
-    #id: rainflow_smoothrate
-    
-    Higher values smooth out the water flow more.
-
-    
-== Debris ==
-
-Entrainment is the process of debris lifting by an erosion agent (water, wind, or slumping).
-
-Entrainment Rate:
-    #id: entrainment
-    
-    The proportion of entrained material that is dragged along with slumping material.
-
-~~~ Settle ~~~
-
-Iterations:
-    #id: settle_iterations
+    #id: debris_iterations
     
     How many iterations of the spread algorithm to run for each frame.
+
+Quantization:
+    #id: debris_quant
+
+    Controls the chunkiness of the debris flow. A lower value would make the flow more continuous and a higher value would make the flow more chunky.
+	
+Post Smooth:
+	#id: debris_postsmooth
+	
+	Smooth the debris on the terrain as a post processing step.
+	
+Water Absorption:
+    #id: water_absor
+
+   Controls the movement of the debris based on last frame's flow field. Higher values would stop the debris from moving near the flow channels, and lower values would cause the debris to ignore the flow channels, making it move independently. 
+
+Max Height:
+    #id: debris_maxheight
     
-Spread Rate:
-    #id: settle_rate
-    
-    How quickly debris spreads over the terrain with each iteration.
-    
+    The maximum height of wet debris that would not move due to water absorption. Beyond this limit the debris start to move again.
+
 Repose Angle:
-    #id: settle_repose
+    #id: debris_repose
     
     The maximum slope (measured in degrees from the horizontal) at which loose solid material will remain in place without sliding.
 
-
+reposeanglemaskmode:
+	#id: debris_reposeanglemaskmode
+	
+	Controls whether to use a mask for repose angle or not.
+	
+Repose Angle Mask:
+	#id: debris_reposeanglemasklayer
+	
+	The name of the repose angle mask.
+	
 == Bedrock ==
 
 Bedrock Override:
@@ -208,6 +389,11 @@ Reset Debris Layer:
     #id: cleardebris
     
     If the input already has a debris layer, delete it.
+
+Reset Sediment Layer:
+    #id: clearsediment
+    
+    If the input already has a sediment layer, delete it.
     
 Add Debris Layer to Final Height Layer:
     #id: debris_addtoheight
@@ -236,6 +422,11 @@ Material Layer:
     
     The name of the layer containing the debris elevation (default `debris`).
 
+Sediment Layer:
+    #id: sedimentlayer
+    
+    The name of the layer containing the sediment elevation (default `sediment`).
+	
 Bedrock Layer:
     #id: bedrocklayer
 
@@ -255,21 +446,11 @@ Flow Dir Layer:
 
 
 == Simulation ==
-
-Reset Simulation:
-    #id: resimulate
-    
-    Click to clear the simulation cache. Be careful clicking this if you are not viewing the first frame. Houdini will have to re-simulate every frame up to the one you are viewing, which can be slow if you are on a high frame number.
-    
+  
 Start Frame:
     #id: startframe
     
     The node does not start simulation erosion until this frame. The default is `1` (the first frame).
-
-Sub Steps:
-    #id: substep
-    
-    The number of simulation substeps to run at each frame. Higher numbers give better results but are slower.
 
 Cache Simulation:
     #id: cacheenabled

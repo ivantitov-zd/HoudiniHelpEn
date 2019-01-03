@@ -1,0 +1,87 @@
+= OpenColorIO support =
+
+"""Houdini ships with the OpenColorIO library and uses it for color conversion in various places in the application."""
+
+
+== Overview ==
+
+Computer programs like Houdini prefer to work in a [linear color space|/render/linear] internally, which is easy to manipulate digitally. It's often preferable for outputs, such as final images, printed film, and displays, to be in _perceptual_ color space (gamma corrected/color corrected). Color management in Houdini involves translating between linear and perceptual color spaces at the boundary between Houdini and the outside world at appropriate times.
+
+OpenColorIO (OCIO) is an industry-standard open-source library for managing and translating color spaces.
+
+OCIO is more powerful and flexible than Houdini's default gamma and lookup table (LUT) support, and is recommended for professional use.
+
+
+== Set up ==
+
+* Set the `$OCIO` environment variable to the file path of an OpenColorIO configuration file (such as `config.ocio`).
+
+    The existence of this environment variable controls whether Houdini automatically uses OCIO in various places.
+
+* You can set the default colorspace using the `OCIO_ACTIVE_DISPLAYS` and `OCIO_ACTIVE_VIEWS` environment variables.
+
+* For sRGB files and sources, the source colorspace used for sRGB is defined by the Houdini environment variable `HOUDINI_OCIO_SRGB_FILE_COLORSPACE`. If this variable is not defined, the OpenColorIO config file is searched for a colorspace that matches srgb, either fully or partially.
+
+* You can turn various forms of OCIO support in the __Edit > Color Settings__ window.
+
+NOTE: 
+  The `OCIO`, `OCIO_ACTIVE_VIEWS`, and `OCIO_ACTIVE_DISPLAYS` environment variables are not Houdini environment variables. They cannot be set through the [Aliases and Variables |/ref/windows/alias] dialog, nor can they be set in the `houdini.env` file. They must be set in the shell or desktop environment before launching Houdini.
+
+
+== Image inputs ==
+
+* Texture images are assumed to be linear in Houdini and Mantra. If needed, you can manually convert textures using the [OCIO Color Transform VOP|Node:vop/ocio_transform].
+
+* If OCIO is configured and you set the [File COP|Node:cop2/file] to linearize colors, it will use the OCIO file naming convention to deduce the color space of the input image and linearize it correctly. (This will also automatically switch the output to 16 bit to prevent banding.)
+
+
+== Render output ==
+
+* Renders from Mantra are in linear space.
+
+* Flipbooks from the viewport are either sRGB or linear, depending on the "Render Beauty Pass Only" option (linear when On, sRGB when off).
+
+* The image in the Render View can be color corrected using OCIO.
+
+    The Correction toolbar is stowed by default at the bottom of the view. Click the stowbar just below the view area to show it. When OpenColorIO is active, Houdini replaces default gamma and LUT controls on the Correction toolbar with OCIO controls.
+
+* The output of the [Render Region tool|/render/renderregion] can be color corrected using OCIO. (You can turn this on or off in the __Edit > Color Settings__ window.)
+
+
+== Color correcting the display == (display)
+
+* When OpenColorIO is active, the Scene View, Render View, and MPlay can use OCIO to color-correct display.
+
+    When OCIO is active, Houdini replaces default gamma and LUT controls on the Correction toolbar with OCIO controls.
+
+    [Image:/images/render/ocio_menus.jpg]
+
+    * In the Scene View, open the Viewport menu (the menu to the left of the Camera menu, in the top left corner of the viewport) and turn on __Correction Toolbar__ to show the color correction toolbar at the bottom of the viewer.
+
+    * In the Render View, the Correction toolbar is stowed by default at the bottom of the view. Click the stowbar just below the view area to show it.
+
+* When OpenColorIO is active (`$OCIO` points to a configuration file), gamma and LUT controls in the interface are replaced by __Display__ and __View__ menus. These define the output colorspace for the display. The colorspace within Houdini is linear, and the `scene_linear` role specifies the OpenColorIO linear colorspace.
+
+    For example, when OCIO is active, the scene viewer's Color Correction toolbar (__Viewport menu > Correction Toolbar__) has OCIO controls.
+
+* MPlay can load both linear and non-linear files, such as OpenEXR (linear) and JPEG (sRGB).
+
+
+== Additional support ==
+
+You can turn use of OCIO for various features on or off in the __Edit > Color Settings__ window.
+
+* Picking color from an image in the [color editor|/ref/windows/coloreditor] can be linearized using OCIO (for images using the OCIO naming convention).
+
+* Node preview thumbnails in compositing network can be color corrected using OCIO.
+
+* The [OCIO Color Transform VOP|Node:vop/ocio_transform] performs manual color conversions. The [Import Properties from OpenColorIO VOP|Node:vop/ocio_import] lets you access OCIO variables.
+
+* There are [several VEX functions|/vex/color_suite] for doing manual color conversions, texture lookups, and introspection using the OCIO library.
+
+* [Hom:hou.Color], [Hom:hou.Vector3], and [Hom:hou.Vector4] have methods for transforming using OCIO in Python scripts.
+
+
+
+
+

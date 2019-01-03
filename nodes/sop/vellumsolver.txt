@@ -1,0 +1,326 @@
+#type:     node
+#context:  sop
+#internal: vellumsolver
+#icon:     DOP/vellumsolver
+
+= Vellum Solver =
+
+"""Runs a dynamic Vellum simulation."""
+
+The Vellum Solver is a wrapper around a DOP network to simplify the running of
+Vellum solves.
+
+Like most Vellum SOPs, it is a three input SOP.   The first input is
+the surface geometry to solve.  The second input should have the same
+number of points as the first, with point-to-point correspondence
+either with point numbers or `id` attributes.   The second input
+also should have special primitives describing the constraint relationships.
+Constraints are how the connectivity between points are defined and controlled
+and can be created with a Vellum Constraints SOP.   Note that the network tab
+menu has several macros to refer to common setups, such as Vellum
+Configure Cloth.   The third input provides the collision geometry.
+The collision geometry should have matching topology frame-to-frame.
+In addition, some types of packed geometry are recognized.
+
+You can dive into the solver to add DOP nodes to apply special forces.
+You can also use the [Vellum Constraint Property|Node:dop/vellumconstraintproperty]
+DOP to adjust the constraint properties during the solve using these
+internal nodes.
+
+@parameters
+
+== Solver ==
+
+Timescale:
+    #id: timescale
+
+    Scales the effective time of the Vellum solve.  This can be used to
+    create bullet-time like effects where the physics of the Vellum
+    solver run at a different rate than the Houdini playbar.  A
+    value of 2 will cause cloth to fall twice as fast, and 0.1
+    will slow it to a tenth the speed.
+
+Substeps:
+    #id: substeps
+
+    Each frame will be broken into this number of substeps.  Additional
+    substeps are required for fast moving collisions or sudden forces.
+
+    The default substeps can be very aggressive, usually if the
+    Vellum solver is too stretchy, raising substeps to 2 or 5 is
+    a good first start.
+
+Constraint Iterations:
+    #id: niter
+
+    Within each substep, this number of passes will be taken by the
+    constraint enforcement operations.   Stiff constraints can
+    require more iterations to converge.  A good starting point
+    is the diameter of the geometry - the number of edges between
+    the farthest points.
+
+
+Smoothing Iterations:
+    #id: smoothiter
+
+    The default constraint iterations use a Gauss-Seidel approach that
+    is fast to converge.  However, if it doesn't fully converge due to
+    too high stiffness, or impossible configurations, it will leave the error
+    as bad looking triangles.  The smoothing iterations use a Jacobi
+    approach which is slower to converge but leaves error spread out
+    in a more attractive fashion.  The default of ten passes helps
+    smooth out error, but might need to be increased if the overall
+    __Constraint Iterations__ is very high.
+
+=== Collisions ===
+
+Enable Collisions:
+    #id: enablecollisions
+
+    Controls if any collision detection is done at all.
+
+Self Collisions:
+    #id: doselfcollisions
+
+    Controls if self collisions are detected.
+
+Ground Plane:
+    #id: useground
+
+    Adds a ground plane to the simulation.  The ground plane will
+    be visualized with a blue grid.
+
+Ground Position:
+    #id: groundpos
+
+    Location of the center of the ground plane.
+
+
+Collision Passes:
+    #id: collisionsiter
+
+    Number of collision detection passes to perform.  These are interleaved
+    between the constraint iterations.  Since collision is expensive, it is
+    best to minimize this.   But frequent interleaving helps avoid tent-poling
+    effects where a small collider is fighting with the no-stretch constraints.
+    In practice we find 10 to be correct for most situations, and substeps
+    often being a better solution to increase quality.
+
+
+Post Collision Passes:
+    #id: postcollisioniter
+
+    After all constraints are performed, a final round of collision detection
+    is done.   Collisions are often the most noticeable failure mode, and it
+    is ideal if the next frame can start with non-intersecting geometry.
+    Thus a final cleanup pass can achieve these requirements.   We have
+    found that "number of stacked layers + 2" is a good estimate for this
+    number.   This allows the effect of the underlying collider to ripple
+    through the stacked layers fully.
+
+Polish Passes:
+    #id: resolveallmax
+
+    In any collision pass, any colliding pair may not be fully resolved.   This
+    number of additional collider-pair passes will be run until they are
+    resolved.  Since these are only performed on active colliders (and no new
+    collision search is done) this is very cheap.
+
+
+Layer Shock:
+    #id: layershock
+
+    The `layer` integer point attribute is used to flag point as belonging
+    to different layers of cloth.  Higher numbers refer to higher layers.
+    Layer Shock will make lower layers this many times heavier during collision
+    evaluation, ensuring the higher layers will move out of their way.  The
+    rest of the dynamics are unaffected by this, and the difference is fixed
+    regardless of the number of layers between the two.  This can be thought
+    of as a way to dial between one-way layering of sims and fully coupled
+    sims.
+
+== Forces ==
+
+Gravity:
+    #id: gravity
+
+    Uniform gravity force to apply.
+
+
+Wind:
+    #id: wind
+
+    A uniform wind direction.  Since this is a drag force, a wind of zero
+    will act like still air and slow everything down; and a high wind will
+    speed cloth up to that speed.
+
+Wind Drag:
+    #id: winddrag
+
+    The amount the particles are dragged by the wind force.  This is also
+    scaled by the tangential and normal drag forces specified on the
+    Vellum Constraints SOP to provide unequal drag depending on orientation.
+
+=== Friction ===
+
+Static Threshold:
+    #id: static_threshold
+
+    A threshold at which to apply full friction.  When the ratio of the tangential velocity and the normal impulse is less than this, the tangential velocity will be fully eliminated through friction.  This is roughly tan() of the slope angle that will allow sliding under gravity.
+
+
+Dynamic Scale:
+    #id: dynamic_scale
+
+    If the static threshold fails, this controls what percentage the tangential velocity will be reduced in the dynamic friction case.
+
+Enable External:
+    #id: friction
+
+    A scale factor on the amount of friction effect to apply for collisions with external geometry.
+
+Enable Self:
+    #id: selffriction
+
+    A scale factor on the amount of friction effect to apply for collisions with self geometry.
+
+Ground Static Scale:
+    #id: static_sdfscale
+
+    A scale factor for the ground plane's static friction.  Useful to
+    create frictionless grounds.
+
+Ground Dynamic Scale:
+    #id: dynamic_sdfscale
+
+    A scale factor for the ground plane's dynamic friction.  Useful to
+    create frictionless grounds.
+
+== Simulation ==
+
+Reset Simulation:
+    #id: resimulate
+
+    Clears the entire simulation cache.
+
+Cache Enabled:
+    #id: cacheenabled
+
+    Controls if the simulation is cached to memory.
+
+Cache Memory (MB):
+    #id: cachemaxsize
+
+    Maximum size of the memory cache.
+
+Start Frame:
+    #id: startframe
+
+    What frame on the Houdini playbar that the simulation should begin at.
+
+Simulation Type:
+    #id: simulationtype
+
+    Style of the simulation.
+
+    Quasistatic:
+	Each frame the simulation takes the inputs and runs them forward
+	the given number of frames.  The final result becomes that frames
+	result.   No frame-to-frame coherency is present.
+
+    Dynamic:
+	Each frame is solved from the previous frame, and the inputs are
+	used to setup the first frame only.
+
+Quasistatic Frames:
+    #id: quasistaticframes
+
+    The number of frames to roll forward for the quasi-static simulation.
+
+
+Clear Dynamics:
+    #id: zerodynamics
+
+    All dynamic forces and states, such as velocities, are removed from
+    the output.   This allows the output of a clean state to start
+    a new simulation from, such as when completing a drape.
+
+== Advanced ==
+
+Target:
+    #id: targetmethod
+
+    Points on the simulation mesh can be marked as __Pin to Target__ to follow the targeted animation.   By default, this target is the first input.  But in some cases the animation you wish to target may be present in another SOP node, so that can be specified here.
+
+Target Path:
+    #id: targetpath
+
+    The path of a node to refer to when simulation points are set to the
+    target animation.  Should have a one-to-one point correspondence
+    with the simulation points, either by point number or `id`.
+
+Integration:
+    #id: integration
+
+    When integrating points forward by their velocities, curved motions
+    like swinging pendulums will be mispredicted and be damped by
+    the constraint projections.   A second order predictor recovers more of
+    this curved motion and maintains more energy in the system.
+
+    In any case, if collisions are detected the system will fall back
+    to first order to avoid excessive bouncing.
+
+Max Acceleration:
+    #id: maxaccel
+
+    Various acceleration limiting options can be used to prevent the
+    simulation from being over-eager to obey non-realistic forces.   These
+    can otherwise result in large energy spikes.
+
+Fallback to First Order Integration on Collision:
+    #id: accelfallback
+
+    If __Max Acceleration__ is exceeded for a point, assume it signals a sharp,
+    discontinuous collision where the second order prediction will be wrong
+    and add erroneous motion, often in the form of bouncing.  In this case,
+    fallback to first order integration for the affected point.
+
+
+Limit Acceleration in Velocity Update:
+    #id: limitaccel
+
+    Cap the amount that velocity of a particle is allowed to change as a
+    result of any of the dynamics.   This is useful to prevent some
+    instant motion being mis-identified as a massive force, and thus
+    avoid fly-away particles.
+
+Limit Displacement on Collision:
+    #id: limitdisplace
+
+    During the collision resolution, if the collision correction moves a
+    particle more than the acceleration amount, cap the effect.  The hope
+    is to fail more gracefully when a part of a model snags on the cloth
+    and is pulling it in a surprising fashion.
+
+
+== Visualize ==
+
+Show Collision:
+    #id: showcollision
+
+    Show the collision object as a blue wireframe.
+
+
+Show Guide Geometry:
+    #id: showguide
+
+    Show additional guide geometry from the solver.
+
+[Include:/nodes/sop/_vellum_common]
+
+
+@related
+    - [Node:sop/vellumdrape]
+    - [Node:sop/vellumconstraints]
+    - [Node:sop/vellumconstraints_grain]
+    - [Node:sop/vellumio]

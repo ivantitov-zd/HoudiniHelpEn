@@ -1,0 +1,346 @@
+= Node search =
+
+"""You can programmatically find nodes using the same code as the Find dialog in the network editor."""
+
+
+== Overview ==
+
+The code that implements node search in the network editor's [Find window|/network/find] is available for scripting in the `nodesearch` package.
+
+The package uses "Matcher" objects to find matching nodes. A matcher has the following methods:
+
+~~~~
+
+`Matcher.nodes(network, ignore_case=False, recursive=False, recurse_in_locked_nodes=True)` -> `list` of [Hom:hou.Node]:
+
+    Starting at the given network, returns a list of `hou.Node` instances representing the matching nodes.
+
+    `network`:
+
+        A hou.Node object representing the network to search inside.
+
+    `ignore_case`:
+
+        If this is True, any string-comparing the matcher does will be case-
+        insensitive. The default is False.
+
+    `recursive`:
+
+        If this is True, recursively search inside container nodes as well.
+        The default is False.
+
+    `recurse_in_locked_nodes`:
+
+        If recursive is True and this is True, the matcher will search inside
+        locked assets. The default is False.
+
+~~~~
+
+`Matcher.matches(node, ignore_case=False)` -> `bool`:
+
+    Returns `True` if the given node matches, or `False` if the node does not
+    match.
+
+
+== Parsing queries ==
+
+You can parse a query string (like in the freeform text box at the top of the find window) into a matcher using this function:
+
+{{{
+#!python
+import hou
+from nodesearch import parser
+
+# Create a matcher that finds nodes whose name starts with time_
+# and whose X translation is > 1
+matcher = parser.parse_query("time_* tx:>1")
+
+network = hou.node("/obj/")
+for node in matcher.nodes(network, recursive=True):
+    ...
+}}}
+
+
+The `select()` high-level function automatically parses the query string for you and selects the nodes in the network editor.
+
+{{{
+#!python
+from nodesearch import parser
+
+# You can optionally supply which network editor pane to use; otherwise
+# the function will just find one
+editor = hou.ui.paneTabOfType(hou.paneTabType.NetworkEditor)
+# If you don't supply a network, the function will use the current network
+# of the editor
+network = hou.node("/obj/geo1")
+
+# frame=True pans and zooms the editor to center on the selected nodes
+parser.select("time_* tx:>1", editor=editor, network=network, frame=True)
+}}}
+
+
+== Constructing Matcher objects ==
+
+You can also manually construct a matcher (this is like using the "Add condition" controls in the find window):
+
+{{{
+#!python
+import hou
+import nodesearch
+
+# Create a matcher that finds nodes whose name starts with time_
+name_matcher = nodesearch.Name("time_*")
+
+# Create a matcher that finds nodes whose Translation X value is greater
+#    than 10
+parm_matcher = nodesearch.Parm("tx", ">", 1.0)
+
+# A matcher that must match both sub-conditions
+both_matcher = nodesearch.Group([name_matcher, parm_matcher])
+
+# A matcher that can match either sub-condition
+either_matcher = nodesearch.Group([name_mater, parm_matcher], intersect=False)
+}}}
+
+`parser.select()` also works with a constructed Matcher object using the `query=` keyword argument:
+
+{{{
+#!python
+parser.select(query=both_matcher, editor=editor, network=network, frame=False)
+}}}
+
+
+== Matcher classes ==
+
+You can use the following Matcher subclasses to construct a matcher:
+
+`nodesearch.All()`:
+
+    Matches all nodes.
+
+    Query string equivalent: `*`
+
+~~~~
+
+`nodesearch.Null()`:
+
+    Never matches any node.
+
+~~~~
+
+`nodesearch.Name(name, exact=False)`:
+
+    Matches nodes by their individual names in the network editor (for
+    example, `sphere1`).
+
+    {{{
+    #!python
+    matcher = nodesearch.Name("foo")
+    }}}
+
+    `name`:
+
+        The name string to match. If exact=True, only matches nodes with this
+        exact name. If exact=False, matches nodes whose names contain this
+        substring.
+
+    `exact`:
+
+        Whether to match the exact name. The default is False, which matches a
+        substring within the name.
+
+    Query string equivalent: `foo`
+
+~~~~
+
+`nodesearch.Parm(name, op, value)`:
+
+    Matches nodes where a given parameter value compares true with a target
+    value.
+
+    For example, to match nodes whose translate Y is greater than or equal to
+    10:
+
+    {{{
+    #!python
+    matcher = nodesearch.Parm("ty", ">=", 10)
+    }}}
+
+    `name`:
+
+        The internal name of the parameter to match. You can view the internal
+        name of a parameter by hovering over its label in the parameter
+        editor.
+
+    `op`:
+
+        A string specifying how to compare the target value to the parameter
+        value. For numeric parameters, this should be one of `"<"`, `">"`, `"<="`,
+        `"=<"`, `">="`, `"=>"`, `"="`, `"=="`, or `"!="`.
+
+        For string parameters, you can use `"="`/`"=="` or the special
+        operators `"|="` or `"~="`. `"|="` checks if the target value is a substring
+        of the parameter value. `"~="` treats the target string as a pattern and
+        try to match it with the parameter value.
+
+    `value`:
+
+        The "target" value to compare with the each node's parameter value.
+
+    Query string equivalent: `ty:>=10`
+
+~~~~
+
+`nodesearch.RawParm(name, value, is_pattern=False, exact=False)`:
+
+    Matches nodes where the raw string contents of a parameter match a target
+    string. The "raw" value of a parameter does expand variables or evaluate
+    expressions.
+
+    Use this, for example, if you want to find usages of a certain expression
+    function:
+
+    {{{
+    #!python
+    matcher = nodesearch.RawParm("ch(")
+    }}}
+
+    `is_pattern`:
+
+        If this is True, the matcher treats the target string as a pattern,
+        instead of looking for it as a substring.
+
+    `exact`:
+
+        If this is True, the parameter contents must match the target string
+        exactly. The default is False, meaning the target matches if it is a
+        substring of the parameter contents. (Ignored if is_pattern=True.)
+
+    Query string equivalent: `group~="ch("`
+
+~~~~
+
+`nodesearch.State(name, boolean)`:
+
+    Matches nodes that have or don't have a certain flag/status.
+
+    For example:
+
+    {{{
+    #!python
+    # To match bypassed nodes:
+    matcher = nodesearch.State("bypass", True)
+    # To find nodes that have errors:
+    matcher = nodesearch.State("error", True)
+    # To find nodes that have descriptive parameter display turned off:
+    matcher = nodesearch.State("displaydescriptivename", False)
+    }}}
+
+    `name`:
+
+        A string representing the flag/status to check for.
+
+        This can be the internal name of a node flag: audio, bypass,
+        colordefault, compress, current, debug, display, displaycomment,
+        displaydescriptivename, export, expose, footprint, highlight,
+        inoutdetaillow, inoutdetailmedium, inoutdetailhigh, material, lock,
+        softlock, origin, pick, render, selectable, template, unload, visible,
+        xray.
+
+        You can also search for the following statuses: "comment" (the node's
+        comment field has content), "warning" (the node has a warning),
+        "error" (the node has an error).
+
+    `boolean`:
+
+        Whether the given flag/status should be on or off.
+
+    Query string equivalent: `+bypass +error -displaydescriptivename`
+
+~~~~
+
+`nodesearch.NodeType(typename, typecat=None, exact=False)`:
+
+    Matches nodes of a specific type (for example, Copy SOP, or Geometry
+    Object).
+
+    For example:
+
+    {{{
+    #!python
+    # Match any type with "vex" in its internal name
+    matcher = nodesearch.NodeType("vex")
+    # Match any SOP with vex in its internal name
+    matcher = nodesearch.NodeType("vex", hou.sopNodeTypeCategory())
+    # Only match nodes with an exact name
+    matcher = nodesearch.NodeType("examplecom::character::2.0", "Sop")
+    }}}
+
+    `typename`:
+
+        If exact=True, the exact internal name of a node type. If exact=False,
+        matches a substring in a type name.
+
+    `exact`:
+
+        Whether to match the exact type name. The default is False, which
+        matches a substring within the type name.
+
+    Query string equivalent: `'vex 'Sop/vex`
+
+~~~~
+
+`nodesearch.ParameterState(condition)`:
+
+    Matches nodes that have a parameter in a certain condition.
+
+    The condition is a string with one of the following values:
+
+    `"off_default_parm"` -- the node has a parameter that has a value other than
+    its default.
+
+    `"spare_parm"` -- the node has at least one spare parameter.
+
+    `"animated_parm"` -- the node has a time-dependent parameter.
+
+    `"expression_parm"` -- the node has a parameter driven by an expression.
+
+    Query string equivalent: `@off_default_parm @spare_parm`
+
+~~~~
+
+`nodesearch.Not(matcher)`:
+
+    Reverses the meaning of the specified matcher, so this matcher matches any
+    nodes the child matcher _doesn't_ match.
+
+    Query string equivalent: `NOT _keep_`
+
+~~~~
+
+`nodesearch.Input(matcher)`:
+
+    Matches nodes that have nodes that match the specified matcher as input.
+
+~~~~
+
+`nodesearch.Output(matcher)`:
+
+    Matches nodes that have nodes that match the specified match as output.
+
+~~~~
+
+`nodesearch.Group(submatchers, intersect=True)`:
+
+    Groups matchers together with an "and" or "or" relationship.
+
+    If `intersect=True`, only matches nodes which all the sub-matchers match.
+    Query string equivalent: `(a & b & c)`.
+
+    If `intersect=False`, matches nodes which any of the sub-matchers match.
+    Query string equivalent: `(a | b | c)`.
+
+    {{{
+    #!python
+    matcher = nodesearch.Group([matcher1, matcher2, matcher3], intersect=False)
+    }}}

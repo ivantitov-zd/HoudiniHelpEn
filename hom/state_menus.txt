@@ -1,0 +1,290 @@
+= Python state |> context menu =
+
+#flow: /hom/index#state
+
+"""How to set up your state's context menu and respond to user interaction with the menu."""
+
+
+== Overview ==
+
+You can use the [Hom:hou.ViewerStateMenu] object to build a custom context menu that appears when the user presses ((RMB)) while your state is active.
+
+See [viewer state user interface guidelines|state_guidelines] for information about how to design the context menu for your state.
+
+
+== Building and binding the menu ==
+
+In the [code where you generate the state template|python_states#install], create the context menu using a [Hom:hou.ViewerStateMenu] object, then bind it to the template using [Hom:hou.ViewerStateTemplate#bindMenu]. 
+
+{{{
+#!python
+from __future__ import print_function
+
+
+# Class implementing the state behavior
+class MyState(object):
+    def __init__(self, state_name, scene_viewer):
+        self.state_name = state_name
+        self.scene_viewer = scene_viewer
+
+    def onMenuAction(self, kwargs):
+        print("You chose:", kwargs["menu_item"])
+
+
+# Function to generate the state template, which describes the state and any
+# menus, handles, selectors, etc. bound to it
+def createViewerStateTemplate():
+    # Create the template object
+    template = hou.ViewerStateTemplate(
+        "mystate", "My State", hou.sopNodeTypeCategory()
+    )
+    # Bind the implementation class
+    template.bindFactory(MyState)
+
+    # Create and bind context menu
+    menu = hou.ViewerStateMenu('bend_menu', 'Bend')
+    menu.addActionItem("first", "Action One")
+    menu.addActionItem("second", "Action Two")
+    menu.addActionItem("third", "Action Three")
+    template.bindMenu(menu)
+
+    return template
+}}}
+
+See the [Hom:hou.ViewerStateMenu] object for how to build the menu.
+
+
+== Responding to menu actions ==
+
+When the user opens the menu and chooses an item, Houdini will call your state's `onMenuAction` method. The dictionary passed to the method has a `menu_item` key contaning the ID of the selected menu item.
+
+TIP:
+    You may only want to track when action menu items are chosen and ignore the user changing "settings" (toggling checkboxes and changing radio selections). You can [read the current value of settings items|#settings] in other handler methods to use the settings to influence how the state works.
+
+* For action menu items and toggle items, if the `menu_item` in the dictionary equals the ID you set on the item, the item was chosen.
+
+    {{{
+    #!python
+    # When you create the menu
+    menu = hou.ViewerStateMenu('bend_menu', 'Bend')
+    menu.addActionItem("delete", "Delete Current")
+
+    # ...
+
+    # In the menu handler method
+    def onMenuAction(self, kwargs):
+        if kwargs["menu_item"] == "delete":
+            # Code to implement the "delete" action
+            # ...
+    }}}
+
+* Instead of coding a tedious `if`/`else` tree for every action in your menu like this:
+
+    {{{
+    #!python
+    def onMenuAction(self, kwargs):
+        menu_item = kwargs["menu_item"]
+
+        # This gets annoying to write and read if there are a lot of these
+        if menu_item == "delete":
+            # ...
+        elif menu_item == "dup":
+            # ...
+        elif menu_item == "done":
+            # ...
+    }}}
+
+    You can use some Python magic to separate action handling into methods based on the menu item ID:
+
+    {{{
+    #!python
+
+    # When you create the menu
+    menu = hou.ViewerStateMenu('bend_menu', 'Bend')
+    menu.addActionItem("delete", "Delete")
+    menu.addActionItem("dup", "Duplicate")
+    menu.addActionItem("done", "Finish")
+
+    # ...
+
+    # In the state class
+    class MyState(object):
+        def __init__(self, state_name, scene_viewer):
+            self.state_name = state_name
+            self.scene_viewer = scene_viewer
+
+        def onMenuAction(self, kwargs):
+            # Call a method with the same name as the chosen ID
+            # (but prefix the method name with an underscore)
+            menu_item = kwargs["menu_item"]
+            method = getattr(self, "_" + menu_item)
+            return method(kwargs)
+
+        def _delete(self, kwargs):
+            # ...
+
+        def _dup(self, kwargs):
+            # ...
+
+        def _done(self, kwargs):
+            # ...
+    }}}
+
+* For toggle items, you can get the new on/off state of the toggle from the dictionary using the menu item's ID as the key.
+
+    {{{
+    #!python
+    # When you create the menu
+    menu = hou.ViewerStateMenu('bend_menu', 'Bend')
+    menu.addToggleItem("showpoints", "Show Points")
+
+    # ...
+
+    # In the menu handler method
+    def onMenuAction(self, kwargs):
+        if kwargs["menu_item"] == "showpoints":
+            # Read the current state of the checkbox
+            showpoints = kwargs["showpoints"]
+    }}}
+
+* For radio strip items, if the `menu_item` in the dictionary equals the ID you set on the _radio strip_ (not an individual radio item), an item from the that strip was chosen.
+
+    You can get the new current item index from the dictionary using the strip ID as the key.
+
+    {{{
+    #!python
+    # When you create the menu
+    menu = hou.ViewerStateMenu('bend_menu', 'Bend')
+    menu.addRadioStrip("deform_type", "Deformation Type")
+    menu.addRadioStripItem("deform_type", "bend", "Bend")
+    menu.addRadioStripItem("deform_type", "squash", "Squash")
+
+    # ...
+
+    # In the menu handler method
+    def onMenuAction(self, kwargs):
+        if kwargs["menu_item"] == "deform_type":
+            # Get the index of the currently selected item
+            current = kwargs["deform_type"]
+    }}}
+
+
+== Reading menu settings == (settings)
+
+Whenever you include checkbox menu items (using [Hom:hou.ViewerStateMenu#addToggleItem]) or radio button items (using [Hom:hou.ViewerStateMenu#addRadioStrip]) in the context menu, Houdini passes the current state of those items in every `kwargs` dictionary passed to every event handler method.
+
+This makes it easy to check a menu setting to change how you handle a certain event. In the following example, the `onMouseEvent` code checks menu settings to change how it interprets mouse clicks.
+
+{{{
+#!python
+from __future__ import print_function
+
+
+# Class implementing the state behavior
+class MyState(object):
+    def __init__(self, state_name, scene_viewer):
+        self.state_name = state_name
+        self.scene_viewer = scene_viewer
+
+    def onMouseEvent(self, kwargs):
+        ui_event = kwargs["ui_event"]
+        if ui_event.device().isLeftButton():
+            # Check if the "Bend" checkbox item in the menu is on
+            if kwargs["bend"]:
+                option = kwargs["bend_parm_option"]
+                # ...
+            else:
+                # ...
+
+
+# Function to generate the state's context menu
+def create_menu():
+    menu = hou.ViewerStateMenu('bend_menu', 'Bend')
+
+    menu.addToggleItem( 'bend', 'Bend', True )
+
+    menu.addSeparator()
+
+    select_parm_menu = hou.ViewerStateMenu( 'select_parm_menu', 'Select Parm...' )
+    select_parm_menu.addRadioStrip( 'bend_parm_option', 'Bend Parm', 0 )  
+    select_parm_menu.addRadioStripItem( 'bend_parm_option', 'bend', 'Bend' )
+    select_parm_menu.addRadioStripItem( 'bend_parm_option', 'twist', 'Twist' )
+    select_parm_menu.addRadioStripItem( 'bend_parm_option', 'lengthscale', 'Length Scale' )
+    select_parm_menu.addRadioStripItem( 'bend_parm_option', 'taper', 'Taper' )
+    select_parm_menu.addRadioStripItem( 'bend_parm_option', 'squish', 'Squish' )
+
+    menu.addMenu(select_parm_menu)
+
+    return menu
+
+
+# Function to generate the state template, which describes the state and any
+# menus, handles, selectors, etc. bound to it
+def createViewerStateTemplate():
+    # Create the template object
+    template = hou.ViewerStateTemplate(
+        "mystate", "My State", hou.sopNodeTypeCategory()
+    )
+    # Bind the implementation class
+    template.bindFactory(MyState)
+
+    # Bind handles, selectors, menus...
+    template.bindMenu(create_menu())
+
+    return template
+}}}
+
+
+== Menu hotkeys == (hotkeys)
+
+NOTE:
+    The hotkey system in Houdini is in transition and may be replaced in a future version.
+
+* Houdini uses symbols (such as `h.pane.gview.world.selectall`) to represent hotkey-able actions instead of the key itself (such as `shift+p`) so users can edit them using the [hotkey editor|/ref/windows/hotkey].
+
+    When you build the state menu, you can create your own custom hotkey symbol, and assign it to menu items in the state context menu. This will allow users to assign a hotkey to the menu item.
+
+* The [Hom:hou.ViewerStateMenu#addActionItem], [Hom:hou.ViewerStateMenu#addToggleItem], and [Hom:hou.ViewerStateMenu#addRadioStripItem] methods accept Houdini _hotkey symbol_ strings as an optional argument.
+
+* Hotkey symbols have a dotted prefix that specifies in what _context_ the hotkey is usable (this allows the user to assign to same hotkey to different actions in different contexts).
+
+    For a SOP viewer state, the prefix for your hotkeys will be:
+
+    `h.pane.gview.state.sop.<<state_name>>.`
+
+    where <<state_name>> is the internal name for the state you specify when you [create the state template|python_states#install].
+
+* You will add a name for the specific action to the end of the context to make a hotkey symbol. So, for example, if you want to specify a Delete hotkey, you could use the symbol:
+
+    `h.pane.gview.state.sop.<<state_name>>.delete`
+
+{{{
+#!python
+import hou
+
+# Create hotkey symbols
+
+# Need to create the hotkey context first with addContext
+key_context = "h.pane.gview.state.sop.mystate"
+hou.hotkeys.addContext(
+    key_context, "mystate Operation",
+    "These keys apply to the mystate operation."
+)
+
+# Call addCommand with the symbol, a name, and a description
+del_key = key_context + ".delete"
+hou.hotkeys.addCommand(del_key, "Delete", "Delete the current change")
+dup_key = key_context + ".duplicate"
+hou.hotkeys.addCommand(
+    dup_key, "Duplicate", "Copies the current change into a new change"
+)
+end_key = key_context + ".finish"
+hou.hotkeys.addCommand(end_key, "Finish", "Saves the current change")
+
+# Build the menu
+menu = hou.ViewerStateMenu('bend_menu', 'Bend')
+# Call add*Item methods with the hotkey symbol as an extra argument 
+menu.addActionItem("delete", "Delete", del_key)
+menu.addActionItem("dup", "Duplicate", dup_key)
+menu.addActionItem("done", "Finish", end_key)
+}}}

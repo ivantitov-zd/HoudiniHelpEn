@@ -2,6 +2,7 @@
 
 #bestbet: vexpression
 
+
 == Overview ==
 
 Several nodes in Houdini let you write short VEX expressions or snippets of VEX code. For example, the [Point Wrangle|Node:sop/pointwrangle], [Attrib Wrangle|Node:sop/attribwrangle] geometry nodes; [Geometry Wrangle|Node:dop/geometrywrangle], and [Gas Field Wrangle|Node:dop/gasfieldwrangle] dynamics nodes, and [particle dynamics nodes|/dopparticles/].
@@ -85,7 +86,7 @@ NOTE:
     To access the value of a user created parameter, use `chv()` vex function.
 
 
-== Accessing geometry attributes == (attributes)
+== Accessing geometry attributes and info == (attributes)
 
 In the snippet, you can read/write the value of an attribute using `@<<attribute_name>>`.
 For example, to read or write to the `P` (position) attribute, use `@P` in the VEX code.
@@ -96,54 +97,92 @@ For example, to read or write to the `P` (position) attribute, use `@P` in the V
 
 * If you write to a `@attribute` in the VEX code and the attribute does not exist, Houdini will create it. (The Volume Wrangle node will _not_ create new volumes this way.)
 
-Houdini knows to cast certain attributes using the appropriate VEX datatype.
-The following table lists known attributes that are automatically cast.
-(Automatic casting does *not* work if you use `@opinput<<n>>_<<name>>` to access a different input.)
+* Houdini provides some attribute-like variables you can use in the snippet. `@elemnum` contains the number of the current element being processed. `@numelem` contains the total number of elements in the geometry/list. See [indexing variables#indexing] below.
+
+* Some nodes may provide additional attribute-like variables you can read to get computed information about the geometry. For example, in the [Volume Wrangle node|Node:sop/volumewrangle], you can use `@center` to get the center of the volume.
+
+* Houdini knows to cast [some commonly used attributes|#known] using the appropriate VEX datatype.
+The table of [known attributes below|#known] lists attributes that Houdini can automatically cast.
+
+	Houdini assumes all other `@` references are *float* unless you manually specify a different type.
+	To manually specify the VEX datatype for an attribute, add a character representing the type before the `@` sign.
+	For example, to cast the `foo` attribute as a string, you would use `s@foo`.
+
+	NOTE:
+		Automatic casting does *not* work if you use `@opinput<<n>>_<<name>>` to [access a different input|#other_inputs]. In that case, you must always specify the type.
+
+	The following table lists the available datatypes and the corresponding characters.
+
+	VEX type ||
+	    Syntax ||
+	`float` |
+	    `f@<<name>>`
+	`vector2` (2 floats) |
+	    `u@<<name>>`
+	`vector` (3 floats) |
+	    `v@<<name>>`
+	`vector4` (4 floats) |
+	    `p@<<name>>`
+	`int` |
+	    `i@<<name>>`
+	`matrix2` (2x2 floats) |
+	    `2@<<name>>`
+	`matrix3` (3x3 floats) |
+	    `3@<<name>>`
+	`matrix` (4x4 floats) |
+	    `4@<<name>>`
+	`string` |
+	    `s@<<name>>`
+
+
+=== Non-float attributes with known types === (known)
+
+As a convenience, you don't need to specify the type of the following commonly used attributes
+(Houdini knows what type they should be).
+Other attributes are assumed to be float unless you specify a type (see above).
+
+For example, in a VEX snippet you can just type `@Cd` instead of having to type `v@Cd` to specify that it's a vector.
+
+TIP:
+	See the [attributes page|/model/attributes] for information on commonly used attributes.
 
 VEX type ||
     Attribute names ||
     
 `vector` (3 floats) |
-    `@P`, `@accel`, `@center`, `@dPdx`, `@dPdy`, `@dPdz`, `@Cd`, `@N`,
-    `@scale`, `@force`, `@rest`, `@torque`, `@up`, `@uv`, `@v`
+    [@P|Attr:/model/attributes#p],
+    [@accel|Attr:/model/attributes#accel],
+    [@Cd|Attr:/model/attributes#cd],
+    [@N|Attr:/model/attributes#n],
+    [@scale|Attr:/model/attributes#scale],
+    [@force|Attr:/model/attributes#force],
+    [@rest|Attr:/model/attributes#rest],
+    [@torque|Attr:/model/attributes#torque],
+    [@up|Attr:/model/attributes#up],
+    [@uv|Attr:/model/attributes#uv],
+    [@v|Attr:/model/attributes#v]
+    
+    `@center`, `@dPdx`, `@dPdy`, `@dPdz` (see [Volume Wrangle|Node:sop/volumewrangle]).
 
 `vector4` (4 floats) |
-    `@backtrack`, `@orient`, `@rot`
+    [@backtrack|Attr:/model/attributes#backtrack],
+    [@orient|Attr:/model/attributes#orient],
+    [@rot|Attr:/model/attributes#rot]
 
 `int` |
-    `@id`, `@ix`, `@iy`, `@iz`, `@nextid`, `@pstate`, `@resx`, `@resy`, `@resz`,
-    `@ptnum`, `@vtxnum`, `@primnum`, `@numpt`, `@numvtx`, `@numprim`, `@group_*`
+    [@id|Attr:/model/attributes#id],
+    [@nextid|Attr:/model/attributes#nextid],
+    [@pstate|Attr:/model/attributes#pstate]
+    
+    `@elemnum`, `@ptnum`, `@primnum`, `vtxnum`, `@numelem`, `@numpt`, `@numprim`, `numvtx` (see [indexing variables|#indexing] below).
+    
+    `@group_*` (see [accessing group membership|#groups] below).
+    
+    `@ix`, `@iy`, `@iz`, `@resx`, `@resy`, `@resz` (see [Volume Wrangle|Node:sop/volumewrangle]).
 
 `string` |
-    `@name`, `@instance`
-
-All other `@` references are cast as *float*.
-To manually specify the VEX datatype for an attribute,
-you must add a character representing the type before the `@` sign.
-For example, to cast the `foo` attribute as a string, you would use `s@foo`.
-
-The following table lists the available datatypes and the corresponding characters.
-
-VEX type ||
-    Syntax ||
-`float` |
-    `f@<<name>>`
-`vector2` (2 floats) |
-    `u@<<name>>`
-`vector` (3 floats) |
-    `v@<<name>>`
-`vector4` (4 floats) |
-    `p@<<name>>`
-`int` |
-    `i@<<name>>`
-`matrix2` (2x2 floats) |
-    `2@<<name>>`
-`matrix3` (3x3 floats) |
-    `3@<<name>>`
-`matrix` (4x4 floats) |
-    `4@<<name>>`
-`string` |
-    `s@<<name>>`
+    [@name|Attr:/model/attributes#name],
+    [@instance|Attr:/model/attributes#instance]
 
 
 === Accessing attributes on other inputs === (other_inputs)
@@ -153,6 +192,73 @@ If the node has more than one input, you can get an attribute from a different i
 The "same element" may be the element with the same index in the other input (for example, when you're processing point number 10, `@opinput1_P` would give you the `P` attribute on point number 10 in the second input).
 
 However, nodes can have an "Attribute to Match" parameter that lets you match up "same" elements based on the value of an attribute. For example, if you used `id` as the "attribute to match", and you were processing a polygon with attribute `id` set to `12`, then `@opinput1_P` would give you the `P` attribute on the polygon in the second input that also has `id` set to `12`. Check the parameters of the node in which you're writing the snippet.
+
+
+== Indexing variables == (indexing)
+
+Most snippets involve looping over all the points/primitives in a geometry. You can also loop over a list of numbers from zero to some limit. It is often useful to know the number of the current element in the list you are looping over, and the total number of elements in the list.
+
+`@elemnum`:
+    The number of the current element.
+    
+    You can use `@elemnum` to be generic (or when you are iterating over numbers). If you know you are operating on points (for example), you could use `@ptnum` instead to be clearer, but at the risk that the code won't work if you change to operating on primitives or vertices.
+
+`@numelem`:
+    The total number of elements in the current geometry/list.
+    
+    You can use `@numelem` to be generic (or when you are iterating over numbers). If you know you are operating on points (for example), you could use `@numpt` instead to be clearer, but at the risk that the code won't work if you change to operating on primitives or vertices.
+
+`@ptnum`:
+    The point number of the current point, when the snippet is looping over points.
+    
+`@primnum`:
+    The primitive number of the current [primitive|/model/primitives], when the snippet is looping over primitives.
+    
+`@vtxnum`:
+    The vertex number of the current vertex, when the snippet is looping over vertices.
+
+`@numpt`:
+    The total number of points in the current geometry, when the snippet is looping over points.
+
+`@numprim`:
+    The total number of [primitives|/model/primitives] in the current geometry, when the snippet is looping over primitives.
+
+`@vtxnum`:
+    The _linear vertex number_. This counts over _all vertices in the geometry_, from 0 to the total number of vertices in the geometry - 1). It is different from the vertex's _primitive index_, which is the vertex's number within the primitive it is a part of.
+
+    The primitive number of the primitive this vertex is on is in `@primnum`. To get the primitive number an arbitrary linear vertex index is on, use [Vex:vertexprim]. To convert the linear vertex index into a vertex index within the primitive it is a part of, use [Vex:vertexprimindex]. When looping over vertices, the number of vertices in the current primitive is in `@numvtx`. To get the number of vertices on an arbitrary primitive, call [Vex:primvertexcount] with the primitive number.
+
+    For example, if you wanted to set a vertex attribute on the vertices of a polycurve to the proportional value along the curve, you would say:
+
+    {{{
+    #!vex
+    # Take linear vertex index and convert to primitive index
+    int vtx = vertexprimindex(0, @vtxnum)
+
+    # Set an attribute to the vertex number divided by the last index, so the
+    # values range from 0.0 to 1.0 along the length of the polycurve
+    f@prop = vtx / (float(@numvtx) - 1)
+    }}}
+
+`@numvtx`:
+    The total number of vertices in the current geometry, when the snippet is looping over vertices.
+
+NOTE:
+	The element number of the _last_ element is `@numelem - 1`, because the first item is numbered `0`.
+
+For example, to get a list of the points near the current point in a snippet:
+
+{{{
+#!vex
+int nbors[] = neighbours(0, @ptnum)
+}}}
+
+To read an attribute from the point _opposite_ the current point on a curve:
+
+{{{
+#!vex
+vector opposite_color = point(0, "Cd", (@numpt - 1) - @ptnum )
+}}}
 
 
 == Arrays ==
@@ -314,7 +420,7 @@ addvertex(geoself(), prim, p3);
 See [VEX geometry functions|geometry].
 
 
-== Accessing group membership ==
+== Accessing group membership == (groups)
 
 A special virtual attribute of the form `@group_<<groupname>>` lets you get or set group membership for the current element.
 

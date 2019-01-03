@@ -67,111 +67,190 @@ same in DOP and SOP modes.
 
 
 @parameters
-    Use External SOP:
+
+Use External SOP:
 	Since this node is itself a SOP network, if this toggle is not
 	set the SOP network used for solving is the contained network.
 
-    SOP Path:
-        #channels: /soppath
+SOP Path:
+    #channels: /soppath
 
-        Points to the SOP that is accessed on each timestep. 
-        
-        The global parameter listed above are set on this SOP node, so this is the
-        node that should be used as the first parameter in `stamp` or `stamps` expressions to access this information.
-        
-    Data Name:
-        #channels: /datapath
+    Points to the SOP that is accessed on each timestep. 
+    
+    The global parameter listed above are set on this SOP node, so this is the
+    node that should be used as the first parameter in `stamp` or `stamps` expressions to access this information.
+    
+Data Name:
+    #channels: /datapath
 
-        The name of the Geometry data on the simulation object that
-        should be processed by this solver. 
-        
-        Usually this will be the
-        main geometry for an object, named `Geometry`, but this is not
-        required.
+    The name of the Geometry data on the simulation object that
+    should be processed by this solver. 
+    
+    Usually this will be the
+    main geometry for an object, named `Geometry`, but this is not
+    required.
 
-	They type of the data should be `Geometry`, `Scalar Field`, `Vector
-	Field`, or `Matrix Field`.  If it is `Geometry`, the output of the
-	SOP network is made the new data value.  If it is a field
-	type, the first volumes (regardless of name) in the output
-	will be sampled to become the new field values.  The fields
-	will not change size or resolution. 
+    The type of the data should be `Geometry`, `Scalar Field`, `Vector
+    Field`, or `Matrix Field`.  If it is `Geometry`, the output of the
+    SOP network is made the new data value.  If it is a field
+    type, the first volumes (regardless of name) in the output
+    will be sampled to become the new field values.  The fields
+    will not change size or resolution. 
 
-    Invoke Compiled Block:
-	To run a SOP solver, a copy of the geometry has to be made to
-	ensure the SOPs can still read the original, unmodified, geometry
-	during the solve.  This adds a considerable overhead to a SOP
-	solver, however.
+Invoke Compiled Block:
+    To run a SOP solver, a copy of the geometry has to be made to
+    ensure the SOPs can still read the original, unmodified, geometry
+    during the solve.  This adds a considerable overhead to a SOP
+    solver, however.
 
-	If the SOP Path refers to a compiled block, or an Output SOP
-	connected directy to a compiled block, the block can be directly
-	invoked.  Doing so allows the copy to be avoided and instead the
-	geometry manipulated in-place.
+    If the SOP Path refers to a compiled block, or an Output SOP
+    connected directly to a compiled block, the block can be directly
+    invoked.  Doing so allows the copy to be avoided and instead the
+    geometry manipulated in-place.
 
-	The compile block's output becomes the new version of the solved data.
-	An input named "data" will be given the original version solved
-	data.
+    The compile block's output becomes the new version of the solved data.
+    An input named "data" will be given the original version solved
+    data.
 
-    Number of Additional Inputs:
-	It is possible to bind additional inputs to the invoked compile
-	block.  If the compile block has a named input matching one of these,
-	it will gain the corresponding geometry when invoked.  The normal
-	rules to transform DOP Data into Geometry are performed, so Scalar
-	Fields will be imported as Volumes, etc.
+Primary Input:
+    Controls which input gets the original version of the solved data.
+    By default this is "data".
 
-	Input Name:
-	    The name of the input to bind to.  The compile block begin
-	    with the matching name will be wired to this data.
-	Source:
-	    Where to gain the geometry from.
-	    
-	    This Object's Data:
-		Data attached to the currently solved object will be used.
-		Note that you cannot refer to the data being currently
-		solved as it is being solved in-place.
-	    Object's Data:
-		Data attached to another object in the simulation.
-	    Relationship's Data (Packed):
-		A relationship defines a link between this object
-		and many other objects.  This brings in all the other
-		objects that match that relationship.  The resulting
-		geometry consists of many packed primitives, one per
-		object, that contain the respective data.
-	    Solve Metadata:
-		An empty geometry with detail attributes that provide
-		the current status of the solver.
-	Object Name:
-	    Which object to fetch data from.
-	Relationship:
-	    The relationship to use to determine which objects to fetch.
-	Data Name:
-	    What data on the object to acquire and convert to geometry.
-	Fetch Time:
-	    When to fetch the data.  A SOP Solver solves a window of
-	    time, so it may be necessary to get the data either at
-	    the start or end of that window.
+    NOTE:
+	If you try to load this data using an [Object Merge|Node:sop/object_merge] or [DOP Import|Node:sop/dopimport], you will get an empty geometry as it has been removed from
+	the DOP simulation so it can be solved in place!
+
+Num Extra Inputs:
+    It is possible to bind additional inputs to the invoked compile
+    block.  If the compile block has a named input matching one of these,
+    it will gain the corresponding geometry when invoked.  The normal
+    rules to transform DOP Data into Geometry are performed, so Scalar
+    Fields will be imported as Volumes, etc.
+
+    Input Name:
+	The name of the input to bind to.  The compile block begin
+	with the matching name will be wired to this data.
+
+    Source:
+	Where to gain the geometry from.
 	
-    SOP Output is in Simulation Space:
-        When extracting the geometry from the SOP at each timestep,
-        turning on this parameter will cause the SOP Solver to transform
-        the geometry from world space to local object space. 
-        
-        NOTE:
-	    When data is pulled into SOP using the [Object Merge
-	    SOP|Node:sop/object_merge], it is extracted into world space, so
-	    this option will often need to be turned on. Alternatively a DOP
-	    Transform SOP can be used at the SOP level to change the geometry
-	    from one space to another, rather than using this option.
+	This Object's Data:
+		Data attached to the currently solved object will be used.
+		
+		NOTE:
+		    You cannot refer to the data being currently solved as it is being solved in-place.  Specifically, the data specified by the Data Name parameter and any extra output is not available.
+		    
+	Object's Data:
+		Data attached to another object in the simulation.
+		
+	Relationship's Data (Packed):
+		A relationship defines a link between this object and many other objects.  This brings in all the other objects that match that relationship.  The resulting 	geometry consists of many packed primitives, one per object, that contain the respective data.
 
-    Solve Objects on Creation Frame:
-        Causes the SOP Solver to operate on an object even on the frame
-        in which the object enters the simulation. 
-        
-	    If you want to bring an object into a simulation and not modify it on the initial frame, turn this option off.
+	    Additional primitive attributes are present on each packed
+	    primitive to describe the object
 
-    [Include:standard_solver_parms]
+	    `objid`:
+		Unique integer id of the object.
+	    `objname`:
+		The name of the object, note DOPs allows duplicate names.
+	    `bounce`:
+		The Bounce Physical Parameter.
+	    `bounceforward`:
+		The Bounce Forward Physical Parameter.
+	    `friction`:
+		The Friction Physical Parameter.
+	    `dynamicfriction`:
+		The Dynamic Friction Physical Parameter.
+	    `temperature`:
+		The Temperature Physical Parameter.
+	    `pscale`:
+		The Thickness of the Surface Collision Parameter.
+
+    Solve Metadata:
+	An empty geometry with detail attributes that provide the current status of the solver.
+	
+	`simtime`:
+	    Current simulation time.
+	`startsimtime`:
+	    Simulation time of the start of the current solve step.
+	`endsimtime`:
+	    Simulation time of the end of the current solve step.
+	`time`:
+	    Current Houdini time.
+	`timestep`:
+	    Duration of current solve step.
+	`objid`:
+	    Unique object id of object currently being solved
+	    by this sop solver.  This doesn't exist when
+	    solving relationships.
+	`objname`:
+	    Current name of the solving object.  May be duplicate
+	    in DOPs.  Will be present for relationships.
+	`dopnet`:
+	    Path of the DOP network currently solving.
+	`datapath`:
+	    Full path to geometry this sop solver is being
+	    asked to process.
+	`dataname`:
+	    Name of the data this sop solver is being
+	    asked to process.
+	    
+    Object Name:
+	Which object to fetch data from.
+    Relationship:
+	The relationship to use to determine which objects to fetch.
+    Collider Labels:
+	Objects can have a collider label to provide a hint of how the
+	user wants them to be used by various solvers.  The Use Solver
+	Default, Use Volume Collisions and Use Surface Collisions options
+	of the Static Object are such an example.  This lets you filter
+	the objects found in a relationship collision by a label in addition
+	to by the relationship type.
+    Data Name:
+	What data on the object to acquire and convert to geometry.
+    Fetch Time:
+	When to fetch the data.  A SOP Solver solves a window of
+	time, so it may be necessary to get the data either at
+	the start or end of that window.
+
+Num Extra Outputs:
+    It is possible to define a compiled sop network with more than
+    one output node.  This is done with the Primary Path.  In order
+    to process multiple geometry in-place, these extra outputs can
+    be specified here.
+
+    Input Name:
+	The name of the Block Begin Compile SOP that will receive
+	the original version of this geometry.
+    Data Name:
+	The data on this object to solve with this output.
+    SOP Path:
+	The path to the compile end node whose results will replace
+	the data.  Note this is relative to this node, so often
+	can simply be the name of the node.
+
+SOP Output is in Simulation Space:
+    When extracting the geometry from the SOP at each timestep,
+    turning on this parameter will cause the SOP Solver to transform
+    the geometry from world space to local object space. 
+    
+    NOTE:
+    When data is pulled into SOP using the [Object Merge
+    SOP|Node:sop/object_merge], it is extracted into world space, so
+    this option will often need to be turned on. Alternatively a DOP
+    Transform SOP can be used at the SOP level to change the geometry
+    from one space to another, rather than using this option.
+
+Solve Objects on Creation Frame:
+    Causes the SOP Solver to operate on an object even on the frame
+    in which the object enters the simulation. 
+    
+    If you want to bring an object into a simulation and not modify it on the initial frame, turn this option off.
+
+[Include:standard_solver_parms]
 
 @inputs
-    [Include:standard_data_inputs]
+    [Include:standard_microsolver_inputs]
 
 @outputs
     [Include:standard_data_outputs]

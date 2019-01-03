@@ -13,28 +13,25 @@
 
 To apply a texture image to a 3D model, you must first create _flattened_ version of the 3D geometry in texture space, so the computer knows how to map pixels in the flat image onto points on the 3D surface. This flattened representation of the model is stored as UV coordinates in an attribute (usually `uv`) on each vertex of the geometry.
 
-This node works in two steps. It takes individual texture pieces (defined by _seams_ that cut the model's geometry up into smaller pieces that are easier to work with) and _flattens_ them into 2D texture space, trying to equalize polygon size. Then it lays out or _packs_ all the flattened pieces into the available texture space as efficiently as possible (using the same algorithm as the [UV Layout node|Node:sop/uvlayout]) to maximize coverage.
+This node works in two steps. It takes individual texture pieces (defined by _seams_ that cut the model's geometry up into smaller pieces that are easier to work with) and _flattens_ them into 2D texture space, trying to equalize polygon size.
 
-You can use the tools in this node (cut, join, pin, align, straighten) to give the node hints to help it give better results.
+NOTE:
+	This node packs the UV pieces using an algorithm optimized for interactivity. To get more options and the most efficient packing, follow this node with a [UV Layout node|Node:sop/uvlayout].
 
-//:vimeo:UV flatten
-//    #id: 116671338
+This node lets you add [constraints|#constraints] for the flattening algorithm. Constraints force the layout algorithm to satisfy certain conditions, giving you extra control over the final UV layout.
 
-
-== Set up the viewer to show UVs == (views)
-
-By default, the Houdini viewer only shows one view, the Perspective view ("Persp"). You can  
-
-* To switch a viewport to show UV space, click the View menu (the left menu in the top right corner of a viewport) and choose __Set view > UV Viewport__, or hover the mouse over the viewport and press ((Space + 5)).
-
-* The Scene View can be split into multiple viewports. You may want to split the viewer so you can see/work on the 3D model in the Perspective view and the UVs in the UV View at the same time.
-
-	To set how the viewer is split, click the [Icon:VIEW/layout_single] layout menu icon at the far right end of the viewer tool, then select a layout such as [Icon:VIEW/layout_quad] "Four views" or [Icon:VIEW/layout_tall2] "Two views side-by-side".
-	
-	Then you can switch one of the views to show UVs (see above).
+You can use this node interactively, using the tools in the node's state to specify constraints, or you can turn off __Manual layout__ and use the node procedurally.
 
 
-== Using the UV Flatten tool == (howto)
+== Workflow == (howto)
+
+:task: Set up the viewer to show UVs:
+
+	By default, the Houdini viewer only shows one view, the Perspective view ("Persp"). You can switch to a multi-viewport layout and then switch one of the viewports to show the current network's geometry in UV space.
+
+	* To set how the viewer is split, click the [Icon:VIEW/layout_single] layout menu icon at the far right end of the viewer tool, then select a layout such as [Icon:VIEW/layout_quad] "Four views" or [Icon:VIEW/layout_tall2] "Two views side-by-side".
+
+	* To switch a viewport to show UV space, click the View menu (the left menu in the top right corner of a viewport) and choose __Set view > UV Viewport__, or hover the mouse over the viewport and press ((Space + 5)).
 
 :task: Use UV Flatten to lay out a model's texture space:
 
@@ -47,6 +44,22 @@ By default, the Houdini viewer only shows one view, the Perspective view ("Persp
 	# Use the controls in the operation toolbar (across the top of the viewer) or in the parameter editor to change how the node works.
 	
 	*Note* most geometry will flatten into self-overlapping pieces at first. For example, if you apply UV Flatten to a torus, the node will simply project the top and bottom of the torus down on top of each other in the UV plane. You need to [cut UV seams|#seams] to allow the node to "unwrap" separate 3D pieces into non-overlapping flat pieces.
+
+:task: Add constraints:
+	When the node's state is active in the viewer, you can use the tool icons in the operation toolbar at the top of the viewer to switch between tools allowing you add constraints by clicking the viewer.
+
+	(You can also switch tools using the ((RMB)) context menu in the viewer.)
+
+	See [quick selection|#quick] for how to switch some tools between working immediately when you click, or waiting for you to make a selection and press ((Enter)).
+
+:task: Remove a constraint:
+	* To remove a [seam|#seams], use the Sew tool.
+
+	* To remove a [pin#pins], click the pin to select it, then press ((Del)).
+
+	* To remove an [alignment or straighten|#align] constraint, click one of the aligned edges to select it, then press ((Del)).
+
+	* To remove a [rectangular|#rectify] constraint, click a rectangular-ized region to select it, then press ((Del)).
 
 :task: Show the UV Flatten interface back in the viewer again:
 	If you ever press ((Esc)) to switch to the View tool, or switch to a different node, the viewer will switch to show the interface for the new tool.
@@ -62,27 +75,54 @@ By default, the Houdini viewer only shows one view, the Perspective view ("Persp
 		If you've [pinned|#pins] any pieces, they won't move/resize when you change the packing area.
 
 
-== Creating seams == (seams)
+== Quick selection == (quick)
 
-You will usually need to manually specify seams along which to cut the model into texture pieces or _islands_. You will usually need to cut geometry into at least a few pieces to prevent them from overlapping when flattened.
+* When quick selection is on (the default), certain tools react immediately to clicks:
+
+	* In the Cut tool, clicking an edge makes the edge a seam.
+
+	* In the Sew tool, clicking a seam edge removes the seam.
+
+	* In the Rectify tool, the tool highlights quad grid regions as you move the mouse pointer over them. Clicking in a quad grid region will select the entire region (you still need to press ((Enter)) to apply the constraint).
+
+* When quick selection is off, you must select points/edges/faces, then press ((Enter)) in all tools.
+
+:task: Turn Quick Selection on or off:
+	In the viewer, right-click and choose __Quick Selection__.
+
+
+== Understanding manual layout == (manual)
+
+There are two ways of using UV Flatten: interactively, and procedurally. You can switch between them, but you should understand the difference in how the node works.
+
+* When you use the node *interactively* (the default), the node will apply some constraints (__Layout constraints__) such as cutting seams before packing, then use the shapes influenced by those constraints to pack the pieces. Then, you can create more constraints interactively (for example, cutting more seams or pinning UVs). These constraints (__Flattening constraints__) are applied _on top of_ the packed layout.
+
+	This is because re-packing after each small change could radically alter the layout, making it extremely hard to work interactively with the pieces jumping around. By applying interactive changes _post-packing_, pieces won't move as you work on them.
+	
+	When you want to "commit" your interactive changes and re-pack for the most efficient layout with the new constraints, click the __Repack__ button in the operation toolbar at the top of the viewer. When you click __Repack__, the node _copies_ the post-packing "flattening" constraints you added interactively into the pre-packing "layout" constraints parameters. The node then repacks the pieces taking those constraints into account.
+	
+	You can work in a cycle like this, making interactive changes, repacking to see their effect on the layout, and then making more interactive changes if necessary.
+
+* You might not care about flattening interactively and want the node to work *procedurally*. For example, you might calculate the seams somehow using a script. Or you might have existing islands and just want to use this node for layout and/or relaxing the UVs. In this case you want changes to the parameters to be immediately visible in the output, without having to click __Repack__.
+
+	To set the node to work procedurally, turn on the __Enable manual layout__ parameter (under the __Layout constraints__).
+
+	When __Enable manual layout__ is on, the "Flattening" constraints are _the only constraints_, and they are applied _before packing_. There are no post-packing constraints. Any values in the "Layout" constraints parameters are ignored.
+
+	In this mode, any changes you make to the "Flattening" constraints immediately changes the node's output.
+
+
+== Seams == (seams)
+
+Seams specify where the algorithm will cut the geometry into pieces. If a model has no seams at all, this node will fall back to simply projecting the geometry down onto the UV plane. Unless a model is extremely simple, this will produce bad distortion and overlap of UV pieces.
+
+This node will not automatically add seams. You can precede this node with a [UV Autoseam|Node:sop/uvautoseam] node, and/or manually cut seams using the Cut tool. You will usually need to cut geometry into at least a few pieces to prevent them from overlapping when flattened.
 
 :task: Cut seams interactively in the UV Flatten tool:
 
 	# Click the [Icon:BUTTONS/texture_cut_seams] Cut icon in the operation toolbar (across the top of the viewer).
 	
 	# Whether [secure selection|#secure] is on or off changes how the cut tool works. See [secure selection|#secure] below.
-
-:task: Cut seams by selecting them _before_ using UV Flatten:
-
-	If the geometry has an [edge group|/model/groups] named `seams`, the node will automatically cut seams along those edges.
-	
-	For example, you can create an edge group using the [Group node|Node:sop/group]:
-	
-	# Before using UV Flatten, click the [Icon:TOOLS/select_component] Select tool, and right-click the [Icon:TOOLS/select_edges] component select mode icon and choose Edges (or press ((3))).
-	
-	# Select edges on the model that should separate texture pieces.
-	
-	# Use the ((Tab)) menu to add a [Group node|Node:sop/group]. In the parameter editor, set the __Base group__ name to `seams`.
 
 :task: Join seams back together:
 	# Click the [Icon:BUTTONS/texture_merge_seams] Join icon in the operation toolbar (across the top of the viewer).
@@ -110,16 +150,9 @@ You will usually need to manually specify seams along which to cut the model int
 * Island boundary edges are bright green in the UV view. "New" seams (in the __Post-packing__ parameter) have a thicker line.
 
 
-=== Cut/join and secure selection === (secure)
-
-The cut and join tools work slightly differently based on whether [secure selection mode|/basics/select#secure] is on or off. When secure selection is *off*, clicking edges cuts/joins them instantly. When secure selection is *on*, you select one or more edges and press ((Enter)) to cut/join them all at once.
-
-To toggle secure selection, right-click the [Icon:TOOLS/select][Icon:TOOLS/select_component] Select tool and turn __Secure selection__ on or off in the menu (or press [Shift + ~|Key:h.pane.gview.secureselection]). However you should remember that secure selection mode changes how selection works *in all tools*. See [the documentation for secure selection|/basics/select#secure] for more information.
-
-
 == Pinning vertices == (pins)
 
-_Pinning_ a vertex locks it to the pin's UV coordinates. When the node recomputes flattening and layout, the vertex will stay in place. (You can however move the vertex manually by moving the pin.)
+A pin keeps a single point on a piece at the same UV coordinates.  When the node recomputes flattening and layout, the vertex will stay in place. However, dragging a pin will move the pinned point, and all other unconstrained points will move/rotate to accomodate the new pin position. (You can use this to rotate an island, by pinning the rotation pivot, then adding a second pin and dragging it around the first.)
 
 :task: Pin vertices in place:
 	# Click the [Icon:DOP/constraint] Pin icon in the operation toolbar (across the top of the viewer).
@@ -169,54 +202,42 @@ TIP:
 	
 	# Select the vertices you want to align with each other, then press ((Enter)).
 	
-	# Currently the tool aligns in U (horizontally) by default. 
-	
-		If you want to align in V (vertically) instead, the current interface is less than ideal. First, expand the __Axis aligned vertex groups__ heading in the parameter editor. Find the alignment constraint you just created at the end of the list of constraints under the heading. Change the __Align parallel to__ parameter for that constraint to "V Axis".
-
-		This should be fixed in a future release.
+		The tool uses a heuristic to choose to align to U or V based on which axes the points are closer to. If you want to change the alignment axis, expand the __Axis aligned vertex groups__ heading in the parameter editor, find the alignment constraint you just created (at the end of the list of constraints), and change the __Align parallel to__ parameter for that constraint.
 
 :task: Repack the pieces taking into account new straighten/align constraints:
 	Click the __Repack__ button in the operation toolbar (across the top of the viewer).
 
 
-== Visualize UV space distortion == (visualize)
+== Making quads rectangular == (rectify)
 
-Houdini starts with a UV distortion visualizer already configured, but disabled by default.
+For regions containing a regular grid of quadrilateral polygons, you can constrain those polygons to lay out as a rectangular grid aligned along the UV axes. This reduces distortion and can make the layout clearer.
 
-:task: Turn on the UV distortion visualizer:
-	# Right click the [Icon:VIEW/visualization] Visualization icon in the View toolbar (along the right side of the 3D viewer).
-	
-	# Turn on the checkbox next to the "UV Distortion" visualizer.
+[Image:/images/uv/rectify_before.jpg] [Image:/images/uv/rectify_after.jpg]
 
-:task: Change the UV distortion visualizer settings:
-	# Right click the [Icon:VIEW/visualization] Visualization icon in the View toolbar (along the right side of the 3D viewer).
-	
-	# Turn on the [Icon:BUTTONS/edit] Edit icon to the right of the "UV Distortion" visualizer.
-	
-		* UV distortion is a range from `-n` to `+n`, so the visualizer should have __Set using__ as "Center and Width", and the __Center__ set to `0`. You can change the width based on the amount of distortion, but `2` or `3` are usually good values.
-	
-		* You can change the __Color Ramp__ preset to visualize the distortion using different colors.
+:task:
+	# Click the [Icon:BUTTONS/texture_rectanglize] Rectify icon in the operation toolbar (across the top of the viewer).
+
+	# If [Quick Selection|#quick] is on, this tool highlights quad grid regions as you move the mouse pointer over them, and selects the entire region with one click. If Quick Selection is off, you must select all the primitives you want to align and then press ((Enter)).
 
 
-== Understanding manual layout == (manual)
+== Visualization == (viz)
 
-There are two ways of using UV Flatten: interactively, and procedurally. You can switch between them, but you should understand the difference in how the node works.
+When the tool's state is active in the viewer, it overlays a pattern on the model allowing you to visualize the UVs. This can make it obvious where you have distortion or overlap.
 
-* When you use the node *interactively* (the default), the node will apply some constraints (__Layout constraints__) such as cutting seams before packing, then use the shapes influenced by those constraints to pack the pieces. Then, you can create more constraints interactively (for example, cutting more seams or pinning UVs). These constraints (__Flattening constraints__) are applied _on top of_ the packed layout.
+:task: Turn the overlay off:
+	In the viewer, right-click and choose __Visualize texture > Off__.
 
-	This is because re-packing after each small change could radically alter the layout, making it extremely hard to work interactively with the pieces jumping around. By applying interactive changes _post-packing_, pieces won't move as you work on them.
-	
-	When you want to "commit" your interactive changes and re-pack for the most efficient layout with the new constraints, click the __Repack__ button in the operation toolbar at the top of the viewer. When you click __Repack__, the node _copies_ the post-packing "flattening" constraints you added interactively into the pre-packing "layout" constraints parameters. The node then repacks the pieces taking those constraints into account.
-	
-	You can work in a cycle like this, making interactive changes, repacking to see their effect on the layout, and then making more interactive changes if necessary.
+:task: Turn off display of materials/textures so you can see the overlay better:
+	In the display toolbar on the right side of the menu, turn off the [Icon:VIEW/materials] Display Materials on Objects button.
 
-* It is possible you don't care about flattening interactively and want the node to work *procedurally*. For example, you might calculate the seams somehow using a script. Or you might have existing islands and just want to use this node for layout and/or relaxing the UVs. In this case you want changes to the parameters to be immediately visible in the output, without having to click __Repack__.
+:task: Change the overlay pattern:
 
-	To set the node to work procedurally, turn on the __Enable manual layout__ parameter (under the __Layout constraints__).
+	In the viewer, right-click and choose __Visualize texture__, then choose a pattern.
 
-	When __Enable manual layout__ is on, the "Flattening" constraints are _the only constraints_, and they are applied _before packing_. There are no post-packing constraints. Any values in the "Layout" constraints parameters are ignored.
+	Turn on __Display orientation glyph__ in this menu to add an "L" shape to the pattern to help you tell when the texture is right-side-up.
 
-	In this mode, any changes you make to the "Flattening" constraints immediately changes the node's output.
+:task: Change the overlay scale:
+	In the viewer, scroll ((mouse_wheel)) up or down to change the scale of the overlay pattern.
 
 
 @parameters
@@ -231,13 +252,13 @@ Flattening Method:
 	How to flatten 3D geometry into 2D texture space. The node has two different methods that allow different hints (constraints) and have different efficiencies. Both methods are designed to minimize _angular distortion_, meaning that angles in the texture image should appear correct when projected onto the textured 3D surface. The methods differ mainly in how to handle _area distortion_, that is keeping polygons roughly the same size in texture space.
 	
 	Spectral (SCP):
-		The default. Tends to be faster than ABF. Allows preserving island shapes. Allows aligning selected edges to UV grid.
+		The default. Faster, more robust, slightly lower quality than Angle Based.
 	
 	Angle Based (ABF):
-		Slightly slower than SCP but produces less area distortion. Allows straightening of edge groups and quad patches.
+		Slower, may not always solve, higher quality (less area distortion).
 
 
-~~~~ Existing UVs ~~~~
+== Existing UVs ==
 
 What to do with existing texture pieces if there are already texture coordinates in the __UV attribute__.
 
@@ -251,7 +272,7 @@ Preserve Island Boundary Shapes (SCP only):
 	Preserves the shape of any existing UV islands (allowing them to rotate or scale), and re-flattens their interior UVs. You can turn on this option _and_ __Preserve layout__ if you want to preserve existing islands in-place but relax their UVs.
 
 
-~~~~ Flattening constraints ~~~~
+== Flattening constraints ==
 
 Seams:
 	#id: seamgroup
@@ -260,58 +281,64 @@ Seams:
 
 	See [understanding manual layout|#manual] above for more information.
 
-div style="margin-left: 2em">>
-	~~~~ Vertex pins ~~~~
 
-	::Enable pins:
-		#id: usepins
+Rectify group:
+	#id: rectifygroup
 
-		A "master switch" to enable or disable all pins.
+	A set of edges defining a rectangular grid of quadrilateral polygon. The [tool|#rectify] lists all edges in the selected region, but if you are filling this field in procedurally, it's sufficient to fill in only the _horizontal_ vertex edges. This is a list of [vertex edges|#vedges].
 
-	This section contains a multiparameter where each item corresponds to a pin. You can edit the pins by changing the parameters but it is usually easier to change them interactively. See [pinning vertices|#pins] above.
+
+~~~~ Vertex pins ~~~~
+
+Enable pins:
+	#id: usepins
+
+	A "master switch" to enable or disable all pins.
+
+This section contains a multiparameter where each item corresponds to a pin. You can edit the pins by changing the parameters but it is usually easier to change them interactively. See [pinning vertices|#pins] above.
+
+Primitive/Vertex:
+	The primitive number of the polygon containing the pinned vertex and the sequential index of the pinned vertex in that polygon. 
 	
-	::Primitive/Vertex:
-		The primitive number of the polygon containing the pinned vertex and the sequential index of the pinned vertex in that polygon. 
-		
-	::UV:
-		The coordinates to pin the vertex to.
-		
-	::Reference UV:
-		The UV coordinates of the next vertex in the same polygon. It is ignored unless the pin is the only pin in its respective island. Mainly used in interactive state.
-
-
-	~~~~ Axis-aligned vertex groups ~~~~
-
-	::Enable Axis Alignment:
-		#id: usealignments
-
-		A "master switch" to enable or disable all alignment constraints.
-
-	This section contains a multiparameter where each item corresponds to an alignment constraint. You can delete individual constraints here. See [aligning edges|#align] above.
+UV:
+	The coordinates to pin the vertex to.
 	
-	::Group:
-		The vertices to line up. Note that it is enough include only one of possibly several vertices in the island wired to the same point.
-		
-	::Align Parallel To:
-		Axis along which to line up.
+Reference UV:
+	The UV coordinates of the next vertex in the same polygon. It is ignored unless the pin is the only pin in its respective island. Mainly used in interactive state.
 
 
-	~~~~ Straightened Loops (ABF only) ~~~~
+~~~~ Axis-aligned vertex groups ~~~~
 
-	::Enable Loop Straightening:
-		#id: usestraightenings
+Enable Axis Alignment:
+	#id: usealignments
 
-		A "master switch" to enable or disable all straightening constraints.
+	A "master switch" to enable or disable all alignment constraints.
 
-	This section contains a multiparameter where each item corresponds to a straightening constraint. You can delete individual constraints here. See [straightening edges|#align] above.
+This section contains a multiparameter where each item corresponds to an alignment constraint. You can delete individual constraints here. See [aligning edges|#align] above.
+
+Group:
+	The vertices to line up. Note that it is enough include only one of possibly several vertices in the island wired to the same point.
 	
-	::Group:
-		#id: straight_group
-		
-		A group of vertices that describe a sequence of edges to be forced into a straight line. Each vertex represents the edge between that vertex and the its subsequent vertex in its respective polygon. (You can't simply define these using edge groups because seam edges are shared between islands, so straightening would have to be applied to all the affected islands at once.)
+Align Parallel To:
+	Axis along which to line up.
 
 
-~~~~ Layout constraints ~~~~
+~~~~ Straightened Loops (ABF only) ~~~~
+
+Enable Loop Straightening:
+	#id: usestraightenings
+
+	A "master switch" to enable or disable all straightening constraints.
+
+This section contains a multiparameter where each item corresponds to a straightening constraint. You can delete individual constraints here. See [straightening edges|#align] above.
+
+Group:
+	#id: straight_group
+	
+	A group of vertices that describe a sequence of edges to be forced into a straight line. This is a list of [vertex edges|#vedges].
+
+
+== Layout constraints ==
 
 Enable manual layout:
 	Switches the node to work non-interactively. The Flattening constraints will be applied before packing, and the Layout constraints will be ignored. This allows you to use the node procedurally, where changes to the parameters immediately change the node's output, without having to click __Repack__.
@@ -326,7 +353,7 @@ Seams:
 	See [understanding manual layout|#manual] above for more information.
 
 
-~~~~ Output groups ~~~~
+== Output groups ==
 
 Seams:
 	#id: outputseams
@@ -339,7 +366,7 @@ Constrained Islands:
 	Turn the checkbox next to this parameter on to create a primitive group in the output containing the polygons in all islands that have a pin, axis-alignment, or straighten constraint.
 
 
-~~~~ Packing area ~~~~
+== Packing area ==
 
 Controls the area of texture space within which the node will try to pack the texture pieces. You can use these parameters to position the area exactly, or drag the corners or sides of the box handle in the UV view when this node is active.
 
@@ -350,13 +377,24 @@ Size:
 	The width and height of the packing area, in UV units.
 
 
+== About vertex edge groups == (vedges)
+
+:fig:[Image:/images/uv/vertex_edge.svg]
+
+	The rectify group and straightened group fields contain list of _vertex edges_. Each edge is represented by a vertex number. Each vertex number implies a vertex edge from that vertex to the next vertex clockwise.
+
+	These fields have to use vertices instead of primitive edges because primitive edges are _shared_ between the polygons on either side. If that particular edge was a seam, it wouldn't be clear which side was supposed to be aligned.
+
+
 @related
 
 - [/shade/textures]
+- [Node:sop/uvautoseam]
+- [Node:sop/uvlayout]
 - [Node:sop/uvproject]
 - [Node:sop/uvquickshade]
 - [Node:sop/texture]
 - [Node:sop/uvpelt]
 - [Node:sop/uvunwrap]
-- [Node:sop/uvlayout]
+
 

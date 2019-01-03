@@ -68,6 +68,46 @@ table>>
         td>> Float
         td>> Multiplier for the mass density of a Solid Object.
 
+== Material Space Attributes ==
+
+The attribute `materialP` can be thought of as the positions of the simulated object in the material space.
+`materialP` is the undeformed configuration relative to which the current position `P` determines the deformation of a simulated object. 
+`materialP must stay the same throughout the entire simulation.
+The finite element solver relies on assumption that the `materialP` attribute remains unchanged from frame to frame; it should never be modified externally (e.g., through a SOP solver) otherwise bad simulation results will be produced.
+
+In the case where no __Rest Shape__ is specified and nor `restP` attribute is provided, `materialP` can be thought of as a permanent rest position.
+If no animation of the rest position is required in a sim, only `materialP` should be specified (no `restP`).
+At any stage in the simulation, it is the mapping from `materialP` to the current `P` that determines the deformation of tets in simulated objects.
+The deformation in turn defines the energy stored inside the object.
+
+The attribute `materialuvw` can be used to specify a UVW parametrization of the material space.
+The U, V and W directions that are implied by `materialuvw` matter if the anisotropic controls are used or when the fiber controls are used on a simulated object.
+For the FEM muscle simulation use case, the fiber controls are an important tool for controlling muscle contraction.
+
+Similar to `materialuvw`, the `materialuv` attribute can be used to specify UV directions for cloth. This attribute is essential for triangle meshes, in particular, to define the warped and weft directions for cloth.
+
+table>>
+    tr>>
+        th>> Name
+        th>> Class
+        th>> Type
+        th>> Description
+    tr>>
+        td>> `materialP`
+        td>> Point
+        td>> Vector
+        td>> Material position of each point.
+    tr>>
+        td>> `materialuvw`
+        td>> Point or Vertex
+        td>> Vector
+        td>> Local material uvw coordinates for each point or vertex of a tet.
+    tr>>
+        td>> `materialuv`
+        td>> Point or Vertex
+        td>> Vector
+        td>> Local material uvw coordinates for each point or vertex of a polygon or polysoup.
+
 == Fracturing Control Attributes ==
 
 When you create a simulation with fracturing, it is recommended to specify chunks of tetrahedrons that you want to stay together. Otherwise, the fracturing process may create a very large amount of separate pieces, many of which may consist of single tetrahedrons. For this purpose, you can assign a nonnegative integer to each chunk using the `fracturepart` attribute. In areas where you don't want to specify parts, you can set `fracturepart` to -1, which means that each primitive in that region will become its own part. Real-life materials tend not to be equally strong everywhere. For realistic results, it is recommended to vary the __Fracture Threshold__ locally using the vertex attribute `fracturethreshold`.
@@ -107,7 +147,14 @@ table>>
                
 == Reference Attributes ==
 
-The attribute `restP` can be used to specify the rest position for all the object points. The attribute `materialP` is similar to the rest position, but it must not be changed during a simulation. Among other things, `materialP` defines the mass and the strength of the internal forces that act within the simulation geometry. The attribute `materialP` can be thought of as an initial rest position.
+The attribute `baseP` can be used to specify a generic base position for all the object points. This attribute's values must not be changed during a simulation. When the user does not specify `baseP`, the solver creates this point attribute based on the point positions on the creation frame. This attribute is used as a fallback; whenever the user does not specify `materialP`, the attribute `baseP` is read instead. In the same way, `baseP` is used as a fallback for when no `restP` or `targetP` attributes are provided. Finally, `baseP` is used to bind the simulated and the embedded geometry, in the embedded workflow (e.g., a T-pose). This embedded binding looks at the `baseP` position attribute on both the simulated geometry and the embedded geometry. If no `baseP` attribute is provided by the user on the embedded geometry, the solver creates the `baseP` attribute on the embedded geometry based on the position `P` at the creation frame.  
+    tr>>
+        td>> `baseP`
+        td>> Point
+        td>> Vector
+        td>> base position of each point
+
+The attribute `restP` can be used to specify an animated rest position for all the object points. For example, at each frame `restP` may be modified in a SOP Solver before the finite element solver. Among other things this makes it possible to create plastic deformation kinds of effects. When the rest should stay the same during an entire simulation the attribute `restP` should not be used. In that case, it is sufficient to specify only an attribute `materialP`, which would act as a permanent, unchanged rest position. If no attribute `materialP` is specified, the solver falls back to the `baseP` attribute that gets automatically created at the creation frame.
 table>>
     tr>>
         th>> Name
@@ -115,22 +162,11 @@ table>>
         th>> Type
         th>> Description
     tr>>
-        td>> `materialP`
-        td>> Point
-        td>> Vector
-        td>> Material position of each point.
-    tr>>
         td>> `restP`
         td>> Point
         td>> Vector
         td>> Rest position of each point.
 	
-The attribute `baseP` can be used to specify a generic base position for all the object points. This attribute's values must not be changed during a simulation. When the user does not specify `baseP`, the solver creates this point attribute based on the point positions on the creation frame. This attribute is used as a fallback; whenever the user does not specify `materialP`, the attribute `baseP` is read instead. In the same way, `baseP` is used as a fallback for when no `restP` or `targetP` attributes are provided. Finally, `baseP` is used to bind the simulated and the embedded geometry, in the embedded workflow (e.g., a T-pose). This embedded binding looks at the `baseP` position attribute on both the simulated geometry and the embedded geometry. If no `baseP` attribute is provided by the user on the embedded geometry, the solver creates the `baseP` attribute on the embedded geometry based on the position `P` at the creation frame.  
-    tr>>
-        td>> `baseP`
-        td>> Point
-        td>> Vector
-        td>> base position of each point
 
 The attribute `initialpid` stores the initial point index for each point. This is the point index at the creation time of the object. This attribute is created only when fracturing is enabled on both the object and the solver. The finite element solver uses this attribute for the options __Import Rest Geometry__ and __Import Target Geometry__ to transfer animated positions and velocities in SOPs to the current fractured topology in the simulated object.
  
@@ -176,7 +212,40 @@ table>>
         td>> Point
         td>> Int
         td>> When 1, the point is hard constrained to the target animation (e.g., `targetP`). When zero, the point is unconstrained.
- 
+
+== Fiber Attributes ==
+
+The `fiberscale` point attribute acts as a multiplier for the rest strain in the fiber direction.
+Among other things, this is useful for FEM muscle simulations.
+If the `fiberscale` is changed from 1 to 0.5, then the muscle wants to be half as long as before in the direction of the fiber.
+If you animate the `fiberscale` in a SOP Solver such that it decreases from 1 to a smaller value, you will cause a muscle contraction in the sim.
+
+The `fiberstiffness` point attribute acts as a multiplier for the stiffness along the fiber direction.
+The fiber direction of the material is determined by the W axis of the materialuvw coordinates.
+`fiberstiffness` works as a multiplier on top of all the other material property multipliers, including the anisotropic multipliers.
+If the `fiberstiffness` changed from 1 to 10, then the stiffness along the fiber direction becomes 10 stronger than before.
+This can be used to control how strong and how quick the effect of muscle flexing using the fiberscale attribute takes effect. 
+
+For fiberscale/fiberstiffness to have the desired effect, it is important that UVW directions are specified.
+A material-space UVWs for FEM muscles can be specified using the `materialuvw` point/vertex attribute.
+By providing `materialuvw` as a vertex attribute, you are able to provide a local UVW space for each individual tet, which gives you to option of providing a separate UVW frame to each tet.
+
+table>>
+    tr>>
+        th>> Name
+        th>> Class
+        th>> Type
+        th>> Description
+    tr>>
+        td>> `fiberstiffness`
+        td>> Point
+        td>> Float
+        td>> Multiplier for stiffness along the fiber direction, the W direction implied by `materialuvw`.
+    tr>>
+        td>> `fiberscale`
+        td>> Point
+        td>> Float
+        td>> Multiplier for the rest strain along the fiber direction, the W direction implied by `materialuvw`.
 
 == State Attributes ==
 

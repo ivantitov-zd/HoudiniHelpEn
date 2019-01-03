@@ -1,0 +1,185 @@
+= Python state |> nodeless states =
+
+#flow: /hom/index#state
+
+"""How to implement a state that does not work on a specific node, like a viewer or inspector tool."""
+
+
+== Overview ==
+
+(See [Python states|python_states] for the basics of how to implement a custom viewer state.)
+
+While some states may be intrinsically tied to an asset and [work by manipulating parameters on the asset|state_node], you can write very useful states that are _nodeless_. These states can use the Python scripting API to inspect existing nodes/geometry, or manipulate other settings in Houdini.
+
+For example:
+
+* A state the displays the values of all primitive attributes on the polygon under the pointer.
+
+* A state that lets you drag left or right to scrub along the timeline.
+
+* A state that lets the user manipulate the view in a custom way.
+
+
+== How to ==
+
+# [Install and implement|python_states] your state.
+
+    For an inspector that's not tied to a specific node type, it makes sense to install the state code in a module in `HOUDINIPATH/viewer_states/` that will be automatically registered at startup.
+
+    However, if your nodeless tool happens to be embedded with an asset, you can [register the state in the asset's OnInstall script|python_states#embed].
+
+# Write a shelf tool script to launch the state.
+
+    *Currently, custom Python states are only available at the SOP level*. This somewhat limits the types of "inspector" tools you can write, since often you would want that kind of tool at the Object level. However, it is still very useful to create SOP-level inspection tools.
+
+    In your shelf tool script, you can check whether the viewer is already at the SOP level, and if not, prompt the user to select a Geometry object to work inside.
+
+    {{{
+    #!python
+    import stateutils
+
+
+    # We want to launch a SOP state, so we need to make sure the
+    # viewer is at the SOP level first
+    viewer = stateutils.findSceneViewer()
+    network = viewer.pwd()
+    if network.childTypeCategory() != hou.sopNodeTypeCategory():
+        # We're not already inside an object, so ask the user for an object
+        # to dive into
+        objects = viewer.selectObjects(
+            prompt='Select object',
+            quick_select=False,
+            use_existing_selection=True,
+            allow_multisel=False,
+            allowed_types=['geo']
+        )
+        if objects:
+            # selectObjects returns a list, just take the first item
+            network = objects[0]
+            # Dive into the object
+            viewer.setPwd(network)
+        else:
+            # The user pressed Enter without selecting an object
+            raise hou.Error("You must select an object to use this tool")
+
+    # Set the viewer's current state to my state
+    viewer.setCurrentState("mystate")
+    }}}
+
+    If your nodeless tool happens to be embedded with an asset, you can create this shelf tool in the asset's __Tools__ tab, so it becomes available to users when the asset is intalled.
+
+# Activating the state using `setCurrentState()` will call the state's `onGenerate` method. You can use this method to display a prompt and set up the viewer if needed.
+
+    {{{
+    #!python
+    class MyState(object):
+        def __init__(self, scene_viewer, state_name):
+            self.scene_viewer = scene_viewer
+            self.state_name = state_name
+
+        def onGenerate(self, kwargs):
+            # Show a prompt to the user
+            self.scene_viewer.setPromptMessage("Hover over primitives to show info")
+
+            # Make the group selection box visible
+            self.scene_viewer.setGroupListVisible(True)
+    }}}
+
+
+== Viewport methods ==
+
+When Houdini instantiates your state class, it passes the initializer a [Hom:hou.SceneViewer] reference. You can get a reference to the current _viewport_ using [Hom:hou.SceneViewer#curViewport].
+
+(A viewport is a specific view onto the geometry. The default viewer has a single viewport showing the Perspective view, however the user can set up different viewport arrangements, such as a "quad-view" showing Top, Front, Right, and Perspective viewports.)
+
+The [Hom:hou.Viewport] object has useful methods for inspecting what's under the mouse pointer, as well as changing the view.
+
+
+== Example: Scrub tool ==
+
+This state lets you drag in the viewer to move forward/back along the timeline. You can use the context menu to choose between relative dragging and absolute positioning.
+
+:box:$HOUDINI_USER_PREFS/viewer_states/scrub.py
+    {{{
+    #!python
+    import hou
+
+
+    class ScrubState(object):
+        def __init__(self, scene_viewer, state_name):
+            self.state_name = state_name
+            self.scene_viewer = scene_viewer
+            self._base_x = self._base_frame = None
+
+        def onGenerate(self, kwargs):
+            self.scene_viewer.setPromptMessage(
+                "Drag left/right to scrub along timeline"
+            )
+
+        def onExit(self, kwargs):
+            self.scene_viewer.clearPromptMessage()
+
+        def _scrub_abs(self, x):
+            # Take the absolute position of the mouse pointer (as a percentage
+            # of the total viewer width) and move that far along the current
+            # frame range
+
+            width, _ = self.scene_viewer.contentSize()
+            pct = x / float(width)
+            start_frame, end_frame = hou.timeline.frameRange()
+            frame = int((end_frame - start_frame) * pct + start_frame)
+            hou.setFrame(frame)
+
+        def _scrub_rel(self, x):
+            # Use the difference between the mouse pointer's current position
+            # and the previous position to calculate how many frames to move
+            # forward/back
+
+            if self._base_x is not None:
+                delta = int((x - self._base_x) / 10.0)
+                frame = max(0, self._base_frame + delta)
+                hou.setFrame(frame)
+            else:
+                self._base_x = x
+                self._base_frame = hou.intFrame()
+
+        def onMouseEvent(self, kwargs):
+            device = kwargs["ui_event"].device()
+            if device.isLeftButton():
+                x = device.mouseX()
+                if kwargs["mode"] == "abs":
+                    self._scrub_abs(x)
+                elif kwargs["mode"] == "rel":
+                    self._scrub_rel(x)
+            else:
+                self._base_x = None
+
+
+    template = hou.ViewerStateTemplate("scrub", "Scrub", hou.sopNodeTypeCategory())
+    template.bindFactory(ScrubState)
+
+    menu = hou.ViewerStateMenu("scrub", "Scrub")
+    menu.addRadioStrip("mode", "Mode", "rel")
+    menu.addRadioStripItem("mode", "rel", "Relative")
+    menu.addRadioStripItem("mode", "abs", "Absolute")
+    template.bindMenu(menu)
+
+    hou.ui.registerViewerState(template)
+    }}}
+
+    To quickly try this tool, paste the code for the tool into the Houdini Source Editor window. Then in the Python Shell do the following:
+
+    {{{
+    #!pycon
+    >>> hou.ui.register(hou.session.scrub_template)
+    >>> scene_viewer = hou.ui.paneTabOfType(hou.paneTabType.SceneViewer)
+    >>> scene_viewer.setCurrentState("scrub")
+    }}}
+
+    
+
+
+
+
+
+

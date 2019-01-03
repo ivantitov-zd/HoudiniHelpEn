@@ -1,0 +1,485 @@
+#type: node
+#context: sop
+#icon: SOP/rbdmaterialfracture
+#internal: rbdmaterialfracture
+
+#tags: break
+
+= RBD Material Fracture =
+
+"""Fractures the input geometry based on a material type."""
+
+
+== Overview ==
+
+This node allows you to accurately fracture geometry based on a specific type of material. Currently concrete, glass panels, and wood are supported.
+
+It accepts four inputs: geometry, constraint geometry, proxy geometry, and an optional input for extra points to control the fracturing process. It will fracture the incoming geometry using different fracturing method depending on the material specified in the __Material Type__ parameter. If an input constraint geometry is specified, it will update the constraints for the fractured pieces.
+
+* [Concrete|#concrete]
+* [Glass|#glass]
+* [Wood|#wood]
+
+See [fracturing objects for simulation|/dyno/fracturing] for a guide to fracturing workflows and tools in Houdini.
+
+
+== Using different displays ==
+
+The __Guide Geometry__ parameter on the [RBD Material Fracture|Node:sop/rbdmaterialfracture] node will allow you to switch between different displays. All materials have __Fractured Geometry__, which will display the group being fractured.
+
+[Image:/images/dynamics/rbdmaterialfracture_concrete1.png]
+[Image:/images/dynamics/rbdmaterialfracture_glass_none.png]
+[Image:/images/dynamics/rbdmaterialfracture_wood_none.png]
+
+They also all have __Constraint Network__, which will display the internal constraint network of all fractured pieces.
+
+[Image:/images/dynamics/rbdmaterialfracture_concrete_constraintnetwork.png]
+[Image:/images/dynamics/rbdmaterialfracture_glass_constraintnetwork.png]
+[Image:/images/dynamics/rbdmaterialfracture_wood_constraintnetwork.png]
+
+There are two concrete-specific displays: __Primary Volume__ and __Edge Detail__. These views allow you to display the volume distribution for each primary fracture level used for scattering and display the boolean cutting planes used to generate the edge detail.
+ 
+[Image:/images/dynamics/rbdmaterialfracture_concrete_primaryvolume.png]
+[Image:/images/dynamics/rbdmaterialfracture_concrete_edgedetail.png]
+ 
+There are also two glass-specific displays: __Concentric Noise__ and __Edge Detail__. These views allow you to display the noise used for determining the discontinuity for concentric cracks and display the magnitude distribution of the edge noise.
+
+[Image:/images/dynamics/rbdmaterialfracture_glass_CN.png]
+[Image:/images/dynamics/rbdmaterialfracture_glass_EN.png]
+   
+The three wood-specific displays allow you to display the cutting planes for grains, cuts, and splinters.
+
+[Image:/images/dynamics/rbdmaterialfracture_wood_grains.png]
+[Image:/images/dynamics/rbdmaterialfracture_wood_cuts.png] 
+[Image:/images/dynamics/rbdmaterialfracture_wood_splinters.png]
+   
+
+== Working with concrete ==
+
+* The __Fracture Level__ will control how many cuts your object will have. Increasing this number will add more fractures to the existing fractured pieces, breaking each chunk into smaller pieces.
+
+    [Image:/images/dynamics/rbdmaterialfracture_concrete1.png] [Image:/images/dynamics/rbdmaterialfracture_concrete2.png]
+    
+* Turning on __Edge Detail__ will add more noise to the cuts.
+
+    [Image:/images/dynamics/rbdmaterialfracture_concrete1.png] [Image:/images/dynamics/rbdmaterialfracture_concrete3.png]
+    
+* Use the [RBD Paint|Node:sop/rbdpaint] node to interactively paint weaker areas on the geometry in the viewport before the [RBD Material Fracture|Node:sop/rbdmaterialfracture] node. This will paint a `density` attribute in the areas you want more fracturing to occur. 
+
+    NOTE:
+        Choose __Scatter From Attribute__ on the [RBD Material Fracture|Node:sop/rbdmaterialfracture] node and specify `density` as the __Attribute Name__.
+    
+    [Image:/images/dynamics/rbdpaint.png]
+    
+
+== Working with glass ==
+
+NOTE:
+    This is meant to be used for glass panels (flat objects). Curved glass isn't currently supported.
+    
+* __Fracture per Piece__ is extremely useful when working with different panes of glass. It allows you to loop through each piece in the input geometry and fracture them individually.
+
+    [Image:/images/dynamics/rbdmaterialfracture_glass_panels.png]
+
+* The parameters on the __Cracks__ tab are useful for determining how many cracks you want the glass to have.
+
+* __ Enable Chipping__ on the __Chipping__ tab will give your simulation more details, as it will chip the corners of the broken glass as it breaks apart.
+
+
+== Working with wood ==
+
+* By default, the fracture direction of wood is determined by its longest point.
+
+    [Image:/images/dynamics/rbdmaterialfracture_wood_direction.png]
+
+* To determine the amount of fracturing, you can edit the __Cut Spacing__ parameters to give the wood more or less cuts.
+
+    [Image:/images/dynamics/rbdmaterialfracture_wood_cut.png]
+
+* Use the controls on the __Cluster__ tab to stick fractured pieces together into larger chunks that won't break apart. This will give your simulations more variation in shapes and sizes.
+
+
+@parameters
+
+Group:
+    #id: group
+    The geometry to be fractured. If no group is specified, the full input geometry will be fractured.
+
+Material Type:
+    #id: materialtype
+    The type of material of the incoming geometry.
+    
+    Concrete:
+        Concrete material type.
+    Glass:
+        Glass material type. Only flat glass panel is currently supported.
+    Wood:
+        Wood material type.
+
+Fracture Namespace:
+    Adds a namespace prefix to the name of each piece. This is useful for avoiding duplicated piece name or isolating a group of constraints.
+
+Fracture per Piece:
+    Loop through each piece in the input geometry and fracture them individually.
+    If the __Piece Attribute__ is not found, it will fracture based on connectivity.
+
+Piece Attribute:
+    The primitive attribute that defines each piece for partitioning.
+
+Single Pass:
+    Fractures a specific piece at the given index.
+    This can be useful for debugging and testing using a single piece.
+
+Random Seed:
+    Seed used when adding random variation of the parameters for each piece.
+
+Reset Cached Pass:
+    Reset the currently cached display in the for loop.
+    Use this to update the guide geometry if it is not displaying the current geometry.
+
+
+== Concrete == (concrete)
+
+Guide Geometry:
+    #id: concrete_guidegeo
+    None:
+        No guide geometry.
+    Fractured Geometry:
+        The group that is currently being fractured will be highlighted.
+    Primary Volume:
+        Display the volume distribution for each primary fracture level used for scattering.
+    Edge Detail:
+        Display the cutting planes used to generate the edge detail.
+    Constraint Network:
+        Display the constraint network of all pieces.
+
+
+=== Primary Fracture ===
+
+Enable Fracture:
+    Turning this off will bypass this fracture level.
+
+Fracture Level:
+    The number of levels of recursive fracturing to perform.
+
+Fracture ID:
+    The fracture ID for this fracture level. The output attributes and groups associated with this fracture level will have this tag.
+
+Fracture Ratio:
+    The ratio out of all the pieces from the previous level to fracture at this level.
+
+Scatter From:
+    Volume:
+        Scatter points based on the fog volume generated.
+
+    Attribute:
+        Scatter points based on the specified point attribute in the incoming geometry.
+        For example, the [RBD Paint SOP|Node:sop/rbdpaint] can be used to paint a `density` attribute on the geometry.
+
+Attribute Name:
+    The name of the point attribute to use as a density attribute when scattering points.
+
+Scatter Points:
+    The number of points to scatter.
+
+Scatter Seed:
+    The random seed for scattering points.
+
+Use Input Points:
+    Use additional Voronoi cell points from the fourth input.
+
+Input Points:
+    Specifies a group of points from the fourth input geometry to use for Voronoi cells.
+
+Volume Resolution:
+    The resolution of the fog volume.
+    The higher the resolution, the slower the fracturing time will be.
+    Smaller geometry will require higher volume resolution.
+
+Noise Frequency:
+    #id: concrete_volumenoisefreq#
+    [Include:/nodes/vop/unifiednoise_static#freq/]
+
+Noise Offset:
+    #id: concrete_volumenoiseoffset#
+    [Include:/nodes/vop/unifiednoise_static#offset/]
+
+Cutoff Density:
+    The low density level to cutoff at. Density below this value will be discarded.
+
+
+=== Chipping ===
+
+Enable Chipping:
+    Break off corners of pieces to create chips.
+
+Overall Ratio:
+    The overall ratio out of all the pieces to perform chipping.
+
+Overall Seed:
+    The overall seed for the ratio of fracturing.
+
+
+=== Detail ===
+
+Detail Size:
+    #id: concrete_detailsize
+    The size of the polygons added for the edge and interior detail.
+
+Edge Detail:
+    #id: concrete_edgedetail
+    Use Boolean to obtain edge detail.
+
+Detriangulate:
+    Convert geometry back to N-gons after applying boolean.
+    Turning this off can sometime make the result more stable.
+
+Interior Detail:
+    #id: concrete_interiordetail
+    Add noise to the interior points, scaled based on their distance to the surface.
+
+Depth Volume Voxel Size:
+    #id: concrete_depthvolumevoxelsize
+    The size in world space of the voxels in the SDF used for depth sampling.
+
+[Include:/nodes/sop/rbdinteriordetail#noiseamp]
+
+[Include:/nodes/sop/rbdinteriordetail#noisetype]
+
+[Include:/nodes/vop/unifiednoise_static#freq]
+
+[Include:/nodes/vop/unifiednoise_static#offset]
+
+
+=== Constraints ===
+
+Apply Constraint Properties:
+    Apply constraint properties to the output constraint geometry.
+    The [RBD Constraint Properties SOP|Node:sop/rbdconstraintproperties] can be used for advanced constraint setups.
+
+Glue Constraint Name:
+    [Include:/nodes/sop/rbdconstraintproperties#glue_constraintname/]
+
+Primary Strength:
+    The starting strength of the glue bonds of primary fracture.
+
+Level Multiplier:
+    The number to multiply the primary strength with for each increment of fracture level.
+
+Chipping Strength:
+    The strength of glue bonds of corner chips.
+
+[Include:/nodes/sop/rbdconstraintproperties#glue_strengthvariance]
+
+Switch to Soft Constraint when Broken:
+    [Include:/nodes/sop/rbdconstraintproperties#usenextconstraint/]
+
+Soft Constraint Name:
+    [Include:/nodes/sop/rbdconstraintproperties#glue_constraintname/]
+
+Degrees of Freedom:
+    [Include:/nodes/sop/rbdconstraintproperties#constraintdof/]
+
+
+== Glass == (glass)
+
+Guide Geometry:
+    #id: glass_guidegeo
+    None:
+        No guide geometry.
+    Fractured Geometry:
+        The group that is currently being fractured will be highlighted.
+    Concentric Noise:
+        Display the noise used for determining the discontinuity for concentric cracks.
+    Edge Noise:
+        Display the magnitude distribution of the edge noise.
+    Constraint Network:
+        Display the constraint network.
+
+
+=== Impact Points ===
+
+Use Scatter:
+    Use randomly scattered points on the surface as impact points.
+
+Use Input Points:
+    Use points from the fourth input as additional impact points.
+
+Input Points:
+    The group of points from the fourth input to use as impact points.
+
+
+=== Cracks ===
+
+Radial Crack Number:
+    The number of radial cracks to generate for each impact point.
+
+Number Variance:
+    The variance in the number of radial cracks for each piece.
+
+Number Seed:
+    The seed for the variance of the number of radial cracks.
+
+Minimum Width:
+    The minimum width between each concentric crack going outward radially.
+
+Impact Spread:
+    How far from the origin(s) the concentric cracks spread.
+
+Discontinuity Freq:
+    The frequency of the discontinuity noise for concentric cracks.
+
+Discontinuity Size:
+    The amplitude of the discontinuity noise for concentric cracks.
+
+
+=== Chipping ===
+
+Overall Ratio:
+    The overall ratio out of all the pieces to perform chipping.
+
+Overall Seed:
+    The overall seed for the ratio of fracturing.
+
+Corner Ratio:
+    The ratio of corners in a piece that are chipped off.
+
+
+=== Detail ===
+
+Detail Size:
+    #id: glass_detailsize
+    The size of the polygons to add for the edge noise.
+
+Enable Edge Noise:
+    Add noise to the cracks.
+
+Fade From Origin:
+    How far to fade off the edge noising from the fracture origins.
+
+Fade From Border:
+    How far to fade off the edge noising from the borders of the glass.
+
+Use Convex Decomposition:
+    #id: glass_enableconvexdecomposition
+    Create proxy geometry from the high-resolution pieces using a [convex decomposition|Node:sop/convexdecomposition].
+
+[Include:/nodes/sop/convexdecomposition#maxconcavity]
+
+
+=== Constraints ===
+
+Radial Strength: 
+    The strength of the glue bonds between radial cracks.
+
+Concentric Strength:
+    The strength of the glue bonds between concentric cracks.
+
+Chipping Strength:
+    The strength of the glue bonds for corner chips.
+
+
+== Wood == (wood)
+
+Guide Geometry:
+    #id: wood_guidegeo
+    None:
+        No guide geometry.
+    Fractured Geometry:
+        The group that is currently being fractured will be highlighted.
+    Grains:
+        Display the cutting planes for the grains.
+    Cuts:
+        Display the cutting planes for the cuts.
+    Splinters:
+        Display the cutting planes for the splinters.
+    Constraint Network:
+        Display the constraint network.
+
+
+=== Grain ===
+
+Fracture Direction:
+    The direction of fracturing.
+
+    Auto (Bounding Box):
+        Determine the direction automatically based on the oriented bounding box.
+
+    Vector:
+        Use the vector specified as the direction of fracturing.
+
+Grain Spacing:
+    The spacing between grain lines.
+
+Grain Offset:
+    The size of offset randomly applied to each grain line.
+
+Grain Offset Seed:
+    The seed of the random offset.
+
+Height:
+    [Include:/nodes/sop/mountain#height/]
+
+Element Size:
+    [Include:/nodes/sop/mountain#elementsize/]
+
+Grain Detail Size:
+    The size of polygons used to cut the grain lines. 
+
+
+=== Cut ===
+
+Cut Spacing:
+    The spacing between cuts.
+
+Cut Offset:
+    The size of offset randomly applied to each cut.
+
+Cut Offset Seed:
+    The seed of the random offset.
+
+Splinter Density:
+    The amount of splinters for each cut.
+
+Splinter Length:
+    The length of the splinters.
+
+
+=== Detail ===
+
+Use Convex Decomposition:
+    Create proxy geometry from the high-resolution pieces using a [convex decomposition|Node:sop/convexdecomposition].
+
+[Include:/nodes/sop/convexdecomposition#maxconcavity]
+
+
+=== Cluster ===
+
+[Include:/nodes/sop/rbdcluster#clustertype]
+
+[Include:/nodes/sop/rbdcluster#offset]
+
+[Include:/nodes/sop/rbdcluster#jitter]
+
+[Include:/nodes/sop/rbdcluster#size]
+
+[Include:/nodes/sop/rbdcluster#randomdetach]
+
+[Include:/nodes/sop/rbdcluster#detachratio]
+
+[Include:/nodes/sop/rbdcluster#detachseed]
+
+
+=== Constraints ===
+
+Grain Strength:
+    The strength of glue bonds between grains.
+
+Cut Strength:
+    The strength of glue bonds between cuts and splinters.
+
+
+@related
+    - [Node:sop/booleanfracture]
+    - [Node:sop/rbdinteriordetail]
+    - [Node:sop/voronoifracture]

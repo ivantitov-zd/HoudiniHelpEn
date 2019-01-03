@@ -1,0 +1,289 @@
+#type: node
+#context: sop
+#icon: POP/velocity
+#internal: pointvelocity
+
+= Point Velocity =
+
+""" Computes and manipulates velocities for points of a geometry. """
+
+The Point Velocity SOP provides a simple interface to compute and manipulate
+the velocity attribute, `v`, of a geometry's points. The node includes
+functionality to robustly compute velocity from time-dependent deformation of
+the incoming geometry, as well as several ways to generate and composite noise
+on top of it.
+
+NOTE:
+    The order of tabs corresponds to the order in which their corresponding
+    operations are performed (from left to right). When enabled, __Add
+    Velocity__ modifier is applied last.
+
+@inputs
+
+Input:
+    Geometry whose point velocities to manipulate.
+
+@outputs
+
+Output:
+    Modified geometry.
+
+@parameters
+
+Group:
+    #id: group
+    Only points in this group will be affected by this node.
+
+Add Velocity:
+    #id: addvel constvel
+    When enabled, this vector is added to every point's velocity.
+
+== Basic ==
+
+Initialization:
+    #id: init
+    Controls how the velocity point attribute is initialized.
+
+    Compute from Deformation:
+        Point velocities are deduced from their time-dependent motion.
+    Keep Incoming:
+        The incoming point velocities are kept; if the input geometry does not
+        contain a velocity point attribute, it is created and initialized to
+        zero.
+    Set Value:
+        The given __Default Value__ is written to each point's `v` attribute.
+    From Attribute:
+        Velocities are initialized using the value of the given point attribute.
+
+Default Value:
+    #id: defval
+    Velocities get set to this value; only available when __Initialization__
+    mode is __Set Value__.
+
+Frame Sample:
+    #id: inc
+    Frame offset used for computing point velocities from deformation.
+
+    NOTE:
+        If __Velocity Approximation__ is set to __Central Difference__, the
+        geometries used are offset forward and backward by __Frame Sample__.
+
+Evaluate Within Frame Range:
+    #id: evalframe
+    Enabling this option ensures that the geometry is not evaluated outside of
+    the provided __Frame Range__.
+
+Frame Range:
+    #id: framerange
+    When __Evaluate Within Frame Range__ is enabled, the node ensures that the
+    input geometry is not evaluated outside of this range.
+
+Velocity Approximation:
+    #id: velapproximation
+    Finite difference method to use for computing velocities from deformation.
+
+    Backward Difference:
+        Approximates velocity by considering the difference in particle
+        positions from the current frame and the frame offset backward by
+        __Frame Sample__.
+    Central Difference:
+        Approximates velocity by considering the difference in particle
+        positions from the current frame offset forward and backward by
+        __Frame Sample__.
+    Forward Difference:
+        Approximates velocity by considering the difference in particle
+        positions from the current frame offset forward by __Frame Sample__ and
+        the current frame itself.
+
+    NOTE:
+        If __Evaluate Within Frame Range__ is enabled and one of the frame
+        samples lies outside the specified __Frame Range__, this node will try
+        to use an alternate approximation scheme.
+
+Compute Acceleration:
+    #id: computeaccel
+    When this option is enabled, this node will also approximate point
+    accelerations. This is useful for rendering curved trajectories with
+    acceleration motion blur.
+
+    NOTE:
+        The calculated accelerations will only be non-zero if __Velocity
+        Approximation__ is set to __Central Difference__.
+
+Acceleration Attribute:
+    #id: accelattribute
+    The computed acceleration will be stored in this point attribute.
+
+Compute Angular Velocity:
+    #id: computeangular
+    Enabling this option will use the difference in orientations to compute the
+    angular velocity (stored in the `w` point attribute).
+
+Match by Attribute:
+    #id: matchbyattribute
+    When this option is enabled, points on successive frames will be identified
+    by using the value of the provided attribute rather than the point number.
+
+Attribute to Match:
+    #id: attributetomatch
+    Name of the integer or string point attribute to use for matching
+    successive frames (when __Match by Attribute__ is enabled).
+
+Attribute Name:
+    #id: attribname
+    Name of the point attribute to use for initializing velocities. Only
+    available when __Initialization__ is set to __From Attribute__.
+
+Scale:
+    #id: scale
+    Attribute corresponding to __Attribute Name__ is multiplied by this value
+    to get the initial point velocities.
+
+== Curl Noise ==
+
+Add Curl Noise:
+    #id: addcurlnoise
+    Adds divergence-free curl noise to point velocities.
+
+Animated:
+    #id: animated
+    If this option is turned on, produced noise will vary with time.
+
+Scale:
+    #id: cnscale
+    Controls the amount of added curl noise.
+
+Pulse Duration:
+    #id: pulseduration
+    Time rate of change of the noise pattern is inversely proportional to
+    __Pulse Duration__; only available when __Animated__ is enabled.
+
+Swirl Size:
+    #id: cnswirlsize
+    Controls base feature size of the generated noise.
+
+Swirl Scale:
+    #id: cnswirlscale
+    Feature size along each axis is governed by the product of __Swirl Size__
+    with the applicable component of this parameter.
+
+Offset:
+    #id: cnoffset
+    Offset within the evaluated noise field. Can be used as a seed to modify
+    the noise values without affecting the overall look of the pattern.
+
+Grain:
+    #id: cnrough
+    Controls influence falloff for each successive noise layer.
+
+Turbulence:
+    #id: cnturbulence
+    Specifies the number of composited noise layers.
+
+Location Attribute:
+    #id: locattrib
+    Noise for each point is produced by sampling a volumetric field using the
+    value of this vector attribute. If this parameter is set to `P`, the
+    applied noise pattern will vary based on the motion of the points. If this
+    is undesirable, a `rest` attribute can be added to the input geometry and
+    its value used instead.
+
+== From Object ==
+
+Add Object Motion:
+    #id: addobjectmotion
+    Adds the velocity of an animated object-level node to point velocities.
+
+Object Path:
+    #id: objpath
+    The object node to extract a transform from.
+
+Scale:
+    #id: objscale
+    Before being added to point velocities, the object velocity is scaled by
+    this amount.
+
+Frame Sample:
+    #id: objsample
+    Frame offset used for computing the object's velocity.
+
+    NOTE:
+        If __Velocity Approximation__ is set to `Central Difference`, the
+        object transforms used are offset forward and backward by __Frame
+        Sample__.
+
+Velocity Approximation:
+    #id: objapproximation
+    Finite difference method to use for computing the object's velocity.
+
+    Backward Difference:
+        Approximates velocity by considering the difference in object's
+        transformations from the current frame and the frame offset backward by
+        __Frame Sample__.
+    Central Difference:
+        Approximates velocity by considering the difference in object's
+        transformations from the current frame offset forward and backward by
+        __Frame Sample__.
+    Forward Difference:
+        Approximates velocity by considering the difference in object's
+        transformations from the current frame offset forward by __Frame
+        Sample__ and the current frame itself.
+
+== Conical Noise ==
+
+Conical Noise:
+    #id: doconenoise
+    Modify point velocities with conical noise.
+
+    NOTE:
+        Conical noise is not spatially coherent, nor does it continuously
+        depend on the seed values.
+
+Mode:
+    #id: conemode
+    In __Add__ mode, each point's velocity is offset by a random vector, which
+    falls within the defined cone. In __Rotate__ mode, each point's velocity is
+    randomly jittered within a cone of the specified size (without affecting
+    speed).
+
+Scale:
+    #id: conescale
+    Controls the cone height (and the amount of added conical noise) when
+    __Mode__ is set to __Add__.
+
+Cone Angle:
+    #id: coneangle
+    Controls the cone width.
+
+Direction:
+    #id: conedir
+    The cone opens in this direction; only available when __Mode__ is set to
+    __Add__.
+
+Direction Attribute:
+    #id: useconedirattrib conedirattrib
+    When enabled, value of this vector point attribute is used to control the
+    cone orientation for each point, instead of the global __Direction__
+    parameter; only available when __Mode__ is set to __Add__.
+
+    NOTE:
+        If the referenced point attribute does not exist or is zero, the global
+        __Direction__ vector is used.
+
+Directional Bias:
+    #id: useconedirbias conedirbias
+    When enabled, the randomly generated vector is biased towards the center of
+    the cone (for positive values) or the edge of the cone (for negative
+    values).
+
+Global Seed:
+    #id: coneseed
+    Value of this parameter is used to seed the random number generator. The
+    generated noise can be altered by changing the seed.
+
+Seed Attribute:
+    #id: useconeseedattrib coneseedattrib
+    When enabled, the value of this attribute is used for seeding the random
+    vector for each point instead of the point number; this enables consistent
+    noise generation when deleting points.
+

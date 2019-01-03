@@ -24,7 +24,7 @@ h_glob_target(
     TARGET_NAME glob_non_svg_icons
     LIST_FILE ${non_svg_file_list}
     FOLDERS Pics
-    EXTENSIONS pic png
+    EXTENSIONS pic png svg
     COMMENT "Globbing .pic and .png files"
 )
 

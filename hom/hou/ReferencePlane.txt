@@ -1,0 +1,104 @@
+= hou.ReferencePlane =
+#type: homclass
+#cppname: HOM_ReferencePlane
+#group: view
+
+"""The reference grid (a.k.a. reference plane) in the scene viewer pane tab."""
+
+@methods
+
+::`sceneViewer(self)` -> [Hom:hou.SceneViewer]:
+    #cppname: HOM_ReferencePlane::sceneViewer
+    Return the scene viewer containing this plane.
+
+::`isVisible(self)` -> `bool`:
+    #cppname: HOM_ReferencePlane::isVisible
+    Return whether the grid is visible in the viewer.
+
+::`setIsVisible(self, on)`:
+    #cppname: HOM_ReferencePlane::setIsVisible
+    Make this grid visible or invisible in the viewer.
+
+::`transform(self)` -> [Hom:hou.Matrix4]:
+    #cppname: HOM_ReferencePlane::transform
+    Return the transformation matrix for this plane.
+
+    When the transformation matrix is the identity matrix, the plane's
+    bottom-left corner is at the origin and it sits in the XY plane.  In this
+    orientation, increasing the number of cells in x or the size of a cell in x
+    grows the plane outward from the origin along the x-axis.  Similarly,
+    increasing the number of cells or size of a cell in y grows the plane along
+    the y-axis.
+
+    Note that the transformation matrix does not contain any scale information.
+    The reference plane extends to infinity.
+
+    The following function will return the normal of the plane:
+    {{{
+    #!python
+    def normal(reference_plane):
+        return hou.Vector3(0, 0, 1) * reference_plane.transform().inverted().transposed()
+    }}}
+
+::`setTransform(self, matrix)`:
+    #cppname: HOM_ReferencePlane::setTransform
+    Set the transformation matrix for this plane to a [Hom:hou.Matrix4].
+
+    This matrix is used to translate and rotate the plane.  See the
+    [transform|Hom:hou.ReferencePlane#transform] method for more information.
+
+    Note that scale information inside the transformation matrix is ignored.
+
+    The following function will change the position of the origin of the plane:
+    {{{
+    #!python
+    def set_origin(reference_plane, new_origin):
+        translation = hou.hmath.buildTranslate(hou.Vector3(new_origin) - origin(reference_plane))
+        reference_plane.setTransform(reference_plane.transform() * translation)
+
+    def origin(reference_plane):
+        return hou.Vector3(0, 0, 0) * reference_plane.transform()
+    }}}
+
+    The following function will change the normal of the plane:
+    {{{
+    #!python
+    def set_normal(reference_plane, normal_vector):
+        existing_rotation = hou.Matrix4(reference_plane.transform().extractRotationMatrix3())
+        rotation = existing_rotation * normal(reference_plane).matrixToRotateTo(normal_vector)
+        translation = hou.hmath.buildTranslate(origin(reference_plane))
+        reference_plane.setTransform(rotation * translation)
+
+    def normal(reference_plane):
+        return hou.Vector3(0, 0, 1) * reference_plane.transform().inverted().transposed()
+
+    def origin(reference_plane):
+        return hou.Vector3(0, 0, 0) * reference_plane.transform()
+    }}}
+
+::`cellSize(self)` -> `tuple` of `float`:
+    #cppname: HOM_ReferencePlane::cellSize
+    Return the x and y sizes (width and height) of one cell in the grid of
+    cells.  The return value is a tuple of two floats.
+
+::`setCellSize(self, size)`:
+    #cppname: HOM_ReferencePlane::setCellSize
+    Change the x and y sizes (width and height) of each cell in the grid of
+    cells.  `size` is a sequence of two floats.
+
+    Changing the size of each cell will change the total size of the grid.
+
+::`numberOfCellsPerRulerLine(self)` -> `tuple` of `int`:
+    #cppname: HOM_ReferencePlane::numberOfCellsPerRulerLine
+    Return the number of cells in the x and y directions between ruler lines.
+    Ruler lines are darker than the normal lines drawn between grid cells.
+
+::`setNumberOfCellsPerRulerLine(self, number)`:
+    #cppname: HOM_ReferencePlane::setnumberOfCellsPerRulerLine
+    Set the number of cells in the x and y directions between ruler lines.
+    `number` is a sequence of two integers.
+
+    For example if `number` is `(1, 1)`, Houdini will draw ruler lines
+    between every cell in the grid.
+
+    To turn off ruler lines entirely, call this method with `(0, 0)`.

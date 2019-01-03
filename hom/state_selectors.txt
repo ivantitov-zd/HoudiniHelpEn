@@ -1,0 +1,170 @@
+= Python state |> selections =
+
+#flow: /hom/index#state
+
+"""How to allow the user to select geometry as part of working with your SOP node state or to select objects with your OBJ node state ."""
+
+
+== Overview ==
+
+Often the workflow for a SOP filter node will allow the user to select components (such as polygons or points) for the node to work on. The tool may allow/require multiple selections, for example the "copy to points" tool takes the geometry to copy and the points to copy onto. These selections are then used to fill in "Group" parameters on the newly created node.
+
+There are three ways to support selection for custom tools with Python states:
+
+* [Manually script asking the user for each selection|#manual]. This is the traditional way that existing shelf tools work. We strongly suggest you use this method 
+
+* [Bind one or more selectors|#bindings]. This is similar to manually scripting selections. This method is currently not recommended.
+
+* [Bind a single persistent geometry selector|#selector]. This makes the active Python state ask for a selection. When the user completes a selection you can accept the selection by returning `True` from the `onSelection()` callback.
+
+
+== Manually scripting selection == (manual)
+
+This is traditional Houdini workflow where a shelf [tool script|tool_script] (usually embedded with the asset it creates) asks for the selections using HOM scripting, then uses utility functions to create the node, then enters the node's state.
+
+See [tool script|tool_script] for more information on writing tool scripts. See [Python states and nodes|state_node] for more information on writing a custom Python state for an asset type.
+
+{{{
+#!python
+import stateutils
+import soptoolutils
+
+
+pane = stateutils.activePane()
+# Only run the selector script if we are in a viewer (not putting the node)
+# down in a network editor
+if isinstance(pane, hou.SceneViewer):
+    # First we'll ask for the primitive(s) to copy
+    source = stateutils.Selector(
+        name="select_polys",
+        geometry_types=[hou.geometryType.Primitives],
+        prompt="Select primitive(s) to copy, then press Enter",
+        primitive_types=[hou.primType.Polygon],
+        # Which paramerer to fill with the prim nums
+        group_parm_name="sourcegroup",
+        # Which input on the new node to wire this selection to
+        input_index=0,
+        input_required=True,
+    )
+    # Then, we'll ask for the points to copy onto
+    target = stateutils.Selector(
+        name="select_points",
+        geometry_types=[hou.geometryType.Points],
+        prompt="Select points to copy onto, then press Enter",
+        group_parm_name="targetgroup",
+        # Remember to wire each selection into the correct input :)
+        input_index=1,
+        input_required=True,
+    )
+
+    # This function takes the list of Selector objects and prompts the user for
+    # each selection
+    container, selections = stateutils.runSelectors(
+        pane, [source, target], allow_obj_selection=True
+    )
+
+    # This function takes the container and selections from runSelectors() and
+    # creates the new node, taking into account merges and create-in-context
+    newnode = stateutils.createFilterSop(
+        kwargs, "$HDA_NAME", container, selections
+    )
+    # Finally enter the node's state
+    pane.enterCurrentNodeState()
+
+else:
+    # For interactions other than in a viewer, fall back to the low-level
+    # function
+    soptoolutils.genericTool(kwargs, "$HDA_NAME")
+}}}
+
+
+== Binding geometry selectors ==
+
+*This method is currently not recommended*.
+
+Theoretically, you can use [Hom:hou.ViewerStateTemplate#bindSelector] to bind one or more component selectors to your state, similar to using the `stateutils.Selector` objects and `stateutils.runSelectors()` in the script above. The state would run through these selectors and then let you create the node in the state's `onGenerate()` callback.
+
+However, we recommend you manually script the selections and creating the node using utility functions as described above.
+
+
+== Binding a single geometry selector ==
+
+You can use [Hom:hou.ViewerStateTemplate#bindGeometrySelector] to bind a single SOP-level selector that runs when the viewer enters your custom SOP state. When the user completes a selection, Houdini calls your state's `onSelection()` callback method.
+
+In the `onSelection()` method, you can get a `"selection"` item (a [Hom:hou.GeometrySelection] object) from the dictionary passed in. If you want to accept the selection, return `True` and the Houdini will end the selector and enter your state's regular operation. You can return `False` to reject the selection, and the selector will continue to run.
+
+This may be useful for [nodeless states|state_nodeless], for example a state that lets you select components from the display geometry then displays information about them.
+
+{{{
+#!python
+
+class MyState(object):
+    def __init__(self, state_name, scene_viewer):
+        self.state_name = state_name
+        self.scene_viewer = scene_viewer
+
+    def onSelection(self, kwargs):
+        sel = kwargs["selection"]
+        # Only accept the selection if it contains three polygons
+        are_prims = sel.geometryType() == hou.geometryType.Primitive
+        are_all_polys = all(pt == hou.primType.Polygon for pt in sel.primitiveTypes())
+        selection = sel.selections()[0]
+        count = selection.numSelected()
+
+        return are_prims and are_all_polys and count == 3
+
+
+template = hou.ViewerStateTemplate(
+    "mystate.pystate", "My State",
+    hou.sopNodeTypeCategory()
+)
+template.bindFactory(MyState)
+
+template.bindGeometrySelector(
+    prompt="Select three polygons",
+    quick_select=False,
+    use_existing_selection=True,
+    geometry_types=hou.geometryType.Primitives,
+    primitive_types=hou.primType.Polygon,
+    allow_other_sops=False
+)
+}}}
+
+See the help for [Hom:hou.ViewerStateTemplate#bindGeometrySelector] for information about the method's arguments.
+
+
+== Binding a single object selector ==
+
+You can use [Hom:hou.ViewerStateTemplate#bindObjectSelector] to bind a single OBJ-level selector that runs when the viewer enters your custom OBJ state. When the user completes a selection, Houdini calls your state's `onSelection()` callback method.
+
+In the `onSelection()` method, you can get a `"selection"` item (a list of [Hom:hou.Node] objects) from the dictionary passed in. If you want to accept the selection, return `True` and the Houdini will end the selector and enter your state's regular operation. You can return `False` to reject the selection, and the selector will continue to run.
+
+{{{
+#!python
+
+class MyOBJState(object):
+    def __init__(self, state_name, scene_viewer):
+        self.state_name = state_name
+        self.scene_viewer = scene_viewer
+
+    def onSelection(self, kwargs):
+        cameras = kwargs["selection"]
+        print "Number of cameras selected: ", len(cameras)
+
+        return True
+
+
+template = hou.ViewerStateTemplate("myOBJstate", "My OBJ State", hou.objNodeTypeCategory())
+template.bindFactory(MyOBJState)
+
+# Add a selector to select camera objects only
+template.bindObjectSelector(
+    prompt="Select camera object(s) and press Enter",
+    quick_select=False,
+    use_existing_selection=True,
+    allowed_types=('*cam*',))
+}}}
+
+See the help for [Hom:hou.ViewerStateTemplate#bindObjectSelector] for information about the method's arguments.
+
+

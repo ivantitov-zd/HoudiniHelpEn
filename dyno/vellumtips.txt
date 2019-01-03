@@ -1,0 +1,132 @@
+= Tips and Troubleshooting =
+
+== Sources ==
+
+* Vellum uses continuous collision detection. This is great to avoid fast moving geometry teleporting through your cloth, but is useless if your points are randomized every frame.
+
+* Don't assume your geometry sequence is good. Try dropping a timeshift at `$F+1`, and wire it and the original into a sequence blend to see if it blends. If not, check if there are point id attributes that are causing problems. The `id` attribute overrides point numbers, which can sometimes fix your matching. You can also try using a [Match Topology|Node:sop/matchtopology] to make your point numbers consistent frame to frame.
+    
+    NOTE:
+        Even if your sources work, the subdivided version of your sources may not. Vellum only cares about points of the previous frame, so won't mind if your primitive numbers are randomized each frame. Subdivide will generate different point numbers if it has different primitive numbers. Likewise, if you had matching `id` attributes before, after a subdivide you probably won't which could produce bad results.
+        
+== PScale ==
+
+The default vellum `pscale` is small, but any `pscale` attribute in the input will trump it. This means your sequence may already have a surprising value. It maybe to too small.
+
+Vellum works best with a pscale that isn't too small, so it can float the cloth on top of the collider without hard collisions. Generally you don't want your `pscale` to be bigger than  your edge length, which could cause self intersections.
+
+Vellum does pre-processing, like bullet does, on the original geometry so it doesn't explode even if points are on top of each other. It records the original distances into attributes and uses those to reduce `pscale` for collisions. When the cloth separates, these attributes will be relaxed so the cloth won't got back to too close. Setting a too large `pscale` likely won't blow up the cloth, but it will do collision tests with the large pscale. This can cause your cloth to crawl to a stop.
+
+Always sanity test pscale. The [Vellum Solver SOP|Node:sop/vellumsolver] has a parameter on the __Visualize__ tab to show thickness but putting a sphere on each point. This may be too tiny to see with defaults. Adjust the default `pscale` accordingly.
+
+== Speed vs Quality ==
+
+There are four main areas you can tweak to get the cloth simulating as fast as possible and look as good as possible.
+
+# Substeps:
+    This breaks up the frame into smaller steps, which is essential for fast moving cloth. If you have too many collisions and changes in a single substep, the cloth can slow down a lot because triangles are all potentially colliding with each other. Using smaller substeps gives better collision bounds, possibly meaning less of a performance hit than you'd expect.
+    
+# Constraint Iterations:
+    These allow the stretch and bend constraints to work. To get stiff, non-stretching, or non-bending, cloth you need larger numbers. These are usually cheaper than you think.
+
+    A rough minimum is the "diameter" of your cloth. This is the "longest shortest path", ie, find the farthest points on the surface of your cloth, trace the shortest path between them, and count the number of edges you needed to go through. In practice, gravity is the big force to deal with, so you can likewise estimate how many edges "tall" your cloth piece is. No need to be 100% accurate. 
+
+    If you increase substeps, the amount of forces effectively go down, so you can reduce iterations.
+    
+# Collision Passes:
+    Handles both external and self collisions. These are interleaved between the constraint iterations. For example, if you have 50 iterations and 5 collisions, it will do 10 iterations between each collision. Increasing this helps with failed collisions, but also consider increasing substeps instead. 
+    
+    Having 2 substeps and 10 collisions is about same cost as 1 substep and 20 collisions, but the former will likely be better.
+
+# Post Collision Passes:
+    After all constraint iterations are done, these additional passes are done in hopes of cleaning everything up. Because these passes don't interact with the constraints, you will get protrusions where the cloth is pushed out in the shape of the collider rather than forming a tent. This is the last attempt to avoid failed collisions.
+
+== Resolving problems ==
+
+=== Stretchiness ===
+
+While XPBD does a good job of not over-stiffening the cloth, if there isn't enough iterations it can fail to converge. If things seem to stretched out, increase constraint iterations. Increasing substeps will also help with this, but iterations are usually cheaper.
+
+=== Protrusion problem ===
+
+If you have a sharp pointy piece of geometry colliding with a high resolution cloth, you'll get just the local area deformed to get out of that way. This is because collision resolution is entirely local. It will move only the colliding points, leaving the rest of the mesh stationary. To deal with this, you need to alternate the collision with the cloth smoothing passes. Two things that do this:
+
+# Collision Passes: A default of 10 will mix 10 collision detections inside all the constraint passes. You can increase this up to the constraint iterations. For a default setup, this would be 100.
+
+# Substeps: Gives more iterations over all.
+
+=== Failed collisions ===
+
+# Cloth Thickness:
+    Default cloth is very thin. Making the cloth fatter gives more room for it to float before it has a hard collision. Be careful not to make it bigger than your edge lengths though.
+
+# Substeps: 
+    This reduces the error that has to be fixed as everything moves less. Higher res cloth seems to need more substeps.
+
+# Post Collision Passes: 
+    As the final attempt, given more chances for this to get things right can help more than increasing substeps. Consider bumping this for every "layer" that you have.
+
+# Layer Shock: 
+    If there is a proper ordering to your cloth, ie, one layer is on top of another, you can give the higher layers a higher layer number. This is an integer attribute, and only the difference in value is used. During collisions, points with higher layer numbers will act lighter, letting you vary between full 2-way and 1-way interaction of layers.
+
+=== Asymmetric Solves ===
+
+Vellum uses Gauss Seidel rather than Jacobi. This causes it to converge faster to solutions, but in the process it doesn't update smoothly. So if things don't fully converge, you will get strange asymmetric results as the errors are concentrated on certain parts of the cloth and not spread uniformly about. This is addressed with the Smoothing Iterations. Increasing this helps smooth out the spikes of error, so they are less objectionable. The default of 10 probably is good for all cases.
+
+=== Unruly objects ===
+
+Sometimes an object seems to defy conservation of momentum and starts accelerating or spinning with some mysterious internal energy.
+
+One potential cause is self-intersections, especially if your pscales are too large.
+
+One solution is to use plasticity to make the final configuration the rest configuration, thus removing all the internal energy.
+
+Another potential cause is when the solve doesn't converge and leaves energy asymmetrically in the system. This builds up and can even cause sims with no self-intersections to spin. This is seen in pressure and strut constraints in particular. Increasing Smoothing Iterations and Damping can help avoid this. You can also sometimes gain a benefit by sorting your constraints randomly (by primitive) or your points randomly (before building constraints).
+
+=== Unstable Pins ===
+
+Strong bend constraints and hard pins can cause numerical stability issues. The work around is to use soft constraints. The Smoothing Iterations helps deal with these.
+
+== Restarting Sims ==
+
+When using the output of a drape or a previous sim as a starting point, care must be taken of attributes.
+
+=== IDs ===
+
+* If merging together multiple pieces, check if they have id attributes that will conflict.
+
+* If blasting primitives, check if the constraint network disagrees with your changes.
+
+* Check if welds still point to the right positions.
+
+* Consider a post-process to fuse welds.
+
+=== Overlap ===
+
+Initial frame overlap is computed only if no `overlap_self` or `overlap_external` attributes are present. Thus if you restart, you will get the old values. This should be reasonable when the old values are from a valid solve, but there are cases where they have the wrong distances baked in. This creates impossible solves in regions that gain their own momentum, flicking around. Look for these "hotspots" by setting the stretch ratio high and picking out red areas that failed to converge. Deleting `overlap_*` is usually a safe choice.
+
+=== Collisions not working ===
+
+Vellum can collide with most, but not all, geometry types.
+
+Sphere, Tube, Circle, Metaball:
+    In Primitive mode, only collides with central point.
+Bezier/NURBS Curves:
+    Collides with the polygonal hull.
+Bezier/NURBS Mesh Surfaces:
+    Only collides with the hull points.
+VDB, Volume, HeightField:
+    In SOP level, only collides with representative points. 
+    
+    In DOPs, using a Terrain Collider Object will work for heightfields. Similarly, VDB/SDF can be done using a Static Object and setting the __Collision Detection__ to __Use Volume__.
+Polygon Soups:
+    Same as underlying polygons.
+Tetrahedra:
+    Controlled by the __Tetrahedral Open Faces__ toggle. This defaults to on. Collides with the triangles of the exterior of the tetrahedral mesh.
+Packed Geometry::
+    As per the underlying geometry.
+Other Packed Types:
+    Varies on whether they support the __Fast Extraction__ option. [Repack SOP|Node:sop/repack] can be used (possible with pack fragments option) to convert to a Packed Geometry that supports fast extraction, possibly at a cost of memory use. In particular, default RBD uses Packed Fragments which do NOT support fast extraction; but a repack after the assemble can fix it.
+    
+    NOTE:
+        RBD sims have to be converted to packed geometry from packed fragments for Vellum to support collisions, so if you want to have cloth react to an RBD sim you need to repack after the [Assemble SOP|Node:sop/assemble].

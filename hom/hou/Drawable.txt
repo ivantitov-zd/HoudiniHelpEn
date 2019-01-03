@@ -1,0 +1,183 @@
+= hou.Drawable =
+#type: homclass
+#cppname: HOM_Drawable
+#group: view
+
+"""Represents extra geometry to draw in the viewer alongside user content (for example, as guide geometry)."""
+
+
+== Overview ==
+
+You can attach geometry to a viewer in a Drawable object, causing the geometry to appear in the viewer even though the geometry is not actually part of the scene. This is useful to show _guide geometry_ in a [custom Python state|/hom/python_states].
+
+{{{
+#!python
+import hou
+# Create an empty geometry object
+geo = hou.Geometry()
+# Get the verb from the Box node
+box_verb = hou.sopNodeTypeCategory().nodeVerb("box")
+# Set the verb's parameters
+box_verb.setParms({
+    "t": hou.Vector3(0.5, 0.5, -0.5),
+    "scale": 0.5,
+})
+# Execute the verb and put its output in the Geometry object
+box_verb.execute(geo, [])
+
+# Grab a reference to the viewer
+scene_viewer = hou.ui.paneTabOfType(hou.paneTabType.SceneViewer)
+# Create a Drawable object
+drawable = hou.Drawable(scene_viewer, geo, "my_guide")
+# Set the Drawable display mode as wireframe (this is the default)
+drawable.setDisplayMode(hou.drawableDisplayMode.WireframeMode)
+# Enable and show the drawable geometry
+drawable.enable(True)
+drawable.show(True)
+# Tumble the view to see the geometry
+}}}
+
+{{{
+#!python
+import hou
+# Create a geometry from the Sphere node
+sphere_verb = hou.sopNodeTypeCategory().nodeVerb("sphere")
+geo = hou.Geometry()
+sphere_verb.execute(geo, [])
+    
+# Add color and alpha attributes to the sphere
+color_attrib = geo.addAttrib(hou.attribType.Prim, "Cd", (1.0, 1.0, 1.0))
+alpha_attrib = geo.addAttrib(hou.attribType.Prim, "Alpha", 1.0)
+    
+color = hou.Color(1.0, 0.0, 0.0)
+for prim in geo.prims():
+    prim.setAttribValue(color_attrib, color.rgb())
+    prim.setAttribValue(alpha_attrib, 0.7)
+    
+# Create a Drawable object
+scene_viewer = hou.ui.paneTabOfType(hou.paneTabType.SceneViewer)
+drawable = hou.Drawable(scene_viewer, geo, "my_sphere")   
+# Set the Drawable display mode with the current viewport shading mode
+drawable.setDisplayMode(hou.drawableDisplayMode.CurrentViewportMode)
+# Set the size of the sphere
+drawable.setTransform(hou.hmath.buildScale(0.5, 0.5, 0.5))
+drawable.enable(True)
+drawable.show(True)
+}}}
+
+== Tips and notes ==
+
+* The Drawable object keeps a reference to the Geometry object you pass. You can change the Geometry object's contents and the next time the viewer redraws it will draw the new contents.
+
+* When you create the Drawable object, it is disabled and hidden. You need to call `enable(True)` and then `show(True)` for the geometry to appear.
+
+* Even after they are activated and shown, Drawable geometry does not appear in the viewer until the next redraw (for example, when the user changes the view).
+
+    You can force an individual viewport to redraw using [Hom:hou.GeometryViewport#draw].
+
+    {{{
+    #!python
+    scene_viewer.curViewport().draw()
+    }}}
+
+* You can generate the contents of a Geometry object from scratch using verbs, or grab a copy of the output of a SOP node using [Hom:hou.SopNode#geometry].
+
+* You can also use [Hom:hou.drawablePrimitive] to specify a `built-in` shape to generate the content of a Drawable object.
+
+* `enabling`/`disabling` a drawable may cause performances issues if performed too often, especially with large geometries. It's good practice to use `show` instead of `enable` for hiding and showing a drawable.
+
+* It's also good practice to `disable` drawables when they are not actively used in a viewer.
+
+* The drawable geometry will appear in the viewer until you disable it, or the Drawable object is deleted. If there are no references to the object, Python will automatically delete it during garbage collection, and the guide geometry will disappear. So, you need to make sure to keep a live reference to the object as long as you want it to appear.
+
+    If you're using Drawable to draw guide geometry for a custom state, you will generally store a reference to the Drawable object on the [state implementation object|/hom/python_states#impl].
+
+
+@methods
+::`__init__(self, scene_viewer, geometry, name)`:
+    #cppname: HOM_Drawable::HOM_Drawable
+
+    Creates a drawable object for drawing a geometry in a viewport. The new drawable is hidden and disabled by default.
+
+    `scene_viewer`:
+        A [Hom:hou.SceneViewer] reference to the viewer the guide geometry will appear in.
+
+    `geometry`:
+        Either a [Hom:hou.Geometry] object containing the geometry to draw, or a [Hom:hou.drawablePrimitive] value specifying a shape to draw.
+
+    `name`:
+        A string to identify this drawable object. This should be unique across all drawables in the current session.
+
+    In a custom state, you can base the Drawable's name on the state name to try to ensure uniqueness. For example:
+
+    {{{
+    #!python
+    class MyState(object):
+        def __init__(self, state_name, scene_viewer):
+            self.state_name = state_name
+            self.scene_viewer = scene_viewer
+
+            geo = hou.Geometry()
+            verb = hou.sopNodeTypeCategory().nodeVerb("box")
+            verb.execute(geo, [])
+            self._box = hou.Drawable(
+                self.scene_viewer, geo,
+                # Use the state name as the basis for the drawable's name
+                self.state_name + "_box"
+            )
+    }}}
+
+::`name(self)`:
+    #cppname: HOM_Drawable::name
+
+    The name of this drawable.
+
+::`enable(self,value)`:
+    #cppname: HOM_Drawable::enable
+
+    Enables or disables the drawing of the geometry.
+
+    `value`:
+        `True` to enable or `False` to disable the drawing.
+
+::`show(self, value)`:
+    #cppname: HOM_Drawable::show
+
+    Displays or hides the geometry in the viewport. The object must be enabled first. It will appear the next time the viewer redraws.
+
+    `value`:
+        `True` to show the geometry or `False` to hide it.
+
+::`setDisplayMode(self, mode)`:
+    #cppname: HOM_Drawable::setDisplayMode
+
+    Sets the display mode of the geometry. 
+
+    `mode`:
+        A [Hom:hou.drawableDisplayMode] value.
+
+::`displayMode(self)`: -> [Hom:hou.drawableDisplayMode]
+    #cppname: HOM_Drawable::setDisplayMode
+
+    Returns the display mode of the geometry.
+
+::`setTransform(self, xform)`:
+    #cppname: HOM_Drawable::setTransform
+
+    Sets the transform matrix of the geometry. The changes will appear the next time the viewer redraws.
+
+    `xform`:
+        A [Hom:hou.Matrix4] transformation matrix to set the geometry's tranlation, rotation, and scale.
+
+::`transform(self)`: -> [Hom:hou.Matrix4]:
+    #cppname: HOM_Drawable::transform
+
+    Returns the geometry transform matrix.
+
+::`setWireframeColor(self, color)`:
+    #cppname: HOM_Drawable::setWireframeColor
+
+    Updates the color of the geometry when the drawable display mode is set to [Hom:hou.drawableDisplayMode#WireframeMode]. The change will appear the next time the viewer redraws.
+
+    `color`:
+        A [Hom:hou.Color] value to specify the primitive color.

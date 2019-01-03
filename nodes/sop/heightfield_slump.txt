@@ -11,10 +11,22 @@ A slump is a form of mass wasting that occurs when a coherent mass of loosely co
 
 Whereas [Height Field Erode|Node:sop/heightfield_erode] simulates erosion be iterating over animation frames, this node calculates and applies the effect of slumping all at once.
 
+While Height Field Slump includes in-place erosion tools, these are primarily
+meant to be used by higher level tools.
+
 
 @parameters
 
 == Slump ==
+
+Slump Mode:
+    #id: slumpmode
+	
+    The method that the bound material layer will be slumped. Either Smooth or Granular.
+
+    The smooth operation will quickly diffuse the material.  This results in slower transport but ensures a smooth field useful for liquid-like transport mechanisms.
+
+    The granular operations moves the material in quantized chunks.  This allows for faster transport, but will result in a chunky field, useful for boulder-like transport mechanisms.
 
 Spread Iterations:
     #id: iterations
@@ -31,6 +43,11 @@ Repose Angle:
     
     The maximum slope, measured in degrees from the horizontal, at which loose solid material will remain in place without sliding.
 
+Repose Angle Mask:
+	#id: reposeanglemasklayer
+	
+	The name of the repose angle mask. This only works when slump mode is set to Granular.
+	
 Height Factor:
     #id: height_factor
     
@@ -41,6 +58,68 @@ Entrainment Rate:
     
     Entrainment is process of material lifting by an agent of erosion. This controls the percentage of the entrained material that is dragged with the slumping material in each iteration.
 
+Stability Mask:
+	#id: stabilitymasklayer
+	
+	The name of the stability mask. This mask can be used to make to debris more stable.
+	
+Quantization:
+	#id: quant
+	
+	Controls the chunkiness of the material flow. A lower value would make the flow more continuous and a higher value would make the flow more chunky.
+	
+Grid Bias:
+	#id: gridbias
+	
+	Controls how biased the movement of material is. Setting it to positive values would bias the movement in the direction of the principal axes, and when set to negative values, it would bias the movement at angles of 45 degree relative to the principal axes. The default value of zero would mean no bias in any direction.
+
+Grid Bias Mask:
+	#id: gridbiasmasklayer
+	
+	The name of the grid bias mask.
+
+Random Seed:
+    #id: seed
+    
+    Random seed to make erosion vary for the same set of variables on the same input.
+	
+Do Erosion:
+	#id: doerosion
+	
+	When turned on, it would erode the bedrock layer while slumping the material layer. 
+	
+	NOTE: A sediment layer must provided when this option is on.
+
+Global Erosion Rate:
+    #id: globalerosionrate
+    
+    Controls how many meters of bedrock or debris (here entrained material) is eroded every iteration.
+    
+Erodability:
+    #id: erodability
+    
+    Controls the softness of bedrock or debris (here entrained material). Higher values would make the terrain easier to erode, causing deeper incisions, more sediment, and more debris being deposited as a result.
+
+Erodability Mask:
+	#id: erodabilitymasklayer
+	
+	The name of the erodability mask.
+	
+Erosion Rate:
+    #id: erosionrate
+    
+    Controls the rate at which erosion happens. This is a multiplier on `Erodability`.
+	
+Bank Angle:
+    #id: bankangle
+    
+    Sets the angle at which the riverbank rests relative to the riverbed. Lowre values would make wider and flatter river channels.
+
+Bank Angle Mask:
+	#id: bankanglemasklayer
+	
+	The name of the bank angle mask.
+	
 Allow Material Outflow:
     #id: openborder
     
@@ -51,7 +130,71 @@ Add to Bedrock:
     
     Place material back into the bedrock (height layer) for further calculations such as erosion.
 
+== Adavanced Erosion ==
 
+This folder is only active when both Granular mode and Do Erosion are set.
+
+Removal Rate:
+	#id: removalrate
+	
+	Proportion of debris from thermal erosion that is deleted. This simulates wind carrying away a certain amount of debris rather than it all accumulating. The default is `0` (no deletion). Negative values correspond to the debris being less dense than the rock, so one unit of eroded rock produces more than one unit of debris.
+
+Max Debris Depth:
+    #id: maxdebrisdepth
+    
+    Stop erosion when the debris layer reaches this depth.
+
+~~~ Erodability ~~~
+
+Ramp-up Iterations:
+	#id: erodability_rampupiters
+	
+	The iteration where erodability would get to its maximum value.
+	
+Initial Factor:
+	#id: erodability_initialfactor
+	
+	Controls how much of the set erodability would the material have on its initial movement. It would increase over the set spread iterations until the max iteration, where it would stay at maximum set value.
+	
+Slope Factor:
+	#id: erodability_slopefactor
+	
+	Control how much the slope of the terrain would affect the erosion amount. Higher values would increase the slope effecting the erosion, and lower values would decrease it. Lowing this value would increase erodability as a result.
+
+~~~ Riverbed ~~~
+
+Erosion Rate Factor:
+	#id: bed_erosionratefactor
+	
+	A multiplier on `Erosion Rate` that would cause a change on the riverbed only. Increasing this value would cause a more aggresive erosion on the bed, and as a result, it would increase the depth of the incisions.
+
+Deposition Rate:
+    #id: bed_depositionrate
+    
+    Controls the rate at which the excess sediment turns into debris. A value of zero means no sediment is turned into debris, while a value of one will convert all created sediment into debris, and the bedrock would in turn be protected more by the created debris.
+
+Deposition Rate Mask:
+	#id: bed_depositionratemasklayer
+	
+	The name of the deposition rate mask.
+
+Sediment Capacity:
+    #id: bed_sedimentcap
+    
+    The amount of sediment that can be carried per unit of moving water. The higher the capacity, the longer the material can erode before it starts depositing its excess sediment.
+	
+~~~ Riverbank ~~~
+
+Erosion Rate Factor:
+	#id: bank_erosionratefactor
+	
+	A multiplier on `Erosion Rate` that would cause a change on the riverbank only. Increasing this value would cause a more aggresive erosion on the bank, and as a result, it would increase the width of the incisions.
+	
+Max Bank to Bed Water Ratio:
+	#id: bank_maxbankbedwaterratio
+	
+	The maximum of bank to bed water column height ratio that will be considered as river bank bank. Ratios higher than this number will not be considered as bank during erosion.
+	
 == Flow Field ==
 
 Calculate Flow Fields:
@@ -89,6 +232,10 @@ Entrained Material:
     
     If the input already has a debris layer from a previous [Heightfield Erode|Node:sop/heightfield_erode] you can put its name here and the algorithm will treat it as already-loose soil.
 
+Sediment:
+    #id: sedimentlayer
+    
+    Name of the field to use as sediment in the slumping and erosion simulation.
     
 ~~~ Output Layers ~~~
 

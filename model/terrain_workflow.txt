@@ -1,0 +1,153 @@
+= Realistic terrain <| with heightfields =
+
+"""A heuristic workflow using the heightfield tools, based on experience generating realistic-looking terrain."""
+
+
+== Overview ==
+
+This page describes a general, heuristic workflow for generating natural-looking terrain using Houdini's [heightfield|heightfields] tools. At its most basic, terrain generation uses the following steps:
+
+[Image:/images/model/terrain_workflow.svg]
+
+
+== Massing ==
+
+:col:
+    *Massing* involves blocking out the large-scale structure of the terrain in three dimensions. For example, in a mountainous terrain, how much space the mountains will occupy, the shape of the space they enclose, where the mountains are higher and lower.
+
+    In heightfields, this means creating a basic, low-resolution field that has the _general characteristics_ of the final terrain. The surfaces can be smooth or blocky at this stage, we'll add noise later.
+
+    You can creates masses in several ways:
+
+    * [Paint|Node:sop/heightfield_paint] directly into the heightfield.
+
+    * [Project|Node:sop/heightfield_project] 3D geometry into the heightfield.
+
+    * [Import 2D images|Node:sop/heightfield_file] (Liday, GeoTiff, image maps, COPs) into the heightfield (pixel intensity is used as height).
+
+:col:
+    [Image:/images/model/terrain_massing_model1.jpg] [Image:/images/model/terrain_massing_model2.jpg]
+
+
+== Seeding ==
+
+:col:
+    *Seeding* is the process of adding small disturbances to smooth surfaces to make them more natural. The less smooth the surfaces, the more realistic erosion will be later.
+
+    Simply adding overall noise to the field alone, or projecting large-scale geometry alone, often does not create enough "obstacles" (features that water and soil must move around) to create interesting erosion. Seeding is about adding those obstacles.
+
+    * Add a slight [Heightfield Noise|Node:sop/heightfield_noise] to projected geometry.
+
+    * Add [Heightfield Distort by Layer|Node:sop/heightfield_distortbylayer] or [Heightfield Distort by Noise|Node:sop/heightfield_distort].
+
+:col:
+    [Image:/images/model/terrain_seeding.jpg]
+
+~~
+
+:col:
+    One useful trick is to create a 3D model of a large field of random jagged rocky shapes (for example, using the [Mountain SOP|Node:sop/mountain]), then painting a mask on your heightfield (with falloff) and only projecting the rocky geometry into the masked area. Then add Distory by Layer or Distort by Noise on top of that.
+
+:col:
+    :video:
+        #src: videos/terrain_seeding.mp4
+
+
+== Lobing ==
+
+:col: 
+    Mountain formations are often broken into smaller sections, which can be thought of as _lobes_.
+    *Lobing* is the process of taking a low resolution heightfield and using [Heightfield Erode|Node:sop/heightfield_erode] to cut a mountain into smaller sections.
+
+    Turn up _precipitation_, _cut angles_, and _sediment capacity_ on the Erode node to get the cutting effect.
+
+:col:
+    [Image:/images/model/terrain_lobing.jpg]
+
+~~
+
+:col:
+    :box:Before lobing
+        [Image:/images/model/terrain_lobing_before.jpg]
+
+:col:
+    :box:After lobing
+        [Image:/images/model/terrain_lobing_after.jpg]
+
+
+== Remapping ==
+
+:col: 
+    *Remapping* involves repeating the massing/seeding/lobing steps multiple times to create different levels (for example foothills, low mountains, high mounbtains).
+
+    The trick is to build your terrain in "Elevation Passes". After the previous [Heightfield Erode|Node:sop/heightfield_erode], add a [Heightfield Remap|Node:sop/heightfield_remap] and remap the elevation, compressing the field vertically. Then repeat the massing/seeding/lobing step _over top of_ the previous now-compressed contents.
+
+:col:
+    :video:
+        #src: videos/terrain_remapping.mp4
+
+== Upsampling ==
+
+When you're finished "lobing" you need to *upsample* the heightfield to a higher resolution so erosion has greater detail.
+
+Use [Heightfield Resample|Node:sop/heightfield_resample] to double the field's resolution. (You will probably want to iterate this process so do not resample to high at first.)
+
+
+== Shaping ==
+
+:col:
+    The *Shaping* involves adding geologic features using [Heightfield Terrace|Node:sop/heightfield_terrace] and [Heightfield Clip|Node:sop/heightfield_clip].
+
+    Using masks, you can Clip to top off mountains, and add terracing to certain areas to create more interesting variations for erosion.
+
+:col:
+    [Image:/images/model/terrain_shape.jpg]
+    [Image:/images/model/terrain_terrace.jpg]
+
+
+== Re-seeding ==
+
+*Re-seeding* is a repeat of the earlier seeding operation at a higher resolution. You want to add more obstacles that will force erosion to change direction.
+
+
+== Erosion ==
+
+:col:
+    Now use the full power of [Heightfield Erode|Node:sop/heightfield_erode] to start getting the look you want. It will take some practice to learn what effect the various settings have, but often there are no "right" settings. Try extreme settings sometimes and see what you get. All that matter is the result looks interesting and natural.
+
+    Along with the high-level Heightfield Erode node you can use nodes representing the individual erosion types:
+    [HF Erode Thermal|Node:sop/heightfield_erode_thermal],
+    [HF Erode Hydro|Node:sop/heightfield_erode_hydro], and
+    [HF Precipitation|Node:sop/heightfield_erode_precipitation].
+
+    You will probably want iterate on this step a few times.
+
+:col:
+    [Image:/images/model/terrain_erosion.jpg]
+    
+
+== Final ==
+
+:col: 
+    Once you have the terrain you want, you can move on to shading the terrain and scattering rocks and trees.
+
+    The [Heightfield Quickshade|Node:sop/heightfield_quickshade] node gives you a simple material setup on your terrain quickly.
+
+:col:
+    [Image:/images/model/terrain_shading.jpg]
+
+~~
+
+:col:
+    The [Heightfield Scatter|Node:sop/heightfield_scatter] lets you scatter points for instancing across the terrain.
+
+    * You can control the scatter with masks.
+
+    * You can do a hierarchical scatter that prevents overlap of different scales.
+
+    * You can add variant attributes to the points so, for example, they are instanced with different tree types or rock shapes.
+
+:col:
+    :video:
+        #src: /model/videos/terrain_multiscatter.mp4
+

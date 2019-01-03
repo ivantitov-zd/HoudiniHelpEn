@@ -1,0 +1,163 @@
+= Vellum basics =
+
+Vellum uses a Position Based Dynamics approach to cloth, hair, and grains. This new approach is fast, reliable, and produces acceptable results quickly.
+
+There are several shelf tools that will create the basic node setup for you. The best example of a SOP setup using Vellum is the [Icon:SHELF/vellum_simplecloth][Simple Cloth|/shelf/vellumsimplecloth] tool, which is available on the __Characters__ tab for Houdini Core users, and on the __Vellum__ tab for Houdini FX users.
+
+[Image:/images/vellum/simpleclothsetupnodes.png]
+[Image:/images/vellum/simpleclothsetupgeo.png]
+
+It asks you to select a geometry object to solve as cloth, and a geometry object to use as a collider. In this example, a grid is used as the cloth object and a torus is used as a collider. These get wired into the [Vellum Constraints|Node:sop/vellumconstraints] node, which creates constraints to act like different materials. The [Simple Cloth|/shelf/vellumsimplecloth] tool uses a Vellum Configure Cloth node, which is a Vellum Constraints node with common cloth parameters already applied. There are also presets for Vellum Configure Balloon, Vellum Configure Grain, Vellum Configure Hair, and Vellum Configure Softbody that use this same node.
+
+The [Vellum Solver|Node:sop/vellumsolver] allows you to modify things like __Substeps__ and  __Constraint Iterations__ to balance the speed and quality of your simulation. The node also has a __Forces__ tab that allows you to set __Gravity__, __Wind__, __Wind Drag__, and __Friction__.
+
+NOTE:
+    There is a default __Wind Drag__ force that is set in SOPs. However, the default DOP network does not create a drag force.
+
+The [Vellum I/O|Node:sop/vellumio] node saves the output geometry as well as the constraint geometry to disk. There are some default deletes on the __Save Filter__ tab to clean out the most common attributes that aren't needed in order to cut down on the file size.
+
+The [Vellum Post-Process|Node:sop/vellumpostprocess] allows you to visualize components like __False Color Mode__ for stretch or bend stress. You can also visualize constraints and thickness, which is useful for troubleshooting your simulation.
+
+=== Vellum nodes ===
+
+There are several Vellum SOPs available in the [tab menu|/basics/tabmenu]. Many put down a [Vellum Constraints|Node:sop/vellumconstraints] node with a different __Constraint Type__ set and specific parameters exposed for the constraint type.
+
+:col:
+    [Vellum Constraints|Node:sop/vellumconstraints] nodes:
+    
+    [Icon:SOP/vellumattachconstraints] Vellum Attach to Geometry
+    
+    [Icon:SHELF/vellum_balloon] Vellum Configure Balloon
+    
+    [Icon:SHELF/vellum_cloth] Vellum Configure Cloth
+    
+    [Icon:SHELF/vellum_hair] Vellum Configure Hair
+    
+    [Icon:SHELF/vellum_softbody] Vellum Configure Softbody
+    
+    [Icon:SOP/vellumglueconstraints] Vellum Glue
+    
+    [Icon:SOP/vellumstitchconstraints] Vellum Stitch Points
+    
+    [Icon:SOP/vellumstrutsconstraints] Vellum Struts
+    
+    [Icon:SOP/vellumweldconstraints] Vellum Weld Points
+
+:col:
+    Other Vellum SOPs:
+
+    [Icon:SHELF/vellum_grains][Vellum Configure Grain|Node:sop/vellumconstraints_grain]
+   
+    [Icon:DOP/vellumsolver][Vellum Solver|Node:sop/vellumsolver]
+    
+    [Icon:SHELF/vellum_cloth][Vellum Drape|Node:sop/vellumdrape]
+    
+    [Icon:SOP/vellumrestblend][Vellum Rest Blend|Node:sop/vellumrestblend]
+    
+    [Icon:SOP/vellumpack][Vellum Pack|Node:sop/vellumpack]
+    
+    [Icon:SOP/vellumunpack][Vellum Unpack|Node:sop/vellumunpack]
+    
+    [Icon:SOP/vellumio][Vellum I/O|Node:sop/vellumio]
+    
+    [Icon:SOP/vellumpostprocess][Vellum Post-Process|Node:sop/vellumpostprocess]
+
+== Using Vellum in DOPs ==
+
+The [Vellum Constraints|Node:sop/vellumconstraints] node is still used to configure constraints when using Vellum in DOPs. However, it exists inside a [Vellum Source|Node:dop/vellumsource] node, which allows it do additional things such as emit.
+
+There are shelf tools for each type of Vellum effect, which are all able to interact with each other. When you use multiple Vellum effects on multiple objects, all objects will be merged into one geometry object and one constraint geometry object in the DOP network.
+
+For more information on each effect, see the following shelf help pages.
+
+:col:
+    [Icon:SHELF/vellum_cloth][Vellum Cloth|/shelf/vellumcloth]
+    
+    [Icon:SHELF/vellum_hair][Vellum Hair|/shelf/vellumhair]
+    
+    [Icon:SHELF/vellum_softbody][Vellum Softbody|/shelf/vellumsoftbody]
+
+:col:
+    [Icon:SHELF/vellum_balloon][Vellum Balloon|/shelf/vellumballoon]
+    
+    [Icon:SHELF/vellum_grains][Vellum Grains|/shelf/vellumgrains]
+    
+You can apply POP forces in Vellum, since it is particle based. It also respects [Particle Streams|/dopparticles/streams], so a force applied to one object doesn't have to be applied to all objects.
+
+For example, if the grid is a cloth object and the torus is a softbody object, you can apply a [POP Wind|Node:dop/popwind] force to the cloth by placing the node in between the `grid_object1_vellum` and `merge2` nodes.
+
+[Image:/images/vellum/vellumdopsforces.png]
+
+However, if you want to apply the wind to the softbody instead, you can move the [POP Wind|Node:dop/popwind] force in between the `torus_object1_vellum` and `merge2` nodes. Similarly, if you want to apply the wind to both objects, you can place it between the `merge2` and `vellumsolver1` nodes.
+
+== Vellum Solver SOP and DOP differences ==
+
+The [Vellum Solver SOP|Node:sop/vellumsolver] is a wrapped up version of the [Vellum Solver DOP|Node:dop/vellumsolver]. However, it has a features that you need to add yourself in DOPs for producing same result.
+
+* Gravity is on by default. This is the case in some DOP networks, but not all.
+
+* Wind is on by default with still air. You can add a [POP Drag|Node:dop/popdrag] or [POP Wind|Node:dop/popwind] and set its air resistance to 0.1 for equivalence.
+
+* The ground plane is not on by default, but can be turned on with the __Ground Position__ parameter. You have to explicitly add a [ground plane|/shelf/groundplane] in DOPs.
+
+== Using Dynamic Constraints ==
+
+Typically constraints are set up before simulation. However, you can also set up constraints dynamically that occur during simulation. If you dive inside your [Vellum Solver|Node:sop/vellumsolver], you can create [Vellum Constraints|Node:sop/vellumconstraints] nodes and wire them into your `force_output` to create all kinds of effects.
+
+For example, you create a Vellum glue constraint that will glue points once they get close together. 
+
+# Once you have your simulation set up, dive inside the [Vellum Solver|Node:sop/vellumsolver], create a [Vellum Constraints|Node:sop/vellumconstraints] node, and wire it into the `force_output`. 
+
+# Set the __Constraint Type__ to __Glue__.
+
+# Change the __Create Constraint__ parameter to __Each Frame__ so it will check to see if there are any nearby points every frame. 
+
+    NOTE:
+        There is a maximum __Constraints Per Point__ parameter that is set to 1 by default, so there will only ever be 1 constraint created.
+
+    TIP:
+        You can optionally turn on __Breaking__ and set a __Threshold__ where the glue constraints will separate.
+
+:video:
+    #src: /videos/VellumWebStick.mp4
+
+== Tetrahedral softbodies ==
+
+If you want a simple softbody, we recommend you use [Vellum Softbody|/shelf/vellumsoftbody], since it's very simple to set up and can take all kinds of geometry, including geometry with holes. Tetrahedral softbodies requires you to take extra steps to remesh, reduce, and tetrahedralize your geometry before applying Vellum constraints. Tetrahedral softbodies are typically used in cases where you need higher quality.
+
+[Image:/images/vellum/tetrahedral_softbodies.png]
+
+We are still working on this functionality. We intent to add a shelf tool to more easily create tetrahedral softbodies in an incremental build of this version. The following example describes how to set this up manually with a piece of test geometry.
+
+# Create a [Test Geometry:Squab|Node:sop/testgeometry_squab] using the [tab menu|/basics/tabmenu].
+
+# Append a [PolyReduce SOP|Node:sop/polyreduce] node and change the __Percent to Keep__ parameter to `10`.
+
+# Add a [Solid Conform SOP|Node:sop/solidconform] node to the chain.
+
+# Next create a [Vellum Constraints|Node:sop/vellumconstraints] node, and wire the  [Solid Conform|Node:sop/solidconform] into the first input.
+
+# Make sure the __Constraint Type__ is set to __Distance Along Edges__, and set the Stiffness to `100`.
+
+# Append a [Vellum Solver|Node:sop/vellumsolver], turn on the __Ground Position__ parameter, and lower it below the squab.
+
+# Add another [Vellum Constraints|Node:sop/vellumconstraints] node between the first one and the [Vellum Solver|Node:sop/vellumsolver], and change the __Constraint Type__ to __Tetrahedral Volume__.
+
+# Create a [Point Deform SOP|Node:sop/pointdeform] and wire the squab geometry into the first input, the [Solid Conform|Node:sop/solidconform] node into the second input, and the [Vellum Solver|Node:sop/vellumsolver] into the third input.
+
+    Tip:
+        You can also change the __Minium Points__ to `3` and the __Radius__ to `.4`. This should make the tentacles appear smoother.
+
+:col:
+    Advantages:
+    
+    * Sometimes Vellum Softbodies can product artifacts since the struts inside can protrude through the geometry.
+ 
+    * This is preferable over Vellum Balloon if you don't want one part of the geometry to be enlarged if another part is compressed.
+
+:col: 
+    Disadvantages:
+    
+    * It is not as fast as struts.
+ 
+    * You have to take extra steps to remesh, reduce, and tetrahedralize your geometry, whereas struts works on the original geometry.  Struts is very simple to set up and can take all kinds of geometry, including geometry with holes.

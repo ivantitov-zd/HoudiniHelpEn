@@ -1,6 +1,7 @@
 #type:     node
 #context:  sop
 #internal: heightfield_scatter
+#version: 2.0
 #icon:     SOP/heightfield_scatter
 
 = HeightField Scatter =
@@ -9,60 +10,259 @@
 
 This node generates point geometry from a height field.
 
-WARNING:
-    The node will _only_ scatter points where the __Scatter amount layer__ is on. If the layer is empty, or the parameter is left blank, the node won't create any points at all.
-
-
 @parameters
 
-Scatter Amount Layer:
+Tag Name:
+    #id: tag
+    
+    The name of the tag attribute added to the generated points from this node. By default it is set to `$OS` which is the name of the node.
+
+Scatter Method:
+    #id: scattermethod
+    
+    How to scatter the points.
+    
+    By Coverage using Mask Layer:
+        Given a certain __Coverage__ value and __Variability__ values, this method will scatter points so that they would cover the set amount of __Coverage__ on the painted mask on the heightfield.
+        
+    By Density using Mask Layer:
+        Given a certain __Density__ value, this method will scatter points so that they would have __Density__ as their number of points per meter square on the painted mask on the heightfield.
+
+    Total Point Count using Mask Layer:
+        Given a certain __Total Point Count__ value, this method will scatter points so that they would have exactly the number set as their number of points on the painted mask on the heightfield.
+        
+    Per Point Count using Source Points:
+        Given a certain range or exact value, this method will scatter points around the points with tags matching __Source Point Tag__.
+    
+== Scattering ==
+
+Mask Layer:
     #id: layer
     
     The name of a mask layer specifying which areas of the height field will get scattered points.
-    
-Use Exact Point Count:
-    #id: dopointcount
-    
-    Specify the exact number of points to generate, rather than a density value.
-    
-Point Count:
-    #id: npts
-    
-    When __Use exact point count__ is on, the number of points to generate.
-    
-Density:
-    #id: densityscale
-    
-    When __Use exact point count__ is off, the number of points per square meter to generate.
-    
 
+Coverage:
+    #id: coverage
+    
+    The ratio of area of the painted mask on the input height field that should be covered with the points about to be scattered given their size from the __Variability__ section.
+	
+Density:
+    #id: density
+    
+    The number of points per square meter to generate on the painted mask on the input height field.
+	
+Total Point Count:
+    #id: totalpointcount
+    
+    The exact number of points to be scattered on the painted mask on the input height field.
+
+Source Point Tag:
+    #id: sourcetag
+    
+    The name of the tag attribute from the source points that the new points would be scattered around. If points are fed into the second input, the node will look in the set of points in the second input for tags matching this string instead of the first input.
+	
+Per Point Count Method:
+    #id: perpointcount_method
+    
+    How to scatter the newly generated points around the source points.
+   
+    Poisson Distribution:
+		Scatter points according to a poisson distribution given the range.
+        
+    Exact Number:
+        Scatter points by exactly placing down _Exact Number_ many points.
+
+Range:
+    #id: perpointcount_poissonrange
+    
+    The range that the poisson distribution spans on.
+		
+Exact Number:
+    #id: perpointcount_exactnumber
+    
+    The exact number of points to be scattered around the points with matching tags as __Source Point Tag__.
+
+Positioning Method:
+    #id: positioning_method
+    
+    How to position points around the source points. Points are uniformly scattered in the circular rings around the source points.
+    
+    Offset:
+		Treat the numbers as the min and max radius away from the inner radius of the source points.
+        
+    Origin:
+        Treat the numbers as the min and max radius away from the origin of the source points.
+		
+	Ratio:
+		Treat the numbers as the min and max ratios on the inner radius of the source points away from their origin.
+
+Source Origin Radius:
+    #id: positioning_origin
+	
+	The inner and the outer radius of a circular ring around the source points.
+
+Source Inner Radius Offset:
+    #id: positioning_offset
+	
+	The inner and the outer radius of a circular ring indicated as offset to the inner radius of the source points.
+
+Source Inner Radius Ratio:
+    #id: positioning_ratio
+	
+	The inner and the outer ratio of a circular ring applied on the inner radius of the source points.
+
+Outer Radius:
+    #id: outerradius
+	
+	Sets the radius away from the origin of the points that is considered to be the physical area occupied by the points. This value is scaled according to parameters in __Variability__ and stored in the __footprint__ attribute.
+	
+Falloff:
+    #id: falloff
+	
+	When not equal to zero, it indicates the inner radius away from the origin of the points.
+	
+== Variability ==
+
+Method:
+    #id: variability_method
+	
+    How to scale the generated points.
+    
+    Uniform Distribution:
+		Scale points according to a uniform distribution given the range.
+        
+    Normal Distribution:
+        Scale points according to a normal distribution given the range and the spread (the standard deviation of the distribution).
+		
+	Exact Scale:
+		Scale points by a fixed amount.
+
+Range:
+    #id: variability_unifromrange
+	
+	The range that the uniform distribution spans on.
+	
+Range:
+    #id: variability_normalrange
+		
+	Sets the min and max of the values that are accepted from a normal distribution with a mean equal to the average of the min and max values, and a standard deviation of __Spread__.
+
+Spread:
+    #id: variability_normalspread
+	
+	Set the standard deviation of the normal distribution. Increasing this number with a fixed range results in lower number of points scattered.
+Exact Scale:
+    #id: variability_exactscale
+	
+	Set the exact amount that all points will be scaled by.
+	
 == Relaxation ==
 
-Relax Points:
-    #id: relaxpoints
-    
-    Pushes points away from each other as a secondary step, to prevent clumping.
-    
-Relax Iterations:
-    #id: relaxiterations
-    
-    When __Relax points__ is on, the number of iterations of relaxation to do. More iterations will more evenly distribute the points, but can be slower, and after a certain number of iterations that evenly distribute the points, more iterations is wasted effort.
-    
-Scale Radii By:
-    #id: scaleradiiby
-    
-    When __Relax points__ is on, scale point radii by this amount before relaxing. A value less than 1 will _increase_ clumping. A value of 0 does no relaxation. A value greater than 1 may speed up convergence of the relaxation when scattered points are very far apart.
+    Relax Points:
+        #id: relaxpoints
+        
+        Pushes points away from each other as a secondary step, to prevent clumping.
 
-Use Max Relax Radius:
-    #id: usemaxradius
-    
-    Prevent far-flung outlier points from affecting relaxation.
-    
-Max Relax Radius:
-    #id: maxradius
-    
-    Points this far from other points are not included in relaxation. Decrease this if outlier points in low-density areas are causing problems with relaxation.
+    Self Overlap:
+        #id: relax_selfoverlap
+        
+        Whether to apply relaxation between the newly generated points or not.  
 
+    Avoid Point Tag:
+        #id: relax_avoidtag
+        
+        The name of the tag attribute of the points that relaxation will take place on.
+
+    Mask Cut Off:
+        #id: relax_maskcutoff
+        
+        The minimum value of the mask which is considered to actually be painted area. Outside of this area, points are removed.
+        
+    Iterations:
+        #id: relax_iterations
+        
+        When __Relax points__ is on, the number of iterations of relaxation to do. More iterations will more evenly distribute the points, but can be slower, and after a certain number of iterations that evenly distribute the points, more iterations is wasted effort.
+
+    Removing Rate:
+        #id: relax_removingrate
+        
+        The rate at which the points would be removed while relaxing. If set to a lower value, more iterations are needed to reach a stable output, but there is more control.
+        
+    Stepping Ratio:
+        #id: relax_stepratio
+        
+        The ratio of the calculated intersecting distance between two points that is moved per iteration.
+        
+    Allow Out of Bounds Points:
+        #id: relax_allowoutofbounds
+        
+        When turned on, points outside the bounds of the heightfield will not be removed.
+
+    Point Removal Method:
+        #id: relax_pointremovalmethod
+	
+Keep Incoming Scatter Points:
+    #id: keepscatterpoints
+	
+	When turned on, the output will include the incoming scatter points together with the newly scattered points.
+	
+Keep Incoming Terrain:
+    #id: keepterrain
+	
+	When turned on, the output will include the input height field with all its layers.
+
+Randomize Orients:
+    #id: randomizeorients
+	
+	When turned on, randomize the point orientations around their normal vector.
+	
+Match Normals with Terrain:
+    #id: matchnormalterrain
+	
+	When turned on, match the normal vectors of every point to the normal of the terrain at that location.
+	
+Match Direction with Slope:
+    #id: matchslopeterrain
+
+	When turned on, rotate around the normal vector so the Z-direction is facing along the slope of the terrain.
+    
+
+Randomize Up:
+    #id: randomup
+
+    Specify the number of degrees to jitter the computed normal direction of
+    the instance.
+
+Randomize Yaw:
+    #id: randomyaw
+
+    Specify the number of degrees to rotate around the normal.  180 will
+    provide completely random directions.
+
+Instance on New Points:
+    #id: instancenewpoints
+	
+	When turned on, use the primitives on the third input to pack them and instance them on every point.
+
+Define Pieces:
+    #id: piecemode
+		
+	From Attribute:
+        Use the __Piece Attribute__ to figure out the pieces connected to the input.
+
+    From Connectivity:
+		Internally use a connectivity sop to figure out the pieces of the input primitives.
+
+Piece Attribute:
+    #id: pieceattrib
+	
+	Sets the string that node uses to find the primitive piece attribute attached to each piece.
+	
+Quantization:
+    #id: quant
+	
+	Sets the value that the position of newly generated points are quantized to.
+	
 Global Seed:
     #id: seed
     
@@ -72,6 +272,12 @@ Max Points:
     #id: emergencylimit
     
     An optional hard limit on the number of points to generate, to prevent accidents where you mistype a value and Houdini tries to generate a ridiculous number of points that locks up the computer.
+
+    NOTE:
+	Do not rely on this parameter to set a specific number of points.
+	The actual generated points will be less than this, but could be
+	much less depending on seed values and the density.  Use total
+	point count scattering or adjust the density.
 
 
 @related

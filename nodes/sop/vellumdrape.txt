@@ -1,0 +1,224 @@
+#type:     node
+#context:  sop
+#internal: vellumdrape
+#icon:     SHELF/vellum_cloth
+
+= Vellum Drape =
+
+"""Vellum solver setup to pre-roll fabric to drape over characters."""
+
+When stitching together pieces of flat cloth it is useful to do so
+within a simulation rather than through modeling operations.   The
+Vellum Drape SOP provides a sandbox simulation designed around moving
+stitched points together slowly before fusing them with welds.
+
+@parameters
+
+Load from Disk:
+    #id: loadfromdisk
+
+    After a drape is completed, it can be loaded from file rather
+    than recomputed.
+    
+    
+Geometry File:
+    #id: file
+
+    The file to save the drape to.  A pair of packed primitives will
+    be saved as both the constraint and surface geometry are required.
+
+    Note that this is not a file sequence as a drape is expected to
+    be the final configuration.
+    
+    
+Reload Geometry:
+    #id: reload
+
+    Force the geometry to reload if it updated from some external process.
+    
+    
+Save to Disk:
+    #id: execute
+
+    Save the current drape results to the given file.
+    
+    
+Freeze:
+    #id: dofreeze
+
+    Rather than outputting the current frame, output the provided
+    freeze frame.   This is useful for setting up the pre-roll
+    for a sequence of drape operations.
+    
+    
+Freeze at Frame:
+    #id: freezeframe
+
+    Which frame to pre-roll to.  This is an absolute frame number,
+    so should be some number of frames after the start frame of
+    your scene.
+    
+    
+== Draping ==
+
+Inflate Collisions:
+    #id: collision_doinflate
+    
+    The initial pose of the cloth may be intersecting the collision
+    object.  This may happen if replacing a low res proxy collider
+    with a higher resolution object, for example.  In this case by
+    slightly deflating the collision object and inflating it over time
+    you can recover a non-self intersecting drape.
+    
+    
+Initial Deflation:
+    #id: collision_deflate
+
+    The distance to peak the collision geometry inwards at the start frame.
+    
+    
+Final Inflation:
+    #id: collision_inflate
+
+    The distance to peak the collision geometry outwards at the final frame.
+    
+    
+Inflation Frames:
+    #id: collision_frames
+
+    The number of frames to spread the inflation process over.
+    
+    
+Weld Additional Seams:
+    #id: doweld
+
+    Seams of cloth can be welded in a two step process.  For the first
+    stage, soft springs will pull the points together.  No gravity
+    will be present to allow the cloth to flow over the body.  In
+    the second stage, the points are welded together, immediately
+    closing the seam.  Gravity is then enabled to let the cloth
+    fall down.
+    
+    
+=== Weld Seams ===
+
+=== Seams ===
+
+Enable:
+    #id: seam_enable#
+
+    Enable this particular seam.
+    
+    
+Group:
+    #id: seam_group#
+
+    Point group to use as the first half of the seam.  This should be an
+    ordered point group to ensure points match with the target.  
+    
+    NOTE:
+        Specifying more than one named ordered group will result in an unordered list of points.
+    
+    
+Target Group:
+    #id: seam_target#
+
+    Point group to use as the second half of the seam.  Each point
+    of the group will be joined to the target in the point group order,
+    so ordered point groups should be used.
+
+    NOTE:
+        Using multiple named ordered point groups may not match as expected. Instead, use one seam per named group.
+    
+Cycle:
+    #id: seam_cycle#
+
+    If the point groups do not line up, cycle the start point this number
+    of points.
+    
+    
+Reverse:
+    #id: seam_reverse#
+
+    If one of the point groups has reversed order, this will let you reverse
+    the order of the seaming.  This is useful when procedurally generated
+    seams are pointed the wrong way.
+    
+    
+=== Weld Properties ===
+
+Welding Frame Delay:
+    #id: weldframe
+
+    The number of frames to use soft springs before welding the points
+    together.
+    
+    
+Attraction Stiffness:
+    #id: stretchstiffness
+
+    The strength of the springs.
+    
+    
+Add Bend across Welds:
+    #id: bendweld
+
+    When the points are welded, bend constraints are also added to make
+    it act like a single flat piece of cloth.  Without this, the seam
+    can cusp and bend freely.
+
+    The bend stiffness is averaged from the surrounding bend constraints.
+    
+    
+== Solver ==
+
+[Include:vellumsolver#timescale]
+[Include:vellumsolver#substeps]
+[Include:vellumsolver#niter]
+[Include:vellumsolver#smoothiter]
+    
+=== Collisions ===
+
+[Include:vellumsolver#enablecollisions]
+[Include:vellumsolver#doselfcollisions]
+[Include:vellumsolver#useground]
+[Include:vellumsolver#groundpos]
+[Include:vellumsolver#collisionsiter]
+[Include:vellumsolver#postcollisioniter]
+[Include:vellumsolver#resolveallmax]
+[Include:vellumsolver#layershock]
+    
+== Forces ==
+
+[Include:vellumsolver#gravity]
+
+Air Drag:
+    #id: airdrag
+
+    Amount of air resistance bringing the cloth to a standstill.
+    
+Velocity Damping:
+    #id: veldamping
+
+    A more brute force approach to reducing dynamic velocity - the velocity
+    is scaled directly by this amount, causing sudden movements to
+    be quickly damped.
+    
+=== Friction ===
+
+[Include:vellumsolver#static_threshold]
+[Include:vellumsolver#dynamic_scale]
+    
+== Simulation ==
+
+[Include:vellumsolver#resimulate]
+[Include:vellumsolver#cacheenabled]
+[Include:vellumsolver#cachemaxsize]
+[Include:vellumsolver#startframe]
+    
+@related
+    - [Node:sop/vellumsolver]
+    - [Node:sop/vellumconstraints]
+    - [Node:sop/vellumconstraints_grain]
+    - [Node:sop/vellumio]
+

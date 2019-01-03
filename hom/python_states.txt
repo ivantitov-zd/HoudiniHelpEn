@@ -1,0 +1,647 @@
+= Writing custom viewer states in Python =
+
+#flow: /hom/index#state
+
+"""A viewer state controls how to interpret mouse movements, clicks, keys, and so on in the viewer."""
+
+
+== Overview ==
+
+Viewer states control interaction in the viewport. For example, the [Icon:TOOLS/rotate] Rotate tool is a view state. The [Icon:TOOLS/handles] Handles tool allows access to the viewer state associated with the current node. Houdini lets you [create|/hom/python_states] and [register|Hom:hou.ui#registerViewerState] your own custom view states in Python.
+
+A custom state can, for example:
+
+:col:
+    * [Display handles|state_handles] and let the user manipulate the handles to change parameters or settings.
+    * [Interact with geometry|state_events] to, for example, let you draw on a surface, or display information about what's under the mouse cursor.
+    * [Display guide|state_guides] geometry.
+:col:
+    * [Let the user select|state_selectors] geometry.
+    * Display a [custom right-click menu|state_menus]
+    * Respond to low-level mouse, keyboard, and tablet [events|state_events].
+    * Wrap changes in [undo blocks|state_undo].
+
+A [Houdini digital asset|/assets/] can specify a state (for the [Icon:TOOLS/handles] Handles tool to use when a node of that type is current). Eventually you will be able to programmatically enter a state by calling [Hom:hou.SceneViewer#setCurrentState], for example in a shelf tool script (for tools that don't create a node, such as an inspection tool).
+
+To start playing with the code right away, see [implementing a state|#impl] below, which shows how to implement, register, and launch a minimal viewer state.
+
+
+=== Limitations ===
+
+* Currently Python states are *only available at the SOP (geometry) and OBJ levels*. It is not currently possible to have custom viewer states in other network types, for example Dynamic or Composite networks.
+    
+* There is currently no way to specify an icon for a state. 
+
+
+== State names ==
+
+A state has an internal _name_ and a human readable _label_ that appears in the UI. If you create a new custom state, the internal name you choose must be unique: if two authors use the same state name, one of the states will fail to register. If you consider that a state or asset you create might someday be shared with other users/studios or even sold as a product, you should take the time to ensure proper uniqueness.
+
+There is the additional complication that Houdini automatically creates generic states for each asset, so you can't use the name of an existing node type as a state name.
+
+* If your state is intrinsic to a particular asset, use the asset's name (with namespace) as the state name and add `.pystate` on the end. This makes the state's relationship with the asset obvious, but avoids conflict with the asset's automatically created generic state.
+
+    You can create a name like this automatically in a `OnInstall` event script, for example:
+
+    {{{
+    #!python
+    state_name = kwargs["type"].type().name() + ".pystate"
+    }}}
+
+    For more information see [registering|#register] below.)
+
+* If the state is shared between more than one node, or not tied to a node, you must still ensure that the state name does not conflict with the generic state of any asset. The best way to do this is to incorporate the same namespace string you would use for an asset.
+
+    For example, if you work at the Example.com movie studio and use `examplecom::` as the namespace prefix for your assets, when you want to create a "scrub" state, you would use the state name `examplecom::scrub`.
+
+* State names do not have the same character restrictions as node type names and node names. A state name is more or less an arbitrary string.
+
+* You may need to use the name as a file/directory name (for example, if you're [storing the code in a file|#file])
+
+
+== Tool + state vs. self-contained state ==
+
+Many, if not most "native" Houdini node states do not handle their own selection or create the node. Instead, they rely on a shelf tool script to ask for a selection and create the node. The state is then simply responsible for displaying handles.
+
+You can use this workflow with a custom Python state as well, especially when the state is closely associated with an asset. You can [write a Shelf tool script|#tool] to ask for a selection and create the node (and filling in the node's __Group__ field with the selection).
+
+Alternatively, your state can be self contained: it can create a node when invoked from the viewer and have its own selector.
+
+(If your state doesn't require a node (for example, an inspector-type tool), see [writing nodeless state|state_nodeless] for more information.)
+
+* If you need to ask for more than one type of selections (for example, "Select some curves" followed by "Select some points on those curves"), use a tool script. Currently, a Python state can only accept a single type of selection.
+
+* If the code needs to know what's in the selection _before_ it creates the node, use a tool script.
+
+See [working with a node|state_node] for more information on manipulating a node instance in a state.
+
+
+== Installing a state in Houdini == (install)
+
+There are currently two ways to make a custom state available in Houdini: [embed|#embed] the state's code with an asset, or put a [Python file|#file] containing the code in the right directory on the Houdini path.
+
+
+=== Embedding a state in an asset === (embed)
+
+The following instructions create a SOP asset and a minimal state so you can try out the code.
+
+# Start with a SOP asset you want to add a state to.
+
+    If you just want to start with a blank asset, you can [follow these steps|Fold:1]
+
+    :box:
+        #id: blank_asset
+        #fold: 1
+
+        To quickly create a "blank" SOP asset to experiment with:
+
+        # At the Object level, use the ((Tab)) menu to create a [Geo|Node:obj/geo] object.
+
+        # Double-click the `geo1` node to dive into the Geometry network inside.
+
+        # Use the ((Tab)) menu to create a Subnetwork node.
+
+        # Right-click the `subnet1` node and choose __Create digital asset__.
+
+        # Set the __Operator name__ to `statedemo`, the __Operator Label__ to `State Demo`, and __Save to library__ to `Embedded`.
+
+            Setting the library location to `Embedded` saves the asset with the current scene file instead of in an asset library.
+
+# Open the [type properties|/ref/windows/optype] window for the asset. (Right click an instance of the asset type and choose __Type properties__).
+
+# Click the __Scripts__ tab.
+
+# Under the list of scripts on the left side, click the __Event handler__ pop-up menu and choose "Python Module".
+
+    With the `PythonModule` script selected on the left side, you can edit the module contents in the editor on the right side.
+
+# Paste the following minimal state implementation into the editor.
+
+    {{{
+    #!python
+from __future__ import print_function
+
+
+# A minimal state handler implementation. You can 
+class MyState(object):
+    def __init__(self, state_name, scene_viewer):
+        self.state_name = state_name
+        self.scene_viewer = scene_viewer
+
+    # Handler methods go here
+    def onMouseEvent(self, kwargs):
+        dev = kwargs["ui_event"].device()
+        print("Mouse:", dev.mouseX(), dev.mouseY(), dev.isLeftButton())
+
+
+# Grab a reference to the asset's node type
+nodetype = kwargs['type']
+# Use the node's name and label as the state name and label
+state_name = nodetype.name() + ".pystate"
+label = nodetype.description()
+category = nodetype.category()
+# Instantiate ViewerStateTemplate with the state name, label,
+# and node type category
+template = hou.ViewerStateTemplate(state_name, label, category)
+
+# Mandatory binding
+template.bindFactory(MyState)
+
+# Other optional bindings would go here...
+    }}}
+
+    See [implementing a state|#impl] below for more information on adding functionality to the state class.
+
+    TIP:
+        You can build the template object at the module level (as shown above) and reference it using `module.template`. However, you may want to wrap the creation of the template object inside a function, just to keep temporary variable names (such as `state_name` and `label` above) from leaking out into the module's namespace:
+
+        {{{
+        #!python
+        # Wrap the tempalte creation code in a function instead of creating the
+        # template at the module level
+        def createViewerStateTemplate():
+            # Use the node's name and label as the state name and label
+            state_name = nodetype.name() + ".pystate"
+            label = nodetype.description()
+            category = nodetype.category()
+            # Instantiate ViewerStateTemplate with the state name, label,
+            # and node type category
+            template = hou.ViewerStateTemplate(state_name, label, category)
+            
+            # Mandatory binding
+            template.bindFactory(MyState)
+
+            # Other optional bindings would go here
+
+            return template
+        }}}
+
+        Then, outside the module, you would use `module.createViewerStateTemplate()` to get the template instead of referencing it directly.
+
+# Under the list of scripts on the left side, click the __Event handler__ pop-up menu again, and this time choose "On Install".
+
+    With the `OnInstall` script selected on the left side, you can edit the module contents in the editor on the right side.
+
+    We will use a `OnInstall` script (which runs when the node type is installed into the session) to register the state. 
+
+# Paste the following event script into the editor:
+
+    {{{
+    #!python
+module = kwargs['type'].hdaModule()
+hou.ui.registerViewerState(module.template)
+    }}}
+
+    This will register the state with Houdini.
+
+# We'll add another asset event script to unregister the state as well. 
+
+    Under the list of scripts on the left side, click the __Event handler__ pop-up menu again, and this time choose "On Uninstall".
+
+    With the `OnUninstall` script selected on the left side, you can edit the module contents in the editor on the right side. 
+
+
+    Paste the following event script into the editor:
+
+    {{{
+    #!python
+state_name = kwargs['type'].name() + ".pystate"
+hou.ui.unregisterViewerState(state_name)
+    }}}
+
+    This will unregister the state from Houdini when the node type is uninstalled from the session.
+
+    The use of the `OnInstall` and `OnUninstall` scripts will allow you to *test changes to the state by saving the asset*. This causes the state to be registered again, picking up our changes.
+
+# Finally, we will set the asset to use this new state. In the type properties window, click the __Node__ tab.
+
+# Set the __Default state__ field to the state name (the internal name of the node, shown at the top of the window next to __Operator type:__, plus the `.pystate` suffix).
+
+# At the bottom of the type properties window, click __Accept__.
+
+    If the asset was locked, Houdini will prompt you to unlock the asset so you can save your changes.
+
+# To test the state, select the asset in the network editor. Move the mouse into the scene viewer and press ((Enter)).
+
+    * The toolbar at the top of the viewer should display the state's label on the left.
+
+TIP:
+    The procedure above uses the _asset node type_'s name as the _state_'s name. This is clean and makes it easy to associate the state with the asset. However, an alternate strategy some people might find useful would be to fill in the __Default state__ field on the __Node__ tab _first_, and then automatically _use whatever is in that field as the state name_. This means the contents of the __Default state__ field would never be out-of-sync with the embedded state name, however it also means that name is not automatically derived from the node.
+
+    To name the state this way, first fill in the __Default state__ field with the state name you want (remember that it must be unique across all states and installed asset names). Then, in the scripts, wherever you compute the state name from the node name, change the script to get the name like this:
+
+    {{{
+    #!python
+    state_name = node_type.definition().sections()['DefaultState'].contents()
+    }}}
+
+    (The contents of the __Default state__ field are stored internally in an "extra files" section named `DefaultState`, so you can read it or even change in a script using this method.)
+
+
+=== Loading a state from the Houdini path === (file)
+
+The following instructions create a SOP viewer state that can be "shared" between multiple assets. This type of state (nicknamed `self-installed` state) is registered by Houdini on startup.
+
+# In `$HOUDINI_USER_PREF_DIR`, create a new folder called `viewer_states`. Create a new file inside that folder called `mystate.py`.
+
+    {{{
+    HOUDINIPATH /
+        viewer_states /
+            mystate.py
+    }}}
+
+# Open `mystate.py` in a text editor and paste in the following minimal state implementation.
+
+    {{{
+    #!python
+from __future__ import print_function
+
+import hou
+
+# A minimal state handler implementation. 
+class MyState(object):
+    def __init__(self, state_name, scene_viewer):
+        self.state_name = state_name
+        self.scene_viewer = scene_viewer
+
+    # Handler methods go here
+    def onMouseEvent(self, kwargs):
+        dev = kwargs["ui_event"].device()
+        print("Mouse:", dev.mouseX(), dev.mouseY(), dev.isLeftButton())
+
+# A registration entry-point
+def createViewerStateTemplate():
+    # Choose a name and label 
+    state_name = "mystate"
+    state_label = "My New State"
+    category = hou.sopNodeTypeCategory()
+
+    # Create the template
+    template = hou.ViewerStateTemplate(state_name, state_label, category)
+    template.bindFactory(MyState)
+
+    # Other optional bindings will go here...
+
+    # returns the 'mystate' template
+    return template
+}}}
+
+On startup, Houdini will call `createViewerStateTemplate` to access the state template and perform the registration. If omitted, Houdini will simply skip the state registration.
+
+See [implementing a state|#impl] below for more information on adding functionality to the state class.
+
+TIP:
+    Try to keep the filename (for example, `examplestudio_bend.py`) similar the state name you use when instantiate the template (for example, `examplestudio::bend`), to make it easy to see which file holds which state.
+
+# Find a SOP asset you want to add a state to.
+
+    If you just want to start with a blank asset, you can [follow these steps|Fold:2]
+
+    :box:
+        #fold: 2
+
+        [Include:#blank_asset/]
+
+# Open the [type properties|/ref/windows/optype] window for the asset. (Right click an instance of the asset type and choose __Type properties__).
+
+# Click the __Node__ tab.
+
+# Set the __Default state__ field to the state name (for example, in the code above, this is `mystate`).
+
+# At the bottom of the type properties window, click __Accept__.
+
+    If the asset was locked, Houdini will prompt you to unlock the asset so you can save your changes.
+
+# To test the state, select the asset in the network editor. Move the mouse into the scene viewer and press ((Enter)).
+
+    * The toolbar at the top of the viewer should display the state's label on the left.
+
+TIP:
+    To reload a `self-installed` state during a Houdini session, you must call [Hom:hou.ui#reloadViewerState] with the name of the state. This will allow you to test changes to your state without restarting Houdini. 
+
+
+== Implementing the state == (impl)
+
+The following section shows a high-level overview of the methods you can add to the class implementing your state.
+
+For guides to implementing specific functionality, see the following pages:
+
+:flow:
+    #show: list
+    #hide_self: true
+
+
+=== Initializer (required) === (init)
+
+`def __init__(self, state_name, scene_viewer):`:
+    `state_name`:
+        The state name string this state was registered under.
+
+    `scene_viewer`:
+        A [Hom:hou.SceneViewer] object representing the scene viewer the tool is operating in. This object has many useful methods you can use to implement your state, for example [Hom:hou.SceneViewer#currentGeometrySelection] and [Hom:hou.SceneViewer#setCurrentGeometrySelection].
+
+    In general, you'll just want to store the arguments in object attributes in case other methods need them:
+
+    {{{
+    #!python
+
+    class MyState(object):
+        def __init__(self, state_name, scene_viewer):
+            self.state_name = state_name
+            self.scene_viewer = scene_viewer
+
+        # Event handlers
+        # ...
+    }}}
+
+
+=== Event handlers === (handlers)
+
+Event handlers are called with a single argument, a dictionary containing various useful items. The dictionary will typically (but not always) contain the following items:
+
+:box:
+    #id: standard_dict_items
+
+    `node`:
+        Contains a [Hom:hou.Node] instance representing the node being operated on by the current state.
+
+    Menu items:
+        The dictionary also contains the current values associated with [menu items|state_menus], using the menu item name as the key.
+
+The following tables list the event handlers you can define on your state class.
+
+
+=== Lifecycle event handlers === (lifecycle)
+
+Method name ||
+    Called by Houdini ||
+        #width: 20%
+        Notes ||
+
+`onEnter` |
+    state is entered from the network |
+        This method is called when the state is activated by the user creating a new node, or selecting an existing node and pressing ((Enter)) in the viewport.
+
+`onGenerate` |
+    state is entered without an existing node |
+        This method is called when the state is activated by the user entering the state _not_ from an existing node, for example a shelf tool script calling [Hom:hou.SceneViewer#setCurrentState]. See [nodeless states|state_nodeless] for information on states that work without a node.
+
+        For states associated with assets, you could theoretically create a node in this method, however we strongly recommend creating you create the node in the [tool script|tool_script] instead. See [working with a node in a Python state|state_node] for more information.
+        
+        The dictionary passed to this method does not contain the `node` item. You can get the network location corresponding to the viewer using [Hom:hou.SceneViewer#pwd].
+
+`onInterrupt` |
+    state is interrupted |
+        This method is called when:
+        * The window loses focus.
+        * The pointer leaves the viewer (including moving over a menu).
+        * The user pushes a "volatile" tool (for example, holding down ((S)) to enter the volatile selection tool).
+
+`onResume` |
+    interruption ends |
+        This method is called when:
+        * The pointer re-enters the viewer.
+        * The user pops back to this state from a "volatile" tool (for example, releasing ((S)) after using the volatile selection tool).
+
+`onExit` |
+    state is about to be exited |
+        This method is called when:
+        * The user or Houdini switches to a different tool.
+        * The user closes the viewer or switches to a different pane tab.
+        * The user exits Houdini.
+
+Additional notes:
+
+* Houdini calls *either* `onEnter` (if the state should work on an existing node) *or* `onGenerate` (if the should create a new node) when the tool activates, never both. The dictionary passed to `onEnter` has a `node` item to access the existing node as a [Hom:hou.Node] object. See [editing nodes|state_nodes] for more information.
+
+* Houdini will call `onEnter`/`onGenerate` when the state begins, even if the mouse pointer is not over the viewer at the time. If you want to display screen visuals around the cursor, wait for an `onMouseEvent` call to show them.
+
+* While the state is "interrupted" it does not receive [UI events|state_events].
+
+* You cannot rely on every `onInterrupt` call being followed by a corresponding `onResume`. If the user exits the state while it's interrupted, you will not receive an `onResume` call, just `onExit`.
+
+* If the user opens the state's context menu, when the pointer moves over the menu and leaves the menu you will receive `onInterrupt` and `onResume` events.
+
+* If your state is current but interrupted because Houdini is in the background, and the user switches to Houdini, even if the mouse pointer is over the viewer, your state will not receive an `onResume` call until the user makes some input (such as moving the mouse).
+
+
+=== UI event handlers ===
+
+See [UI event handling|state_events] for more information.
+
+The dictionary passed to these methods has the following extra item:
+
+`ui_event`:
+    Contains a [Hom:hou.ViewerEvent] instance with information about the event (for example, for a mouse event, the current mouse coordinates and whether a button was clicked).
+
+Method name ||
+    Called by Houdini ||
+        #width: 25%
+        Notes ||
+
+`onMouseEvent` |
+    mouse moves/clicks |
+        See [mouse handling|state_events#mouse].
+
+`onMouseWheelEvent` |
+    mouse wheel scroll |
+        [Hom:hou.UIEventDevice#mouseWheel] returns `-1` or `1` depending on the scroll direction.
+        
+        See [mouse wheel handling|state_events#wheel].
+
+`onMenuAction` |
+    context menu choice |
+        See [context menu handling|state_menus].
+
+
+=== Selection event handlers ===
+
+Houdini will call these methods if you have bound selectors to your state. See [selection handling|state_selectors] for more information.
+
+Method name ||
+    Called by Houdini ||
+        #width: 25%
+        Notes ||
+
+`onStartSelection` |
+    user starts selecting |
+        None
+
+`onSelection` |
+    user selected geometry |
+        The dictionary passed to this handler has the following extra item:
+        
+        `selection`:
+            A [Hom:hou.GeometrySelection] object representing the completed selection.
+
+        You should *Return True from this method* to signal your state "accepts" the current selection and stop the selector. If the method returns any other value (or doens't contain a `return` statement), the selector will remain active.
+
+`onStopSelection` |
+    user stops selecting |
+        This is called when the state "accepts" a selection by returning `True` from `onSelection()`, or if the state [exits|#lifecycle] before accepting a selection.
+
+
+=== Handle event handlers ===
+
+Houdini will call these methods if you have bound handles to your state. See [Python state handles|state_handles] for more information.
+
+Method name ||
+    Called by Houdini ||
+        #width: 25%
+        Notes ||
+
+`onHandleToState` |
+    user interaction with a handle |
+        This lets you update node parameters (and/or the state/display) when a handle changes.
+        
+        The dictionary passed to this method contains the following extra items:
+        
+        `handle`:
+            The string ID of the handle.
+        `parms`:
+            A dictionary containing the new handle parameter values.
+        `mod_parms`:
+            A list of of the names of parameters that changed.
+        `prev_parms`:
+            A dictionary containing the previous handle parameter values.
+            This can be useful for computing deltas.
+
+`onStateToHandle` |
+    node parameters change |
+        This lets you update handle parameters when node parameters change.
+        
+        The dictionary passed to this method contains the following extra items:
+        
+        `handle`:
+            The string ID of the handle.
+        `parms`:
+            A dictionary containing the new node parameter values.
+
+
+== HOM API ==
+
+* [Hom:hou.ViewerStateTemplate]
+* [Hom:hou.ViewerStateMenu]
+* [Hom:hou.ui#registerViewerState]
+* [Hom:hou.ui#unregisterViewerState]
+* [Hom:hou.ui#reloadViewerState]
+* [Hom:hou.ui#reloadViewerStates]
+* [Hom:hou.Drawable]
+* [Hom:hou.ViewerEvent]
+* [Hom:hou.UIEventDevice]
+* [Hom:hou.hotkeys#addCommand]
+* [Hom:hou.SceneViewer]
+
+
+== Debugging tips == (debug)
+
+=== Reloading states ===
+
+For states defined on disk, if the files on disk change, you can tell Houdini to reload the state using [Hom:hou.ui#reloadViewerState].
+
+
+=== Displaying debugging information ===
+
+The most basic but still useful form of debugging is to print information, such as the contents of variables, as the script runs. Houdini provides a few ways of displaying this type of information.
+
+* You can use the Python `print` function in your script to print information.
+
+    * The main advantage of using prints is that you can output a lot of information, including multi-line blocks of text (such as the current Python call stack), and scroll back to read it later.
+        #glyph: fa-plus
+
+    * The output may appear in a console window, or Houdini's Python shell window, or the shell you started Houdini from, depending on how you started Houdini and what windows are open.
+        #glyph: fa-minus
+
+    TIP:
+        It's a good idea to use `from __future__ import print` to get used to using `print` as a function instead of as a statement. The function is easier to use and has more functionality.
+
+    {{{
+    #!python
+    from __future__ import print
+    import traceback
+    
+    class MyState(object):
+        def __init__(self, state_name, scene_viewer):
+            self.state_name = state_name
+            self.scene_viewer = scene_viewer
+        
+        def onMouseEvent(self, kwargs):
+            # Print the mouse position
+            ui_event = kwargs["ui_event"]
+            device = ui_event.device()
+            print("Mouse position x=", device.mouseX(), "y=", device.mouseY())
+            
+            # Print the current Python call stack
+            traceback.print_stack()
+    }}}
+
+* The [Hom:hou.SceneViewer#setPromptMessage] and [Hom:hou.SceneViewer#clearPromptMessage] functions let you display prompts for user interaction in the status line at the bottom of the main Houdini window. You can "abuse" these functions to display debugging information.
+
+    * The advantage of this method is that the information is front-and-center in the window as you interact with Houdini.
+        #glyph: fa-plus
+    
+    * The disadvantage is that the status line can only show one line of information at a time and when you change it the previous message is lost.
+        #glyph: fa-minus
+
+    {{{
+    #!python
+    class MyState(object):
+        def __init__(self, state_name, scene_viewer):
+            self.state_name = state_name
+            self.scene_viewer = scene_viewer
+        
+        def onMouseEvent(self, kwargs):
+            # Display the mouse position in the status line
+            ui_event = kwargs["ui_event"]
+            device = ui_event.device()
+            message = "Mouse x=%d y=%d" % (device.mouseX(), device.mouseY())
+            self.scene_viewer.setPromptMessage(message)
+    }}}
+
+* The [Hom:hou.ui#displayMessage] function pops up a message window and waits for the user to click OK or Cancel.
+
+    * This has a few advantages for debugging. One is that it pauses the script while it waits, which may be useful if you're trying to investigate changes that happen very quickly. It also lets you give some feedback to the script based on which button you click. Another is that the function has keyword arguments that let you attach a block of "details" text that is hidden by default but can be expanded. This is useful, for example, for displaying the current Python call stack.
+        #glyph: fa-plus
+
+    * You probably don't want to use this function in a loop, where it would be annoying to have to click to dismiss multiple message windows.
+        #glyph: fa-minus
+
+    {{{
+    #!python
+    import traceback
+    
+    import hou
+    
+    
+    class MyState(object):
+        def __init__(self, state_name, scene_viewer):
+            self.state_name = state_name
+            self.scene_viewer = scene_viewer
+        
+        def onMouseEvent(self, kwargs):
+            ui_event = kwargs["ui_event"]
+            device = ui_event.device()
+            # Only diplay the message on a click
+            if device.isLeftButton():
+                message = "Mouse x=%d y=%d" % (device.mouseX(), device.mouseY())
+                
+                # Get the call stack at this point in the script and format it
+                # in a string so we can attach it to the message as "details"
+                details = "".join(traceback.format_stack())
+                
+                # Display a message and wait for the user to click a button in
+                # the message window
+                clicked = hou.ui.displayMessage(
+                    message, buttons=("OK", "Error"),
+                    details_label="Current call stack",
+                    details=details
+                )
+                
+                # If user clicked the "Error" button, raise an error
+                if clicked == 1:
+                    raise Exception("Don't blame me!")
+    }}}
+
+
+
+

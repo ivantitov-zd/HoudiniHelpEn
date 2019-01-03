@@ -23,6 +23,17 @@
     #cppname: HOM_SceneViewer::selectPositions
     #status: nd
 
+::`selectOrientedPositions(self, prompt='Click to specify a position', number_of_positions=1, connect_positions=True, show_coordinates=True, bbox=BoundingBox(),icon=None, label=None)` -> tuple of (Vector3, Matrix3) tuples:
+    #cppname: HOM_SceneViewer::selectOrientedPositions
+    
+    This method is very similar to [Hom:hou.SceneViewer#selectPositions], except the position type
+    is always world space, and instead of a tuple of positions this returns a tuple
+    of `(position, orientation)` pairs, with the position a [Hom:hou.Vector3]
+    and the orientation a [Hom:hou.Matrix3].
+    This allows you to prompt the user for oriented position, respecting possible orientation aids such as
+    [the construction plane|/model/aids#cplane] and
+    [alignment|/model/aids#align].
+
 ::`selectDynamics(self, prompt='Select dynamics objects', sel_index=0, allow_objects=True, allow_modifiers=False, quick_select=False, use_existing_selection=True, allow_multisel=True, icon=None, label=None, prior_selection_paths=[], prior_selection_ids=[], prior_selections=[])` -> tuple of [Hom:hou.DopData]:
     #cppname: HOM_SceneViewer::selectDynamics
     #status: nd
@@ -35,6 +46,23 @@
     #cppname: HOM_SceneViewer::selectDynamicsPolygons
     #status: nd
 
+::`selectSceneGraph(self, prompt, preselection, prim_mask, quick_select, use_existing_selection, confirm_existing, allow_multisel, allow_drag, path_prefix_mask, prim_kind)` -> tuple of string:
+    #cppname: HOM_SceneViewer::selectSceneGraph
+    #status: nd
+
+::`currentSceneGraphSelection()` -> tuple of string:
+    #cppname: HOM_SceneViewer::currentSceneGraphSelection
+    #status: nd
+
+::`setCurrentSceneGraphSelection(selection)`:
+    #cppname: HOM_SceneViewer::setCurrentSceneGraphSelection
+    #status: nd
+
+::`stageSerial()` -> int:
+    #cppname: HOM_SceneViewer::stageSerial
+    Integer that is increased every time the Scene Graph View data is modified.
+    Only count on this number to be bigger when changes occur, and not
+    necessarily incremented by 1.
 
 == Selection utils ==
 
@@ -104,6 +132,84 @@
     If wait_for_exit is True, then the function will not return until the
     viewer exits the tool.
 
+::`beginStateUndo(self, label)`:
+    #cppname: HOM_SceneViewer::beginStateUndo
+    Opens an undo block to perform undoable operations with the current viewer 
+    state. All operations performed after the opening will appear as one single 
+    operation on the undo stack. Use [Hom:hou.SceneViewer#endStateUndo] to close an open block. 
+
+    `beginStateUndo` and `endStateUndo` can be used for managing an undo block that begins in 
+    one function but ends in another one. Only one undo block is supported for a sequence of 
+    undoable operations. Exceptions will be raised if a call to a second `beginStateUndo` is 
+    detected before the undo block is closed by `endStateUndo`.
+    
+    Python state example of a valid undo block:    
+    {{{
+    #!python
+    def onMouseEvent(self, kwargs):
+        ui_event = kwargs["ui_event"]
+        node = kwargs["node"]
+        if ui_event.reason() == hou.uiEventReason.Start:
+            # left mouse button pressed
+            self.scale = node.parent().parm("scale").evalAsFloat()
+            self.scene_viewer.beginStateUndo('scale')
+
+        if ui_event.reason() == hou.uiEventReason.Active:
+            # left mouse button down while the mouse is moving
+            self.scale *= 1.01
+            node.parent().parm("scale").set(self.scale)
+
+        if ui_event.reason() == hou.uiEventReason.Changed:
+            # left mouse button released
+            self.scene_viewer.endStateUndo()
+    }}}
+    
+    Example of a non-valid undo block that raises an exception:
+    {{{
+    #!python
+    def onMouseEvent(self, kwargs):
+        ui_event = kwargs["ui_event"]
+        node = kwargs["node"]
+        if ui_event.reason() == hou.uiEventReason.Start:
+            # left mouse button pressed
+            self.tx = node.parent().parm("tx").evalAsFloat()
+            self.scale = node.parent().parm("scale").evalAsFloat()
+            self.scene_viewer.beginStateUndo('scale')
+
+        if ui_event.reason() == hou.uiEventReason.Active:
+            # left mouse button down while the mouse is moving
+            self.scale *= 1.01
+            node.parent().parm("scale").set(self.scale)
+
+            self.scene_viewer.beginStateUndo('move x')
+            self.tx += 0.2
+            node.parent().parm("tx").set(self.tx)
+            self.scene_viewer.endStateUndo()
+
+        if ui_event.reason() == hou.uiEventReason.Changed:
+            # left mouse button released
+            self.scene_viewer.endStateUndo()
+    }}}
+    
+    `label`:
+	    The label of the undo block used for displaying the undo operation in the Edit menu. An exception is raised if the label is empty.
+
+::`endStateUndo(self)`:
+    #cppname: HOM_SceneViewer::endStateUndo
+    Closes an undo block previously opened with [Hom:hou.SceneViewer#beginStateUndo]. 
+
+    `endStateUndo` will raise an exception if called before `beginStateUndo`.
+
+::`showHandle(self, name, value)`:
+    #cppname: HOM_SceneViewer::showHandle
+
+    Shows or hides a display handle linked to the current tool state. This API is typically used with [Python states|/hom/python_states] and can be called from any python state callbacks -- with one small caveat. Avoid calling `showHandle` from the python state constructor, doing so will lead to a runtime error.
+
+    `name`:
+        The name of the handle as specified with [Hom:hou.ViewerStateTemplate#bindHandle]
+
+    `value`:
+        `Bool` value, `True` to show the handle, `False` to hide it.
 
 == Modeling ==
 
@@ -113,6 +219,13 @@
     this viewer.
 
     See [Hom:hou.ConstructionPlane] for more information.
+
+::`referencePlane(self)` -> [Hom:hou.ReferencePlane]:
+    #cppname: HOM_SceneViewer::referencePlane
+    Return the reference plane (or grid) in the perspective viewport of
+    this viewer.
+
+    See [Hom:hou.ReferencePlane] for more information.
 
 
 == Split views == (viewport_methods)
@@ -184,6 +297,19 @@
     #cppname: HOM_SceneViewer::setApplyToAllSplitViews
     #status: ni
 
+::`setPromptMessage(self, message, message_type=promptMessageType.Prompt)`:
+    #cppname: HOM_SceneViewer::setPromptMessage
+    Sets the viewport to display a message at the bottom of the screen.
+
+    `message`:
+	    Text message to display.
+
+    `message_type`:
+        A [Hom:hou.promptMessageType] value representing the type of message to display. Defaults to [Hom:hou.promptMessageType#Prompt].
+
+::`clearPromptMessage(self)`:
+    #cppname: HOM_SceneViewer::clearPromptMessage
+    Clear the prompt message previously set with [Hom:hou.SceneViewer#setPromptMessage].
 
 == Snapping ==
 
@@ -384,6 +510,88 @@
 ::`setDisplayedNodeBehaviour(self, behaviour)`:
     #cppname: HOM_SceneViewer::setDisplayedNodeBehaviour
     #status: ni
+
+
+
+::`stage(self)`:
+    #cppname: HOM_SceneViewer::stage
+    #status: nd
+
+::`setShowGeometry(self, show)`:
+    #cppname: HOM_SceneViewer::setShowGeometry
+    #status: nd
+    
+    
+
+::`showGeometry(self)` -> `bool`:
+    #cppname: HOM_SceneViewer::showGeometry
+    #status: nd
+    
+    
+
+::`setShowCameras(self, show)`:
+    #cppname: HOM_SceneViewer::setShowCameras
+    #status: nd
+    
+    
+
+::`showCameras(self)` -> `bool`:
+    #cppname: HOM_SceneViewer::showCameras
+    #status: nd
+    
+    
+
+::`setShowLights(self, show)`:
+    #cppname: HOM_SceneViewer::setShowLights
+    #status: nd
+    
+    
+
+::`showLights(self)` -> `bool`:
+    #cppname: HOM_SceneViewer::showLights
+    #status: nd
+    
+    
+
+::`setShowSelection(self, show)`:
+    #cppname: HOM_SceneViewer::setShowSelection
+    #status: nd
+    
+    
+
+::`showSelection(self)` -> `bool`:
+    #cppname: HOM_SceneViewer::showSelection
+    #status: nd
+    
+    
+::`setDenoise(self, enable)`:
+    #cppname: HOM_SceneViewer::setDenoise
+    Enables denoising for non-GL renders.
+    
+
+::`denoise(self)` -> `bool`:
+    #cppname: HOM_SceneViewer::denoise
+    Denoising setting for non-GL renders (on/off).
+    
+    
+
+::`hydraRenderers(self)` -> tuple of `str`:
+    #cppname: HOM_SceneViewer::hydraRenderers
+    #status: nd
+    
+    
+
+::`setHydraRenderer(self, ren_name)`:
+    #cppname: HOM_SceneViewer::setHydraRenderer
+    #status: nd
+    
+    
+
+::`currentHydraRenderer(self)` -> `str`:
+    #cppname: HOM_SceneViewer::currentHydraRenderer
+    #status: nd
+    
+    
 
 
 == Group list ==
@@ -647,10 +855,10 @@
     #status: ni
     <!-- Note that it could be in a closed desktop. -->
 
-::`viewerType(self)` -> hou.viewerType enum value:
+::`viewerType(self)` -> `hou.stateViewerType` enum value:
     #cppname: HOM_SceneViewer::viewerType
-    #status: ni
 
+    Returns the type of the viewer, either `Scene` for a viewer looking at Objects, SOPs, or DOPs; or `SceneGraph` for a viewer looking at LOPs.
 
 @replaces
 

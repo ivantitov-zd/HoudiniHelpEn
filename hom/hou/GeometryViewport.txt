@@ -8,19 +8,22 @@
 
 == Viewport framing ==
 
+In general, _homing_ resets the view direction to the default view, while _framing_ keeps the current view direction and just moves the viewpoint.
+
 ::`home(self)`:
     #cppname: HOM_GeometryViewport::home
-    #status: nd
+    
+    Moves/tumbles the viewport to the default view.
 
 ::`homeAll(self)`:
     #cppname: HOM_GeometryViewport::homeAll
     
-    Homes the viewport on all geometry objects.
+    Moves/tumbles the view to show all geometry/objects (including templated geometry). See also [homeNonTemplated()|#homeNonTemplated].
 
 ::`homeSelected(self)`:
     #cppname: HOM_GeometryViewport::homeSelected
 
-    Homes the viewport on the selected geometry.
+    Moves/tumbles the view to show the selected geometry/objects.
 
 ::`homeGrid(self)`:
     #cppname: HOM_GeometryViewport::homeGrid
@@ -30,72 +33,108 @@
 ::`homeNonTemplated(self)`:
     #cppname: HOM_GeometryViewport::homeNonTemplated
 
-    Homes the viewport on all non-templated geometry.
+    Moves/tumbles the view to show all _non-templated_ geometry.
 
 ::`frameAll(self)`:
     #cppname: HOM_GeometryViewport::frameAll
 
-    Frames the viewport on all geometry objects.
+    Moves the view to show all geometry/objects. See also [frameNonTemplates()|#frameNonTemplated].
 
 ::`frameBoundingBox(self, bbox)`:
     #cppname: HOM_GeometryViewport::frameBoundingBox
 
-    Frames the viewport on giving bounding box
+    Moves the view to show an arbitrary area in the scene.
+
+    `bbox`:
+        A [Hom:hou.BoundingBox] representing the volume of space to focus on.
 
 ::`frameSelected(self)`:
     #cppname: HOM_GeometryViewport::frameSelected
 
-    Frames the viewport on the selected geometry.
+    Moves the view to show the selected geometry/objects.
 
 ::`frameGrid(self)`:
     #cppname: HOM_GeometryViewport::frameGrid
 
-    Frames the viewport on the grid.
+    Frames the view on the grid.
 
 ::`frameNonTemplated(self)`:
     #cppname: HOM_GeometryViewport::frameNonTemplated
 
-    Frames the viewport on all non-templated geometry.
+    Moves the view to show all _non-templated_ geometry.
 
-::`viewTransform(self)`:
+
+== Viewpoint and cameras ==
+
+* Unlike some other 3D packages, in Houdini the view is not always linked to an actual Camera object. The _may_ be "locked" to a camera (so changing the view tumbles/moves the camera), or it may be a "free" ("No camera") view not tied to a camera, or it may be _temporarily_ looking through a camera (or light), but the view is not locked to the camera (so changing the view will not affect the camera). The user interface for these settings is the camera menu in the top right corner of each viewport, and the [Icon:VIEW/display_lock_camera] Lock Camera button on the view toolbar.
+
+    Most of the methods in this section are not affected by the difference. For example, if the view is "free", the [defaultCamera()|#defaultCamera] method will return an object that manipulates just the view, but if the view is locked to a camera, it will return an object that manipulates the linked camera.
+
+* You can tell if the view is currently looking through a camera/light if the result of [camera()|#camera] is not `None`. This does not tell you whether the view is locked to the camera or not.
+
+* The following talks about the camera representing the "viewpoint" as a shorthand, however the viewport camera stores many settings besides the viewpoint position and direction, including pivot, aspect ratio, clipping planes, and so on.
+
+::`viewTransform(self)` -> [Hom:hou.Matrix4]:
     #cppname: HOM_GeometryViewport::viewTransform
 
-    Returns the transform matrix of the viewport.
+    Returns the transform matrix of the view. To set the viewpoint programmatically, use [defaultCamera()|#defaultCamera] to get a [Hom:hou.ViewportCamera] object and manipulate that.
 
-::`viewPivot(self)`:
+::`viewPivot(self)` -> [Hom:hou.Vector3]:
     #cppname: HOM_GeometryViewport::viewPivot
 
-    Returns the pivot of the viewport.
+    Returns a [Hom:hou.Vector3] representing the view pivot as a point in world space.
 
+::`resolutionInPixels(self)` -> `2-tuple of int`:
+    #cppname: HOM_GeometryViewport::resolutionInPixels
+    Returns the resolution of the viewport in pixels, as (width, height). 
 
-== Cameras ==
-
-::`camera(self)` -> ObjNode or None:
+::`camera(self)` -> [Hom:hou.ObjNode] or `None`:
     #cppname: HOM_GeometryViewportSettings::camera
 
-    Return the camera or light node that the viewport is looking through.
-    Return None if the viewport is not looking through a camera or light node.
+    If the viewport is currently *looking through* a camera or light (not necessarily locked to it), this returns an object representing the camera/light's node. Returns `None` if the viewport is not looking through a camera/light.
 
 ::`saveViewToCamera(self, camera_node)`:
     #cppname: HOM_GeometryViewport::saveViewToCamera
 
-    Saves the viewport's current view into the given camera node.  It does this
-    by setting the camera's transform parameters to match the viewport's view
-    transform matrix.
+    Copies the viewpoint transform of the current view onto the transformation parameters of a camera or light node.
+
+    `camera_node`:
+        A [Hom:hou.ObjNode] object representing the node to save the view to.
 
 ::`setCamera(self, camera_node)`:
     #cppname: HOM_GeometryViewport::setCamera
 
-    Makes the viewport look through the given camera node.
+    Copies the viewport transfrom from the transformation parameters of a camera or light onto the current view. This is the same as choosing a camera/light from the __Look throuogh__ submenu in the viewport's Camera menu.
 
-::`defaultCamera(self)` -> `hou.GeometryViewportCamera`:
+    `camera_node`:
+        A [Hom:hou.ObjNode] object representing the node to save the view from.
+
+::`defaultCamera(self)` -> [Hom:hou.GeometryViewportCamera]:
     #cppname: HOM_GeometryViewport::defaultCamera
-    
-    Query the current camera settings of the viewport. This may be the settings applied by an object if the viewport is looking through a camera (or light).
 
-::`setDefaultCamera(self, cam_settings)`:
-    #cppname: HOM_GeometryViewport::setDefaultCamera
+    Returns an object representing the viewport's viewpoint. The returned object is "live" in that changing its settings will immediately change the view
+
+    If a camera/ight is locked to the view, changing the settings of the `GeometryViewportCamera` will change the camera/light node's parameters as well.
+
+    Instead of a live object, you can get a "disconnected" version of the viewpoint using [Hom:hou.GeometryViewportCamera#stash]. This is a useful way to remember a certain viewpoint in code for later. You can restore a "stashed" camera using [setDefaultCamera()|#setDefaultCamera].
+
+    {{{
+    #!python
+    # Remember the current view
+    cam = viewport.defaultCamera()
+    saved = cam.stash()
     
+    # Change the view somehow
+    
+    # Restore the original view
+    viewport.setDefaultCamera(saved)
+    }}}
+    
+::`setDefaultCamera(self, stashed_cam)`:
+    #cppname: HOM_GeometryViewport::setDefaultCamera
+
+    Takes a [Hom:hou.GeometryViewportCamera] and copies its values into this viewport.
+  
     Set the current camera settings of the viewport to the settings stored in `cam_setting`. If the viewport is looking through a camera and the view is not locked to the camera, it will be switched to "No camera".  If the view is locked to the camera, the camera object will be updated instead.
  
 ::`useDefaultCamera(self)`:
@@ -103,11 +142,25 @@
     
     Set the viewport camera to "No camera" and stop looking through a camera object (or light).
 
+   
+::`isCameraLockedToView(self)` -> `bool`:
+    #cppname: HOM_GeometryViewport::isCameraLockedToView
+    
+    Query to see if the camera is locked to the view. This returns the state of the camera lock only; this can be enabled without viewing through a camera.
+
+
+::`lockCameraToView(self)`:
+    #cppname: HOM_GeometryViewport::lockCameraToView
+    
+    Set the viewport camera lock. When True, any changes to the view will affect the camera object being viewed though. When False, the camera will become disconnected from the viewport and revert to the default viewport camera when the user tumbles the view. 
+    It is possible to enable this without the viewport looking through a camera, though view changes will not affect any objects until the user sets the viewport to look through a camera or light. 
+
 
 ::`draw(self)`:
     #cppname: HOM_GeometryViewport::draw
 
     Request that the viewport redraw. Multiple `draw()` calls within the same script will be merged into a single call.
+
 
 == Settings ==
 
@@ -197,6 +250,59 @@
     to `1`) to viewport coordinates, where `(0,0)` is the bottom left corner of
     the viewport.
 
+== Callbacks ==
+
+::`addEventCallback(self, callback)`:
+	#cppname: HOM_GeometryViewport::addEventCallback
+	Register a Python callback to be called whenever a viewport event occurs. The event types are defined in [Hom:hou.geometryViewportEvent].
+
+	'callback':
+
+	Any callable Python object that expects keyworded arguments specific to an event type. This callback can be used for any geometry viewport event type. 	
+
+	Arguments for [Hom:hou.geometryViewportEvent.CameraSwitched]:
+	* event_type: This viewport event.
+	* desktop: The desktop object holding the scene viewer.
+	* viewer: The scene viewer object holding the viewport.
+	* viewport: The viewport object that triggered the event.
+
+	{{{
+	#!python
+	import hou
+
+	def myViewportCB(**kwargs):
+		event_type=kwargs['event_type']
+		desktop=kwargs['desktop']
+		viewer=kwargs['viewer']
+		viewport=kwargs['viewport']
+
+		print "\nmyViewportCB=",myViewportCB
+		print "event type=",event_type
+		print "desktop=",desktop
+		print "viewer=",viewer
+		print "viewport=",viewport
+
+		cam = viewport.camera()
+		print "camera=%s\n\n"%(cam.name())
+
+	curSceneViewer = [item for item in hou.ui.curDesktop().currentPaneTabs() if item.type() == hou.paneTabType.SceneViewer][0]
+	curSceneViewer.curViewport().addEventCallback(myViewportCB)
+	}}}
+
+::`clearEventCallbacks(self)`:
+    #cppname: HOM_GeometryViewport::clearEventCallbacks
+    Remove all Python callbacks that have been registered with
+    [Hom:hou.GeometryViewport#addEventCallback].
+
+::`removeEventCallback(self,callback)`:
+    #cppname: HOM_GeometryViewport::removeEventCallback
+    Remove a specific Python callback that have been registered with
+    [Hom:hou.GeometryViewport#addEventCallback].
+
+::`eventCallbacks(self)` -> `tuple` of callbacks:
+    #cppname: HOM_GeometryViewport::eventCallbacks
+    Return a tuple of all the Python callbacks that have been registered with
+    [Hom:hou.GeometryViewport#addEventCallback].
 
 @replaces
 

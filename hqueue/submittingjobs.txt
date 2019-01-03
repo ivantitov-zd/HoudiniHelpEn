@@ -1,0 +1,85 @@
+= How to Submit Jobs =
+
+
+== General Submission == (general)
+
+All render and simulation jobs can be submitted from within Houdini.
+
+Navigate to _/out_ and put down either an HQueue Render ROP or an HQueue Simulation ROP.  Configure the ROP node to point to:
+* the HQueue server
+* the underlying output driver (i.e. Mantra ROP, Geometry ROP)
+* and the location of Houdini on the farm (i.e. Target HFS)
+
+Then click on the Render button to submit the job.
+
+Details on the HQueue ROPs can be found in the Houdini help documentation.
+
+
+
+== Submitting Sliced Simulation Jobs == (simslicejobs)
+For sliced-simulation jobs, it is recommended that the Distribute shelf tool be used to create and configure the HQueue Simulation ROP.  The shelf tool can be found under any of the dynamics shelves such as Particle Fluids, Fluid Containers, Cloth, Wires, etc.
+
+Set the _Slice Divisions_ parameter on the HQueue Simulation ROP to break up the simulation into slices.  The number of slices determine the number of client machines required to process the simulation.  For example, if Slice Divisions is set to 2x2x2, then a total of 8 client machines are required on HQueue to simulate the scene.
+
+Click on the Render button to submit the job.
+
+
+
+== Submitting Cluster Simulation Jobs == (simclusterjobs)
+There are 2 methods to setup your cluster simulation for submission to the HQueue farm.  The method to use depends on how the cluster simulation network was created.
+
+# *If you created a cluster simulation using one of the shelf tools like Smoke Cluster or Pyro Cluster...*
+
+    ...then use the Distribute shelf tool from one of the dynamics shelves such as Particle Fluids, Fluid Containers, Cloth, Wires, etc.  Be sure to choose "Clustering" as the distribution method when prompted.  When finished, click on the Render button on the HQueue Simulation ROP to submit the job.
+
+# *If you manually created a cluster simulation without using a shelf tool...*
+
+    ...then you need to manually prepare your cluster simulation for distribution.
+
+    The following procedure describes how to do the preparation.  It assumes that you have at least a Cluster Points SOP in your geometry network and that the clustered geometry is exported to DOPs for simulation.
+
+    # Attach a ROP Output Driver SOP to the end your cluster simulation network.  Specifically, the ROP Output Driver should be connected to the network chain that contains the Dop I/O SOP which imports the cluster simulation back into the SOP context.
+    # On the ROP Output Driver, set the Output File parameter so that it contains &#36;{CLUSTER} in its name.  This is necessary so that the output of each cluster simulation is written to a different file.  Likewise, the name should also contain $F.
+    # Put down a File Merge SOP in the same context as the ROP Output Driver.  The merge node will be used to load the cluster geometry files back into the scene.
+    # On the File Merge node, create a channel reference from the File parameter to the Geometry ROP's Output File parameter.  Set the first value of the Merge Range parameter to 0 and create a channel reference from the second value of the Merge Range parameter to the Cluster Settings->Clusters parameter on your Cluster Points SOP.  Finally, set the Merge parameter to 'CLUSTER'.
+    # Navigate to _/out_ and put down an HQueue Simulation ROP.  Set the Output Driver parameter to point to the ROP Output Driver that you put down earlier.  Set the Partitioning Type parameter to 'Clusters'.  Finally, set the Cluster Node parameter to point to your Cluster Points SOP.
+    # Configure the HQueue Simulation ROP to point to your HQueue server and the location of Houdini on the farm as usual.
+    # Click on the Render button to submit the cluster simulation job.
+
+
+
+== Submitting Wedge ROP Jobs == (wedgejobs)
+The following procedure describes how to submit jobs involving a Wedge ROP:
+
+# Navigate to _/out_ and put down an HQueue Simulation ROP.
+# Set the Output Driver parameter to point to your Wedge ROP.
+# Set the Partitioning Type parameter to Wedges.
+# Configure the HQueue Simulation ROP to point to your HQueue server and the location of Houdini on the farm as usual.
+# On the output driver node pointed by the Wedge ROP, set its output file parameter so that the filename contains &#36;{WEDGENUM}.  This is necessary so that the output of each wedge is saved to a different file.
+# Go back to the HQueue Simulation ROP and click on the Render button to submit the job.
+
+
+== Submitting from a Local Folder == (submitlocal)
+
+You are not restricted to submit jobs using a .hip file that is on the shared folder.  You have the option of working from a .hip file in a local directory and then submitting a copy of your .hip to the shared folder which is then processed by HQueue.
+
+On your HQueue Render ROP (or HQueue Simulation ROP), change the Render Current HIP File drop-down menu parameter to Copy Project Files to Shared Folder and Render.  Then set the Project Path parameter to where you would like to copy your .hip file to.
+
+Click on the Render button and a file dependency dialog will pop-up like the following:
+
+<center>
+[Image:/images/hqueue/file_dependency_dialog.png]
+</center>
+
+Choose the files that you want to copy to the shared folder.  Then click OK.  Houdini will send the files and submit the job to HQueue.
+
+
+
+== Submitting Jobs Remotely == (submitremotely)
+
+You can configure the HQueue Render ROP (or HQueue Simulation ROP) to submit a job for another .hip file.  This is useful for when you have a .hip file already on the shared folder but you are on a machine that does not have access to it.
+
+On your HQueue Render ROP, change the Render Current HIP File drop-down menu parameter to Render Target HIP File.  Set the Target HIP parameter to the location of the .hip file on the shared folder.  You can use `$HQROOT` in the path to represent the root of the shared folder.
+
+Click on the Render button.  Houdini will submit a job to HQueue for the target .hip file.
+

@@ -1,0 +1,473 @@
+= FAQs =
+
+@faqs
+#filtered: yes
+
+== General FAQs == (general)
+
+:: Do I need a license to run HQueue?
+    #id: do-i-need-a-license-to-run-hqueue
+
+    No.  The HQueue server does not require a license to operate.
+
+    However, you do require licenses to run Houdini jobs on the HQueue farm.  Specifically, the HQueue clients require access to Houdini Engine (or equivalent, i.e. Houdini FX) licenses and Mantra Render licenses when processing jobs submitted from Houdini.
+
+    For complete details on HQueue licensing, please see the [Licensing|overview#licensing] section.
+
+:: What are the software requirements for the HQueue server and the HQueue client?
+    #id: what-are-the-software-requirements-for-the-hqueue-server-and-the-hqueue-client
+
+    The HQueue server and client can only run on Windows, Mac OSX and Linux.  They have no other software requirements.
+
+:: What are the hardware requirements for the HQueue server and the HQueue client?
+    #id: what-are-the-hardware-requirements-for-the-hqueue-server-and-the-hqueue-client
+
+    The hardware requirements of the HQueue server depends on the size of the farm -- the number of clients on the farm and the average number of jobs that are in the system.  As a starting point, it is recommended that the HQueue server machine has at least 1Gb of RAM and at least 1 CPU running at 2Ghz.  At the moment, the HQueue server uses at most 1 CPU.
+
+    In addition to CPU and memory requirements, the HQueue server needs minimal networking and I/O resources.
+
+    The HQueue client requires hardware that is powerful enough to perform Mantra renders and dynamic simulations.  The HQueue client process itself requires little CPU power, memory, I/O and networking.
+
+    The shared network folder can act as a bottleneck since the client machines concurrently read and write to the drive.  It is advised that the shared folder is hosted on a dedicated machine with high I/O and networking performance.
+
+:: Can I install the HQueue server on my workstation (i.e. the machine I submit jobs from)?
+    #id: can-i-install-the-hqueue-server-on-my-workstation-ie-the-machine-i-submit-jobs-from
+
+    Yes.  This is recommended for small, personal farms because it potentially frees a machine that can be converted to a client that is dedicated for renders and simulations.
+
+:: Can I install the HQueue server on the machine hosting the shared network folder?
+    #id: can-i-install-the-hqueue-server-on-the-machine-hosting-the-shared-network-folder
+
+    Yes, but this is not recommended for medium-scale to large-scale farms.  The client machines will require a lot of I/O resources when rendering or simulating.  If the farm is busy enough, then renders and simulations can take away resources from the HQueue server causing it to schedule jobs at a slower rate.
+
+:: Can I add the HQueue server machine as a client to the farm?
+    #id: can-i-add-the-hqueue-server-machine-as-a-client-to-the-farm
+
+    Yes, however you should be aware that if a heavy render or simulation job is assigned to the machine, then the server may schedule jobs at a slower rate as it contends for I/O and CPU resources with the running job.
+
+:: How do I register a shared folder with the HQueue Server?
+    #id: how-do-i-register-a-shared-folder-with-the-hqueue-server
+
+    To register a shared folder with the HQueue server, you need to edit the server configuration file which is located at:
+
+    * `/opt/hqueue/hqserver.ini` on Linux.
+    * `C:\HQueueServer\hqserver.ini` on Windows.
+    * `/Library/HQServer/hqserver.ini` on Mac OSX.
+
+    Open the configuration file in a text editor and modify the values for the following keys:
+
+    * `hqserver.sharedNetwork.host`
+        :box:
+            #display: bordered
+            Set this to the network (DNS) name of the machine hosting the shared folder.
+    * `hqserver.sharedNetwork.path.linux`
+        :box:
+            #display: bordered
+            (optional, only if you have Linux client machines)
+            
+            Set this to the shared folder path on the host machine.
+
+    * `hqserver.sharedNetwork.mount.linux`
+        :box:
+            #display: bordered
+            (optional, only if you have Linux client machines)
+            
+            Set this to where you want the shared folder to be mounted on the client machines.
+
+    * `hqserver.sharedNetwork.path.windows`
+        :box:
+            #display: bordered
+            (optional, only if you have Windows client machines)
+            
+            Set this to the share name of the shared folder on the host machine.  If the shared folder is on a storage area network (SAN), then leave this field blank.
+
+    * `hqserver.sharedNetwork.mount.windows`
+        :box:
+            #display: bordered
+            (optional, only if you have Windows client machines)
+        
+            Set this to the drive letter that you want mapped to the shared folder on the client machines.
+
+    * `hqserver.sharedNetwork.path.macosx`
+        :box:
+            #display: bordered
+            (optional, only if you have Mac OSX client machines)
+            
+            Set this to the shared folder path on the host machine.
+
+    * `hqserver.sharedNetwork.mount.macosx`
+        :box:
+            #display: bordered
+            (optional, only if you have Mac OSX client machines)
+            
+            Set this to where you want the shared folder to be mounted on the client machines.
+
+    Save the changes to the configuration file and then restart the HQueue server process to register the shared folder:
+
+    * [Restarting the HQueue Server on Linux|faqs#how-do-i-restart-the-hqueue-server-on-my-linux-machine]
+    * [Restarting the HQueue Server on Windows|faqs#how-do-i-restart-the-hqueue-server-on-my-windows-machine]
+    * [Restarting the HQueue Server on Mac OSX|faqs#how-do-i-restart-the-hqueue-server-on-my-mac-osx-machine]
+
+:: How do I submit render or simulation jobs to HQueue?
+    #id: how-do-i-submit-render-or-simulation-jobs-to-hqueue
+
+    See [How to Submit Jobs|submittingjobs].
+
+:: What is $HQROOT?
+    #id: what-is-$hqroot
+
+    `$HQROOT` is an environment variable that exists on the client machine and is mapped to the shared folder's mount point.  It can be used in the _Target HFS_, _Target HIP_ and _Project Path_ parameters of the HQueue Render ROP and HQueue Simulation ROP.
+
+    `$HQROOT` is how client machines know the location of the shared folder in a platform-independent way.  For example, suppose you have a mixed farm of Linux and Windows machines and suppose the shared folder mount points are set to `/mnt/hq` for Linux and `H:` for Windows.  Now if you set the _Target HFS_ parameter to:
+
+    {{{
+    $HQROOT/houdini_distros/hfs.$HQCLIENTARCH
+    }}}
+
+    Then when a Linux machine executes the job, it knows to look for Houdini in `/mnt/hq/houdini_distros/hfs.linux-x86_64`.  Similarly, when a Windows machine executes the job, it knows to look for Houdini in `H:/houdini_distros/hfs.windows-x86_64`.
+
+    The value of `$HQROOT` is stored in the HQueue server configuration file.  See [How do I register a shared folder with the HQueue Server?|faqs#how-do-i-register-a-shared-folder-with-the-hqueue-server]
+
+:: What is $HQCLIENTARCH?
+    #id: what-is-$hqclientarch
+
+    `$HQCLIENTARCH` is an environment variable that exists on the client machine and is set to the client's operating system and computer architecture.  It is used primarly in the HQueue Render ROP's and HQueue Simulation ROP's `Target HFS` parameter, but can also be used in the `Target HIP` and `Project Path` parameters.
+
+    `$HQCLIENTARCH` is how client machines know the location of Houdini on the shared folder in a platform-independent way.  For example, suppose you have a mixed farm of Linux and Windows machines.  And suppose you set the `Target HFS` parameter to:
+
+    {{{
+    $HQROOT/houdini_distros/hfs.$HQCLIENTARCH
+    }}}
+
+    Now when a Linux machine executes the job, it knows to look for Houdini in `/mnt/hq/houdini_distros/hfs.linux-x86_64` (assuming that `$HQROOT` is set to `/mnt/hq` for Linux).  Similarly, when a Windows machine executes the job, it knows to look for Houdini in `H:/houdini_distros/hfs.windows-x86_64` (again assuming that `$HQROOT` is set to `H:` for Windows).
+
+    The value of `$HQCLIENTARCH` can be one of the following:
+
+    * `linux-i686` -> 32-bit Linux
+    * `linux-x86_64` -> 64-bit Linux
+    * `windows-i686` -> 32-bit Windows
+    * `windows-x86_64` -> 64-bit Windows
+    * `macosx-i686` -> 32-bit Mac OSX
+    * `macosx-x86_64` -> 64-bit Mac OSX
+
+
+
+== Linux FAQs == (linux)
+:: How do I add a Linux client machine to the farm?
+    #id: how-do-i-add-a-linux-client-machine-to-the-farm
+
+    There are two ways to add a Linux client to the farm:
+
+    # Using the Houdini installer script
+        [Download the Houdini Linux tarball package|https://www.sidefx.com/download] and run the Houdini installer script on the client machine.  When choosing which items to install, select "HQueue Client" and select all other items off.  Follow the installer instructions to complete the installation.  Note that the installer script automatically installs a copy of Python into the install location.
+
+    # Using the HQueue web interface
+        Go to the __CLIENTS__ page on the HQueue web interface (i.e. http://<server_name>:5000), click on the "Add Clients" button at the bottom and choose to add a Linux machine.  Fill out the form in the following page and click "Add Machines" to perform the installation.  Note that a compatible Python distribution must be installed on the machine *prior* to adding the client through the web interface.
+
+:: How do I restart the HQueue server on my Linux machine?
+    #id: how-do-i-restart-the-hqueue-server-on-my-linux-machine
+
+    To restart the HQueue server, open a terminal on the server machine and type:
+    {{{
+    #!bash
+    cd /opt/hqueue
+    ./scripts/hqserverd restart
+    }}}
+    where `/opt/hqueue` is the HQueue server install location.
+
+:: How do I restart the HQueue client on my Linux machine?
+    #id: how-do-i-restart-the-hqueue-client-on-my-linux-machine
+
+    To restart the HQueue client, go to the HQueue web interface, go to the __CLIENTS__ page, check the box beside the client and then click on the Restart button at the bottom of the page.
+
+    You can also restart the HQueue client by opening a terminal on the client machine and typing:
+    {{{
+    #!bash
+    cd /home/hquser/hqclient
+    ./hqclientd restart
+    }}}
+    where `/home/hquser/hqclient` is the HQueue client install location.
+
+:: How do I install Houdini onto the shared folder for my Linux client machines?
+    #id: how-do-i-install-houdini-onto-the-shared-folder-for-my-linux-client-machines
+
+    <a href="https://www.sidefx.com/download" target="_top_">Download Houdini</a> onto a client machine.  Open a terminal and type:
+
+    {{{
+    #!bash
+    # Unpack the Houdini tarball.
+    tar zxf houdini-X.Y.ZZZ-linux_x86_64_gcc4.4.tar.gz
+
+    # Dive into the installer directory.
+    cd houdini-X.Y.ZZZ-linux_x86_64_gcc4.4
+
+    # Run the Houdini installer in silent mode to install a copy onto the shared folder.
+    # It is assumed that the shared folder is mounted at /mnt/hq.
+    ./houdini.install --no-menus --no-license --no-install-bin-symlink --no-install-hfs-symlink --make-dir /mnt/hq/houdini_distros/hfsX.Y.ZZZ-linux-x86_64
+
+    # Create a non-versioned symbolic link to the Houdini installation.
+    # HQueue render and simulation jobs by default look for Houdini at
+    #   $HQROOT/houdini_distros/hfs.$HQCLIENTARCH
+    # where $HQROOT maps to the shared folder mount point and $HQCLIENTARCH maps to linux-x86_64
+    # for 64-bit Linux machines.
+    cd /mnt/hq/houdini_distros
+    ln -sf hfsX.Y.ZZZ-linux-x86_64 hfs.linux-x86_64
+    }}}
+
+:: I am getting a "Connection Refused" error when trying to add a client through the web interface.  Why is this happening?
+    #id: i-am-getting-a-"connection-refused"-error-when-trying-to-add-a-client-through-the-web-interface-why-is-this-happening
+
+    When you use the "Add Client" feature on the web interface, HQueue will attempt to make a remote connection using SSH to the client machine in order to transfer files to the machine and install the client code.
+
+    If you are receiving a "Connection Refused" error when attempting to add a client, then the server could not remotely connect to the client machine.  This can happen for a variety of reasons but here are some common ones:
+
+    * The username and password are incorrect.
+    * The client machine is behind a firewall which is dropping remote connections.
+    * The user account specified does not have permission to remotely log into the client machine.  For example, on newer versions of Ubuntu, the root account does not have permission to SSH into the machine by default.
+    * The SSH package is not installed on the client machine.
+
+:: How do I uninstall the HQueue Client on my Linux machine?
+    #id: how-do-i-uninstall-the-hqueue-client-on-my-linux-machine
+
+    Open a terminal and run the following commands to uninstall the HQueue Client:
+
+    {{{
+    #!bash
+
+    # Stop and uninstall the HQueue Client code.
+    # It is assumed that the client was installed in /home/hquser/hqclient,
+    # otherwise adjust the install path accordingly in the commands below.
+    sudo /home/hquser/hqclient/hqclientd stop
+    sudo rm -rf /home/hquser/hqclient
+
+
+    # Open the auto-mounting configuration file, /etc/fstab, in a text editor
+    # and remove the line that contains "/mnt/hq".
+    # You only need to do this if you requested to mount the shared folder
+    # at the time that the client was installed.
+    sudo gedit /etc/fstab
+
+
+    # Unmount the shared folder.
+    # You only need to do this if you requested to mount the shared folder
+    # at the time that the client was installed.
+    sudo umount -l /mnt/hq
+
+
+    # Delete the HQueue user.
+    # You only need to do this if you requested to create the `hquser`
+    # user account at the time that the client was installed.
+    sudo /usr/sbin/userdel hquser
+    sudo rm -rf /home/hqclient
+
+
+    # Delete the HQueue user group.
+    # You only need to do this if you requested to create the `hquser`
+    # user account at the time that the client was installed.
+    sudo /usr/sbin/groupdel hqgroup
+    }}}
+
+:: When I try to add a Linux client through the web interface, I get 'Could not execute install script.  sudo: sorry, you must have a tty to run sudo' error?
+    #id: when-i-try-to-add-a-linux-client-through-the-web-interface,-i-get-'could-not-execute-install-script-sudo:-sorry,-you-must-have-a-tty-to-run-sudo'-error
+
+    This error indicates that the Linux operating system on your machine restricts running administrator-level commands from a remote connection.  To bypass this restriction, log into the Linux machine as the root account and open the `/etc/sudoers` file.  Then comment out the line that reads "Default requiretty".  Save and close the file and then add the machine to HQueue through the web interface.
+
+    After adding the machine to HQueue, you can add the restriction back in by uncommenting "Default requiretty" and saving and closing `/etc/sudoers`.
+
+
+
+== Windows FAQs == (windows)
+:: How do I add a Windows client machine to the farm?
+    #id: how-do-i-add-a-windows-client-machine-to-the-farm
+
+    [Download the Houdini installer|https://www.sidefx.com/download] for Windows and run the executable on the client machine.  When choosing which items to install, select "HQueue Client" and select all other items off.  Follow the installer instructions to complete the installation.
+
+:: How do I restart the HQueue server on my Windows machine?
+    #id: how-do-i-restart-the-hqueue-server-on-my-windows-machine
+
+    Go to the Windows Control Panel, select Administrative Tools and then double-click on Services.  In the Services list, ((RMB)) click HQueueServer and choose Restart.
+
+:: How do I restart the HQueue client on my Windows machine?
+    #id: how-do-i-restart-the-hqueue-client-on-my-windows-machine
+
+    Go to the Windows Control Panel, select Administrative Tools and then double-click on Services.  In the Services list, ((RMB)) click HQueueClient and choose Restart.
+
+:: How do I install Houdini onto the shared folder for my Windows client machines?
+    #id: how-do-i-install-houdini-onto-the-shared-folder-for-my-windows-client-machines
+
+    [Download Houdini|https://www.sidefx.com/download] onto a client machine.  Open a command prompt and type:
+
+    {{{
+    #!winbatch
+
+    # Run the Houdini installer in silent mode to install a copy onto the shared folder.
+    # It is assumed that the shared folder is mapped at H:.
+    #
+    # HQueue render and simulation jobs by default look for Houdini at $HQROOT/houdini_distros/hfs.$HQCLIENTARCH
+    # where $HQROOT maps to the shared folder mount point and $HQCLIENTARCH maps to windows-x86_64
+    # for 64-bit Windows machines.
+    start /WAIT houdini-X.Y.ZZZ-win64-vc9.exe /S /MainApp=Yes /InstallDir=H:\houdini_distros\hfs.windows-x86_64
+        /ApprenticeLicensing=No /DesktopIcon=No /FileAssociations=No /HoudiniServer=No
+        /HQueueServer=No /HQueueClient=No /IndustryFileAssociations=No /LicenseServer=No
+        /Registry=No /StartMenu=No
+    }}}
+
+:: How do I uninstall the HQueue Client on my Windows machine?
+    #id: how-do-i-uninstall-the-hqueue-client-on-my-windows-machine
+
+    Open Windows Explorer (i.e. ((RMB)) click the Start menu and choose "Explore...") and navigate to the folder where the HQueue Client is installed.  The default install folder is `C:\HQueueClient`.  Double-click on the `Uninstall HQueue Client.exe` file and then follow the instructions in the uninstaller program to uninstall the client.
+
+:: My job fails with an 'Access is denied' error when run on a Windows client machine.  How can I fix this?
+    #id: my-job-fails-with-an-'access-is-denied'-error-when-run-on-a-windows-client-machine-how-can-i-fix-this
+
+    If you see an 'Access is denied' error early on in the job output then the HQueue Client could not access files on the shared folder.  To fix this try changing the user account running the HQueue Client service to the Windows user account that you are logged in with.
+
+    Open the Windows Services window (Control Panel -> Administrative Tools -> Services) and locate the HQueue Client service in the list.  ((RMB)) click the service and choose Properties.
+
+    In the Properties dialog select the Log On tab and then select the "This account:" radio button.  Change the user account and password to your Windows account and password.  Click OK to save the changes and close the dialog.
+
+    Now ((RMB)) click the HQueue Client service again and select Restart to restart the service.
+
+
+== Mac OSX FAQs == (macosx)
+:: How do I add a Mac OSX client machine to the farm?
+    #id: how-do-i-add-a-mac-osx-client-machine-to-the-farm
+
+    Go to the __CLIENTS__ page on the HQueue web interface (i.e. http://<server_name>:5000), click on the "Add Clients" button at the bottom and choose to add a Mac OSX machine.  Fill out the form in the following page and click "Add Machines" to perform the installation.
+
+:: How do I restart the HQueue server on my Mac OSX machine?
+    #id: how-do-i-restart-the-hqueue-server-on-my-mac-osx-machine
+
+    To restart the HQueue server, open a Terminal app on the server machine and type:
+
+    {{{
+    #!bash
+    launchctl unload /Library/LaunchDaemons/com.sidefx.hqserver.plist
+    launchctl load /Library/LaunchDaemons/com.sidefx.hqserver.plist
+    }}}
+
+:: How do I restart the HQueue client on my Mac OSX machine?
+    #id: how-do-i-restart-the-hqueue-client-on-my-mac-osx-machine
+
+    To restart the HQueue client, open a Terminal app on the client machine and type:
+
+    {{{
+    #!bash
+    launchctl unload /Library/LaunchDaemons/com.sidefx.hqclient.plist
+    launchctl load /Library/LaunchDaemons/com.sidefx.hqclient.plist
+    }}}
+
+:: How do I install Houdini onto the shared folder for my Mac OSX client machines?
+    #id: how-do-i-install-houdini-onto-the-shared-folder-for-my-mac-osx-client-machines
+
+    [Download Houdini|https://www.sidefx.com/download] onto a client machine.  You first need to install Houdini into a local folder using the installer.  After Houdini is installed, open a terminal on the client machine and type:
+
+    {{{
+    #!bash
+
+    # Copy the Houdini distro to the shared folder.
+    # This assumes that the shared folder is mounted at /Volumes/hq.
+    cp -a /Applications/Houdini/HoudiniX.Y.ZZZ /Volumes/hq/houdini_distros/.
+
+    # Create a non-versioned symbolic link to the Houdini distro.
+    # HQueue render and simulation jobs by default look for Houdini at
+    #   $HQROOT/houdini_distros/hfs.$HQCLIENTARCH
+    # where $HQROOT maps to the shared folder mount point and $HQCLIENTARCH maps to macosx-x86_64
+    # for 64-bit Mac OSX machines.
+    cd /Volumes/hq/houdini_distros
+    rm -f hfs.macosx-x86_64
+    ln -sf HoudiniX.Y.ZZZ/Frameworks/Houdini.framework/Versions/Current/Resources hfs.macosx-x86_64
+    }}}
+
+:: I am getting a "Connection Refused" error when trying to add a client through the web interface.  Why is this happening?
+    #id: i-am-getting-a-"connection-refused"-error-when-trying-to-add-a-client-through-the-web-interface-why-is-this-happening
+
+    When you use the "Add Client" feature on the web interface, HQueue will attempt to make a remote connection using SSH to the client machine in order to transfer files to the machine and install the client code.
+
+    If you are receiving a "Connection Refused" error when attempting to add a client, then the server could not remotely connect to the client machine.  This can happen for a variety of reasons but here are some common ones:
+
+    * The username and password are incorrect.
+    * The client machine is behind a firewall which is disallowing remote connections.
+    * The user account specified does not have permission to remotely log into the client machine.  To fix this, open the System Preferences on the client machine.  Click on the Sharing icon and then in the Sharing dialog, check on "Remote Login" in the list.
+
+:: How do I uninstall the HQueue Client on my Mac OSX machine?
+    #id: how-do-i-uninstall-the-hqueue-client-on-my-mac-osx-machine
+
+    Open a Terminal app and run the following commands to uninstall the HQueue Client:
+
+    {{{
+    #!bash
+
+    # Stop and uninstall the HQueue Client service using launchctl.
+    sudo launchctl unload /Library/LaunchDaemons/com.sidefx.hqclient.plist
+    sudo rm -f /Library/LaunchDaemons/com.sidefx.hqclient.plist
+
+    # Uninstall the HQueue Client code.
+    sudo rm -rf /Library/HQClient
+
+    # Open the auto-mounting configuration file, /etc/auto_master,
+    # in a text editor and remove the line that contains "auto_hqshared".
+    # You only need to do this if you requested to mount the shared folder
+    # at the time that the client was installed.
+    sudo open /etc/auto_master
+
+    # Unmount the shared folder.
+    # You only need to do this if you requested to mount the shared folder
+    # at the time that the client was installed.
+    sudo rm -f /etc/auto_hqshared*
+    sudo automount -vc
+
+    # Delete the HQueue user group.
+    # You only need to do this if you requested to create the `hquser`
+    # user account at the time that the client was installed.
+    sudo dscl . delete /Groups/hqgroup
+
+    # Delete the HQueue user.
+    # You only need to do this if you requested to create the `hquser`
+    # user account at the time that the client was installed.
+    sudo dscl . delete /Users/hquser
+    rm -rf /Users/hquser
+    }}}
+
+:: My job fails with a 'Permission denied' error when run on a Mac OSX client machine.  How can I fix this?
+    #id: my-job-fails-with-a-'permission-denied'-error-when-run-on-a-mac-osx-client-machine-how-can-i-fix-this
+
+    If you see a 'Permission denied' error early on in the job output then the HQueue Client could not access files on the shared folder.  To fix this try changing the user account running the HQueue Client service from the default 'hquser' to the Mac OSX account that you are logged in with.
+
+    For example, suppose you want to change the account to 'MyUser'.  First open `/Library/LaunchDaemons/com.sidefx.hqclient.plist` in a text editor and locate the line that reads:
+
+    {{{
+    #!xml
+        <string>hquser</string>
+    }}}
+
+    and replace it with:
+
+    {{{
+    #!xml
+        <string>MyUser</string>
+    }}}
+
+    Save the file and now open a Terminal app.  In the terminal run these commands:
+
+    {{{
+    #!bash
+    # Stop the HQueue Client service.
+    sudo launchctl unload /Library/LaunchDaemons/com.sidefx.hqclient.plist
+
+    # Change ownership to MyUser for the HQueue Client files.
+    sudo chown -R MyUser /Library/HQClient
+    sudo chown -R MyUser /Library/Logs/HQClient
+
+    # Start the HQueue Client service.
+    sudo launchctl load /Library/LaunchDaemons/com.sidefx.hqclient.plist
+    }}}
+
+:: HQueue fails to add my Mac OSX client machine to the farm using the web interface.  How can I workaround this?
+    #id: hqueue-fails-to-add-my-mac-osx-client-machine-to-the-farm-using-the-web-interface-how-can-i-workaround-this
+
+    If HQueue fails to add a Mac OSX client machine to the farm and returns an 'Invalid username or password' or similar error message then the problem could be limited remote login access settings.
+
+    To workaround the problem, open System Preferences on the Mac OSX machine and select Sharing.  Then check on the box beside Remote Login.  Finally select Remote Login and then ensure that the 'Allow access for' option is set to 'All users'.
+
+    You can restore the remote login settings to your previous settings after adding the Mac OSX machine to the farm.

@@ -1,43 +1,61 @@
-﻿= hou.hmath =
+= hou.hmath =
 #type: hommodule
 #cppname: HOM_hmath
 #group: general
 
 """Houdini and 3D related math functions."""
 
+See [Hom:hou.Geometry#transformPrims] and [Hom:hou.Matrix4#explode] for matrix transform examples.
+
+
 @functions
 
-::`buildTranslate(values)` -> [Hom:hou.Matrix4]:
+::`buildTranslate(tx, ty, tz)` -> [Hom:hou.Matrix4]:
     #cppname: HOM_hmath::buildTranslate
     #replaces: Exp:translate
-    Return a transformation matrix containing only a translation.  You can
-    build more complex transformations by multiplying the result with
-    another transformation matrix.
 
-    values:
-	A sequence of 3 floats representing the translation in x, y, and z.
+    Returns a transformation matrix containing only a translation.
+    You can build more complex transformations by multiplying this with another transform matrix.
 
-    See [Hom:hou.Geometry#transformPrims] and [Hom:hou.Matrix4#explode] for
-    examples.
+    You can supply three float values for x, y, and z, or a sequence of three floats, or a [Hom:hou.Vector3].
+
+    {{{
+    #!python
+    forward_z = hou.hmath.buildTranslate(0, 0, 1)
+    forward_x = hou.hmath.buildTranslate(hou.Vector3(1, 0, 0))
+    }}}
+
 
 ::`buildRotateAboutAxis(axis, angle_in_deg)` -> [Hom:hou.Matrix4]:
     #cppname: HOM_hmath::buildRotateAboutAxis
     #replaces: Exp:rotaxis
-    Return a transformation matrix containing only a rotation, given
-    an axis and a rotation amount.  You can build more complex transformations
-    by multiplying the result with another transformation matrix.
 
-    See [Hom:hou.Geometry#transformPrims] and [Hom:hou.Matrix4#explode] for
-    examples.
+    Returns a transformation matrix containing only a rotation computed from an axis and a rotation amount.
+    You can build more complex transformations by multiplying this with another transform matrix.
+
+    `axis`:
+        A [Hom:hou.Vector3] normal defining an axis to rotate around. For example, `hou.Vector3(0, 1, 1)` would rotate around a diagonal pointed along positive Y and Z.
+
+    `angle_in_deg`:
+        Number of degrees of rotation around the axis to store in the matrix.
+
+    {{{
+    #!python
+    turn_45_around_yz = hou.hmath.buildRotateAboutAxis(hou.Vector3(0, 1, 1), 45)
+    }}}
 
     If you want to convert Euler angles into a corresponding axis and angle,
     you can use the following code:
+
     {{{
     #!python
     def extractAxisAndAngleFromRotateMatrix(m):
-        '''Given a matrix, return an (Vector3, float) tuple containing the
-           axis and angle.  See Wikipedia's rotation represention page for
-           more details.'''
+        '''
+        Given a matrix, return an (Vector3, float) tuple containing the
+        axis and angle.  See Wikipedia's rotation represention page for
+        more details.
+        '''
+
         import math
 
         acos_input = (m.at(0, 0) + m.at(1, 1) + m.at(2, 2) - 1.0) * 0.5
@@ -60,110 +78,106 @@
         return extractAxisAndAngleFromRotateMatrix(hou.hmath.buildRotate(angles))
     }}}
 
-    See [Wikipedia's axis angle
-    page|Wp:Axis_angle] and [rotation representation
-    page|Wp:Rotation_representation_(mathematics)]
-    for more information.
+    See [Wikipedia's axis angle page|Wp:Axis_angle] and [rotation representation page|Wp:Rotation_representation_(mathematics)] for more information.
 
-::`buildRotate(values, order="xyz")` -> [Hom:hou.Matrix4]:
+::`buildRotate(rx, ry, rz, order="xyz")` -> [Hom:hou.Matrix4]:
     #cppname: HOM_hmath::buildRotate
     #replaces: Exp:rotate
-    Return a transformation matrix containing only a rotation, given a sequence
-    of Euler angles.  You can build more complex transformations by multiplying
-    the result with another transformation matrix.
 
-    values:
-	A sequence of 3 floats representing the rotations about each of
-	the x, y, and z axes.  Each rotation value is in degrees.
+    Returns a transformation matrix containing only a rotation, given Euler angles in degrees.
+    You can build more complex transformations by multiplying this with another transform matrix.
 
-    order:
-	A string containing a permutation of the letters `x`, `y`, and `z`
-	that determines the order in which rotations are performed about
-	the coordinate axes.
+    You can supply three float values for x, y, and z, or a sequence of three floats, or a [Hom:hou.Vector3].
 
-    See [Wikipedia's Euler angles
-    page|Wp:Euler_angles] for more information.
+    {{{
+    #!python
+    xform1 = hou.hmath.buildRotate(45, 45, 0)
+    xform2 = hou.hmath.buildRotate(hou.Vector3(90, 0, 90))
+    }}}
 
-    See [Hom:hou.Matrix4#explode] for an example.  See also
-    [Hom:hou.hmath#buildRotateAboutAxis] and [Hom:hou.hmath#radToDeg].
+    `order`:
+    	A string containing a permutation of the letters `x`, `y`, and `z` that controls the order of rotations.
+
+    See [Wikipedia's Euler angles page|Wp:Euler_angles] for more information.
 
 ::`buildRotateToFrame(new_z_axis, new_y_axis)` -> [Hom:hou.Matrix4]:
     #cppname: HOM_hmath::buildRotateToFrame
     #replaces: Exp:morient
     #status: ni
 
-::`buildScale(values)` -> [Hom:hou.Matrix4]:
+::`buildScale(sx, sy, sz)` -> [Hom:hou.Matrix4]:
     #cppname: HOM_hmath::buildScale
     #replaces: Exp:scale
-    Return a transformation matrix containing only a scale, given a sequence
-    of scale values for x, y, and z.  You can build more complex transformations
-    by multiplying the result with another transformation matrix.
 
-    To apply a uniform scale, use the same value for x, y, and z.
+    Returns a transformation matrix containing only a scale.
+    You can build more complex transformations by multiplying this with another transform matrix.
 
-    See [Hom:hou.Geometry#createNURBSSurface] and [Hom:hou.Matrix4#explode] for
-    examples.
+    You can supply three float values for x, y, and z, or a sequence of three floats, or a [Hom:hou.Vector3]. To apply a uniform scale, use the same value for x, y, and z.
 
-::`buildShear(values)` -> [Hom:hou.Matrix4]:
+    {{{
+    #!python
+    stretch = hou.hmath.buildScale(2, 1, 1)
+    uniform = hou.hmath.buildScale(hou.Vector3(2, 2, 2))
+    }}}
+
+    See [Hom:hou.Geometry#createNURBSSurface] for an example.
+
+::`buildShear(shearx, sheary, shearz)` -> [Hom:hou.Matrix4]:
     #cppname: HOM_hmath::buildShear
-    Return a transformation matrix containing only a shear, given a sequence
-    of shear values for x, y, and z.  You can build more complex transformations
-    by multiplying the result with another transformation matrix.
 
-    See [Wikipedia's shear matrix
-    page|Wp:Shear_matrix] for more information.
+    Returns a transformation matrix containing only a shear.
+    You can build more complex transformations by multiplying this with another transform matrix.
 
-    See [Hom:hou.Matrix4#explode] for an example.
+    You can supply three float values for x, y, and z, or a sequence of three floats, or a [Hom:hou.Vector3].
+
+    See [Wikipedia's shear matrix page|Wp:Shear_matrix] for more information.
 
 ::`buildTransform(values_dict, transform_order="srt", rotate_order="xyz")` -> [Hom:hou.Matrix4]:
     #cppname: HOM_hmath::buildTransform
-    Given a set of translate, rotate, scale, shear, pivot, and pivot_rotate
-    values; and transform rotate orders, return a corresponding matrix.  This
-    function is the inverse of [Hom:hou.Matrix4#explode].
 
-    values_dict:
-	A dictionary whose keys are one of the strings "translate",
-	"rotate", "scale", "shear", "pivot", "pivot_rotate" and whose values
-        are sequences of three floats.  Note that the rotate values are Euler
-        angles about the `x`, `y`, and `z` axes, in degrees.
+    Takes a dictionary containing mapping strings to vectors (such as produced by [Hom:hou.Matrix4#explode]), and returns a [Hom:hou.Matrix4] transformation. You can use this to explode a matrix, modify one or a few components, and then recompose into a matrix, or to generate a matrix from scratch from a few components.
 
-    transform_order:
-	A string containing a permutation of the letters `s`, `r`, and `t`.
-	The rotate, scale, and translate results are dependent on the order in
-	which you perform those operations, and this string specifies that
-	order.
+    The dictionary can contain any of the following keys: `translate`, `rotate`, `scale`, `shear`, `pivot`, `pivot_rotate`. The values can be [Hom:hou.Vector3] objects or 3-tuples of floats.
 
-    rotate_order:
-	A string containing a permutation of the letters `x`, `y`, and `z`
-	that determines the order in which rotations are performed about
-	the coordinate axes.  This does not apply to the "pivot_rotate"
+    `transform_order`:
+    	A string containing a permutation of the letters `s`, `r`, and `t`.
+    	The rotate, scale, and translate results are dependent on the order in
+    	which you perform those operations, and this string specifies that
+    	order.
+
+    `rotate_order`:
+    	A string containing a permutation of the letters `x`, `y`, and `z`
+    	that determines the order in which rotations are performed about
+    	the coordinate axes.  This does not apply to the "pivot_rotate"
         angles, which are always applied in `"xyz"` order.
 
-    This function can be approximately implemented as follows:
+    This function could be re-implemented like this:
+
     {{{
     #!python
     def buildTransform(values_dict, transform_order="srt", rotate_order="xyz"):
-	# Take the return value from explode, along with the transform and
-	# rotate order, and rebuild the original matrix.
-	result = hou.hmath.identityTransform()
-	for operation_type in transform_order:
-	    if operation_type == "t":
-		result *= hou.hmath.buildTranslate(values_dict["translate"])
-	    elif operation_type == "s":
-		result *= hou.hmath.buildScale(values_dict["scale"])
-		if "shear" in values_dict:
-		    result *= hou.hmath.buildShear(values_dict["shear"])
-	    elif operation_type == "r":
-		result *= hou.hmath.buildRotate(values_dict["rotate"], rotate_order)
-	    else:
-		raise ValueError("Invalid transform order")
-	return result
+    	# Take the return value from explode, along with the transform and
+    	# rotate order, and rebuild the original matrix.
+    	result = hou.hmath.identityTransform()
+    	for operation_type in transform_order:
+    	    if operation_type == "t":
+    		  result *= hou.hmath.buildTranslate(values_dict["translate"])
+    	    elif operation_type == "s":
+    		  result *= hou.hmath.buildScale(values_dict["scale"])
+    		if "shear" in values_dict:
+    		    result *= hou.hmath.buildShear(values_dict["shear"])
+    	    elif operation_type == "r":
+    		  result *= hou.hmath.buildRotate(values_dict["rotate"], rotate_order)
+    	    else:
+    		  raise ValueError("Invalid transform order")
+    	return result
     }}}
 
 ::`identityTransform()` -> [Hom:hou.Matrix4]:
     #cppname: HOM_hmath::identityTransform
     #replaces: Exp:identity
-    Returns the identity matrix.  This is the same as calling `hou.Matrix4(1)`.
+
+    Returns the identity matrix.  This is the same as `hou.Matrix4(1)` but may make your code more understandable.
 
     {{{
     #!pycon
@@ -171,11 +185,12 @@
     <hou.Matrix4 [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]]>
     }}}
 
-    See also [Hom:hou.Matrix4#__init__].
+    See [Hom:hou.Matrix4].
 
 ::`degToRad(degrees)` -> `float`:
     #cppname: HOM_hmath::degToRad
     #replaces: Exp:rad
+
     Given a value in degrees, return the corresponding value in radians.
 
     This function is equivalent to `degrees * math.pi / 180.0`.
@@ -249,6 +264,7 @@
 ::`fit(value, old_min, old_max, new_min, new_max)` -> `float`:
     #cppname: HOM_hmath::fit
     #replaces: Exp:fit
+
     Returns a number between `new_min` and `new_max` that is relative to
     the `value` between the range `old_min` and `old_max`.  If the value
     is outside the `old_min` to `old_max` range, it will be clamped to the new
@@ -263,6 +279,7 @@
 ::`fit01(value, new_min, new_max)` -> `float`:
     #replaces: Exp:fit01
     #cppname: HOM_hmath::fit01
+
     Returns a number between `new_min` and `new_max` that is relative to
     the `value` between the range 0 and 1.  If the value is outside the 0
     to 1 range, it will be clamped to the new range.
@@ -273,6 +290,7 @@
 ::`fit10(value, new_min, new_max)` -> `float`:
     #cppname: HOM_hmath::fit10
     #replaces: Exp:fit10
+
     Returns a number between `new_min` and `new_max` that is relative to
     the `value` between the range 1 to 0.  If the value is outside the 1 to 0
     range, it will be clamped to the new range.
@@ -283,6 +301,7 @@
 ::`fit11(value, new_min, new_max)` -> `float`:
     #cppname: HOM_hmath::fit11
     #replaces: Exp:fit11
+
     Returns a number between `new_min` and `new_max` that is relative to
     the `value` between the range -1 to 1.  If the value is outside the
     -1 to 1 range, it will be clamped to the new range.
@@ -298,12 +317,14 @@
 ::`rand(seed)` -> `float`:
     #cppname: HOM_hmath::rand
     #replaces: Exp:rand
+
     Returns a pseudo-random number from 0 to 1.  Using the same `seed` will
     always give the same result.
 
 ::`noise1d(self, pos)` -> `float`:
     #cppname: HOM_hmath::noise1d
     #replaces: Exp:noise
+
     Given a sequence of 1 to 4 floats representing a position in
     N-dimensional space, return a single float corresponding to 1 dimensional
     noise.
@@ -312,6 +333,7 @@
 
 ::`noise3d(self, pos)` -> [Hom:hou.Vector3]:
     #cppname: HOM_hmath::noise3d
+
     Given a sequence of 1 to 4 floats representing a position in
     N-dimensional space, return a [Hom:hou.Vector3] object representing the
     vector noise at the given position.
@@ -370,3 +392,28 @@
 
     See http://www.cs.cmu.edu/~quake/robust.html for details of the
     implementation.
+
+::`intersectPlane(plane_point, plane_normal, line_origin, line_dir)` -> [Hom:hou.Vector3]:
+    #cppname: HOM_hmath::intersectPlane
+
+    Takes a plane defined by an origin point and normal vector (`plane_point` and `plane_normal`) and a line defined by an origin and direction (`line_origin` and `line_dir`) and returns a [Hom:hou.Vector3] value representing the XYZ coordinates of the intersection point between the line and plane. All arguments must be [Hom:hou.Vector3].
+
+    {{{
+    #!python
+    hou.hmath.intersectPlane(
+        hou.Vector3(0, 0, 0), hou.Vector3(0, 1, 0),
+        hou.Vector3(0.212, 1.56, 0), hou.Vector3(0, 0.62, -0.34)
+    )  # -> hou.Vector3(0.212, -1.19209e-07, 0.855484)
+    }}}
+
+    (Note that line runs forward and backward along the `line_dir` from the origin. That is, even if `line_dir` points away from the plane, you will get the intersection "behind" the origin.)
+
+    {{{
+    #!python
+    hou.hmath.intersectPlane(
+        hou.Vector3(0, 0, 0), hou.Vector3(0, 1, 0),  # Ground plane
+        hou.Vector3(0, 1, 0), hou.Vector3(0, 1, 0)  # Line up from 1u above ground
+    )  # -> hou.Vector3(0, 0, 0)
+    }}}
+
+    This function raises an exception if the line is parallel to the plane, or if the `line_dir` has no length, or even if the line is not mathematically parallel but "parallel enough" that the answer would be outside roughly a `-100000, -100000` to `100000, 100000` square.

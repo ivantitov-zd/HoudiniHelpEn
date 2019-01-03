@@ -1,0 +1,480 @@
+= Python API =
+HQueue has a Python API that allows you to programmatically submit and query jobs on the farm.  You must connect to the HQueue server in order to make calls into the API.  Here is an example of how to connect to the server using Python's `xmlrpclib` module:
+
+{{{
+#!python
+import xmlrpclib
+
+# Connect to the HQueue server.
+hq_server = xmlrpclib.ServerProxy("http://hq_server_hostname:5000")
+}}}
+
+The above code creates a proxy reference to the HQueue server and stores it into the `hq_server` variable.  You can then make calls to the methods listed below using the proxy.
+
+
+@functions
+
+::`addClientToGroup(group_id, client_id)` -> `None`:
+    Adds the client associated with the <<client_id>> to the group associated with the <<group_id>>.
+
+::`addNote(note_text, thread_id, job_id, client_id)` -> `bool`:
+        Adds a note to an existing message thread or to a new thread.  
+        
+        If <<client_id>> is not `None`, then the note is added to the message thread associated to the specified client.  
+        
+        If <<job_id>> is not `None`, then the note is added to the message thread associated to the specified job.  
+        
+        If <<thread_id>> is not `None`, then the note is added to the specified message thread.  If no such message thread could be found for the specified id arguments or if all id arguments are `None`, then a new thread is created.
+
+        If <<note_text>> is empty or whitespace only, the note is not added.
+
+        Always returns `True` (even if the note was not added).
+
+::`cancelJobs(job_ids)` -> `None`:
+    Cancels all the jobs linked to each job in the list of job_ids. 
+
+::`createClientGroup(name)` -> `int`:
+    Creates a new client group with name specified by <<name>>. Returns the id of the new group.
+
+::`deleteClientGroup(group_id)` -> `None`:
+    Deleted the client group associated with the <<group_id>>.
+
+::`deleteJobs(job_ids)` -> `None`:
+    Deletes all the jobs linked to each job in the list of job_ids.
+
+::`ejectJobs(job_ids)` -> `None`:
+    Ejects all the jobs linked to each job in the list of job_ids.
+
+::`getAllJobStatusNames()` -> `list` of `str`:
+    Return a list of all the possible job statuses.
+
+::`getClient(client_id, attribs=None)` -> `dict`:
+    Convenience function for getClients(). Return a dictionary of attributes for the specified client.
+
+::`getClientByHostname(hostname, attribs=None)` -> `dict`:
+    *Deprecated.*
+    :box:
+        #display: bordered green
+        Use getClientByName() instead.
+
+    Convenience function for getClients(). Return a dictionary of attributes for the client with the given <<hostname>>.
+
+::`getClientByName(clientname, attribs=None)` -> `dict`:
+    Convenience function for getClients(). Return a dictionary of attributes for the specified client.
+
+    <<clientname>> can be in the `hostname` format to specify a client by hostname
+    or the `hostname:name` format to refer to a client with the specified `hostname` and `name`.
+    By default, clients have an empty (`""`) name.
+
+::`getClientErrors(client_id)` -> `dict`:
+    Return the errors reported by the a client specified in <<client_ids>>. 
+    
+    The returned dictionary contains two keys: `total` and `errors`. `total` is the number of client errors, and `errors` is the list of errors (each error is a `dict`).
+    
+    Return an empty dict if no error is reported.
+
+::`getClientGroupByName(name, attribs=None)` -> `dict`:
+    Convenience function for getClientGroups(). Return a dictionary of attributes for the specified client group.
+
+::`getClientGroup(group_id, attribs=None)` -> `dict`:
+    Convenience function for getClientGroups(). Return a dictionary of attributes for the specified client group.
+
+::`getClientGroups(group_ids=None, attribs=None)` -> `list` of `dict`:
+    Return a list of dictionaries where each dictionary contains the attributes for a client group specified in <<group_ids>>. 
+    
+    <<group_ids>> must be a list of group id numbers.  If it is not specified or is set to `None`, then attributes for all registered client groups are returned.
+    
+    You can optionally set the <<attribs>> argument to a list of client group attributes that will be returned.  This can help reduce the execution time of the function and also reduce the amount of data returned.
+    
+    Here is a list of client group attributes:
+    * `clients`   - list of ids for clients that are members of the group.
+    * `id` - group id
+    * `name` - group name
+
+::`getClients(client_ids=None, attribs=None)` -> `list` of `dict`:
+    Return a list of dictionaries where each dictionary contains the attributes for a client specified in <<client_ids>>.  
+    
+    <<client_ids>> must be a list of client id numbers. If it is not specified or is set to None, then attributes for all registered clients are returned.
+    
+    You can optionally set the <<attribs>> argument to a list of client attributes that will be returned.  This can help reduce the execution time of the function and also reduce the amount of data returned.
+    
+    Here is a list of client attributes:
+    * `availabilityRules` - list of rules outlining the client&#39;s availability on the farm
+    * `available` - whether the client is available to process jobs at the current time or not
+    * `cpus` - number of cpus
+    * `cpuSpeed` - processor speed
+    * `description` - the client's description if set. An empty string is returned if no description is set for the client.
+    * `disabled` - whether the client has been disabled on the farm or not
+    * `groups` - list of group ids that the client is a member of
+    * `hostname` - client machine name
+    * `id` - client id
+    * `idleTime` - number of minutes that the client has been idle (no activity from the logged-in user).  Only applies to workstations.  Is set to-1 if the idle time is unknown.
+    * `ip` - client&#39;s IP address
+    * `label` - client's display label. If the client has no `name` set, the label is the client's `hostname`. Otherwise the label is `hostname:name` where `hostname` and `name` are the client's hostname and name respectively.
+    * `lastHeartbeat` - time when the client last contacted the server.  The time is in UTC.
+    * `latestNote` - the text of the latest note from the thread corresponding to the client. An empty string is returned if there is no corresponding thread.
+    * `load` - client load
+    * `memory` - amount of physical memory in kilobytes
+    * `name` - the name of the client if a name has been specified in the client's `hqnode.ini` file. By default this is empty (i.e. `""`).
+    * `needsUpgrade`    - whether the client&#39;s code is out-of-date and requires an update
+    * `platform` - client&#39;s operating system and architecture
+    * `runningJobs` - ids for the jobs currently running on the client
+    * `threadId` - the id of the note thread corresponding to the client. `null` is returned if there is no corresponding thread.
+    * `version` - hash string representing the version of the HQueue code installed on the client
+
+::`getClientsByHostname(hostnames, attribs=None)` -> `list` of `dict`:
+    *Deprecated.*
+    :box:
+        #display: bordered green
+        Use getClientsByName() instead.
+
+    Convenience function for getClients(). Return a list of dictionaries where each dictionary contains the attributes for a client specified in <<hostnames>>.
+
+    <<hostnames>> must be a list of client hostnames.
+
+::`getClientsByName(clientnames, attribs=None)` -> `list` of `dict`:
+    Convenience function for getClients(). Return a list of dictionaries where each dictionary contains the attributes for a client specified by a clientname in <<clientnames>>.
+
+    <<clientnames>> must be a list of clientnames. You can list clientnames in the `hostname` format to specify a client by hostname,
+    or in the `hostname:name` format to refer to a client with the specified `hostname` and `name`.
+
+::`getConfig(key)` -> `str` or `None`:
+    Return the configuration value for the given key or `None` if the key does not exist in the configuration file.
+
+::`getFailedJobStatusNames()` -> `list` of `str`:
+    Return a list of statuses that denote a failed job.
+
+::`getFinishedJobStatusNames()` -> `list` of `str`:
+    Return a list statuses that denote a finished job.
+
+::`getFinishedRootJobIds()` -> `list` of `int`:
+    Return a list of job ids for all finished root jobs.  Root jobs are jobs that have no parent.
+
+::`getHQRoot(platform ,is_client=True)` -> `str` or `None`:
+    Return the value of the `$HQROOT` environment variable as it appears on a machine of the given platform.  <<platform>> must be either "linux", "windows" or "macosx".  
+    
+    Return `None` if <<platform>> is not one of those values. Return the UNC path if <<platform>> is "windows" and <<is_client>> is True.
+
+::`getJob(job_id, attribs=None)` -> `dict`:
+    Convenience function for getJobs().  Return a dictionary of attributes for the specified job.
+
+::`getJobHistory(client_id, limit=5)` -> `list` of `int`:
+    Return a list of ids for jobs that recently ran on the specified client.  The ids are ordered by job end times with the first item in the list representing the id for the job that last finished on the client.  You can optionally specify the <<limit>> argument to cap the maximum number of ids that are returned.
+
+::`getJobIdsAssignedToClient(client_id)` -> `list` of `int`:
+    Return a list of ids for jobs that are assigned to the specified client.  Return an empty list if the client does not exist.
+
+::`getJobIdsBySatus(statuses)` -> `list` of `int`:
+    Return a list of ids for jobs with a status found in the given list of statuses.
+
+    Valid status names are:
+    * `abandoned`
+    * `cancelled`
+    * `failed`
+    * `paused`
+    * `pausing`
+    * `queued`
+    * `resuming`
+    * `running`
+    * `runnable`
+    * `succeeded`
+    * `waiting`
+
+::`getJobOutput(job_id, max_last_chars=None)` -> `str`:
+    Return the output log for the given job.  Return at most the last <<max_last_chars>> characters of the log.  If <<max_last_chars>> is less than one or is not specified, then return the entire output log.
+
+::`getJobs(job_ids, attribs=None)` -> `list` of `dict`:
+    Return a list of dictionaries where each dictionary contains the attributes for a job specified in <<job_ids>>. 
+    
+    <<job_ids>> must be a list of job id numbers.
+    
+    You can optionally set the <<attribs>> argument to a list of job attributes that will be returned.  This can help reduce the execution time of the function and also reduce the amount of data returned.
+    
+    Here is a list of job attributes:
+    * `children` - list of child job ids
+    * `clients` - list of clients that are executing or have executed the job
+    * `clientsOnHold` - list of clients that are on hold (or reserved) for the job.  Clients can be held for  a job if the job requires multiple clients to execute but only some clients are available at the moment.  Once the job has enough clients on-hold, then those clients are assigned to the job.
+    * `conditions` - list of scheduling conditions imposed on the job
+    * `endTime` - time when the job ended.  The time is in UTC.  Is set to `None` if the job has not finished.
+    * `ETA` - estimated number of seconds before the job is finished.  Is set to -1 if the ETA cannot be determined.  Note that calculation of this attribute requires HQueue to query the job and all of its descendents which can significantly slow down the performance of `getJobs`.
+    * `id` - job id
+    * `latestNote` - the text of the latest note for the thread associated with the job. An empty string is returned if there is no such thread.
+    * `logs` - list of entries for the job&#39;s status change log
+    * `name` - job name
+    * `overallProgress` - overall progress percentage (between 0.0 and 1.0) of the job and its descendents.  Note that calculation of this attribute requires HQueue to query the job and all of its descendents which can significantly slow down the performance of `getJobs`.
+    * `parents` - list of parent job ids
+    * `priority` - job priority
+    * `progress` - progress percentage (between 0.0 and 1.0) of the job command.  If the job has no command to execute, then the progress will always be set to 0.0.
+    * `queueTime` - time when the job was submitted, or queued, in HQueue.  The time is in UTC.
+    * `resources` - dictionary of the resources a job requires. Each key is a resource name and value is the amount of the respective resource the job requires. `None` is returned if the job does not require any resources. See [Resources|resourcedetails] for more information on job resources.
+    * `showBlockedClientsWarning` - a boolean flag indicating whether a warning icon will be displayed in the status column of the Running Jobs table on the Jobs page for the job. Clicking on the icon will show a dialog with information about the job's blocked clients.
+    * `startTime` - time when the job or one of its descedents started.  The time is in UTC.
+    * `status` - internal job status.  HQueue queries only the job itself (and not its descendents) so requesting this attribute is extremely fast.  If you are interested only in whether a job is finished or not, then request for this attribute instead of _uiStatus_.  Possible values of this attribute are _abandoned_, _cancelled_, _failed_, _paused_, _pausing_, _resuming_, _running_, _succeeded_, _runnable_ and _queued_.  _runnable_ is the equivalent of the _waiting for machine_ UI status.  _queued_ indicates that the job is waiting for descedent jobs to finish before it can run.
+    * `tags` - list of tags, or custom properties, attached to the job.  Of note, the _single_ tag indicates that the job can only run on a machine that has no other jobs running on it.
+    * `threadId` - the id of the thread associated with the job. `None` is returned if there is no such thread.
+    * `triesLeft` - the number of times the job will attempt to run after a failure. For example, if a job has a `triesLeft` of 2 and it fails after running, it will automatically be rescheduled and queued, and its `triesLeft` will be decremented and set to 1.
+    * `uiStatus` - job status which appears in the HQueue web interface.  A list of the possible UI job statuses is listed at [Job Statuses|jobdetails#statuses].  Note that this attribute requires HQueue to query the job and all of its descendents which can significantly slow down the performance of `getJobs`.
+    * `waitingFor` - the reason why the job is waiting if available. An empty string is returned if the job is not waiting or if the reason is not available.
+
+::`getLatestNotes(thread_ids=None,attribs=None)` -> `list` of `dict`:
+    Return a list of dictionaries where each dictionary contains the attributes for the latest note of a thread specified in <<thread_ids>>. 
+    
+    <<thread_ids>> must be a list of thread id numbers or `None`. If it is `None` then the latest notes for all of the jobs are returned.
+    
+    You can optionally set the <<attribs>> argument to a list of note attributes that will be returned.  This can help reduce the execution time of the function and also reduce the amount of data returned.
+    
+    Here is a list of note attributes:
+    * `clientHostname` - The hostname of the client associated with the thread.
+    * `clientId` - The id of the client associated with the thread.
+    * `clientLabel` - The display label of the client associated with the thread. If no name is set for the client, this is the same as `clientHostname`, otherwise this is `hostname:name` where `hostname` is the client's hostname, and `name` is the client's name.
+    * `date` - The date and time that the note was last added.
+    * `jobId` - The id of the job associated with the thread.
+    * `text` - The contents of the note.
+
+::`getNoteThreadIds()` -> `list` of `int`:
+    Return a list of ids for all threads.
+
+::`getNoteThreads(thread_ids=None,thread_attribs=None,note_attribs=None)` -> `list` of `dict`:
+    Return a list of dictionaries where each dictionary contains the attributes for a thread specified in <<thread_ids>>.  
+    
+    If <<thread_ids>> is `None` then dictionaries for all threads are returned.
+    
+    The <<thread_attribs>> may be set to a list of thread attributes that will be retured. If the notes attribute is to be returned, then <<note_attribs>> may be set to a list of note attributes that will be returned. These arguements can help reduce the execution time of the function and the amount of data returned.
+    
+    Here is a list of thread attributes:
+    * `clientHostname` - The hostname of the client associated with the thread.
+    * `clientId` - The id of the client associated with the thread.
+    * `clientLabel` - The display label of the client associated with the thread. If no name is set for the client, this is the same as `clientHostname`, otherwise this is `hostname:name` where `hostname` is the client's hostname, and `name` is the client's name.
+    * `jobId` - The id of the job associated with the thread.
+    * `notes` - The notes that belong to the threads.
+    
+    Here is a list of note attribues:
+    * `clientHostname` - The hostname of the client associated with the thread.
+    * `clientId` - The id of the client associated with the thread.
+    * `clientLabel` - The display label of the client associated with the thread. If no name is set for the client, this is the same as `clientHostname`, otherwise this is `hostname:name` where `hostname` is the client's hostname, and `name` is the client's name.
+    * `date` - The date and time that the note was last added.
+    * `jobId` - The id of the job associated with the thread.
+    * `text` - The contents of the note.
+
+::`getNumWaitingJobs(wait_time=0, min_priority=-1, max_priority=-1)` -> `int`:
+    Return the number of jobs that have been waiting for at least <<wait_time>> minutes.
+    
+    A waiting job is a job that is waiting for a resource; for example, an available client machine.
+    
+    If <<wait_time>> is 0 or negative, return the total number of waiting jobs.
+
+    If <<min_priority>> is greater than or equal to 0, then only jobs
+    with priorities greater than or equal to <<min_priority>> are included
+    in the returned number.  If it is less than 0 then there is no
+    minimum priority restriction.
+
+    If <<max_priority>> is greater than or equal to 0, then only jobs
+    with priorities less than or equal to <<max_priority>> are included
+    in the returned number.  If it is less than 0 then there is no
+    maximum priority restriction.
+
+::`getPausedJobStatusNames()` -> `list` of `str`:
+    Return a list containing the statuses that denote a paused job.
+
+::`getPermittedClientsList(job_id)` -> `list` of `str`:
+    Return a list of the clients permitted to run the specified job. The clients are specified by hostname if there is no name set for the client, otherwise they are in the `hostname:name` format where `hostname` is the client's hostname, and `name` is the client's name.
+
+::`getPriorityChangedEventNames()` -> `list` of `str`:
+    Return a list contining the names of the priority change events.
+
+::`getRescheduledEventNames()` -> `list` of `str`:
+    Return a list containing the names of the reschedule events.
+
+::`getResources(resource_ids=None)` -> `list` of `dict`:
+    Returns a list of dictionaries where each dictionary represents a resource. If no argument is passed in, it returns a list of all resources.
+
+::`getResumedEventNames()` -> `list` of `str`:
+    Return a list containing the names of the resume events.
+
+::`getRunningJobStatusNames()` -> `list` of `str`:
+    Return a list containing the statuses that denote a running job.
+
+::`getServerTime()` -> `xmlrpclib.DateTime`:
+    Return the current time reported by the HQueue server.  The time is in UTC.
+
+::`getServerErrors()` -> `dict`:
+    Return the errors reported by the HQueue server. 
+    
+    The returned dictionary contains two keys: `total` and `errors`. `total` is the number of server errors, and `errors` is the list of errors (each error is a `dict`).
+    
+    Return an empty dict if no error is reported.
+
+::`getStartedJobEventNames()` -> `list` of `str`:
+    Return a list containing the names of what is considered a start job event.
+
+::`getSucceededStatusNames()` -> `list` of `str`:
+    Return a list containing the names of what is considered a succeeded job status.
+
+::`getUnfinishedJobStatusNames()` -> `list` of `str`:
+    Return a list containing the statuses that denote an unfinished job.
+
+::`getUnfinishedRootJobIds()` -> `list` of `int`:
+    Return a list of job ids for all unfinished root jobs.  Root jobs are ones that have no parent.
+
+::`getVersion()` -> `str`:
+    Return the HQueue server version.
+
+::`getWaitingJobStatusNames()` -> `list` of `str`:
+    Return a list containing the statuses that denote a waiting job.
+
+::`newjob(jobspec,parent_id=None,child_ids=[])` -> `list` of `int`:
+    Submit a job to the server.  <<jobspec>> can be either a JSON string, a dictionary or a list of dictionaries representing the job specification(s).  See [The Job Specification|jobdetails#spec] for details on job specifications. 
+    
+    The optional argument <<parent_id>> is an id for the job that the new job should be parented to. 
+    
+    The optional argument <<child_ids>> is a list of ids for existing jobs that should be parented to the new job.  
+    
+    Returns a list of ids for the new jobs.
+
+::`pauseJobs(job_ids)` -> `None`:
+    Pauses all the jobs linked to each job in the list of job_ids.
+
+::`ping()` -> `bool`:
+    Test whether the HQueue server is active. Always returns True.
+
+::`removeClientFromGroup(group_id, client_id)` -> `None`:
+    Removes the client associated with <<client_id>> from the group associated with the <<group_id>>.
+
+::`removeNotes(note_ids)` -> `list` of `int`:
+    Removes the notes with the specified ids from the server. When deleting many notes, put the id of the first note in the thread at the end of <<note_ids>>.
+
+    Return a list of ids for notes that could not be deleted.
+
+::`removeSingleNote(note_id)` -> `bool`:
+    Removes the note with the specified id from the server.
+
+    Return `True` if successful. Return `False` otherwise. 
+
+::`removeSingleThread(thread_id)` -> `bool`:
+    Removes the thread with the specified id and all of the notes belonging to that thread.
+
+    Return `True` if successful. Return `False` otherwise.
+
+::`removeThreads(thread_ids)` -> `list` of `int`:
+    Removes the threads with the specified ids and all of the notes belonging to those threads.  
+    
+    Return a list of ids for threads that could not be deleted.
+
+::`rescheduleJobs(job_ids)` -> `None`:
+    Reschedules all the jobs linked to each job in the list of job_ids.
+
+::`resumeJobs(job_ids)` -> `None`:
+    Resumes all the jobs linked to each job in the list of job_ids.
+
+::`runcmd(cmd)` -> `int`:
+    Executes the given command on the HQueue farm.  This is accomplished by creating a new anonymous job with its `command` property set to <<cmd>>.  The job is assigned to a client machine and processed.
+    
+    Return the id of the anonymous job.
+
+::`savePermittedClientsList(job_id, clients_list)` -> `None`:
+    Save the new list of permitted clients to the job with the provided job id and create the appropriate conditions such that only the specified clients are permitted to run this job. Any previously existing conditions will be replaced.
+
+    Clients in the <<clients_list>> can be specified in one of the following formats:
+    * 'hostname' -> allow any client with the hostname 'hostname' to run this job.
+    * 'hostname:name' -> only allow the client with the hostname 'hostname' and name 'name' to run this job.
+    * 'hostname:' -> only allow the client with the hostname 'hostname' and an empty ("") name to run this job.
+
+::`setdisabled(clientname, disabled)` -> `bool`:
+    Disables or enables the given client machine depending on the value of <<disabled>>.  <<disabled>> must be either `True` or `False`.  
+    
+    <<clientname>> can be in the `hostname` format to specify a client by hostname
+    or the `hostname:name` format to refer to a client with the specified `hostname` and `name`.
+    By default, clients have an empty (`""`) name.
+    
+    Return `True` if the method succeeds.  Return `None` otherwise.
+
+::`setShowBlockedClientsWarning(job_id, state)` -> `None`:
+    Sets the value of the specified job's `showBlockedClientsWarning` attribute. Set <<state>> to `True` to have a warning icon be displayed in the status column of the Running Jobs table on the Jobs page corresponding to the specified job. Otherwise, set <<state>> to `False` to hide the warning icon. Clicking on the icon will display a dialog with information about the job's blocked clients as well as the option to view the job's permitted clients list.
+
+::`threadExists(thread_id)` -> `bool` or `None`:
+    Return a boolean representing whether a thread with the given id exists or not. 
+    
+    Return `None` if an error occurs when executing this method.
+
+::`upgradeClients(client_ids)` -> `None`:
+    Upgrades the clients associated with the list of <<client_ids>>.
+
+
+=== Scripting Examples ===
+
+This example demonstrates how to connect to the HQueue server and test if the connection is valid:
+{{{
+#!python
+import xmlrpclib
+hq_server = xmlrpclib.ServerProxy("http://localhost:5000")
+try:
+    hq_server.ping()
+except:
+    print "HQueue server is down."
+}}}
+
+This example demonstrates how to submit a new HQueue job and output its progress:
+{{{
+#!python
+import time
+import xmlrpclib
+
+# Connect to the HQueue server.
+hq_server = xmlrpclib.ServerProxy("http://hq_server_hostname:5000")
+
+# Define a job which renders an image from an IFD using Mantra.
+job_spec = {
+    "name" : "Render My Image",
+    "shell" : "bash",
+    "command": "cd $HQROOT/houdini_distros/hfs;"
+               + " source houdini_setup;"
+               + " mantra < $HQROOT/path/to/ifds/some_frame.ifd"
+}
+
+# Submit the job to the server.
+# newjob() returns a list of job ids (in case multiple jobs are passed in at once).
+job_ids = hq_server.newjob(job_spec)
+
+# Periodically check the job progress and status.
+while True:
+    # Get the job status.
+    job_details = hq_server.getJob(job_ids[0], ["progress", "status"])
+    status = job_details["status"]
+    
+    # Check if the job is finished.
+    if status in ("succeeded", "failed", "cancelled", "abandoned"):
+        break
+
+    # Job is not finished.  Output its progress.
+    progress = job_details["progress"]
+    print "Progress: %.2f" % (progress * 100)
+
+# Output final status.
+print "Status: ", job_details["status"]
+}}}
+
+=== HQueue Client API ===
+HQueue clients have a Python API that allows you to programmatically force the client to send a heartbeat to the server and terminate the client.  You must connect to the HQueue client in order to make calls into the API. Here is an example of how to connect to the client using Python's `xmlrpclib` module:
+
+{{{
+#!python
+import xmlrpclib
+
+# Connect to the HQueue client.
+hq_client = xmlrpclib.ServerProxy("http://hq_client_hostname:5001")
+}}}
+
+The above code creates a proxy reference to the HQueue client and stores it into the `hq_client` variable.  You can then make calls to the methods listed below using the proxy.
+
+
+::`wakeup()` -> `None`:
+    Wake up the client if it is sleeping and force it to send a hearbeat to the server.
+
+::`terminate()` -> `None`:
+    Request the client to terminate. Terminating a client results in the following:
+    * Any paused jobs on the client are cancelled.
+    * New jobs are not assigned to the client.
+    * Any jobs currently running on the client continue executing until they are complete.
+    * The client is removed from the list of clients in the HQueue server.
+    * Once all jobs on the client have finished executing, the client daemon exits.
+

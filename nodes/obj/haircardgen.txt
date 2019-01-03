@@ -1,0 +1,194 @@
+#type:     node
+#context:  obj
+#internal: haircardgen
+#icon:     OBJ/haircardgen
+
+= Hair Card Generate =
+
+"""Converts dense hair curves to a polygon card, keeping the style and shape of the groom."""
+
+The polygon cards output by this operator require far less memory and less computational power to render and display than dense hair curves. This makes them suitable for realtime applications.
+
+The operator assigns groups of nearby curves to clusters and generates polygon cards for each cluster, with the width and orientation matching the original curves.
+
+@parameters
+
+== Groom Source ==
+
+Loads the groom to generate hair cards for.
+
+[Include:/nodes/sop/fur_common#groomdata]
+
+[Include:/nodes/sop/fur_common#sourcemode]
+
+[Include:/nodes/sop/fur_common#sourcegroomobject]
+
+[Include:/nodes/sop/fur_common#sourcegroomfile]
+
+== Geometry ==
+
+=== Clustering ===
+
+Use Custom Cluster Points:
+    #id: usecustomclusterpoints
+
+    Use points from the third input as cluster centers.
+
+Number Hair Cards:
+    #id: numcards
+
+    The number of hair cards to generate.
+
+Seed:
+    #id: clusterseed
+
+    The seed value used to randomly distribute cluster centers.
+
+Curve Cluster Location:
+    #id: clustercurveu
+
+    The position along the curve that is used to compute cluster centers.
+
+    0.5 means the the position half-way along the curve is used to compute clusters.
+
+    TIP:
+    	Use higher values for hair style where only the tips of hairs are visible. This distributes clusters based on tip locations, better matching the visible part of the hair.
+
+=== Orientation ===
+
+Smooth Orientation:
+    #id: orientsmooth
+
+    Averages the orientation across neighboring hair cards. Without this, the orientation can be somewhat erratic and vary wildly, which can create an undesirable look.
+
+Iterations:
+    #id: orientsmoothiters
+
+    The number of times to apply orientation smoothing.
+
+=== Width ===
+
+Width Method:
+    #id: widthmethod
+
+    The method of determining card width.
+
+    Specify Width:
+
+	    Manually specify a uniform width value.
+
+    Compute using Cluster Distribution:
+
+	    Compute card width based on the density of neighboring clusters. Sparser areas receive wider cards, such that the skin is always fully covered in cards.
+
+Width:
+    #id: width
+
+    Manually specified width when __Width Method__ is set to __Specify Width__.
+
+Width Scale:
+    #id: widthscale
+
+    Scale applied on top of the computed width when __Width Method__ is set to __Compute using Cluster Distribution__.
+
+Width Max:
+    #id: widthmax
+
+    Card width is clamped to this maximum when __Width Method__ is set to __Compute using Cluster Distribution__. This prevents very sparse areas from generating extremely wide cards.
+
+Divisions:
+    #id: widthdivs
+
+    The number of polygons along the width of each card.
+
+Bend Range:
+    #id: bendrange
+
+    The amount by which the center of hair cards is bent outwards. This is a range of values, from which a value is picked at random for each card.
+
+Width Ramp:
+    #id: widthramp
+
+    Controls how cards taper towards the tip.
+
+=== Length ===
+
+Extra Length:
+    #id: extralength
+
+    Extend the length of cards by this amount.
+
+Division Method:
+    #id: lengthdivmethod
+
+    The method used to determine the number of polygons along the length of each card.
+
+    Uniform Segment Count:
+	    Manually set a segment count that is used for all cards.
+
+    Segment Length:
+	    Use the number of segments necessary to match the given segment length as closely as possible.
+
+    Refine:
+	    Use the refine SOP to create the number of polygons required to accurately represent the curvature of each card.
+
+
+Uniform Divisions:
+    #id: lengthuniformdivs
+
+    The number of divisions to use when __Division Method__ is set to __Uniform Segment Count__.
+
+Segment Length:
+    #id: lengthseg
+
+    The segment length to aim for when __Division Method__ is set to __Segment Length__.
+
+Refinement:
+    #id: lengthrefinedivs
+
+    The refinement threshold to use when __Division Method__ is set to __Refine__.
+
+== UV Generation ==
+
+Generate UVs:
+    #id: uvenable
+
+    Generate UV Coordinates for cards.
+
+UV Method:
+    #id: uvmethod
+
+    Regular Layout:
+	    Lays out each card individually with scaling matching the world space scaling. Allows each hair card to be textured individually.
+
+    UV Reference Texture:
+	    Supply a texture with white rectangles representing hair texture strips.
+
+	    The UVs of each card will be assigned to the rectangular area that most closely matches the card's shape.
+
+Reference Texture:
+    #id: uvreffile
+
+    The reference texture image to use with the __UV Reference Texture__ method.
+
+Trace Channel:
+    #id: uvrefchannel
+
+    The image channel in which the rectangular shapes are stored.
+
+Packing Method:
+    #id: uvregpackingmethod
+
+    Single Tile:
+	    Fit all cards into a single tile.
+
+    Fixed Scale:
+	    Scale UV tiles by this fixed scale relative to world-space and distribute across however many tiles are required to fit all cards.
+
+Padding:
+    #id: uvregpadding
+
+    Number of pixels to pad UV islands with. Creates extra space around tiles.
+
+@related
+- [Hair Card Texture|Node:out/haircardtex]

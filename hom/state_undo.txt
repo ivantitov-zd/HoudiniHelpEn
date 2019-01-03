@@ -1,0 +1,102 @@
+= Python states |> supporting undo =
+
+#flow: /hom/index#state
+
+"""How to make actions within your custom state undo-able."""
+
+
+== Overview ==
+
+Houdini automatically generates items on the undo stack for many scripted changes, such as editing the value of a parameter. However, these automatic undo items are quite fine grained.
+
+You can specify what goes onto the undo stack in your state using the [Hom:hou.undos] module and methods on the `SceneViewer`. 
+
+
+== Preventing scripted actions from appearing on the undo stack ==
+
+Sometimes you might want to prevent scripted actions from being added to the undo stack. For example, your asset might have hidden parameters that only exist to support your custom state interaction. You don't want changes to these hidden parameters to clog the undo stack.
+
+Wrap the actions you don't want on the undo stack in a `hou.undos.disabler()` manager:
+
+{{{
+#!python
+
+with hou.undos.disabler():
+    node.parm("guide_tx").set(position.x())
+    node.parm("")
+}}}
+
+
+== Wrapping a series of user interactions in an undo block ==
+
+In a custom state, you will often perform scripted actions across many function calls that you want to wrap up into a single undo-able action.
+
+For example, in a custom Python state for an asset you might continuously change a parameter on the node as the user drags the mouse in the viewer. You would want each drag to be a single undo-able action, but by default every single parameter value change within a drag will be an undoable item, making it tedious and annoying to undo an entire drag.
+
+When the user starts performing an action which you want to be undo-able, call [Hom:hou.SceneViewer#beginStateUndo]. The `beginStateUndo()` method takes a string argument which is the label you want to appear to the user for the undo-able action.
+
+When the action is finished, call [Hom:hou.SceneViewer#endStateUndo]. All scripting between the two calls is bundled into a single undo-able action on the undo stack.
+
+{{{
+#!python
+
+class DrawPoints(object):    
+    # ...
+            
+    def _start(self):
+        if not self._pressed:
+            self.scene_viewer.beginStateUndo("Add point")
+            self._index = self._insert_point()
+        self._pressed = True
+        
+    def _finish(self):
+        if self._pressed:
+            self.scene_viewer.endStateUndo()
+        self._pressed = False
+    
+    def onMouseEvent(self, kwargs):
+        node = self._node = kwargs["node"]
+        ui_event = kwargs["ui_event"]
+        device = ui_event.device()
+        origin, direction = ui_event.ray()
+        
+        # Find intersection with geometry or ground
+        intersected = -1
+        inputs = node.inputs()
+        # Only try intersecting geometry if this node has input
+        if inputs and inputs[0]:
+            geometry = inputs[0].geometry()
+            intersected, position, _, _ = stateutils.sopGeometryIntersection(geometry, origin, direction)
+        if intersected < 0:
+            position = stateutils.cplaneIntersection(self.scene_viewer, origin, direction)
+        
+        # Create/move point if LMB is down
+        if device.isLeftButton():
+            self._start()
+            self._set(self._index, position)
+        else:
+            self._finish()
+
+    def onInterrupt(self, kwargs):
+        self._finish()
+
+    # ...
+}}}
+
+
+== Wrapping serial statements in an undo block ==
+
+Within a single function, you will often perform a series of scripted actions that you want to appear to the user as one undo-able action. For example, in a tool script the creation of a new SOP node might involve several steps, including creating a container object, wiring the node into an existing network, moving the node in the network editor layout, and so on.
+
+Wrap the actions you want to group together as one undo-able action in a `hou.undos.group()` manager. The `group()` function takes a string argument which is the label you want to appear to the user for the undo-able action:
+
+{{{
+#!python
+with hou.undos.group("Creation of My Asset"):
+    # Create a new container object for the asset
+    container = hou.node("/obj").createNode("geo")
+    container.createNode("myasset")
+    container.moveToGoodPosition()
+}}}
+
+

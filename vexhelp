@@ -914,6 +914,11 @@ RAY OPTIONS
         scope argument, scope:self, will match the currently shading
         object.
 
+    currentobject
+        Used to specify what the current shading object is. For example,
+        when used with the scope argument, scope:self will match the
+        object passed in by this argument.
+
     maxdist
         The maximum distance to search for objects. This can be used to
         limit the search of objects to nearby objects only. If the
@@ -1284,6 +1289,8 @@ RELATED
   * addvertex
 
   * addprim
+
+  * removepoint
 
 }
 
@@ -2833,6 +2840,126 @@ RELATED
 }
 
 {
+agentsolvefbik
+
+Applies a full-body inverse kinematics algorithm to an agent's skeleton.
+
+USAGES
+  int agentsolvefbik(<geometry>, int outgeo, int prim, int targets[],
+  matrix targetxforms[], int xformgroup, int iters)
+  int agentsolvefbik(<geometry>, int outgeo, int prim, int targets[],
+  matrix targetxforms[], int xformgroup, int iters, float tolerance, int
+  pinroot)
+  int agentsolvefbik(<geometry>, int outgeo, int prim, int targets[],
+  matrix targetxforms[], int xformgroup, int iters, float tolerance, int
+  pinroot, float targetweights[], int targetpriorities[], int
+  targetdepths[])
+  int agentsolvefbik(<geometry>, int outgeo, int prim, int targets[],
+  matrix targetxforms[], int xformgroup, int iters, float tolerance, int
+  pinroot, float targetweights[], int targetpriorities[], int
+  targetdepths[], string goalxformattrib, string constrainedxformattrib,
+  string jointlimitsattrib)
+
+Returns -1 if prim is out of range or is not an agent primitive, or
+targets and targetxforms are not the same length.
+
+If "agent_jointgoalxforms", "agent_jointconstrainedxforms", and
+"agent_jointlimits" attributes are present on the agent, as produced by
+the Agent Configure Joints SOP, then they will be interpreted as joint
+limits to use while solving.
+
+
+geometry
+    The name of the geometry file to reference. Inside Houdini, this may
+    be op:full_path_to_sop to reference a SOP.
+
+outgeo
+    Handle to the geometry to write to. geoself() can be used to get a
+    handle to the current geometry.
+
+prim
+    The primitive number of the agent primitive.
+
+targets
+    A list of the transform indexes of the end effectors in the agent.
+
+targetxforms
+    A list of the target transforms for the end effectors, in the same
+    order as targets.
+
+xformgroup
+    The index of a transform group, which specifies the joints to be
+    used for the IK solver (all transforms not in the transform group
+    will be ignored). agentfindtransformgroup can be used to look up a
+    transform group by name, and a value of -1 indicates that all the
+    transforms in the agent should be included. It's recommended to use
+    a transform group that includes only transforms that correspond to
+    the agent's bone structure.
+
+iters
+    The maximum number of iterations to perform. The solver may
+    terminate early if the tolerance parameter is used.
+
+tolerance
+    The tolerance to use when checking for convergence, defaults to
+    1e-5. If positions converge to within this tolerance, the algorithm
+    will stop. If 0, the solver will always perform exactly iters
+    iterations.
+
+pinroot
+    Whether to pin the root to its start position, instead of allowing
+    it to translate. This can be useful when, for example, solving a
+    subset of an agent's skeleton. Defaults to 0 (off).
+
+targetweights
+    A list containing the weight of each end effector, in the same order
+    as targets. For joints with multiple children, the normalized
+    weights will be used to determine their position - this means that a
+    target with a higher weight than other targets will be more likely
+    to be reached. The default weight is 1.0.
+
+targetpriorities
+    A list containing the priority level of each end effector, in the
+    same order as targets. Targets from a lower priority level will not
+    influence targets with higher priority. For example, priority levels
+    can be used to ensure that the targets for the feet are always
+    satisfied, while still controlling the relative weights of the upper
+    body targets. The default priority is 0 (i.e. all targets are equal
+    priority).
+
+targetdepths
+    For each end effector, specifies how many joints above it in the
+    chain can be adjusted to achieve the target transform. A negative
+    depth can be used to specify that all joints above the target are
+    affected. The default depth is -1.
+
+goalxformattrib
+    An optional parameter specifying an alternative attribute to use
+    instead of "agent_jointgoalxforms".
+
+constraintedxformattrib
+    An optional parameter specifying an alternative attribute to use
+    instead of "agent_jointconstrainedxforms".
+
+jointlimitsattrib
+    An optional parameter specifying an alternative attribute to use
+    instead of "agent_jointlimits".
+
+RELATED
+
+  * solvefbik
+
+  * agentworldtransform
+
+  * agentworldtransforms
+
+  * agentrigfind
+
+  * agentrigparent
+
+}
+
+{
 agenttransformcount
 
 Returns the number of transforms in an agent primitive's rig.
@@ -3333,6 +3460,12 @@ USAGES
   vector anoise(vector pos)
   float anoise(vector pos, int turbulence, float rough, float atten)
   vector anoise(vector pos, int turbulence, float rough, float atten)
+  float anoise(vector pos, int periodX, int periodY, int periodZ)
+  vector anoise(vector pos, int periodX, int periodY, int periodZ)
+  float anoise(vector pos, int periodX, int periodY, int periodZ, int
+  turbulence, float rough, float atten)
+  vector anoise(vector pos, int periodX, int periodY, int periodZ, int
+  turbulence, float rough, float atten)
 
 These functions generate "alligator" noise, a type of cellular noise
 similar to Worley noise (wnoise). It is currently not possible to
@@ -3864,6 +3997,65 @@ RELATED
   * getattrib
 
   * attribtype
+
+}
+
+{
+attribdataid
+
+Returns the data id of a geometry attribute.
+
+USAGE
+  int [] attribdataid(<geometry>, string attribclass, string
+  attribute_name)
+  Returns the data id corresponding to an attribute. Data ids can be
+  used for advanced forms of caching. If the data id of an attribute is
+  the same as you've seen before, you can assume the attribute contains
+  the same data it did before. This allows acceleration structures to
+  only be built when necessary.
+
+  The length and contents of the array are not defined, and no
+  assumptions should be made about the layout. The result will vary from
+  run to run of Houdini, so only exact equality should be used.
+
+
+  In addition to the normal attribute classes, an additional attribute
+  class of "meta" is supported. This has the additional data ids of
+
+      topology
+          The overall wiring of vertices, points and primitives. This
+          will change if any points are rewired or vertices added.
+
+      primitivelist
+          This data id changes if the contents of the primitive change
+          at all.
+
+      detail
+          This data id tracks the entire geometry as a whole. If it is
+          unchanged, no changes occurred in the geometry.
+
+
+<geometry>
+    When running in the context of a node (such as a wrangle SOP), this
+    argument can be an integer representing the input number (starting
+    at 0) to read the geometry from.
+
+    Alternatively, the argument can be a string specifying a geometry
+    file (for example, a .bgeo) to read from. When running inside
+    Houdini, this can be an op:/path/to/sop reference.
+
+texttype
+    One of "detail" (or "global"), "point", "prim", or "vertex".
+
+    You can also use "primgroup", "pointgroup" or "vertexgroup" to read
+    from groups.
+
+texttype
+    The name of the attribute (or intrinsic) to read.
+
+    An integer array indicating the data id of the attribute.
+
+RELATED
 
 }
 
@@ -5159,6 +5351,24 @@ USAGES
   Read a sample from the channel with the given name. The version
   without opinput assumes the first input (0).
 
+  int chinput(int channel_index, int|float sample, vector &t, vector &r,
+  vector &s)
+  int chinput(int opinput, int channel_index, int|float sample, vector
+  &t, vector &r, vector &s)
+  Read samples from the 9 channels starting at the given index. The
+  samples are returned in the 3 vector output arguments. Returns 1 on
+  success or 0 on failure. The version without opinput assumes the first
+  input (0).
+
+  int chinput(string channel_name, int|float sample, vector &t, vector
+  &r, vector &s)
+  int chinput(int opinput, string channel_name, int|float sample, vector
+  &t, vector &r, vector &s)
+  Read samples from the 9 channels starting at the given channel name.
+  The samples are returned in the 3 vector output arguments. Returns 1
+  on success or 0 on failure. The version without opinput assumes the
+  first input (0).
+
 
 texttype
     The input number to read from, starting from 0. For example, the
@@ -5281,6 +5491,65 @@ texttype
 
     If you specify -1, the function uses the current CHOP node or input
     0 if it is connected.
+
+RELATED
+
+}
+
+{
+chop
+
+Returns the value of a CHOP channel at the specified sample.
+
+USAGE
+  float chop(string filename, int|string channel, int|float sample)
+  Read a sample from the channel at the given index.
+
+
+filename
+    The CHOP node path to query using the op: syntax. Doesn't support
+    reading directly from CHOP files yet.
+
+channel
+    The channel index or channel name to query.
+
+sample
+    If this is fractional, the value is linearly interpolated from the
+    two nearest points.
+
+    The value of a channel at the specified sample in a CHOP node.
+
+RELATED
+
+}
+
+{
+chopt
+
+Returns the value of a CHOP channel at the specified sample and
+evaluation time.
+
+USAGE
+  float chopt(string filename, int|string channel, int|float sample,
+  float time)
+  Read a sample from the channel at the given index.
+
+
+filename
+    The CHOP node path to query using the op: syntax. Doesn't support
+    reading directly from CHOP files yet.
+
+channel
+    The channel index or channel name to query.
+
+sample
+    If this is fractional, the value is linearly interpolated from the
+    two nearest points.
+
+time
+    Time in seconds when the CHOP node needs to be evaluated.
+
+    The value of a channel at the specified sample in a CHOP node.
 
 RELATED
 
@@ -5792,8 +6061,9 @@ chwritebuf
 
 Writes a value of CHOP context temporary buffer at the specified index.
 
-USAGE
+USAGES
   int chwritebuf(int index, float value)
+  int chwritebuf(int index, vector t, vector r, vector s)
 
 Writes a value of a CHOP context temporary buffer at the specified
 index. Return 1 if the write succeeded, 0 otherwise.
@@ -7432,6 +7702,34 @@ RELATED
 }
 
 {
+diagonalizesymmetric
+
+Diagonalizes Symmetric Matrices.
+
+USAGE
+  matrix3 diagonalizesymmetric(matrix3 symmat, vector &diag)
+
+Diagonalize a symmetric matrix.
+
+Returns the orthogonal matrix which, combined with the diagonal matrix
+implicit in the second argument, will form the original symmetric
+matrix.
+
+This can be useful for analyzing the result of summing a series of
+outerproduct updates.
+
+
+symmat
+    The symmetric matrix to diagonalize.
+
+diag
+    The diagonal elements of the diagonal matrix.
+
+RELATED
+
+}
+
+{
 diffuse
 
 Returns a diffuse BSDF or computes diffuse shading.
@@ -7698,7 +7996,7 @@ USAGES
 
 EXAMPLES
 
-  > fit(.3, 0, 1, 10, 20) == 13
+  > efit(.3, 0, 1, 10, 20) == 13
 
 RELATED
 
@@ -8390,6 +8688,28 @@ RELATED
 }
 
 {
+expandvertexgroup
+
+USAGE
+  int [] expandvertexgroup(<geometry>, string groupname)
+
+Returns a list of vertices in the specified group of a geometry file.
+
+This can use ad-hoc groups, like 0v3 1v2. It matches the SOP group
+naming convention, in particular that an empty string means all
+vertices.
+
+RELATED
+
+  * invertexgroup
+
+  * nverticesgroup
+
+  * hasattrib
+
+}
+
+{
 fastshadow
 
 Sends a ray from the position P along the direction specified by the
@@ -8436,6 +8756,11 @@ RAY OPTIONS
         Allows an override of the scope for ray-intersections. A special
         scope argument, scope:self, will match the currently shading
         object.
+
+    currentobject
+        Used to specify what the current shading object is. For example,
+        when used with the scope argument, scope:self will match the
+        object passed in by this argument.
 
     maxdist
         The maximum distance to search for objects. This can be used to
@@ -8701,6 +9026,11 @@ RAY OPTIONS
         Allows an override of the scope for ray-intersections. A special
         scope argument, scope:self, will match the currently shading
         object.
+
+    currentobject
+        Used to specify what the current shading object is. For example,
+        when used with the scope argument, scope:self will match the
+        object passed in by this argument.
 
     maxdist
         The maximum distance to search for objects. This can be used to
@@ -9084,7 +9414,7 @@ USAGES
   You can find each occurrence in a loop by setting start at each
   iteration to the next position after the previous match.
 
-  Returns a if the
+  Returns a negative number if the target is not found.
 
   int [] find(<type> array[]; <type> target)
   int [] find(<type> array[]; <type> target; int start)
@@ -9124,9 +9454,11 @@ findattribval
 
 Finds a primitive/point/vertex that has a certain attribute value.
 
-USAGE
+USAGES
   int findattribval( <geometry>, string attribclass, string
   attribute_name, int|string value, int which=0)
+  int[] findattribval( <geometry>, string attribclass, string
+  attribute_name, int|string value)
 
 
 <geometry>
@@ -9148,17 +9480,21 @@ value
     The value to look for in the attribute.
 
 which
-    If multiple elements have the given value in the attribute, the
+    If multiple elements have the given value in the attribute, this
     controls which match to return.
 
     If you're searching for multiple elements with the same attribute
     value, you can use findattribvalcount to get the total number of
     matches and then iterate through them by increasing the which
-    argument to this function in a loop. See the examples below.
+    argument to this function in a loop. See the examples below. The
+    array signature can also be used to return a list of all of the
+    matching elements.
 
     The number of the first point/primitive/vertex where the named
     attribute matches the given value. Returns -1 if no element has the
-    given attribute value.
+    given attribute value. The array signature returns the numbers of
+    all of the points/primitives/vertices where the named attribute
+    matches the given value.
 
 
 TIP
@@ -9175,6 +9511,11 @@ EXAMPLES
       > int prim_num = findattribval(0, "prim", "id", 10);
       > // Note: you can use idtoprim(0, 10) instead
     Find all points with @age == 10
+      > for (int point_num : findattribval(0, "point", "age", 10))
+      > {
+      >     // ...do something with the point...
+      > }
+    Find all points with @age == 10, using findattribvalcount.
       > int count = findattribvalcount(0, "point", "age", 10);
       > int point_num;
       > for (int i = 0; i < count; i++) {
@@ -10018,6 +10359,11 @@ RAY OPTIONS
         Allows an override of the scope for ray-intersections. A special
         scope argument, scope:self, will match the currently shading
         object.
+
+    currentobject
+        Used to specify what the current shading object is. For example,
+        when used with the scope argument, scope:self will match the
+        object passed in by this argument.
 
     maxdist
         The maximum distance to search for objects. This can be used to
@@ -11181,43 +11527,6 @@ Returns an array of light identifiers for the currently shaded surface.
 USAGES
   int[] getlights(...)
   int[] getlights(vector P, ...)
-
-  categories
-      Specifies lights to include/exclude by their "category" tags. This
-      is the preferred include/exclude lights rather than pattern
-      matching light names with the "lightmask" keyword argument.
-
-      For example:
-
-    > diff = diffuse(nml, "lightmask", "hero | fill");
-
-      See light categories for more information.
-
-  lightmask
-      When evaluating light and shadow shaders, objects have pre-defined
-      light masks. This mask is usually specified in the geometry object
-      and specifies a list of lights which are used to illuminate a
-      surface or fog shader. It is possible to override the default
-      light mask by specifying a "lightmask" argument.
-
-      For example:
-
-    > diff = diffuse(nml, "lightmask", "light*,^light2");
-
-      ...will cause all lights whose names begin with "light" except for
-      a light named "light2" to be considered for diffuse illumination.
-
-      All Houdini scoping patterns, excepting group expansion, are
-      supported:
-
-    * * - wild-card match
-
-    * ? - single character match
-
-    * ^ - exclusion operator
-
-    * [list] - character list match
-
   int[] getlights(material mat; vector P; ...)
   With this signature, the light mask is determined solely by the
   material (the lightmask and categories keyword parameters are
@@ -11372,6 +11681,35 @@ Returns the name of the current object whose shader is being run, or the
 empty string if there is no current object.
 
 RELATED
+
+}
+
+{
+getpackedtransform
+
+Gets the transform of a packed primitive.
+
+USAGE
+  matrix getpackedtransform(int input, int primnum)
+
+Gets the transform of a packed primitive. This is constructed from the P
+attribute of the primitive's point and its intrinsic transform.
+
+EXAMPLES
+
+  > // matrix to transform by
+  > matrix transform = ident();
+  > rotate(transform, radians(45), {0,1,0});
+  > translate(transform, {0,1,0});
+  > 
+  > matrix transform = getpackedtransform(0, @primnum);
+  > setpackedtransform(0, @primnum, transform * tf);
+
+RELATED
+
+  * setpackedtransform
+
+  * packedtransform
 
 }
 
@@ -13425,6 +13763,9 @@ Returns 1 if the edge specified by the point pair is in the group
 specified by the string. This function returns 0 if the group does not
 exist or if the edge is not contained in the group.
 
+This can use ad-hoc groups, like p29-30. It matches the SOP group naming
+convention, in particular that an empty string means all edges.
+
 RELATED
 
 }
@@ -13460,6 +13801,10 @@ USAGE
 
     1 if the group exists and the point is in the group, or 0 otherwise.
 
+This can use ad-hoc groups, like 0-3 or @Cd.x>0.5. It matches the SOP
+group naming convention, in particular that an empty string means all
+points.
+
 RELATED
 
 }
@@ -13485,6 +13830,10 @@ USAGE
 
     1 if the groups exists and the primitive is in the group, or 0
     otherwise.
+
+This can use ad-hoc groups, like 0-3 or @Cd.x>0.5. It matches the SOP
+group naming convention, in particular that an empty string means all
+primitives.
 
 RELATED
 
@@ -13870,6 +14219,9 @@ vertexnum
     1 if the group exists and the vertex is in the group, or 0
     otherwise.
 
+This can use ad-hoc groups, like 42p0-2. It matches the SOP group naming
+convention, in particular that an empty string means all vertices.
+
 RELATED
 
 }
@@ -13996,6 +14348,11 @@ RAY OPTIONS
         Allows an override of the scope for ray-intersections. A special
         scope argument, scope:self, will match the currently shading
         object.
+
+    currentobject
+        Used to specify what the current shading object is. For example,
+        when used with the scope argument, scope:self will match the
+        object passed in by this argument.
 
     maxdist
         The maximum distance to search for objects. This can be used to
@@ -14270,6 +14627,25 @@ USAGE
 
 Returns 1 if the Vex CHOP's Unit Menu is currently set to 'frames', 0
 otherwise.
+
+RELATED
+
+}
+
+{
+islpeactive
+
+Returns 1 if Light Path Expressions are enabled. 0 Otherwise.
+
+USAGE
+  int islpeactive()
+
+Returns 1 if there are any image planes with vex variable that starts
+with "lpe:", which indicates that Light Path Expression (LPE) is
+enabled. Returns 0 if no such image plane exists.
+
+This function is used to optimize out any LPE related function calls if
+the current render doesn't have any AOVs that uses LPE.
 
 RELATED
 
@@ -16641,6 +17017,8 @@ RELATED
 
   * uniqueval
 
+  * uniquevals
+
 }
 
 {
@@ -16741,6 +17119,11 @@ RAY OPTIONS
         Allows an override of the scope for ray-intersections. A special
         scope argument, scope:self, will match the currently shading
         object.
+
+    currentobject
+        Used to specify what the current shading object is. For example,
+        when used with the scope argument, scope:self will match the
+        object passed in by this argument.
 
     maxdist
         The maximum distance to search for objects. This can be used to
@@ -17095,6 +17478,12 @@ USAGES
   vector onoise(vector pos)
   float onoise(vector pos, int turbulence, float rough, float atten)
   vector onoise(vector pos, int turbulence, float rough, float atten)
+  float onoise(vector pos, int periodX, int periodY, int periodZ)
+  vector onoise(vector pos, int periodX, int periodY, int periodZ)
+  float onoise(vector pos, int periodX, int periodY, int periodZ, int
+  turbulence, float rough, float atten)
+  vector onoise(vector pos, int periodX, int periodY, int periodZ, int
+  turbulence, float rough, float atten)
 
 These functions are similar to wnoise and vnoise. However, they are
 marginally less efficient in computation and don't have the same
@@ -17541,9 +17930,9 @@ Evaluates an attribute at the subdivision limit surface using Open
 Subdiv.
 
 USAGES
-  int osd_limitsurface(<geometry>, string attrib_name, int face_id,
+  int osd_limitsurface(<geometry>, string attrib_name, int patch_id,
   float u, float v, <type> &result)
-  int osd_limitsurface(<geometry>, string attrib_name, int face_id,
+  int osd_limitsurface(<geometry>, string attrib_name, int patch_id,
   float u, float v, float &result[])
 
 
@@ -17760,7 +18149,7 @@ face_u, face_v
     patch number. This is also the same integer value used to identify
     the face when performing PTex texture mapping.
 
-&face_u, &face_v
+&patch_u, &patch_v
     The function overwrites these variables with the corresponding U/V
     coordinates on the OSD patch.
 
@@ -17970,6 +18359,40 @@ RELATED
 }
 
 {
+packedtransform
+
+Transforms a packed primitive.
+
+USAGE
+  void packedtransform(int input, int primnum, matrix transform)
+
+Transforms a packed primitive by the specified transform. This modifies
+the P attribute of the primitive's point as well as its intrinsic
+transform.
+
+This is equivalent to the following code.
+
+> // matrix to transform by
+> matrix transform = ident();
+> rotate(transform, radians(45), {0,1,0});
+> translate(transform, {0,1,0});
+> 
+> // get current packed transform
+> matrix3 primtf = primintrinsic(0, "transform", primnum);
+> setprimintrinsic(0, "transform", primnum, primtf * (matrix3)transform);
+> int primpoint = primpoint(0, primnum, 0);
+> vector pos = point(0, "P", primpoint);
+> setpointattrib(0, "P", primpoint, pos * transform);
+
+RELATED
+
+  * setpackedtransform
+
+  * getpackedtransform
+
+}
+
+{
 pathtrace
 
 Computes global illumination using PBR for secondary bounces.
@@ -18008,6 +18431,11 @@ RAY OPTIONS
         Allows an override of the scope for ray-intersections. A special
         scope argument, scope:self, will match the currently shading
         object.
+
+    currentobject
+        Used to specify what the current shading object is. For example,
+        when used with the scope argument, scope:self will match the
+        object passed in by this argument.
 
     maxdist
         The maximum distance to search for objects. This can be used to
@@ -20050,8 +20478,8 @@ USAGE
 ptnum
     The point number to get a primitive from.
 
-    An array of primitive numbers. You should not rely on the numbers
-    being in a particular order.
+    An array of primitive numbers. These will be in ascending order and
+    not contain duplicates.
 
     If no primitives own the given point the array will be empty.
 
@@ -20140,6 +20568,65 @@ matrix that best matches the given transform. This is very useful for
 shape matching or blending of transforms.
 
 RELATED
+
+}
+
+{
+polyneighbours
+
+Returns an array of the primitive numbers of the edge-neighbours of a
+polygon.
+
+USAGE
+  int[] polyneighbours(<geometry>, int primnum)
+
+
+<geometry>
+    When running in the context of a node (such as a wrangle SOP), this
+    argument can be an integer representing the input number (starting
+    at 0) to read the geometry from.
+
+    Alternatively, the argument can be a string specifying a geometry
+    file (for example, a .bgeo) to read from. When running inside
+    Houdini, this can be an op:/path/to/sop reference.
+
+This returns an array of primitive numbers of polygons that share an
+edge with this polygon. It uses the Half-Edge data structure so will
+work wtih geometry that supports that (ie, polygons)
+
+EXAMPLES
+
+    This is roughly equivalent to the following code:
+
+  > int[] polyneighbours(const string opname; const int primnum)
+  > {
+  >     int result[] = {};
+  > 
+  >     int start = primhedge(opname, primnum);
+  > 
+  >     for (int hedge = start; hedge != -1; )
+  >     {
+  >         for (int nh = hedge_nextequiv(opname, hedge);
+  >              nh != hedge;
+  >              nh = hedge_nextequiv(opname, nh))
+  >         {
+  >             int prim = hedge_prim(opname, nh);
+  >             if (prim != -1 && prim != primnum)
+  >             {
+  >                 append(result, prim);
+  >             }
+  >         }
+  >         hedge = hedge_next(opname, hedge);
+  >         if (hedge == start)
+  >             break;
+  >     }
+  > 
+  >     return result;
+  > }
+
+RELATED
+
+  * neighbours
 
 }
 
@@ -20413,9 +20900,11 @@ primarclen
 Evaluates the length of an arc on a primitive using parametric uv
 coordinates.
 
-USAGE
+USAGES
   float primarclen(string geometry; vector2 uv1; vector2 uv2; int
   prim_num)
+  float primarclen(string geometry; vector2 uv1; vector2 uv2; int
+  prim_num; int divs)
 
 Returns the arc length between two parametric UV coordinates on a given
 primitive. This lets you measure the distance across a polygon face or
@@ -20435,6 +20924,9 @@ uv1, uv2
 
 prim_num
     The number of the primitive across which to measure the distance.
+
+divs
+    The number of divisions per segment to use or 10 if not supplied.
 
 
 TIP
@@ -20897,9 +21389,11 @@ primuvconvert
 Convert parametric UV locations on curve primitives between different
 spaces.
 
-USAGE
+USAGES
   vector2 primuvconvert(string filename, vector2 uv, int prim_num, int
   mode)
+  vector2 primuvconvert(string filename, vector2 uv, int prim_num, int
+  mode, float tolerance)
 
 
 texttype
@@ -21440,6 +21934,98 @@ RELATED
 }
 
 {
+xnoise
+
+Simplex noise is very close to Perlin noise, except with the samples on
+a simplex mesh rather than a grid. This results in less grid artifacts.
+It also uses a higher order bspline to provide better derivatives. This
+is the periodic simplex noise
+
+USAGES
+  float|vector pxnoise(float x, int xp)
+  float|vector pxnoise(float x, float y, int xp, int yp)
+  float|vector pxnoise(vector xyz, int xp, int yp, int zp)
+  float|vector pxnoise(vector4 xyzt, int xp, int yp, int zp, int wp)
+
+Simplex noise is very close to Perlin noise, except with the samples on
+a simplex mesh rather than a grid. This results in less grid artifacts.
+It also uses a higher order bspline to provide better derivatives.
+
+The various functions return the noise value at a 4D (vector4 argument),
+3D (vector argument), 2D (two float arguments) or 1D (float argument)
+position. You can get a random float value or a vector of three random
+values.
+
+The noise is in the range 0-1 with a median of 0.5. The distribution of
+the noise depends on the dimension, with higher dimensions approaching a
+Gaussian distribution of noise values.
+
+The "p" int or vector arguments specify the range of periodicity, but
+this periodicity is not an integer. For non-periodic simplex noise, see
+xnoise
+
+RELATED
+
+  * Noise and randomness
+
+  * anoise
+
+  * curlnoise
+
+  * flownoise
+
+  * noise
+
+  * onoise
+
+  * pnoise
+
+  * snoise
+
+  * vnoise
+
+  * wnoise
+
+  * xnoise
+
+}
+
+{
+pxnoised
+
+Periodic derivatives of Simplex Noise.
+
+USAGES
+  void pxnoised(float x, int px, float &v, float &dvdx)
+  void pxnoised(float x, int px, vector &v, vector &dvdx)
+  void pxnoised(float x, float y, int px, int py, float &v, float &dvdx,
+  float &dvdy)
+  void pxnoised(float x, float y, int px, int py, vector &v, vector
+  &dvdx, vector &dvdy)
+  void pxnoised(vector xyz, int px, int py, int pz, float &v, float
+  &dvdx, float &dvdy, float &dvdz)
+  void pxnoised(vector xyz, int px, int py, int pz, vector &v, vector
+  &dvdx, vector &dvdy, vector &dvdz)
+  void pxnoised(vector4 xyzw, int px, int py, int pz, int pw, float &v,
+  float &dvdx, float &dvdy, float &dvdz, float &dvdw)
+  void pxnoised(vector4 xyzw, int px, int py, int pz, int pw, vector &v,
+  vector &dvdx, vector &dvdy, vector &dvdz, vector &dvdw)
+
+This computes both the simplex noise value, and the derivatives of the
+noise along each axis. This can be performed quite efficiently as there
+are analytic derivatives available.
+
+See xnoise and pxnoise for other versions of xnoise.
+
+See noise and randomness in the VEX language guide for more information.
+
+RELATED
+
+  * xnoised
+
+}
+
+{
 qconvert
 
 Converts a quaternion represented by a vector4 to a matrix3
@@ -21551,6 +22137,35 @@ RELATED
   * qconvert
 
   * eulertoquaternion
+
+}
+
+{
+quaterniontoeuler
+
+Creates a euler angle representing a quaternion.
+
+USAGE
+  vector quaterniontoeuler(vector4 orient, int order)
+
+Creates a vector representing euler angles from a vector4 representing a
+quaternion.
+
+The angles are in radians. Use the degrees() function to convert radians
+into degrees.
+
+Specify the rotation order with the <order> integer. Use the constants
+defined in $HH/vex/include/math.h (for example, XFORM_XYZ).
+
+RELATED
+
+  * dihedral
+
+  * qconvert
+
+  * quaternion
+
+  * quaternion
 
 }
 
@@ -21706,6 +22321,33 @@ USAGE
   int random_ihash(int seed)
 
 Hashes the given number into an integer value.
+
+RELATED
+
+}
+
+{
+random_poisson
+
+Generates a random Poisson variable given the mean to the distribution
+and a seed.
+
+USAGES
+  int random_poisson(int seed, float mean)
+  int random_poisson(int seed, float mean, int minvalue, int maxvalue)
+
+Creates a random number given the mean of the Poisson distribution. The
+seed is given to allow for the generation of different numbers with the
+same mean.
+
+When minvalue and maxvalue are specified the numbers generated will be
+limited to the specified range.
+
+
+WARNING
+    The specified range should not be farther apart from the mean than 3
+    standard deviations, which in the case of Poisson distribution is
+    equal to sqrt(mean).
 
 RELATED
 
@@ -21902,6 +22544,11 @@ RAY OPTIONS
         Allows an override of the scope for ray-intersections. A special
         scope argument, scope:self, will match the currently shading
         object.
+
+    currentobject
+        Used to specify what the current shading object is. For example,
+        when used with the scope argument, scope:self will match the
+        object passed in by this argument.
 
     maxdist
         The maximum distance to search for objects. This can be used to
@@ -22269,6 +22916,11 @@ RAY OPTIONS
         Allows an override of the scope for ray-intersections. A special
         scope argument, scope:self, will match the currently shading
         object.
+
+    currentobject
+        Used to specify what the current shading object is. For example,
+        when used with the scope argument, scope:self will match the
+        object passed in by this argument.
 
     maxdist
         The maximum distance to search for objects. This can be used to
@@ -22732,6 +23384,11 @@ RAY OPTIONS
         scope argument, scope:self, will match the currently shading
         object.
 
+    currentobject
+        Used to specify what the current shading object is. For example,
+        when used with the scope argument, scope:self will match the
+        object passed in by this argument.
+
     maxdist
         The maximum distance to search for objects. This can be used to
         limit the search of objects to nearby objects only. If the
@@ -22897,6 +23554,10 @@ USAGES
 
   vector relbbox(vector position)
 
+  WARNING
+      This form of relbbox is deprecated and may be removed in the
+      future. Use the other forms as needed.
+
 
 <geometry>
     When running in the context of a node (such as a wrangle SOP), this
@@ -22991,20 +23652,30 @@ Removes a point from the geometry.
 
 USAGES
   int removepoint(int geohandle, int point_number)
-  int removepoint(int geohandle, int point_number, int andprims)
+  int removepoint(int geohandle, int point_number, int and_prims)
 
-Removes a point in the geometry specified by geohandle.
 
-If the point_number is -1, nothing is done.
+texttype
+    A handle to the geometry to write to. Currently the only valid value
+    is 0 or geoself, which means the current geometry in a node. (This
+    argument may be used in the future to allow writing to other
+    geometries.)
 
-If andprims is 1, any valid but degenerate primitives, (for example,
-closed polygons with fewer than 3 vertices or open polygons with fewer
-than 2 vertices), that referred to the specified point will be deleted.
-If andprims is 0, primitives will only be deleted if they become
-invalid, (for example, tetrahedra cannot have fewer than 4 vertices, and
-volumes cannot have zero vertices).
+point_number
+    If this is -1, the function has no effect.
+
+and_prims
+    If this is 1, the function deletes any _degenerate_ primitives that
+    referred to the removed point (for example, closed polygons with
+    fewer than 3 vertices or open polygons with fewer than 2 vertices).
+
+    If this is 0, the function only deletes primitives that become
+    invalid because of the removed point (for example, tetrahedra with
+    fewer than 4 vertices, or volumes with zero vertices).
 
 RELATED
+
+  * addpoint
 
 }
 
@@ -23016,12 +23687,21 @@ Removes a primitive from the geometry.
 USAGE
   int removeprim(int geohandle, int prim_number, int andpoints)
 
-Removes a primitive in the geometry specified by geohandle.
 
-If the prim_number is -1, nothing is done.
+texttype
+    A handle to the geometry to write to. Currently the only valid value
+    is 0 or geoself, which means the current geometry in a node. (This
+    argument may be used in the future to allow writing to other
+    geometries.)
 
-If andpoints is 1, the points that the primitive owns will also be
-deleted if there are no other primitives still referring to them.
+prim_number
+    The index of the primitive to remove. If this is -1, the function
+    does nothing.
+
+andpoints
+    If this is 1, the function will also delete any points associated
+    with the primitive that are not associated with any other
+    primitives.
 
 
 NOTE
@@ -23496,9 +24176,9 @@ USAGES
   float &pdf; int &type; float sx, float sy; ... )
   void sample_bsdf(bsdf F, vector viewer_u, vector &dir, vector &eval,
   float &pdf, int &type, float sx, float sy, int mask, ...)
-  void sample_bsdf(bsdf b; vector viewer_u; vector normal_v; int &mask;
+  void sample_bsdf(bsdf b; vector viewer_u; vector normal_v; int &flags;
   vector &dir; vector &eval; float &pdf; int &type; float sx; float sy;
-  int bounces; ... )
+  int mask; ... )
 
 
 F
@@ -23510,10 +24190,9 @@ viewer_u
 normal_v
     The V vector (input surface normal).
 
-&mask
-    A bitfield of flags for the BSDF, defined in pbr.h.
-
-    See bouncemask for information on component label bitmasks.
+&flags
+    A bitfield of flags for the BSDF, defined in pbr.h. The function may
+    set flags like PBR_BSDF_REVERSE or PBR_BSDF_O_EVENT_EXIT.
 
 &dir
     The function overwrites this variable with the outgoing ray
@@ -23532,7 +24211,9 @@ normal_v
     BSDF.
 
 &type
-    ???
+    In a compound BSDF, this returns the bounce type that was sampled.
+
+    See bouncemask for information on component label bitmasks.
 
 sx and sy
     Random values, such as generated by nextsample. Different values of
@@ -23541,10 +24222,6 @@ sx and sy
 &eval
     Overwritten with the color, scaled by albedo, of the sampled
     component.
-
-&type
-    Overwritten with the type of component sampled. This uses the same
-    constants as in the mask argument.
 
 &pdf
     The sampling pdf for the sampled component.
@@ -23810,6 +24487,56 @@ RELATED
   * sample_orientation_uniform
 
   * sample_circle_uniform
+
+  * sample_sphere_uniform
+
+  * sample_hypersphere_uniform
+
+  * sample_circle_arc
+
+  * sample_direction_cone
+
+  * sample_orientation_cone
+
+  * sample_circle_slice
+
+  * sample_sphere_cone
+
+  * sample_hypersphere_cone
+
+}
+
+{
+sample_circle_ring_uniform
+
+Generates a uniform vector2 with alpha < length < 1, where 0 < alpha <
+1, given a vector2 of uniform numbers between 0 and 1.
+
+USAGE
+  vector2 sample_circle_ring_uniform(vector2 u, float alpha)
+
+
+u
+    Pair of numbers between 0 and 1.
+
+alpha
+    The inner radius to be bounded by. A number between 0 and 1.
+
+Returns a vector2 of length < 1, based on u. Given uniform random u
+pairs of values in , the returned vectors will be uniform random and
+continuous with respect to u inside the unit circle ring with inner
+radius of alpha. Specifically, it returns scale*(cos(angle),sin(angle)),
+where angle is 2*pi*u.x and scale is sqrt((1-alpha^2)*u.y+alpha^2).
+
+RELATED
+
+  * sample_circle_uniform
+
+  * sample_circle_edge_uniform
+
+  * sample_direction_uniform
+
+  * sample_orientation_uniform
 
   * sample_sphere_uniform
 
@@ -24234,6 +24961,11 @@ DETAILS
             Allows an override of the scope for ray-intersections. A
             special scope argument, scope:self, will match the currently
             shading object.
+
+        currentobject
+            Used to specify what the current shading object is. For
+            example, when used with the scope argument, scope:self will
+            match the object passed in by this argument.
 
         maxdist
             The maximum distance to search for objects. This can be used
@@ -25278,6 +26010,55 @@ RELATED
   * sample_orientation_cone
 
   * sample_circle_slice
+
+  * sample_hypersphere_cone
+
+}
+
+{
+sample_sphere_shell_uniform
+
+Generates a uniform vector with alpha < length < 1, where 0 < alpha < 1,
+given a vector of uniform numbers between 0 and 1.
+
+USAGE
+  vector sample_sphere_shell_uniform(vector u, float alpha)
+
+
+u
+    Three numbers between 0 and 1.
+
+alpha
+    The inner radius to be bounded by. A number between 0 and 1.
+
+Returns a vector of length < 1, based on u. Given uniform random u
+vectors of three values in , the returned vectors will be uniform random
+and continuous with respect to u inside the unit sphere shell with the
+inner raidus alpha.
+
+RELATED
+
+  * sample_circle_edge_uniform
+
+  * sample_direction_uniform
+
+  * sample_orientation_uniform
+
+  * sample_circle_uniform
+
+  * sample_hypersphere_uniform
+
+  * sample_circle_arc
+
+  * sample_direction_cone
+
+  * sample_orientation_cone
+
+  * sample_circle_slice
+
+  * sample_sphere_cone
+
+  * sample_sphere_uniform
 
   * sample_hypersphere_cone
 
@@ -26519,6 +27300,35 @@ RELATED
 }
 
 {
+setpackedtransform
+
+Sets the transform of a packed primitive.
+
+USAGE
+  void setpackedtransform(int input, int primnum, matrix transform)
+
+Sets the transform of a packed primitive. This modifies the P attribute
+of the primitive's point as well as its intrinsic transform.
+
+EXAMPLES
+
+  > // matrix to transform by
+  > matrix transform = ident();
+  > rotate(transform, radians(45), {0,1,0});
+  > translate(transform, {0,1,0});
+  > 
+  > matrix transform = getpackedtransform(0, @primnum);
+  > setpackedtransform(0, @primnum, transform * tf);
+
+RELATED
+
+  * getpackedtransform
+
+  * packedtransform
+
+}
+
+{
 setpointattrib
 
 Sets a point attribute in a geometry.
@@ -27612,6 +28422,12 @@ USAGES
   vector snoise(vector pos)
   float snoise(vector pos, int turbulence, float rough, float atten)
   vector snoise(vector pos, int turbulence, float rough, float atten)
+  float snoise(vector pos, int periodX, int periodY, int periodZ)
+  vector snoise(vector pos, int periodX, int periodY, int periodZ)
+  float snoise(vector pos, int periodX, int periodY, int periodZ, int
+  turbulence, float rough, float atten)
+  vector snoise(vector pos, int periodX, int periodY, int periodZ, int
+  turbulence, float rough, float atten)
 
 These functions are similar to wnoise. The noise returned is based on
 the weights of all of the closest points, with each point's contribution
@@ -27728,6 +28544,117 @@ RELATED
   * solvequadratic
 
   * solvepoly
+
+}
+
+{
+solvefbik
+
+Applies a full-body inverse kinematics algorithm to a skeleton.
+
+USAGES
+  matrix[] solvefbik(matrix xforms[], int parents[], int targets[],
+  matrix targetxforms[], int iters)
+  matrix[] solvefbik(matrix xforms[], int parents[], int targets[],
+  matrix targetxforms[], int iters, float tolerance, int pinroot)
+  matrix[] solvefbik(matrix xforms[], int parents[], int targets[],
+  matrix targetxforms[], int iters, float tolerance, int pinroot, float
+  targetweights[], int targetpriorities[], int targetdepths[])
+  matrix[] solvefbik(matrix xforms[], int parents[], int targets[],
+  matrix targetxforms[], int iters, float tolerance, int pinroot, float
+  targetweights[], int targetpriorities[], int targetdepths[], matrix
+  goalxforms[], vector4 constrainedxforms[], vector jointlimits[])
+
+Returns an empty array if:
+
+  * xforms is not the same size as parents
+
+  * targets is not the same size as targetxforms
+
+  * The goalxforms, constrainedxforms, and jointlimits arrays aren't
+    empty, but are not the same size as xforms
+
+The goalxforms, constrainedxforms, and jointlimits parameters should be
+in the form produced by the Agent Configure Joints SOP.
+
+
+xforms
+    The world transforms of all the transforms in the rig being solved.
+
+parents
+    The parent transform index for each transform. A value of -1
+    indicates a root.
+
+targets
+    A list of the transform indices of the end effectors in the
+    skeleton.
+
+targetxforms
+    A list of the target transforms for the end effectors, in the same
+    order as targets.
+
+texttype
+    The maximum number of iterations to perform. The solver may
+    terminate early if the tolerance parameter is used.
+
+texttype
+    The tolerance to use when checking for convergence, defaults to
+    1e-5. If positions converge to within this tolerance, the algorithm
+    will stop. If 0, the solver will always perform exactly iters
+    iterations.
+
+texttype
+    Whether to pin the root to its start position, instead of allowing
+    it to translate. This can be useful when, for example, solving a
+    subset of an agent's skeleton. Defaults to 0 (off).
+
+texttype
+    A list containing the weight of each end effector, in the same order
+    as targets. For joints with multiple children, the normalized
+    weights will be used to determine their position - this means that a
+    target with a higher weight than other targets will be more likely
+    to be reached. The default weight is 1.0.
+
+texttype
+    A list containing the priority level of each end effector, in the
+    same order as targets. Targets from a lower priority level will not
+    influence targets with higher priority. For example, priority levels
+    can be used to ensure that the targets for the feet are always
+    satisfied, while still controlling the relative weights of the upper
+    body targets. The default priority is 0 (i.e. all targets are equal
+    priority).
+
+texttype
+    For each end effector, specifies how many joints above it in the
+    chain can be adjusted to achieve the target transform. A negative
+    depth can be used to specify that all joints above the target are
+    affected. The default depth is -1.
+
+goalxforms
+    Part of the joint constraints as produced by Agent Configure Joints.
+    An empty array indicates no joint constraints.
+
+constrainedxforms
+    Part of the joint constraints as produced by Agent Configure Joints.
+    An empty array indicates no joint constraints.
+
+jointlimits
+    Part of the joint constraints as produced by Agent Configure Joints.
+    An empty array indicates no joint constraints.
+
+RELATED
+
+  * agentsolvefbik
+
+  * agentworldtransform
+
+  * agentworldtransforms
+
+  * setagentworldtransforms
+
+  * agentrigfind
+
+  * agentrigparent
 
 }
 
@@ -28072,6 +28999,11 @@ NOTE
     This differs from Python's split() in that it takes a list of
     separators, not a single string to use as a separator.
 
+NOTE
+    This operates more as a tokenize method than as a split method. In
+    particular, if you have repeated separators they will be merged and
+    only a single split performed.
+
 RELATED
 
 }
@@ -28377,6 +29309,71 @@ USAGES
 RELATED
 
   * product
+
+}
+
+{
+surfacedist
+
+Finds the distance of a point to a group of points along the surface of
+a geometry.
+
+USAGE
+  float surfacedist(<geometry>; string ptgroup; string P_attribute; int
+  search_pt; float max_radius; int &closest_pt; string distance_metric)
+
+Returns the distance from the search point to the closest point in the
+point group.
+
+
+<geometry>
+    When running in the context of a node (such as a wrangle SOP), this
+    argument can be an integer representing the input number (starting
+    at 0) to read the geometry from.
+
+    Alternatively, the argument can be a string specifying a geometry
+    file (for example, a .bgeo) to read from. When running inside
+    Houdini, this can be an op:/path/to/sop reference.
+
+ptgroup
+    The name of a point group or a pattern to generate a point group.
+    Uses the same semantics as a SOP group, so empty strings will match
+    all points. Attribute groups like @Cd.x>0 can also be used, but note
+    that the @ may need to be escaped with a backslash in a Snippet VOP.
+
+P_attribrute
+    The name of the vector attribute to use to measure distance between
+    connected points. Using "P" will give the world distance along the
+    surface, but a custom attribute can be used to measure along a
+    different metric.
+
+search_pt
+    The point to measure the distance for.
+
+max_radius
+    The maximum distance to measure the surface distance. This can speed
+    things up by allowing the search to quit early if the point is not
+    within the radius. Points outside the radius will return a value of
+    -1 for both the distance and the lead point.
+
+&closest_pt
+    Index of the closest point in the source group.
+
+    -1 if no closest point was found.
+
+distance_metric
+    The method to use to measure distance. Accepted values are edge and
+    surface. Edge distance is measured along the edges of the model,
+    while surface distance is measured along edges and across single
+    polygons. Surface distance is a better approximation of the true
+    geodesic distance, but is also more expensive to compute.
+
+    The distance from the search point to the closest point in the point
+    group.
+
+    Returns -1 if no closest point was found.
+
+RELATED
 
 }
 
@@ -29085,7 +30082,7 @@ RELATED
 {
 tolower
 
-Converts all charactors in string to lower case
+Converts all characters in string to lower case
 
 USAGE
   string tolower(const string str)
@@ -29103,7 +30100,7 @@ RELATED
 {
 toupper
 
-Convers all charactors in string to upper case
+Converts all characters in string to upper case
 
 USAGE
   string toupper(const string str)
@@ -29215,6 +30212,11 @@ RAY OPTIONS
         Allows an override of the scope for ray-intersections. A special
         scope argument, scope:self, will match the currently shading
         object.
+
+    currentobject
+        Used to specify what the current shading object is. For example,
+        when used with the scope argument, scope:self will match the
+        object passed in by this argument.
 
     maxdist
         The maximum distance to search for objects. This can be used to
@@ -29766,6 +30768,54 @@ EXAMPLES
       > }
 
 RELATED
+
+  * uniquevals
+
+  * nuniqueval
+
+}
+
+{
+uniquevals
+
+Returns the set of unique values across all values for an int or string
+attribute.
+
+USAGES
+  int[] uniquevals( <geometry>, string attribclass, string
+  attribute_name)
+  string[] uniquevals( <geometry>, string attribclass, string
+  attribute_name)
+
+If any points/primitives/vertices in the geometry have the same value
+for the given attribute, the set of _unique_ values will be smaller than
+the total number of points/primitives/vertices. This function lets you
+acquire the set of unique values.
+
+This function only works with string and integer attributes.
+
+
+<geometry>
+    When running in the context of a node (such as a wrangle SOP), this
+    argument can be an integer representing the input number (starting
+    at 0) to read the geometry from.
+
+    Alternatively, the argument can be a string specifying a geometry
+    file (for example, a .bgeo) to read from. When running inside
+    Houdini, this can be an op:/path/to/sop reference.
+
+texttype
+    One of "detail" (or "global"), "point", "prim", or "vertex".
+
+    You can also use "primgroup", "pointgroup" or "vertexgroup" to read
+    from groups.
+
+texttype
+    The name of the attribute (or intrinsic) to read.
+
+RELATED
+
+  * uniqueval
 
   * nuniqueval
 
@@ -31347,12 +32397,12 @@ It also uses a higher order bspline to provide better derivatives.
 USAGES
   float xnoise(float x)
   vector xnoise(float x)
+  float xnoise(float x, float y)
+  vector xnoise(float x, float y)
   float xnoise(vector xyz)
   vector xnoise(vector xyz)
   float xnoise(vector4 xyzt)
   vector xnoise(vector4 xyzt)
-  float xnoise(float x, float y)
-  vector xnoise(float x, float y)
 
 Simplex noise is very close to Perlin noise, except with the samples on
 a simplex mesh rather than a grid. This results in less grid artifacts.

@@ -82,7 +82,7 @@ Constraint Type:
 	another, like a balloon.
 
     Tetrahedral Volume:
-	Each tetrahedra is turned into a constraint to maintain the volume
+	Each tetrahedron is turned into a constraint to maintain the volume
 	of the tetrahedra.  Note this does not include any shear or
 	stretch constraints - additional distance constraints need
 	to be added to make a proper softbody.
@@ -110,6 +110,13 @@ Constraint Type:
 	like internal struts that give an object stiffness and volume
 	without the expense of a fully FEM solve.
 
+    Tetrahedral Fiber:
+	Each tetrahedron is turned into a constraint that attempts to flatten
+	along the direction specified by the `materialW` attribute on its points,
+	or `{0, 0, 1}` if that attribute doesn't exist.  These constraints can
+	be created with low stiffness that is animated up during the simulation
+	with [Vellum Constraint Property|Node:dop/vellumconstraintproperty] to
+	simulate volumetric contraction effects.
 
 == Geometry ==
 
@@ -186,7 +193,7 @@ Compute Missing Orientation:
 
     For deforming hair geometry as input, the Vellum Solver requires an
     `orient` attribute that provides a stable rotation basis over time.  This
-    attribute can be created with the [Guide Deform|Node:sop/guidedeform] SOP
+    attribute can be created with the [Guide Deform SOP|Node:sop/guidedeform]
     using rest and animated skin, or if this parameter is enabled and `orient` is
     missing, Vellum Constraints will calculate it by extracting a
     per-hair transform relative to the specified __Rest Orientation Frame__.
@@ -285,6 +292,9 @@ Orientation Pin Type:
 
     In addition to holding the location of a point, for hair the orientation
     often may also be constrained.
+
+    NOTE:
+	    This constrains the orientation of the out-going line segments of the hair.  So orientation-pinning the tip of a hair will not affect the angle of the incoming hair.
 
     None:
 	Do not constrain the orientation to the target animation.
@@ -498,6 +508,22 @@ Compression Stiffness:
     lower compression stiffness, the cloth is allowed to collapse and regain
     its fluidity.  Usually this has to be raised with higher resolution cloth.
 
+Stiffness Dropoff:
+    #id: stretchstiffnessdropoff
+
+    The distance from the rest length at which the stiffness of the constraint
+    decreases to zero, or increases from zero to full stiffness, depending on
+    the direction of the dropoff.  A __Decreasing__ dropoff means that the
+    stiffness starts at full strength and decreases to zero at the Dropoff
+    distance from the rest length.  An __Increasing__ dropoff means
+    the stiffness starts at zero and increases to full stiffness at the
+    specified distance from rest length.
+
+    Decreasing dropoff can be useful for creating glue constraints that lose
+    stiffness as they are stretched, decreasing to zero at the specified
+    distance.  Using the same distance in the breaking __Threshold__ with a
+    __Break Type__ of __Stretch Distance__ will cause the constraints to be
+    removed at the same time they reduce to zero stiffness.
 
 Enable Warp/Weft:
     #id: stretchanisotropy
@@ -676,8 +702,21 @@ Rest Angle Scale:
 
     The rest angle of the bend constraints will be the original dihedral
     angle between the triangles.   This scale can be used to increase or
-    decrease this.   Setting to `0` will treat the original configuratoin as a
+    decrease this.   Setting to `0` will treat the original configuration as a
     flat sheet.
+
+Stiffness Dropoff:
+    #id: bendstiffnessdropoff
+
+    The number of degrees away from the rest angle at which the stiffness of
+    the constraint decreases to zero, or increases from zero to full stiffness, depending on
+    the direction of the dropoff.  A __Decreasing__ dropoff means that the
+    stiffness starts at full strength and decreases to zero at the Dropoff
+    degrees from the rest angle.  An __Increasing__ dropoff means the stiffness starts at zero and increases to full stiffness at the specified degrees away from rest angle.
+
+    A small amount of __Increasing__ dropoff can be useful with cloth to make it buckle
+    from a flat state very easily, adding additional wrinkling without changing the overall
+    bend stiffness and look of the cloth too significantly. Decreasing dropoff can be useful for making stretchy glue constraints that weaken right before breaking without snapping back.
 
 Max Branch Angle:
     #id: maxbranchangle

@@ -1,0 +1,115 @@
+= Attribute from String =
+
+#type:     node
+#context:  top
+#internal: attributefromstring
+#icon:     TOP/attributefromstring
+
+"""Parses attribute values from a string, such as a file name."""
+
+The node lets you choose between using a [simple pattern replacement language|#simple], or full-on [regular expressions|#regex]. The simple patterns are easier to write and make sense to use for structured strings with separators.
+
+
+== Simple pattern language == (simple)
+
+This node supports a fairly simple pattern language, alternating named "capture" groups and literal characters. The strings captured by the groups are assigned to attributes. This can be useful for parsing information out of file names, if the name has a regular structure with separator characters.
+
+For example, given "source" file names in the form:
+
+`shot_a.simcache.1.005.bgeo.sc`
+
+You can parse the different parts into attributes using a pattern such as:
+
+`{shot}.{}.{wedgenum}.{frame}.bgeo.sc`
+
+(Empty braces capture a string but aren't assigned to an attribute.)
+
+* In the pattern, curly braces (`{<<name>>}`) match up to the next literal character in the pattern.
+
+    * If the braces are empty, the matching string is thrown away.
+
+    * The braces contain a name, the matching string is assigned to an attribute with that name. For exmaple, the part of the source string "captured" by `{shot}` is assigned to the `shot` attribute.
+
+    * If __Infer attribute type__ is on, the node guesses the attribute type based on the matched string (if it looks like a whole number, it's an integer; if it looks like a number with a decimal point, it's a float; otherwise it's a string). You can explicitly specify the type using `{<<name>>:<<type>>}`. For example, `{shot:string}`, `{frame:int}`, `{time:float}`.
+
+* If you have capture braces at the end of the pattern, they match to the end of the source string.
+
+* Outside braces, characters in the pattern must match characters in the source string exactly.
+
+* Braces are not "greedy"... they only match up to the next literal character, even if going further would give a better match.
+
+    For example, in `day.01.csv`, with the pattern `{name}.csv` you might expect `{name}` to capture `day.01`, but in fact it will only capture `day` (since it captures up to the next literal character, a period). The pattern will then fail because it expects the characters after the period to be `csv`, not `01`.
+
+* The *whole* pattern must match the source string (not just a prefix).
+
+* If the whole pattern doesn't match, none of the attributes in the pattern will be set.
+
+
+== Regular expression == (regex)
+
+For maximum power/flexibility, you can use a regular expression instead. This node uses [Python's regular expression syntax|https://docs.python.org/3/library/re.html].
+
+* Using a regular expression implies __Infer attribute type__.
+
+
+@parameters
+
+[Include:processor_common#pdg_workitemgeneration]
+
+Source String:
+    #id: sourcestring
+
+    The string containing data you want to parse. Usually this is an expression to get the string from an attribute. Since this is a string parameter, you need to enclose the expression in back-ticks. For example: <code>&#96;@name&#96;</code>
+
+Operation:
+    #id: operation
+
+    Determines which operation to perform on the source string. __Match by String__ will extract components from the __Source String__ using a pattern and store them as attributes. __Split by Delimiter__ will split the source string based on a secondary string and store the resulting substrings as attributes.
+
+=== Match by Pattern ===
+
+Pattern Type:
+    #id: useregex
+
+    Determines if the __Pattern__ field is using the [simple brace syntax|#simple] or a [regular expression|#regex]. When using a regular expression, captured groups are assigned to attributes by number, for example, `group0`, `group1`, and so on. If the capture groups are named, e.g. using the syntax `(?P<name>)`, then the attribute name is set to the capture group name.
+
+Pattern:
+    #id: matchstring
+
+    The pattern to use to extract attributes from the __Source string__. The language is controlled by the __Use custom regex__ checkbox. When the checkbox is off, this parameter uses a [simple pattern substitution language|#simple] (see above). When the checkbox is on, this parameter is a [regular expression|#regex].
+
+Infer Attribute Type:
+    #id: infertype
+
+    When this is on, if you don't explicitly state the type of a capture pattern (for example, `{shotnum:int}`), the node will try to guess the type based on the matched string content (if it looks like a whole number, it's an integer; if it looks like a number with a decimal point, it's a float; otherwise it's a string). 
+
+Create Items With No Matches:
+    #id: createnomatch
+
+    By default, the node only creates new work items from incoming items where the pattern matched. When this is on, work items are passed through even if they didn't match.
+
+=== Split by Delimiter ===
+
+Delimiter Type:
+    #id: delimitertype
+
+    Specified what type of delimiter to use for splitting the __Source String__. Using __String__ will split the source string based on the exact contents of the __Delimiter__ field. __Character Set__ attempts to split based on each of the delimiter characters individually. __Regular Expression__ will interpret the __Delimiter__ as a custom regex.
+
+Delimiter:
+    #id: delimiter
+
+    The delimiter to use when splitting the source string.
+
+Store Result As:
+    #id: storage
+
+    How the split string is stored. The components can either be stored as a string array attribute on a single work item, or split into one work item per component.
+
+Trim Whitespace:
+    #id: trimspace
+
+    When this toggle is enabled, leading and trailing whitespace is removed from the components after splitting the string.
+
+@related
+
+- [Node:top/attributecreate]

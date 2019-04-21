@@ -1,0 +1,88 @@
+= Using attributes =
+
+"""TOP attributes are like point attributes, You can use them to set parameters in Houdini nodes called by the work items."""
+
+
+== Overview == (overview)
+
+A work item contains _attributes_, named bits of information similar to attributes on a point in Houdini geometry. If the work  can read the attributes to control the work they do. Attributes are passed down to work items created from "parent" work items, so you can use them to have the result of a work item affect the processing of its child items, group items together, and pass information down through the network.
+
+[Custom code|stocknodes] can read attributes to control generation of work items, however the most common use of attributes is to *reference them in parameters of TOP nodes and/or Houdini networks and nodes that are referenced by the TOP network*.
+
+* For example, let's say you want to wedge different render qualities. You can use the [Wedge|Node:top/wedge] TOP to create work items that have a `pixelsamples` attribute set to different values. Then, in the [ROP Mantra Render|Node:top/ropmantra] TOP, you can set __Pixel samples__ using `@pixelsamples` to reference the attribute value.
+
+* You can also reference work item attributes in external assets/networks called by the TOP network. For example, the [HDA Processor|Node:top/hdaprocessor] cooks a Houdini asset for each work item. You can use `@attribute` references in that asset's parameters to pull values from the work item.
+
+You can reference a component of a vector using `@attribute.<<component>>`, where <<component>> is a zero-based number, or `x`, `y`, or `z` (equivalent of `0`, `1`, `2`). For example `@pos.x` or `@pdg_output.0`.
+
+
+== Using attributes in expressions (pull) == (pull)
+
+:col:
+    When nodes are "called" as part of a TOP network cooking (for example, when TOPs cooks an [HDA Processor|Node:top/hdaprocessor], or renders frames using a [ROP render node|Node:top/ropmantrarender]), it fills in any `@attribute` references using the cooking work item's attributes.
+
+    TIP:
+        When nodes cook for display in the viewer, they fill in `@attribute` references using the attributes of the [currently selected work item|ui#select]. This means you can click around work items and see the visible output of a network change to reflect the output of the selected item.
+
+    [Image:/images/pdg/attribute_reference.png]
+
+    These are called "pull" references. This is the easiest way you 
+
+    If you don't want to or can't put TOPs-specific expressions in certain parameters, you can instead use [an alternate "push" mechanism|#push] where you specify in the TOP network parameters to overwrite at run time.
+
+
+:col:
+    === String parameters ===
+    #display: rounded silver
+
+    An `@attribute` reference by itself is an _Hscript expression_, just like `ch('../geo1/tx') * 2` is an expression. You can use `@attribute` references as part of HScript expressions to compute values in node parameters.
+
+    Remember that if you want to use an expression in a string parameter, you must escape it by enclosing it in backticks (<code>&#96;</code>). For example, to reference the work item's [built-in|#builtin] `output` attribute in a file path parameter, you must enclose the reference in backticks:
+
+    {{{
+    `@pdg_output`
+    }}}
+
+    You can incorporate an expression within "normal" text in the parameter. For example, to use the work item's frame number in a file path:
+
+    <pre>$HIP/output/$OS_<span style="color: #c00">&#96;@pdg_frame&#96;</span>.exr</pre>
+
+NOTE:
+    If it's ambiguous what an `@attribute` expression refers to (for example, a geometry point attribute and a TOP work item attribute have the same name), SOP attributes take precedence over TOP work item attributes.
+
+
+== Replacing parameter contents at run time (push) == (push)
+
+When using the [Wedge TOP|Node:top/wedge] to vary parameter values, if you don't want to put TOP-specific expressions on other nodes (for example, if the ROP you want to render is shared with other pipelines or used manually), you can have the Wedge node replace parameter values with wedge attributes at run time.
+
+See the [help for the Wedge TOP|Node:top/wedge] for how to override parameters at render time.
+
+
+== Built-in attributes == (builtin)
+
+NOTE:
+    When referencing built-in attributes, use `@pdg_<<name>>`, for example, `@pdg_index`.
+
+:col:
+    `index`:
+        Used as a key for sorting work items within a node.
+
+    `name`:
+        Makes it easier to distinguish individual work items in the interface.
+
+    `priority`:
+        Work items with higher priority will run before items with lower priority.
+
+    `frame`:
+        The frame number this item is working on. Of course, not all work items are doing rendering, however needing to store a frame number is common enough that we included it in the built-in attributes.
+
+:col:
+    `input`:
+        A list of filenames used as the input for this bit of work. For example, if the work item represents "draw text over a rendered image", this would be the path to the image to manipulate.
+
+    `output`:
+        A list of filenames produced as the output of this bit of work. For example, if the work item represents "draw text over a rendered image", this would be the path to the output image with the text drawn into it.
+
+    TIP:
+        As processor nodes generate new work items from incoming work items, the `output` attribute of the "parent" work item is automatic assigned as the `input` attribute of the "child" work item.
+

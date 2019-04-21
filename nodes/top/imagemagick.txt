@@ -1,0 +1,264 @@
+= ImageMagick =
+
+#type:      node
+#context:   top
+#internal:  imagemagick
+#icon:      TOP/imagemagick
+
+"""Provides easy access to ImageMagick functionality such as mass image convert, resize, and image mosaics."""
+
+
+== Overview ==
+
+Before you can use this node you must [install ImageMagick|#install].
+
+This node creates work items that call functions in the ImageMagick library to manipulate images. The __Operation__ parameter chooses between different built-in methods of editing or combining images.
+
+
+== Tips and notes ==
+
+* This node will perform the given operation for the list of output result files on each incoming work item, *even when it's a montage or composite*.
+
+    If you have multiple incoming work items each representing one file you want to montage or composite (for example, you generate work items from files using [File Pattern|Node:top/filepattern] and then want to merge them into an image mosaic), insert a [Wait for All node|Node:top/waitforall] before this node to merge them into a single work item.
+
+* *When resizing/converting*, if you have multiple incoming work items each representing one file, by default (no Wait for All) the node will perform the operations in parallel. However, it's *much* faster to convert all files in one process (by putting a Wait for All before the ImageMagick node). This avoids the overhead of scheduling and executing separately for each file.
+
+* Montage (image mosaic) works best when all input images are the same size. You can pipeline two ImageMagick nodes, one to resize all input images to the same size, and one to create the montage.
+
+* The Montage operation has an option for overlaying the result of an expression on each cell. You might think to use this to overlay wedge settings, however because the node requires you to first merge work items representing individual files, the wedged attributes are lost. You can work around this by overlaying the wedge settings on each input image separately using an [Overlay Text node|Node:top/overlaytext] before merging them for this node.
+
+* You can access the full set of ImageMagick options by writing a custom command line. For example, you can change the background for overlays from black to transparent (`-background 'rgba(0,0,0,0)'`), or change the pixel filter used when resizing.
+
+
+== Installation == (install)
+
+Before you can use this node, you must install the [ImageMagick software|http://www.imagemagick.org/], either from the website (Mac/Windows) or using a package manager (Linux).
+
+* *You must manually install ImageMagick on each machine where work items will run*. (If you're using the local scheduler, you must install ImageMagick on the local machine. If you're using a render farm, you must install ImageMagick on all host machines on the farm.)
+
+* *The work items must be able to find the ImageMagick executable*.
+
+    * The `imagemagick` executable should be on the command path for the remote user.
+
+        _or_
+
+    * You can define a `PDG_IMAGEMAGICK` environment variable. This should contain the path to the `imagemagick` executable.
+
+        _or_
+
+    * You can manually enter the path to the executable in the __ImageMagick Path__ parameter.
+
+
+@top_attributes
+
+::`operation`
+    #type: string
+
+    The ImageMagick operation that will be performed (`montage`, `convert`, or `composite`)
+
+::`outputtag`
+    #type: string
+
+    The [file tag|/tops/filetags] of the result data.
+
+::`overridebin`
+    #type: integer
+
+    Whether the node explicitly specifies a path to the `imagemagick` executable in the `imagemagickbin` attribute.
+
+::`imagemagickbin`
+    #type: string
+
+    The file path of the `imagemagick` executable. This is only used if `overridebin` is set to `1`.
+
+::`usecustomcommand`
+    #type: integer
+
+    Whether the node should run the custom command line in the `customcommand` attribute.
+
+::`customcommand`
+    #type: string
+
+    A custom command line to run. This is only used if `usecustomcommand` is set to `1`.
+
+::`output`
+    #type: string
+
+    For `montage` and `composite` operation: specifies the output image.
+
+::`overlaymode`
+    #type: integer
+
+    For `montage`: the type of overlay to add to the montage (0=no overlay, 1=filename, 2=custom expression).
+
+::`overlayexpr`
+    #type: string
+
+    For `montage`: contains an expression to evaluate to get an image overlay. This is only used when `overlaymode` is set to `2`.
+
+::`ordermethod`
+    #type: integer
+
+    For `montage`: how to order the images in the block (0=by index, 1=by filename).
+
+::`input_images`
+    #type: string
+
+    A list of images to use to generate the output.
+
+::`updateresolution`
+    #type: integer
+
+    For `convert`: if this is `1`, the image resolution will be set to the values specified by the `imgwidth` and `imgheight` attributes.
+
+::`imgwidth`
+    #type: integer
+
+    For `convert`: specifies the new image width. Only used if `updateresolution` is set to `1`.
+
+::`imgheight`
+    #type: integer
+
+    For `convert`: specifies the new image height. Only used if `updateresolution` is set to `1`.
+
+::`preservear`
+    #type: integer
+
+    For `convert`: if this is `1`, adjust the `imgwidth` and `imgheight` attribute values to preserve the aspect ratio of the original image.
+
+::`imgquality`
+    #type: integer
+
+    For `convert`: the image quality of the output image (1-100). This is used by output drivers for certain file formats, such as JPEG.
+
+::`output_images`
+    #type: string
+
+    For `convert`: a list of the output image file paths.
+
+::`compositeop`
+    #type: string
+
+    For `composite`: the ImageMagick compositing operation name (`overylay`, `softlight`, or `multiply`).
+
+
+@parameters
+
+Operation:
+    #id: operation
+
+    How the node should manipulate the input images. Each operation has different parameters.
+
+    Montage:
+        Shrinks the images to thumbnail size and arranges them in a square grid. This gives you an overview of the multiple images at once. This is usually called a _mosaic_, but montage is the ImageMagick term.
+
+    Convert:
+        Converts images to a different format, and/or resizes them.
+
+    Composite:
+        Composites multiple images over each other. This can be useful for comparing similar images.
+
+
+~~~ Montage ~~~
+
+Order By:
+    #id: ordermethod
+
+    The order in which incoming images appear in the output image grid (from left-to-right, then top-to-bottom). You can sort by the `index` attribute on the work item, or by the input image file name.
+
+Overlay Mode:
+    #id: overlaymode
+
+    This node can overlay text on each "cell" in the image grid. For example, if you are comparing renders, you could overlay the image file name to make it easy to find the original. See the [tips and notes|#tips] section for information on overlaying wedged settings.
+
+    None:
+        Don't overlay any text on the cells.
+
+    Filename:
+        Overlay the image filename on the cells.
+
+    Custom Expression:
+        Overlay the output of an expression.
+
+Expression:
+    #id: overlayexpr
+
+    When __Overlay mode__ is "Custom expression", this expression is evaluated and overlayed onto the cells.
+
+
+~~~ Convert ~~~
+
+Width:
+    #id: imgwidth
+
+    The width of the output image(s).
+
+Height:
+    #id: imgheight
+
+    The height of the output image(s).
+
+Preserve Aspect Ratio:
+    #id: preservear
+
+    When this is on, ImageMagick will resize the original image within the specified width and height (possibly leaving blank space) to preserve its aspect ratio. When this is off, ImageMagick will _stretch_ the image to fit in the exact width and height.
+
+Image Quality:
+    #id: imgquality
+
+    The image quality to use when outputting JPEG files.
+
+Filename:
+    #id: convertfilename
+
+    The output filename. You can embed `{attributename}` strings in this filename and the node will replace them with the appropriate value for each image. You can also use `{inputfilename}` which is the _base file name_ (without extension) of the file being converted.
+
+Split Results into New Tasks:
+    #id: splitresults
+
+    If an incoming work item has multiple output results being converted (for example, you put a Wait for All before this node to convert all images in one go), you can turn this on to separate them back out into separate work items for each output file.
+
+
+~~~ Composite ~~~
+
+Composite Operation:
+    #id: compositeop
+
+    How to composite the incoming images together.
+
+    Overlay:
+        Copies each image on top off the previous one, with any alpha transparency allowing the previous images to show through.
+
+    Soft Light:
+        Bright pixels lighten, dark pixels darken, but with a smooth gradient between them.
+
+    Multiply:
+        Multiplies the existing pixel values by the pixel values in each image, so darker colors will darken the image, and white pixels have no effect. This is sometimes useful for diffing or overlaying text.
+
+
+~~~~~
+
+ImageMagick Command:
+    #id: customcommand
+
+    You can turn this on and write a custom command line. You can embed certain `{keywords}` in the command line string and the node will replace them with the appropriate values. You can rewrite the command line to access extra ImageMagick options not provided by the parameters of this node, such as different pixel filters when resizing, or different compositing methods.
+
+    * `{imagemagick}` -- the path to the `imagemagick` executable.
+    * `{input_images}` -- the list of input images as a space-separated string (ordered according to the parameters).
+    * `{output_image}` -- the file path of the output image.
+
+Custom Image Tag:
+    #id: imagetag
+
+    Turn this on to apply a custom [file tag|/tops/filetags] to the result files. If this is off, the default tag is `file/image`.
+
+Filename:
+    #id: filename
+
+    The output file path for montage and composite images. The should be relative to `__PDG_DIR__`. For intermediate results, include a <code>&#96;@pdg_name&#96;</code> expression in the name. This makes the work item's name a part of the output filename. This makes it unique across the TOP network.
+
+ImageMagick Path Override:
+    #id: imagemagickbin
+
+    Turn this on to specify an exact path to the ImageMagick executable. See [installation|#install] above.
+

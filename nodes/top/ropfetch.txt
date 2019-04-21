@@ -1,0 +1,211 @@
+#type:     node
+#context:  top
+#internal: ropfetch
+#icon:     TOP/ropfetch
+
+= ROP Fetch =
+
+"""Creates work items that cook a ROP node or network"""
+
+This node can be used to cook a ROP node or network using TOPs in either the
+current .hip file or an external file. It will create one work item per frame,
+based on the frame generation parameters.
+
+The work items can optionally be batched into a single job for all frames, or
+divided into smaller groups of frames. Each batch is cooked as a single job on
+the farm or locally. Batching all frames into one job is typically used for
+simulations so that simulation data can be kept in memory rather than cached
+to disk. Smaller batch sizes such a 4 frames per job can be useful when cooking
+a ROP that cooks quickly to avoid overhead loading the .hip file.
+
+@top_attributes
+
+::`hip`:
+    #type: string
+
+    The path to the .hip file that contains the ROP node.
+
+::`rop`:
+    #type: string
+
+    The ROP node path within the .hip file.
+
+::`top`:
+    #type: string
+
+    If the ROP is contained within a TOP asset, such as the ROP Geometry
+    node, then this attribute is set to the path to that TOP node.
+
+::`control`:
+    #type: string
+
+    When doing a distributed sim, this is set to the path to the Control DOP
+    node.
+
+::`sharedserver`:
+    #type: string
+
+    When doing a distributed sim, this attribute is set to the identifier for
+    the shared sim tracker process.
+
+::`range`:
+    #type: float3
+
+    The start, end and increment frame range values associated with the work
+    item. If the work item is in a batch, these values will refer to the range
+    for the entire batch.
+
+::`slice`:
+    #type: integer
+
+    When doing a distributed sim, this attribute is set to the slice number
+    associated with the work item.
+
+::`slicetype`:
+    #type: integer
+
+    The type of distributed since being used, set to either Particles (0) or
+    Volumes (1).
+
+::`slicedivs`:
+    #type: integer3
+
+    When using Volume slices, this attribute is set to the x, y and z slice
+    divisions.
+
+::`tileindex`:
+    #type: integer
+
+    When using the ROP Fetch to cook a tiled Mantra render, this value is set
+    to the render tile index associated with the work item.
+
+@parameters
+
+[Include:processor_common#pdg_workitemgeneration]
+
+[Include:processor_common#pdg_cachemode]
+
+ROP Path:
+    #id: roppath
+
+    The path to the ROP node or network that will be cooked by this TOP node.
+
+External HIP File:
+    #id: externalhip
+
+    The path to the .hip file that contains the ROP node. When selecting a ROP
+    in the current file it is not necessary to specify this parameter.
+
+    This is typically used when generating a .hip file procedurally as part of
+    an earlier step in the TOP network.
+
+Evaluate Using:
+    #id: framegeneration
+
+    Determines how the TOP node creates work items and evaluates the ROP. When
+    using __Single Frame__ the node will create one work item for each upstream
+    frame. When using __Frame Range__ the node creates one work item per frame
+    in the range, for each upstream work item.
+
+    Single Frame:
+	The node will create a single work item per upstream item, and will set
+	the new work item's frame to match the upstream item's frame. If there
+	are no input nodes then a single item set to frame 1 will be created.
+	The single frame value can be overridden using the __Override Frame__
+	parameter.
+
+    Frame Range:
+	For each upstream work item, the node will create the full frame range of
+	work items. If there are no upstream items, the node will create one
+	set of items for the specified frame range.
+
+Override Frame:
+    #id: frameoverride
+
+    When this parameter is enabled, it overrides the frame used with the
+    __Single Frame__ Evaluation mode.
+
+Frame Range:
+    #id: range
+
+    The frame start, end and step size to use when __Frame Generation__ is set 
+    to __Frame Range__.
+
+Expand Input Files Across Frame Range:
+    #id: expandinputs
+
+    When __Evaluating Using__ is set to __Frame Range__ this toggle can be
+    used to spread the input file list list across the frame range.
+
+    For example, if the upstream work item has 100 output files and the
+    frame range on this node is set to 1 to 50, each work item in this node
+    will have 2 input files. The first work item will have file 1 and file 2,
+    the second work item will have file 3 and file 4, etc.
+
+All Frames in One Batch:
+    #id: batchall
+
+    When this toggle is enabled, work items from the same frame range are
+    grouped into a batch that is scheduled as a single job. This is used for
+    simulations where each frame depends on the previous frame, and it is
+    advantageous to keep everything in memory.
+
+Frames per Batch:
+    #id: framesperbatch
+
+    By default, when this parameter is at 1 each work item is cooked as a 
+    separate job. When this parameter is set to a value greater than 1, work
+    items are grouped into batches.
+
+Cook Batch When:
+    #id: cookwhen
+
+    Determines when batches of frames are scheduled. By default the batch will
+    be scheduled once the dependencies for all frames are cooked, however it is
+    possible to schedule the batch as soon as its first frame can run.
+
+    All Frames are Ready:
+	The batch will only be scheduled once all dependencies on all frames in
+	the batch are satisfied.
+
+    First Frame is Ready:
+	The batch will be scheduled as soon as its first frame is ready. This is
+	possible because the ROP wrapper script used by PDG will ensure that
+	subsequent frames correctly wait for their dependencies. This is done by
+	communicating back to PDG as the job is running to check the status of
+	the dependencies before each frame.
+
+	This incurs slightly more network overhead, and requires ongoing 
+	communication between the job and PDG. This option is not available
+	when cooking a ROP Composite node since COP files nodes must be able to
+	load their entire input file sequence on the first frame.
+
+Distributed Sim:
+    #id: distributed
+
+    When this toggle is enabled, the node will treat the target ROP as part of 
+    a distributed simulation. This enables the parameters for configuring a
+    distributed sim, and disables the frame generation parameters.
+
+Control DOP:
+    #id: control
+
+    The control DOP for the distributed sim.
+
+Slice Type:
+    #id: slicetype
+
+    The type of slicing used for the distributed sim. Can be either
+    __Particles__ or __Volumes__.
+
+Slice Count:
+    #id: slicecount
+
+    When using the __Particles__ slice type, specifies how many slices there
+    are.
+
+Slice Divisions:
+    #id: slicedivs
+
+    When using the __Volumes__ slice type, determines the x, y and z volume
+    divisions for the simulation.

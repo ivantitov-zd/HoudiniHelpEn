@@ -3,7 +3,7 @@
 #cppname: HOM_ViewerStateTemplate
 #group: view
 
-"""Contains attributes describing a certain viewer state (tool)."""
+"""Contains attributes describing a custom viewer state (tool)."""
 
 Viewer states control interaction in the viewport. For example, the [Icon:TOOLS/rotate] Rotate tool is a view state. The [Icon:TOOLS/handles] Handles tool allows access to the state associated with the current node. Houdini lets you [create|/hom/python_states] and [register|Hom:hou.ui#registerViewerState] your own custom view states in Python.
 
@@ -40,11 +40,42 @@ For information on how to create your own custom view states, see [Python states
 
 @methods
 
-::`__init__(self, state_name, state_label, node_type_category)`:
+::`__init__(self, state_name, state_label, node_type_category, contexts=None)`:
     #cppname: HOM_ViewerStateTemplate::HOM_ViewerStateTemplate
     
-    Creates a new instance of ViewerStateTemplate
+    Creates a new instance of `ViewerStateTemplate` representing a unique custom state type.
+    
+    `ViewerStateTemplate` is identified by a name and a category type. The name is the custom type of the 
+    state. The category specifies the context-level that Houdini uses to run the state. If you want your state to run across
+    multiple context-levels, additional contexts can be added with the `contexts` parameter. Therefore, when the state is 
+    active and the user switches to a new context, Houdini will reuse the current state instance, provided the new context 
+    matches one of the state contexts. 
+     
+    This example demonstrates how to register an `OBJ` state which can run in the `SOP` and `CHOP` contexts as well:
 
+    {{{
+    #!python
+    import hou
+
+    # Create a class implementing the state callbacks
+    class MyState(object):
+        def __init__(self, state_name, scene_viewer):
+            self.state_name = state_name
+            self.scene_viewer = scene_viewer
+
+    # Create a template to describe the state and its bindings
+    state_name = "mystate"
+    state_label = "My Custom State"
+    node_type_category = hou.objNodeTypeCategory()
+    extra_contexts = [hou.sopNodeTypeCategory(), hou.chopNodeTypeCategory()]
+    template = hou.ViewerStateTemplate(
+        state_name, state_label, node_type_category, contexts=extra_contexts )
+    template.bindFactory(MyState)
+
+    # Register the template with Houdini
+    hou.ui.registerViewerState(my_template)
+    }}}
+    
     `state_name`:
         A unique string to identify the viewer state.
 
@@ -66,6 +97,34 @@ For information on how to create your own custom view states, see [Python states
         hou.objNodeTypeCategory()
         }}}
 
+        For LOP states use:
+
+        {{{
+        #!python
+        hou.lopNodeTypeCategory()
+        }}}
+
+        For DOP states use:
+
+        {{{
+        #!python
+        hou.dopNodeTypeCategory()
+        }}}
+
+    `contexts`:
+        A list of [Hom:hou.NodeTypeCategory] objects to specify additional context-levels for the state. 
+        
+        Choose any of the following types to add to `contexts`:
+        * [Hom:hou.chopNodeTypeCategory]
+        * [Hom:hou.cop2NodeTypeCategory]
+        * [Hom:hou.dopNodeTypeCategory]
+        * [Hom:hou.lopNodeTypeCategory]
+        * [Hom:hou.objNodeTypeCategory]
+        * [Hom:hou.sopNodeTypeCategory]
+        * [Hom:hou.topNodeTypeCategory]
+
+        *Note:* An exception will be thrown if unsupported types are used.
+
 ::`typeName(self)` -> `str`:
     #cppname: HOM_ViewerStateTemplate::typeName
     
@@ -76,6 +135,11 @@ For information on how to create your own custom view states, see [Python states
     
     Returns the name of the node type category of the state which you can use for creating the proper [category object|Hom:hou.nodeTypeCategory].
 
+::`contexts(self)` -> `list` of [Hom:hou.NodeTypeCategory]:
+    #cppname: HOM_ViewerStateTemplate::contexts
+    
+    Returns the list of [contexts|Hom:hou.NodeTypeCategory] in which the state can be used. 
+    
 ::`bindFactory(self, callable)`:
     #cppname: HOM_ViewerStateTemplate::bindFactory
 
@@ -160,34 +224,31 @@ For information on how to create your own custom view states, see [Python states
         )
     }}}
 
-::`bindGeometrySelector(self, prompt, allow_drag=False, quick_select=True, auto_start=True, use_existing_selection=True, initial_selection="", initial_selection_type=hou.geometryType.Primitives, ordered=False, geometry_types=hou.geometryType.Primitives, primitive_types=None, allow_other_sops=False, hotkey=None)`:
+::`bindGeometrySelector(self, prompt, allow_drag=False, quick_select=True, auto_start=True, use_existing_selection=True, initial_selection="", initial_selection_type=hou.geometryType.Primitives, ordered=False, geometry_types=hou.geometryType.Primitives, primitive_types=None, allow_other_sops=False, hotkey=None, name=None)`:
     #cppname: HOM_ViewerStateTemplate::bindGeometrySelector
     
-    Binds a geometry selector to this viewer state. This selector is used for selecting geometry elements when the underlying viewer state is active. 
+    Binds a geometry selector to a [SOP|Hom:hou.sopNodeTypeCategory] viewer state. This selector is used for selecting geometry elements when the underlying viewer state is active. 
     This selector can only be used in a scene viewer, exception is thrown otherwise at registration ([Hom:hou.ui#registerViewerStateTemplate]). 
 
-    Only one selector can be used with a viewer state. Multiple selectors are not supported, exception is thrown otherwise.
+    Multiple geometry selectors can be bound to a viewer state. However, other selector types cannot be mixed, exception is thrown otherwise.
         
     The viewer state plug-in can implement the `onSelection` method to receive new selections. `onSelection` gets the new selection as a [Hom:hou.GeometrySelection] stored in the `selection` entry of the input
     `kwargs` dictionary. The return value can be `True` to stop the selection tool or `False` to keep it running. Pressing ((Enter)) also terminates the selector.
 
-    `prompt`:
-        Prompt displayed in the viewport when the selector is active. The prompt is mandatory.
-
     `allow_drag`:
         Determines whether selecting a component with a single mouse click completes the selection. This is typically used to prevent a multiple component selection. Defaults to False.
 
-    `quick_select`:
-        If this is `True`, the state's selection event is called whenever the selection changes. If this is `False`, Houdini waits for the user to finish selection by pressing ((Enter)) before it notifies the state about the new selection.
+    `allow_other_sops`:
+        Allow selecting components on geometry from other geometry nodes visible in the viewport. Defaults to `False`.
 
     `auto_start`:
         If `True` (the default), start the selector when the viewer state is activated. If `False`, you must specify a `hotkey` argument that activates the selector.
 
-        NOTE:
-            If you specify `auto_start=False` but don't specify a `hotkey` (or specify `hotkey=None`), Houdini will print a warning to the console and then act as if `auto_start=True`.
+    `geometry_types`:
+        A [Hom:hou.geometryType] value representing the component type the user can select. The default is [Hom:hou.geometryType#Primitives].
 
-    `use_existing_selection`:
-        If this is `True`, and a component selection exists when the user activates the state, Houdini will call `onSelection` with that selection. If this is `False`, Houdini will clear any existing selection and ask for a new selection.
+    `hotkey`:
+        An optional hotkey which acts as a switch for starting or stopping the selector. The default is `None`.
 
     `initial_selection`:
         When `use_existing_selection` is `False`, this is a string of [component group syntax|/model/groups#manual] representing what to set the selection to when the state is activated. The default is no selection.
@@ -195,33 +256,49 @@ For information on how to create your own custom view states, see [Python states
     `initial_selection_type`:
         A [Hom:hou.geometryType] value, representing the type of components specified by the `initial_selection` argument. The default is [Hom:hou.geometryType#Primitives].
 
+    `name`:
+        Optional name identifier (None by default) for the selector, must be unique within the viewer state. The name is used for [triggering|Hom:hou.SceneViewer#triggerStateSelector] selector operations.
+
     `ordered`:
         If this is `True`, Houdini returns the components in the selection in the order the user selected them. The default is `False`, meaning the order of the components you get is unrelated to the order they were selected.
 
         Only set this to `True` if for some reason you need to distinguish, for example, the first primitive the user clicked, or the last, or that kind of thing.
 
-    `geometry_types`:
-        A [Hom:hou.geometryType] value representing the component type the user can select. The default is [Hom:hou.geometryType#Primitives].
+    `prompt`:
+        Prompt displayed in the viewport when the selector is active. The prompt is mandatory.
 
     `primitive_types`:
         If this is not `None`, it should be a [Hom:hou.primType] value representing a type of primitive the user can select. The default of `None` allows selecting all types.
 
-    `allow_other_sops`:
-        Allow selecting components on geometry from other geometry nodes visible in the viewport. Defaults to `False`.
+    `quick_select`:
+        If this is `True`, the state's selection event is called whenever the selection changes. If this is `False`, Houdini waits for the user to finish selection by pressing ((Enter)) before it notifies the state about the new selection.
+
+    `use_existing_selection`:
+        If this is `True`, and a component selection exists when the user activates the state, Houdini will call `onSelection` with that selection. If this is `False`, Houdini will clear any existing selection and ask for a new selection.
+
+::`bindObjectSelector(self, prompt, quick_select=True, auto_start=True, use_existing_selection=True, allow_multisel=True, allowed_types=('*',), hotkey=None, name=None)`:
+    #cppname: HOM_ViewerStateTemplate::bindObjectSelector
+        
+    Binds an object selector to a [OBJ|Hom:hou.objNodeTypeCategory] viewer state. This selector is used for selecting objects when the underlying viewer state is active. This selector can only be used in a 
+    scene viewer, exception is thrown otherwise at registration ([Hom:hou.ui#registerViewerStateTemplate]). 
+
+    Multiple object selectors can be bound to a viewer state. However, other selector types cannot be mixed with [OBJ|Hom:hou.objNodeTypeCategory] selectors, exception is thrown otherwise.
+        
+    The viewer state plug-in can implement the `onSelection` method to receive new selections. `onSelection` gets the new selection as a list of [Hom:hou.Node] objects stored in 
+    the `selection` entry of the input `kwargs` dictionary. The return value can be `True` to stop the selection tool or `False` to keep it running. Pressing ((Enter)) also terminates the selector.
+
+    `allowed_types`:
+        A list of strings to specify one or multiple object types the user can select. For instance, add `geo` to `allowed_types` to select geometry objects only. Patterns such as `*` can be used to select any objects or more restritive patterns 
+        such as `*cam*` for selecting any camera objects. All available object types can be obtained with [Hom:hou.objNodeTypeCategory#nodeTypes]. Defaults to `*`.
+
+    `auto_start`:
+        If `True` (the default), start the selector when the viewer state is activated. If `False`, you must specify a `hotkey` argument that activates the selector.
 
     `hotkey`:
         An optional hotkey which acts as a switch for starting or stopping the selector. The default is `None`.
 
-::`bindObjectSelector(self, prompt, quick_select=True, auto_start=True, use_existing_selection=True, allow_multisel=True, allowed_types=('*',), hotkey=None)`:
-    #cppname: HOM_ViewerStateTemplate::bindObjectSelector
-    
-    Binds an object selector to a viewer state of type `Object`. This selector is used for selecting objects when the underlying viewer state is active. This selector can only be used in a 
-    scene viewer, exception is thrown otherwise at registration ([Hom:hou.ui#registerViewerStateTemplate]). 
-
-    Only one selector can be used with a viewer state. Multiple selectors are not supported, exception is thrown otherwise.
-        
-    The viewer state plug-in can implement the `onSelection` method to receive new selections. `onSelection` gets the new selection as a list of [Hom:hou.Node] objects stored in 
-    the `selection` entry of the input `kwargs` dictionary. The return value can be `True` to stop the selection tool or `False` to keep it running. Pressing ((Enter)) also terminates the selector.
+    `name`:
+        Optional name identifier (None by default) for the selector, must be unique within the viewer state. The name is used for [triggering|Hom:hou.SceneViewer#triggerStateSelector] selector operations.
 
     `prompt`:
         Prompt displayed in the viewport when the selector is active. The prompt is mandatory.
@@ -229,56 +306,34 @@ For information on how to create your own custom view states, see [Python states
     `quick_select`:
         If this is `True`, the state's selection event is called whenever the selection changes. If this is `False`, Houdini waits for the user to finish selection by pressing ((Enter)) before it notifies the state about the new selection. Defaults to `True`.
 
-    `auto_start`:
-        If `True` (the default), start the selector when the viewer state is activated. If `False`, you must specify a `hotkey` argument that activates the selector.
-
-        NOTE:
-            If you specify `auto_start=False` but don't specify a `hotkey` (or specify `hotkey=None`), Houdini will print a warning to the console and then act as if `auto_start=True`.
-
     `use_existing_selection`:
         If this is `True`, and a component selection exists when the user activates the state, Houdini will call `onSelection` with that selection. If this is `False`, Houdini will clear any existing selection and ask for a new selection. Defaults to `True`.
 
-    `allowed_types`:
-        A list of strings to specify one or multiple object types the user can select. For instance, add `geo` to `allowed_types` to select geometry objects only. Patterns such as `*` can be used to select any objects or more restritive patterns 
-        such as `*cam*` for selecting any camera objects. All available object types can be obtained with [Hom:hou.objNodeTypeCategory#nodeTypes]. Defaults to `*`.
-
-    `hotkey`:
-        An optional hotkey which acts as a switch for starting or stopping the selector. The default is `None`.
-
-::`bindSceneGraphSelector(self, prompt, allow_drag=True, quick_select=True, auto_start=True, use_existing_selection=True, allow_multisel=True, prior_selection_paths=None, prim_mask=None, path_prefix_mask=None, prim_kind=None, hotkey=None)`:
+::`bindSceneGraphSelector(self, prompt, allow_drag=True, quick_select=True, auto_start=True, use_existing_selection=True, allow_multisel=True, prior_selection_paths=None, prim_mask=None, path_prefix_mask=None, prim_kind=None, hotkey=None, name=None)`:
     #cppname: HOM_ViewerStateTemplate::bindSceneGraphSelector
 
-    Binds a scene graph selector to this viewer state. This selector is used for selecting scene graph elements when the underlying viewer state is active.
-    This selector can only be used in a scene graph viewer, exception is thrown otherwise at registration ([Hom:hou.ui#registerViewerStateTemplate]). 
+    Binds a scene graph selector to a [SOP|Hom:hou.sopNodeTypeCategory] viewer state. This selector is used for selecting scene graph elements when the underlying viewer state is active.
+    This selector can only be bound used in a scene graph viewer, exception is thrown otherwise at registration ([Hom:hou.ui#registerViewerStateTemplate]). 
 
-    Only one selector can be used with a viewer state. Multiple selectors are not supported, exception is thrown otherwise.
+    Multiple scene graph selectors can be bound to a viewer state. However, other selector types cannot be mixed with scene graph selectors, exception is thrown otherwise.
         
     The viewer state plug-in can implement the `onSelection` method to receive new selections. `onSelection` gets the new selection as a list of element
     paths stored in the `selection` entry of the input `kwargs` dictionary. The return value can be `True` to keep running the selection tool or `False` to stop it. Pressing ((Enter)) also terminates the selector.
 
-    `prompt`:
-        Prompt displayed in the viewport when the selector is active. The prompt is mandatory.
-
     `allow_drag`:
         Allows the selection to be completed with a single mouse click. Defaults to True.
-
-    `quick_select`:
-        Configure the selector to use quick selections. When True the selection callback is called automatically for each selection, if False the user must hit 'enter' to complete the selection. Defaults to True.
-
-    `auto_start`:
-        Start the selector when the viewer state is activated. True by default. 
-
-    `use_existing_selection`:
-        If True, the selector uses the existing selection. Defaults to True.
 
     `allow_multisel`:
         Allows the tool to select multiple elements. Defaults to True.
 
-    `prior_selection_paths`:
-        Array of element paths to pre-select.
+    `auto_start`:
+        Start the selector when the viewer state is activated. True by default. 
 
-    `prim_mask`:
-        Filter mask for the selection ([Hom:hou.scenePrimMask]). Defaults to [Hom:hou.scenePrimMask.ViewerSetting]
+    `hotkey`:
+        An optional hotkey which acts as a toggle switch for starting or stopping the selector. No hotkey by default.
+
+    `name`:
+        Optional name identifier (None by default) for the selector, must be unique within the viewer state. The name is used for [triggering|Hom:hou.SceneViewer#triggerStateSelector] selector operations.
 
     `path_prefix_mask`:
         Filter out selectable elements by a name prefix. Empty by default.
@@ -286,8 +341,140 @@ For information on how to create your own custom view states, see [Python states
     `prim_kind`:
         Primitive kind to highlight. Empty by default.
 
+    `prim_mask`:
+        Filter mask for the selection ([Hom:hou.scenePrimMask]). Defaults to [Hom:hou.scenePrimMask.ViewerSetting]
+
+    `prior_selection_paths`:
+        Array of element paths to pre-select.
+
+    `prompt`:
+        Prompt displayed in the viewport when the selector is active. The prompt is mandatory.
+
+    `quick_select`:
+        Configure the selector to use quick selections. When True the selection callback is called automatically for each selection, if False the user must hit 'enter' to complete the selection. Defaults to True.
+
+    `use_existing_selection`:
+        If True, the selector uses the existing selection. Defaults to True.
+
+::`bindDynamicsSelector(self, prompt, allow_objects=True, allow_modifiers=False, quick_select=True, auto_start=True, use_existing_selection=True, allow_multisel=True, hotkey=None, name=None)`:
+    #cppname: HOM_ViewerStateTemplate::bindDynamicsSelector
+    
+    Binds a dynamics selector to a [DOP|Hom:hou.dopNodeTypeCategory] viewer state. This selector is used for selecting dynamics objects and modifiers when the underlying viewer state is active. 
+    This selector can only be used in a scene viewer, exception is thrown otherwise at registration ([Hom:hou.ui#registerViewerStateTemplate]). 
+
+    Multiple dynamics, point and polygon selectors can be bound to a viewer state. However, other selector types cannot be mixed with [DOP|Hom:hou.dopNodeTypeCategory] selectors, exception is thrown otherwise.
+        
+    The viewer state plug-in can implement the `onSelection` method to receive new selections. `onSelection` gets the new selection as a list of [Hom:hou.DopData] objects stored in the `selection` entry of the input
+    `kwargs` dictionary. The return value can be `True` to stop the selection tool or `False` to keep it running. Pressing ((Enter)) also terminates the selector.
+
+    `allow_modifiers`:
+        Allows the tool to select simulation modifiers. Exception is thrown if `allow_modifiers` and `allow_objects` are both set to False. Default to False. 
+
+    `allow_multisel`:
+        Allows the tool to select multiple elements. Defaults to True.
+
+    `allow_objects`:
+        Allows object selection. Exception is thrown if `allow_modifiers` and `allow_objects` are both set to False. Defaults to True.
+
+    `auto_start`:
+        If `True` (the default), start the selector when the viewer state is activated. If `False`, you must specify a `hotkey` argument that activates the selector.
+
     `hotkey`:
-        An optional hotkey which acts as a toggle switch for starting or stopping the selector. No hotkey by default.
+        An optional hotkey which acts as a switch for starting or stopping the selector. The default is `None`.
+
+    `name`:
+        Optional name identifier (None by default) for the selector, must be unique within the viewer state. The name is used for [triggering|Hom:hou.SceneViewer#triggerStateSelector] selector operations.
+
+    `prompt`:
+        Prompt displayed in the viewport when the selector is active. The prompt is mandatory.
+
+    `quick_select`:
+        If this is `True`, the state's selection event is called whenever the selection changes. If this is `False`, Houdini waits for the user to finish selection by pressing ((Enter)) before it notifies the state about the new selection.
+
+    `use_existing_selection`:
+        If this is `True`, and a component selection exists when the user activates the state, Houdini will call `onSelection` with that selection. If this is `False`, Houdini will clear any existing selection and ask for a new selection.
+
+::`bindDynamicsPointSelector(self, prompt, allow_objects=True, allow_modifiers=False, quick_select=True, auto_start=True, use_existing_selection=True, allow_multisel=True, only_select_points=True, object_based_point_selection=False, use_last_selected_object=False, hotkey=None, name=None)`:
+    #cppname: HOM_ViewerStateTemplate::bindDynamicsPointSelector
+    
+    Binds a dynamics point selector to a [DOP|Hom:hou.dopNodeTypeCategory] viewer state. This selector is used for selecting point elements when the underlying viewer state is active. 
+    This selector can only be used in a scene viewer, exception is thrown otherwise at registration ([Hom:hou.ui#registerViewerStateTemplate]). 
+
+    Multiple dynamics, polygon and point selectors can be bound to a viewer state. However, other selector types cannot be mixed with [DOP|Hom:hou.dopNodeTypeCategory] selectors, exception is thrown otherwise.
+        
+    The viewer state plug-in can implement the `onSelection` method to receive new selections. `onSelection` gets the new selection as a list of ([Hom:hou.DopData],[Hom:hou.GeometrySelection]) tuples stored in the `selection` entry of the input
+    `kwargs` dictionary. The return value can be `True` to stop the selection tool or `False` to keep it running. Pressing ((Enter)) also terminates the selector.
+
+    `allow_modifiers`:
+        Allows the tool to select simulation modifiers. Default to False.
+
+    `allow_multisel`:
+        Allows the tool to select multiple elements. Defaults to True.
+
+    `allow_objects`:
+        Allows object selection. Defaults to True.
+
+    `auto_start`:
+        If `True` (the default), start the selector when the viewer state is activated. If `False`, you must specify a `hotkey` argument that activates the selector.
+
+    `hotkey`:
+        An optional hotkey which acts as a switch for starting or stopping the selector. The default is `None`.
+
+    `name`:
+        Optional name identifier (None by default) for the selector, must be unique within the viewer state. The name is used for [triggering|Hom:hou.SceneViewer#triggerStateSelector] selector operations.
+
+    `object_based_point_selection`:
+        Force selection of points on the currently selected object instead of the default selection of points on the closest object. Default to False.
+
+    `only_select_points`:
+        Default to True.
+
+    `prompt`:
+        Prompt displayed in the viewport when the selector is active. The prompt is mandatory.
+
+    `quick_select`:
+        If this is `True`, the state's selection event is called whenever the selection changes. If this is `False`, Houdini waits for the user to finish selection by pressing ((Enter)) before it notifies the state about the new selection.
+
+    `use_existing_selection`:
+        If this is `True`, and a component selection exists when the user activates the state, Houdini will call `onSelection` with that selection. If this is `False`, Houdini will clear any existing selection and ask for a new selection.
+      
+    `use_last_selected_object`:
+        Force point selection to only be possible on the specified object and do not allow selection of a different object. Default to False.
+
+::`bindDynamicsPolygonSelector(self, prompt, quick_select=True, auto_start=True, use_existing_selection=True, object_based_point_selection=False, use_last_selected_object=False, hotkey=None, name=None)`:
+    #cppname: HOM_ViewerStateTemplate::bindDynamicsPolygonSelector
+    
+    Binds a dynamics polygon selector to a [DOP|Hom:hou.dopNodeTypeCategory] viewer state. This selector is used for selecting polygon elements when the underlying viewer state is active. 
+    This selector can only be used in a scene viewer, exception is thrown otherwise at registration ([Hom:hou.ui#registerViewerStateTemplate]). 
+
+    Multiple dynamics, point and polygon selectors can be bound to a viewer state. However, other selector types cannot be mixed with [DOP|Hom:hou.dopNodeTypeCategory] selectors, exception is thrown otherwise.
+        
+    The viewer state plug-in can implement the `onSelection` method to receive new selections. `onSelection` gets the new selection as a list of ([Hom:hou.DopData],[Hom:hou.GeometrySelection]) tuples stored in the `selection` entry of the input
+    `kwargs` dictionary. The return value can be `True` to stop the selection tool or `False` to keep it running. Pressing ((Enter)) also terminates the selector.
+
+    `auto_start`:
+        If `True` (the default), start the selector when the viewer state is activated. If `False`, you must specify a `hotkey` argument that activates the selector.
+
+    `hotkey`:
+        An optional hotkey which acts as a switch for starting or stopping the selector. The default is `None`.
+
+    `name`:
+        Optional name identifier (None by default) for the selector, must be unique within the viewer state. The name is used for [triggering|Hom:hou.SceneViewer#triggerStateSelector] selector operations.
+
+    `object_based_point_selection`:
+        Force selection of points on the currently selected object instead of the default selection of points on the closest object. Default to False.
+
+    `prompt`:
+        Prompt displayed in the viewport when the selector is active. The prompt is mandatory.
+
+    `quick_select`:
+        If this is `True`, the state's selection event is called whenever the selection changes. If this is `False`, Houdini waits for the user to finish selection by pressing ((Enter)) before it notifies the state about the new selection.
+
+    `use_existing_selection`:
+        If this is `True`, and a component selection exists when the user activates the state, Houdini will call `onSelection` with that selection. If this is `False`, Houdini will clear any existing selection and ask for a new selection.
+      
+    `use_last_selected_object`:
+        Force polygon selection to only be possible on the specified object and do not allow selection of a different object. Default to False.
 
 ::`bindSelector(self, name, selector_type, prompt, primitive_types=None, group_parm_name=None, input_index=0, input_required=True, allow_dragging=True)`:
 	#cppname: HOM_ViewerStateTemplate::bindSelector
@@ -296,6 +483,8 @@ For information on how to create your own custom view states, see [Python states
     These selectors are typically used by the shelf tool of the digital asset to create new instances of the `SOP` nodes. Houdini will 
     invoke all bounded selectors, wait for the user to select geometries, and then connect the input `SOP`s and fill in group parameters 
     to match what was selected.
+
+    This kind of selector is different from the ones created with [Hom:hou.ViewerStateTemplate#bindGeometrySelector] or [Hom:hou.ViewerStateTemplate#bindObjectSelector]. They are stricly used by Houdini and cannot be triggered with [Hom:hou.SceneViewer#triggerStateSelector].
       	
     `name`:
         A unique selector name identifier.

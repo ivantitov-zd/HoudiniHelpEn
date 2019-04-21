@@ -1,0 +1,160 @@
+= Generic Server Begin =
+
+#type:     node
+#context:  top
+#internal: commandserver
+#icon:     TOP/commandserver
+
+"""Starts a generic command server."""
+
+
+== Command chains ==
+
+This node creates a work item that starts up a generic [command server|/tops/servers]. It is the start of a block which ends with a [Command Server End node|Node:top/commandserverend].
+
+* For the duration of the block, the server stays running and ready to accept commands.
+
+* Within the block you can use [Command Send nodes|Node:top/commandsend] to communicate with the server. The work items within the block execute serially (instead of in parallel), one after another.
+
+* After the last work item in a session finishes, the Command Server End node shuts down the server.
+
+* You can optionally schedule multiple parallel servers, or multiple serial session "loops" through the same server. See the __Session count from upstream items__ and __Number of sessions__ parameters.
+
+See [command servers|/tops/servers] for additional details on the use of command chains.
+
+
+== Implementing a server == (generic)
+
+The "generic" server is designed to allow you to implement your own simple servers. The generic server nodes support two protocols:
+
+* XML/RPC is a protocol that provides a "remote function call" interface by passing snippets of XML over HTTP. You can implement an XML/RPC server using a library included in the Python standard library (`SimpleXMLRPCServer` in Python 2.7, `xmlrpc.server` in Python 3).
+
+* "Raw TCP". This provides a low-level "send/receive" interface, like `telnet`. You can implement a TCP server using the `socketserver.TCPServer` class in the Python standard library.
+
+The __Server command__ parameter specifies the command line to start up the server. See the [parameter help|#startupcmdline] for information on passing the hostname and port number.
+
+
+@top_attributes
+
+::`sharedserver`:
+    #type: str
+
+    The sharedserver attribute specifies the name of the shared server instance
+    associated with the work item. In the case of the begin item, it's the name
+    of the server that the work item will eventually create.
+
+::`loopiter`:
+    #type: [int]
+
+    This attribute is inherited from the [Feedback Begin|Node:top/feedbackbegin]
+    node.
+
+    The loop iteration number, within the set of work items associated with
+    the loop. This attribute can be an array of values when using nested feedback
+    loops, since the iteration number at each level is preserved. The loop
+    iteration value for the outer most loop is stored in `loopiter[0]`, the next
+    level is stored in `loopiter[1]`, and so on.
+
+::`loopnum`:
+    #type: int
+
+    This attribute is inherited from the [Feedback Begin|Node:top/feedbackbegin]
+    node.
+
+    Tracks which loop the work item is associated with. This attribute is
+    relavent when generating multiple independent loops in the same feedback
+    begin node, for example by driving the feedback begin node with a
+    [Wedge|Node:top/wedge] node.
+
+::`loopsize`:
+    #type: int
+
+    This attribute is inherited from the [Feedback Begin|Node:top/feedbackbegin]
+    node.
+
+    The total number of iterations in the loop.
+
+
+@parameters
+
+[Include:processor_common#pdg_workitemgeneration]
+
+Session Count from Upstream Items:
+    #id: iterationsfromupstream
+
+    If this is on, the node creates a single server instance, and serially loops through the block once for each incoming work item. If this is off, the node creates parallel server instances for each incoming work item (and you can specify the number of session loops per instance using the __Number of sessions__ parameter).
+
+Number of Sessions:
+    #id: iterations
+
+    When __Session count from upstream items__ is off, this is the number of times to loop through the session block for each server instance. These session loops execute serially, one after the other.
+
+Shared Server Name:
+    #id: sharedservername
+
+    A name for the server instance. The [Command Send|Node:top/commandsend] node can use this choose what server to interact with if you nest multiple command server blocks. The name should be unique across the TOP network. Since this node can start up multiple servers at once, it usually appends the incoming work item index to the name, controlled by the __Append index to server name__ checkbox.
+
+Append Index to Server Name:
+    #id: autosuffixname
+
+    Appends the current work item index to the __Shared server name__ for each parallel instance of the server (for example, `shareserver` -> `sharedserver0`, `sharedserver1`, and so on). This prevents name conflicts between parallel instances.
+
+Server Port:
+    #id: commandport
+
+    The TCP port number the server should bind to (when __Connect to existing server__ if off), _or_ the port to use to connect to an existing server (when __Connect to existing server__ is on). The default value `0` tells the system to dynamically choose an unused port, which is usually what you want. If you want to keep the ports in a certain range (and can guarantee the port numbers will be available), you can use an expression here such as `9000 + @pdg_index`. See the __Server command__ parameter help for how to pass this value to the server startup script.
+
+    Note that on UNIX systems ports 0-1023 can only be bound by a superuser, so you will probably need to choose a port above 1023.
+
+Protocol:
+    #id: prototype
+
+    How Command Send nodes should communicate with the server. The choices are "XML/RPC" or "Raw TCP". See [implementing a server|#generic] above.
+
+Connect to Existing Server:
+    #id: externalserver
+
+    When this is on, the work item will connect to an existing server on a host address, rather than starting up a new server process. This can be useful to connect to a central server such as an asset management system, however you must be sure to serialize access to the server.
+
+Server Address:
+    #id: externalhost
+
+    When __Connect to existing server__ is on, the host address of the server to connect to. Set the __Server port__ parameter to the port used by the existing server.
+
+Load Timeout:
+    #id: timeout
+
+    The timeout used when performing an initial verification that the shared
+    server instance can be reached. When this timeout passes without a successful
+    communication, the work item for that server will be marked as failed
+
+Server Command:
+    #id: startupcmdline
+
+    The command to run to start the server. This command line should work when run on a remote server, so you probably want to put the start script in a known location on the shared network filesystem.
+
+~~~~ Loop Attribute Names ~~~~
+
+These parameters can be used to customize the names of the work item attributes
+created by this node.
+
+Iteration:
+    #id: iterattribute
+
+    The name of the attribute that stores the work item's iteration number.
+
+Number of Iterations:
+    #id: sizeattribute
+
+    The name of the attribute that stores the total iteration count.
+
+Loop Number:
+    #id: numattribute
+
+    The name of the attribute that stores the loop number.
+
+@related
+- [Node:top/commandserverend]
+- [Node:top/houdiniserver]
+- [Node:top/mayaserver]
+- [Node:top/sendcommand]

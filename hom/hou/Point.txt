@@ -3,18 +3,144 @@
 #cppname: HOM_Point
 #group: geo
 
-"""Each Point object resides inside a Geometry object and stores a
-3D position.  Points may be shared between primitives (such as polygons), and
-the set of points and primitives describes a 3D shape."""
+"""Represents a point on a geometry primitive, such as a polygon or NURBS surface."""
 
-The set of points may also store arbitrary data in the form of attributes,
-and each point instance stores a unique attribute value.
+Each Point object resides inside a Geometry object and stores a
+3D position.  Points may be shared between primitives (such as polygons), and
+the set of points and primitives describes a 3D shape.
+
+Each point can store arbitrary values in named attributes.
+
 
 @methods
 
-::`attribValue(self, name_or_attrib)` -> `int`, `float`, `str` or `tuple`:
+== Point data ==
+
+::`geometry(self)` -> [Hom:hou.Geometry]:
+    #cppname: HOM_Point::geometry
+
+    Returns the [Hom:hou.Geometry] object containing this point.
+
+::`number(self)` -> `int`:
+    #cppname: HOM_Point::number
+    #replaces: Exp:pointlist, Exp:poppointnum
+
+    Returns the point number of this point.  Points are numbered sequentially across the entire Geometry
+    starting from 0, and the points returned by [Hom:hou.Geometry#points]
+    are in point number order.
+
+::`prims(self)` -> `tuple` of [Hom:hou.Prim]:
+    #cppname: HOM_Point::prims
+
+    Returns a tuple of the primitives that reference this point.
+
+::`vertices(self)` -> `tuple` of [Hom:hou.Vertex]:
+    #cppname: HOM_Point::vertices
+
+    Returns a tuple of the vertices that reference this point.
+
+    This requires a search through a primitive's vertices, so the cost grows with
+    the total number of vertices across this point's primitives.
+
+::`position(self)` -> [Hom:hou.Vector3]:
+    #cppname: HOM_Point::position
+
+    Return the position of this point as a [Hom:hou.Vector3] containing the (X, Y, Z) values.
+
+    You can transform the `Vector3` using a [Hom:hou.Matrix4]:
+
+    {{{
+    xform = hou.node("/obj/geo1").worldTransform()  # Matrix4
+    new_pos = point.position() * xform
+    }}}
+    
+    This method is a shortcut for accessing the `P` attribute of the point. However, it is not equivalent, because `point.attribValue("P")` returns a 3-tuple of floats, not a `Vector3` object:
+
+    {{{
+    #!python
+    point.position()
+    # is equivalent to
+    hou.Vector3(point.attribValue("P"))
+    }}}
+
+::`setPosition(self, position)`:
+    #cppname: HOM_Point::setPosition
+
+    Changes the point's location.  You would typically call this method from
+    the code of a Python-defined SOP.
+
+    `position` is any sequence of floats, such has a [Hom:hou.Vector3] or a tuple or list of
+    floats, of length 3 or 4.  The fourth coordinate corresponds to
+    the weight, and is usually 1.  The weight is typically used by NURBS
+    curves and sequences.  If the sequence is of size 3, the weight will be
+    unchanged.
+
+    This method is a shortcut for calling [Hom:hou.Point#setAttribValue] on
+    the `P` attribute.
+
+    {{{
+    #!python
+    point.setPosition((x, y, z))
+    # is the same as
+    point.setAttribValue("P", (x, y, z))
+    }}}
+
+    Raises [Hom:hou.GeometryPermissionError] if the geometry is not modifiable.
+    Raises [Hom:hou.InvalidSize] if the length of `position` is not 3 or 4.
+
+::`weight(self)` -> `float`:
+    #cppname: HOM_Point::weight
+
+    Return the weight of this point.  Point weights are displayed in Houdini's
+    geometry spreadsheet as the fourth component of the position. Point weights
+    are used by NURBS.
+
+    Usually, the weight is 1.0.
+
+    This method is a shortcut for accessing the `Pw` attribute of the point.
+
+    {{{
+    #!python
+    point.weight()
+    # is equivalent to
+    point.attribValue("Pw")
+    }}}
+
+    You can build a [Hom:hou.Vector4] containing both the position and weight:
+
+    {{{
+    #!python
+    hou.Vector4(tuple(point.position()) + (point.weight(),))
+    }}}
+
+    See also [Hom:hou.Point#position].
+
+::`setWeight(self, weight)`:
+    #cppname: HOM_Point::setWeight
+
+    Change the point's weight.  You would typically call this method from
+    the code of a Python-defined SOP.
+
+    This method is a shortcut for calling [Hom:hou.Point#setAttribValue] on
+    the `Pw` attribute.
+
+    See [Hom:hou.Point#weight] for more information about a point's weight.
+    See also [Hom:hou.Point#setPosition].
+
+
+== Attributes ==
+
+::`attribType(self)` -> [Hom:hou.attribType] enum value:
+    #cppname: HOM_Point::attribType
+
+    Always returns `hou.attribType.Point`.
+
+    This is only useful if you want to write generic code that works whether the input objects are [Hom:hou.Prim], [Hom:hou.Point], or [Hom:hou.Vertex]. They all have an `attribType()` method that returns the right `attribType` value for the given object.
+
+::`attribValue(self, name_or_attrib)` -> `int`, `float`, `str`, or `tuple`:
     #cppname: HOM_Point::attribValue
     #replaces: Exp:point, Exp:points, Exp:poppoint, Exp:poppointid
+
     Return value stored in this point for a particular attribute.  The
     attribute may be specified by name or by [Hom:hou.Attrib] object.
 
@@ -53,107 +179,6 @@ and each point instance stores a unique attribute value.
     print point.attribValue(cd_attribute)
     }}}
 
-::`floatAttribValue(self, name_or_attrib)` -> `float`:
-    #cppname: HOM_Point::floatAttribValue
-    Return the point attribute value for a particular floating point attribute.
-    The attribute may be specified by name or by [Hom:hou.Attrib] object.
-
-    Raises [Hom:hou.OperationFailed] if no attribute exists with this name
-    or the attribute is not float of size 1.
-
-    In most cases, you'll just use [Hom:hou.Point#attribValue] to access
-    attribute values.  Houdini uses this method internally to implement
-    attribValue.
-
-::`floatListAttribValue(self, name_or_attrib)` -> `tuple` of `float`:
-    #cppname: HOM_Point::floatListAttribValue
-    Return the point attribute value for a particular floating point
-    attribute.  The attribute may be specified by name or by
-    [Hom:hou.Attrib] object.  The return value is a tuple of floats.
-
-    It is valid to call this method when the attribute's size is 1.  In this
-    case, a tuple with one element is returned.
-
-    See also [Hom:hou.Point#attribValue].
-
-::`intAttribValue(self, name_or_attrib)` -> `int`:
-    #cppname: HOM_Point::intAttribValue
-    Return the point attribute value for a particular integer
-    attribute of size 1.  The attribute may be specified by name or by
-    [Hom:hou.Attrib] object.  See [Hom:hou.Point#floatAttribValue] for more
-    information.
-
-::`intListAttribValue(self, name_or_attrib)` -> `tuple` of `int`:
-    #cppname: HOM_Point::intListAttribValue
-    Return the point attribute value for a particular integer attribute.  The
-    attribute may be specified by name or by [Hom:hou.Attrib] object.  The
-    return value is a tuple of ints.  See [Hom:hou.Point#floatListAttribValue]
-    for more information.
-
-::`stringAttribValue(self, name_or_attrib)` -> `str`:
-    #cppname: HOM_Point::stringAttribValue
-    Return the point attribute value for a particular string attribute.  The
-    attribute may be specified by name or by [Hom:hou.Attrib] object.  See
-    [Hom:hou.Point#floatAttribValue] for more information.
-
-::`stringListAttribValue(self, name_or_attrib)` -> `tuple` of `str`:
-    #cppname: HOM_Point::stringListAttribValue
-    Return the point attribute value for a particular string attribute.  The
-    attribute may be specified by name or by [Hom:hou.Attrib] object.  The
-    return value is a tuple of strings.
-
-    It is valid to call this method when the attribute's size is 1.  In this
-    case, a tuple with one element is returned.
-
-    See also [Hom:hou.Point#attribValue].
-
-::`position(self)` -> [Hom:hou.Vector3]:
-    #cppname: HOM_Point::position
-    Return the position of this point as a Vector3 containing the (X, Y, Z)
-    position values.
-    
-    This method is a shortcut for accessing the `P` attribute of the point.
-    {{{
-    #!python
-    point.position()
-    # is equivalent to
-    hou.Vector3(point.attribValue("P"))
-    }}}
-    
-    Because the position is returned as a Vector3, it can be accessed as
-    a sequence.  However, you can also easily use [Hom:hou.Matrix4] to
-    transform the position.
-
-    See also:
-    - [Hom:hou.Point#weight]
-    - [Hom:hou.Vector3]
-    - [Hom:hou.Matrix4]
-
-::`weight(self)` -> `float`:
-    #cppname: HOM_Point::weight
-    Return the weight of this point.  Point weights are displayed in Houdini's
-    geometry spreadsheet as the fourth component of the position, and are
-    used in NURBS curves and surfaces.
-
-    Most of the time, the weight is 1.0.
-
-    This method is a shortcut for accessing the `Pw` attribute of the point.
-    {{{
-    #!python
-    point.weight()
-    # is equivalent to
-    point.attribValue("Pw")
-    }}}
-
-    You can build a [Hom:hou.Vector4] containing both the position and weight
-    as follows:
-    {{{
-    #!python
-    hou.Vector4(tuple(point.position()) + (point.weight(),))
-    }}}
-
-    See also [Hom:hou.Point#position].
-
 ::`setAttribValue(self, name_or_attrib, attrib_value)`:
     #cppname: HOM_Point::setAttribValue
     Store an attribute value in this point.  The attribute may be specified by
@@ -176,76 +201,67 @@ and each point instance stores a unique attribute value.
     - [Hom:hou.Vertex#setAttribValue]
     - [Hom:hou.Geometry#setGlobalAttribValue]
 
-::`setPosition(self, position)`:
-    #cppname: HOM_Point::setPosition
-    Changes the point's location.  You would typically call this method from
-    the code of a Python-defined SOP.
+::`floatAttribValue(self, name_or_attrib)` -> `float`:
+    #cppname: HOM_Point::floatAttribValue
 
-    position:
-	Any sequence of floats, such has a [Hom:hou.Vector3] or a tuple of
-	floats, of length either 3 or 4.  The fourth coordinate corresponds to
-	the weight, and is usually 1.  The weight is typically used by NURBS
-	curves and sequences.  If the sequence is of size 3, the weight will be
-	unchanged.
+    Return the point attribute value for a particular floating point attribute.
+    The attribute may be specified by name or by [Hom:hou.Attrib] object.
 
-    This method is a shortcut for calling [Hom:hou.Point#setAttribValue] on
-    the `P` attribute.
+    Raises [Hom:hou.OperationFailed] if no attribute exists with this name
+    or the attribute is not float of size 1.
 
-    {{{
-    #!python
-    point.setPosition((x, y, z))
-    # is the same as
-    point.setAttribValue("P", (x, y, z))
-    }}}
+    In most cases, you'll just use [Hom:hou.Point#attribValue] to access
+    attribute values.  Houdini uses this method internally to implement
+    attribValue.
 
-    Raises [Hom:hou.GeometryPermissionError] if the geometry is not modifiable.
-    Raises [Hom:hou.InvalidSize] if the length of `position` is not 3.
+::`floatListAttribValue(self, name_or_attrib)` -> `tuple` of `float`:
+    #cppname: HOM_Point::floatListAttribValue
 
-    See also [Hom:hou.Point#setWeight].
+    Return the point attribute value for a particular floating point
+    attribute.  The attribute may be specified by name or by
+    [Hom:hou.Attrib] object.  The return value is a tuple of floats.
 
-::`setWeight(self, weight)`:
-    #cppname: HOM_Point::setWeight
-    Change the point's weight.  You would typically call this method from
-    the code of a Python-defined SOP.
+    It is valid to call this method when the attribute's size is 1.  In this
+    case, a tuple with one element is returned.
 
-    This method is a shortcut for calling [Hom:hou.Point#setAttribValue] on
-    the `Pw` attribute.
+    See also [Hom:hou.Point#attribValue].
 
-    See [Hom:hou.Point#weight] for more information about a point's weight.
-    See also [Hom:hou.Point#setPosition].
+::`intAttribValue(self, name_or_attrib)` -> `int`:
+    #cppname: HOM_Point::intAttribValue
 
-::`attribType(self)` -> [Hom:hou.attribType] enum value:
-    #cppname: HOM_Point::attribType
-    Return the enumerated value [Hom:hou.attribType#Point].  Points,
-    primitives, vertices, and geometry support the same set of methods for
-    querying their attributes, and this method is one of them.
+    Return the point attribute value for a particular integer
+    attribute of size 1.  The attribute may be specified by name or by
+    [Hom:hou.Attrib] object.  See [Hom:hou.Point#floatAttribValue] for more
+    information.
 
-    See also:
-    - [Hom:hou.Prim#attribType]
-    - [Hom:hou.Vertex#attribType]
-    - [Hom:hou.Geometry#attribType]
-    - [Hom:hou.attribType]
+::`intListAttribValue(self, name_or_attrib)` -> `tuple` of `int`:
+    #cppname: HOM_Point::intListAttribValue
 
-::`geometry(self)` -> [Hom:hou.Geometry]:
-    #cppname: HOM_Point::geometry
-    Return the [Hom:hou.Geometry] object containing this point.
+    Return the point attribute value for a particular integer attribute.  The
+    attribute may be specified by name or by [Hom:hou.Attrib] object.  The
+    return value is a tuple of ints.  See [Hom:hou.Point#floatListAttribValue]
+    for more information.
 
-::`number(self)` -> `int`:
-    #cppname: HOM_Point::number
-    #replaces: Exp:pointlist, Exp:poppointnum
-    Return the number of this point.  Points are numbered sequentially
-    starting from 0, and the points returned by [Hom:hou.Geometry#points]
-    are in order by their number.
+::`stringAttribValue(self, name_or_attrib)` -> `str`:
+    #cppname: HOM_Point::stringAttribValue
 
-::`prims(self)` -> `tuple` of [Hom:hou.Prim]:
-    #cppname: HOM_Point::prims
-    Returns a tuple of the primitives that reference this point.
+    Return the point attribute value for a particular string attribute.  The
+    attribute may be specified by name or by [Hom:hou.Attrib] object.  See
+    [Hom:hou.Point#floatAttribValue] for more information.
 
-::`vertices(self)` -> `tuple` of [Hom:hou.Vertex]:
-    #cppname: HOM_Point::vertices
-    Returns a tuple of the vertices that reference this point.  Note that this
-    requires a search through a primitive's vertices, so the cost is linear in
-    the total number of vertices in these primitives.
+::`stringListAttribValue(self, name_or_attrib)` -> `tuple` of `str`:
+    #cppname: HOM_Point::stringListAttribValue
+
+    Return the point attribute value for a particular string attribute.  The
+    attribute may be specified by name or by [Hom:hou.Attrib] object.  The
+    return value is a tuple of strings.
+
+    It is valid to call this method when the attribute's size is 1.  In this
+    case, a tuple with one element is returned. See
+    [Hom:hou.Point#floatAttribValue] for more information.
+
+
+== Not implemented ==
 
 ::`transform(self, matrix)`:
     #cppname: HOM_Point::transform

@@ -1,0 +1,144 @@
+#type:	    node
+#context:   top
+#internal:  ffmpegextractimages
+#icon:	    TOP/ffmpeg
+
+= FFmpeg Extract Images =
+
+"""Extracts a sequence of still images from a video file."""
+
+
+== Overview ==
+
+    The opposite operation (compile frame images into a video) is in the [FFmpeg encode video node|Node:top/ffmpegencodevideo].
+
+    You can use this node two ways:
+
+    * With no inputs, specify a video file to extract images from.
+
+    * If the node has incoming work items with `output`s representing video files, the node will extract for each incoming work item. Set the __Video__ parameter to <code>&96;@pdg_input&96;</code> to use each incoming item's output result file as the input for the frame extraction.
+
+    This node generates *one work item* to extract all images for each input video. (It does not generate separate work items for each frame.) The `output` of the work item is an array of output file names. If you want to wire the output to nodes that expect separate work items per file, use the [Work Item Expand node|Node:top/workitemexpand] to split out the output files in the work item(s).
+
+[Include:ffmpegencodevideo#install]
+
+
+@top_attributes
+
+::`operation`
+    #type: string
+
+    Indicates the ffmpeg operation (`"extract"`).
+
+::`inputvideo`
+    #type: string
+
+    File path to the video to extract from.
+
+::`overridebin`
+    #type: integer
+
+    Whether the user specified a custom `ffmpeg` executable path.
+    If this is `1`, the work script should use the executable path in the `ffmpegbin` attribute.
+
+::`ffmpegbin`
+    #type: string
+
+    The path to the `ffmpeg` executable, if `overridebin` is `1`.
+
+::`fps`
+    #type: integer
+
+    The number of frames to extract per second of video.
+
+::`specifyimagesize`
+    #type: integer
+
+    If this is `1`, output the images at a custom size specified by `imgwidth` and `imgheight`
+
+::`imgwidth`
+    #type: integer
+
+    The width of the output images, if `specifyimagesize` is `1`.
+
+::`imgheight`
+    #type: integer
+
+    The height of the output images, if `specifyimagesize` is `1`.
+
+::`outputfilepath`
+    #type: string
+
+    A pattern string (using FFmpeg-specific `%` formatting syntax) specifying how to generate the output filenames. *Note*: The _actual_ output file names will be in the `@pdg_output` attribute as an array of file paths.
+
+::`customcommand`
+    #type: integer
+
+    When this is `1`, the work script will run the custom command line in `expr`.
+
+::`expr`
+    #type: string
+
+    A custom command line to run, when `customcommand` is `1`.
+
+::`outputtag`
+    #type: outputtag
+
+    TThe [file tag|/tops/filetags] to put on the result file paths.
+
+
+@parameters
+
+== Node ==
+
+Video:
+    #id: inputvideo
+
+    File path of the video file to extract frames from.
+
+Frames Per Second:
+    #id: fps
+
+    How many times a second to sample the video to generate an output image. Higher numbers generate more frame images.
+
+Width:
+    #id: imgwidth
+
+    When the checkbox next to width/height is on, this specifies a custom width for the output images. Otherwise the node uses the video's native size.
+
+Height:
+    #id: imgheight
+
+    When the checkbox next to width/height is on, this specifies a custom height for the output images. Otherwise the node uses the video's native size.
+
+Image Output Pattern:
+    #id: outputfilepath
+
+    The string to use to generate output image file paths. This can include `@expressions` (inside backticks because it's a string parameter), and it must include exactly one FFmpeg-specific `%d` marker for where to put the frame number. You can pad the frame number with leading zeros, for example `%04d` to pad the frame number to 4 digits. You can use the drop-down menu at the end of the textbox to choose between different preset patterns.
+
+Output Tag
+    #id: outputtag
+
+    The [file tag|/tops/filetags] to put on the output file paths. The default is `file/image`.
+
+FFmpeg Command:
+    #id: expr
+
+    Turn this on to customize the command line passed to `ffmpeg`.
+
+FFmpeg Path:
+    #id: ffmpegbin
+
+    Turn this on to set an explicit path to the `ffmpeg` executable.
+    If this is off, the node will look for a `PDG_FFMPEG` environment variable.
+    If the variable is not set, the node will simply assume the executable is on the system path.
+
+
+== Processor ==
+
+[Include:processor_common#pdg_workitemgeneration]
+
+
+@related
+
+- [Node:top/ffmpegencodevideo]

@@ -1,0 +1,43 @@
+= Tips and tricks =
+
+"""Useful general information and best practices for working with TOPs."""
+
+
+== Cooking == (cook)
+
+* Test your network on small data sets, and make sure everything works, before running on big data sets.
+
+* Use __TOPs > Generate Static Work Items__ (see [static vs. dynamic|intro#static] to get a sense of the work to be done before cooking the network.
+
+
+== Attributes == (attrs)
+
+* *Use "pull" attribute references*. Use `@attribute` syntax in parameters to control what gets done (see [pull and push references|attributes#pull]). Not only is it much easier than pushing attributes or writing custom code, PDG has an important feature that lets you resume a cook after being interrupted -- but only if you used `@attribute` syntax so PDG can predict what output files would have been named.
+
+* *In interactive Houdini, attribute references come from the currently selected item*. When other networks (such as SOP networks for generating geometry and COP2 networks for compositing renders) in the HIP file have `@attribute` values, the "current" values of those references are driven by which work item is selected in the [network interface|ui].
+
+    You can, for example, set a viewer pane to show the SOP network output, and then click around the work items in the TOP network, showing the different geometry output by the different items.
+
+    You can also take advantage of this to quickly preview output geometry. The Show Output shelf tool creates a [Geometry object|Node:obj/geo], and inside create a [File SOP|Node:sop/file], then sets the File node's path to <code>&#96;@pdg_output&#96;</code> (the backticks are necessary to escape the expression since the path is a string parameter). When you view the network in a viewer, as you click work items around the TOP network, you can see their geometry output. You can then delete the object/network when you're done inspecting geometry output.
+
+    See [attribute references|attributes#pull] for more information. 
+
+
+== Simulations == (sims)
+
+* *Do not generate simulation frames in parallel*. When generating simulation output using the [ROP Geometry Output|Node:top/ropgeometryoutput] node, go to the __ROP Fetch__ tab and turn on __All Frames in One Batch__.
+
+    If you leave this option off, the separate frames will be generated in parallel. However, since simulations must cook everything up to the frame to render, this leads to a situation where to generate frame 2, Houdini must cook frames 1 and 2, to generate frame 3 it must cook frames 1, 2, and 3, and so on. This is very inefficient.
+
+
+== Output files == (files)
+
+See [file paths|paths] for more information.
+
+* Try to separate temporary "work in progress" files from "final output" files in separate directories. For example, generate intermediate geometry files in `__PDG_TEMP__/geo`, and final geometry files in `__PDG_DIR__/geo`. This makes it easier to find the important output, and lets you clear out the temp files wholesale to force a rebuild.
+
+* You may want to avoid using destructive file operations (move/rename, remove). They can make files appear to be missing, triggering the dependency system to do extra work.
+
+* If you're using a render farm, you should turn on Scheduler Overrides on file operation nodes to force their work items to run locally. There's little point to farming out "file copy" and "make directory" commands.
+
+

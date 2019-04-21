@@ -1,0 +1,406 @@
+= Installation =
+
+"""How to set up a basic HQueue farm."""
+
+
+== Before you begin ==
+
+NOTE:
+    This guide assumes the server and client machines all share the same operating system (Linux, macOS, or Windows). It is possible to set up an HQueue farm with mixed operating systems, but that is not covered in this quick guide.
+
+The following items are required before setting up an HQueue farm:
+
+Network connectivity ||
+    #width: 25%
+
+    - Machines must be able to "see" or ping each other by their domain (DNS) names or by their IP addresseses.
+
+    - Client machines must be able to connect to the server machine through port `5000`.  The server machine must be able to connect to client machines through port `5001`.  This may require opening ports in any local firewalls.
+
+Shared network folder ||
+    - The servers and clients must be able to access a shared network filesystem, for example an NFS mount of SMB share.
+
+    - The shared folder must be mounted at the same location on every machine, for example `/nfs/storage/` on Linux, or `\\bigdisk\hq` on Windows.
+  
+Houdini ||
+    * Install Houdini on every client machine in the same install directory.
+
+        :platform:Mac:
+            On macOS, the default Houdini installation path is `/Applications/Houdini/HoudiniX.Y.ZZZ`.
+
+        :platform:Windows
+            On Windows, the default Houdini installation path is `C:/Program Files/Side Effects Software/Houdini X.Y.ZZZ`.
+
+        :platform:Linux
+            On Linux, the default Houdini installation path is `/opt/hfsX.Y.ZZZ`.
+
+    * Houdini licensing must be set up correctly on each client machine as well, so the client software can launch licensed executables such as `hython` and `mantra`.
+
+
+== Installing HQueue ==
+
+=== Setting up a farm on macOS === (farm_setup_macosx)
+#display: collapsible collapsed
+
+Here are the steps for setting up HQueue on a farm of macOS machines:
+
+# *Install the HQueue Server*
+  - Choose a machine, say `serverMachine`, to run the HQueue Server.
+  - On the machine, download and run the Houdini installer.
+  - In the installer, check on `HQueue -> HQueue Server` in the components
+    list.  Proceed with the installation.
+  - After installation completes the server will be installed at
+    `/Library/HQServer` and a new `com.sidefx.hqserver.plist` service file
+    will exist in `/Library/LaunchDaemons`.
+  - You can open a web browser and navigate to `http://serverMachine:5000` to
+    confirm that the HQueue server is running.
+
+    NOTE:
+      If DNS is not configured for `serverMachine` then you can connect
+      to HQueue using the server machine's IP address.
+
+      For example, `http://X.X.X.X:5000`.
+
+# *Register the network folder with HQueue*
+  - On the server machine, open the HQueue Server configuration file,
+    `/Library/HQServer/hqserver.ini`, in a text editor.
+  - Look for the `hqserver.sharedNetwork.mount.macosx` key and set it
+    to where the network folder is mounted on the machines.
+
+    For example, if the network folder is mounted at `/Volumes/myShare`
+    then the hqserver.ini file should contain this line:
+    {{{
+      hqserver.sharedNetwork.mount.macosx = /Volumes/myShare
+    }}}
+  - Save the changes to the hqserver.ini file.
+  - Then restart the HQueue Server by executing these commands in a terminal:
+    {{{
+      #!bash
+      sudo launchctl unload /Library/LaunchDaemons/com.sidefx.hqserver.plist
+      sudo launchctl load /Library/LaunchDaemons/com.sidefx.hqserver.plist
+    }}}
+
+# *Add a client machine*
+  - Open a web browser and go to the HQueue web interface.
+    For example, `http://serverMachine:5000`.
+
+  - Click the [Image:/images/hqueue/clients.svg] Clients icon at the top-right corner to open the Clients page.
+  
+  - Click __Add Clients__.  In the popup dialog, choose "macOS" as the platform and then click __Continue__.
+  
+  - On the next page:
+    - Enter the name of the machine to be added in the `Machines` field.
+    - For the `Admin. Username` and `Admin. Password` fields, enter the
+      username and password of an administrator account that exists on the
+      machine.  HQueue needs the administrator account to remotely log into the
+      machine and install the HQueue Client.
+    - Leave all other fields at their defaults.
+  
+  - Click __Add Machines__ and wait a few seconds.  The machine will then
+    appear in the Clients page and the HQueue Client will be installed
+    to `/Library/HQClient` and a new `com.sidefx.hqclient.plist` service
+    file will exist in `/Library/LaunchDaemons`.
+
+  NOTE:
+    Repeat these steps for each additional client machine you want
+    to add to the farm.
+
+  NOTE:
+    If adding the machine failed with a "Connection Refused" error then
+    check out this [FAQ|/hqueue/faqs#connection_refused_add_client_macosx].
+
+
+=== Setting up a farm on Windows === (farm_setup_windows)
+#display: collapsible collapsed
+
+Here are the steps for setting up HQueue on a farm of Windows machines:
+
+# *Install the HQueue Server*
+  - Choose a machine, say `serverMachine`, to run the HQueue Server.
+  - On the machine, download and run the Houdini installer.
+  - In the installer:
+    - Uncheck all components except for `HQueue Server`.
+    - Proceed with the installation and when prompted leave all HQueue Server
+      options at their default values.
+  - After installation completes the server will be installed at
+    `C:/HQueueServer` and a new `HQueueServer` service will exist
+    in Windows Services.
+  - You can open a web browser and navigate to `http://serverMachine:5000` to
+    confirm that the HQueue server is running.
+
+    NOTE:
+      If DNS is not configured for `serverMachine` then you can connect
+      to HQueue using the server machine's IP address.
+
+      For example, `http://X.X.X.X:5000`.
+
+# *Register the network folder with HQueue*
+  - On the server machine, open the HQueue Server configuration file,
+    `C:/HQueueServer/hqserver.ini`, in a text editor.
+  - Look for the `hqserver.sharedNetwork.host` key and set it to the machine
+    that is serving the network folder.
+  - Look for the `hqserver.sharedNetwork.path.windows` key and set it to
+    the network folder's share name.
+  - Look for the `hqserver.sharedNetwork.mount.windows` key and set it to
+    the drive letter that the network folder is mapped to.
+  - For example, suppose your network folder is served on a machine named
+    `myFileServer` and its share name is `myShare`, and your machines map `X:`
+    to `\\myFileServer\myShare`, then the hqserver.ini file should contain
+    these lines:
+
+    {{{
+      hqserver.sharedNetwork.host = myFileServer
+      hqserver.sharedNetwork.path.windows = myShare
+      hqserver.sharedNetwork.mount.windows = X:
+    }}}
+  - Save the changes to the hqserver.ini file.
+  - Then restart the HQueue Server by restarting the `HQueueServer` Windows
+    service.  For example, go to _Control Panel -> Administrative Tools ->
+    Services_, locate `HQueueServer` in the services list, RMB-click it and
+    choose `Restart`.
+
+# *Add a client machine*
+  - Run the Houdini installer on the machine that you want to add.
+  - In the installer:
+    - Uncheck all components except for `HQueue Client`.
+    - Proceed with the installation and when prompted to enter the HQueue
+      server information, set the `Name` field to the machine hosting the
+      HQueue Server.  For example, `serverMachine`.
+
+      NOTE:
+        If DNS is not configured for `serverMachine` then you can alternatively
+        enter the server machine's IP address in the `Name` field.
+    - Leave the rest of the HQueue Client options at their default values. 
+  - After installation completes the HQueue Client will be installed to
+    `C:/HQueueClient` and a new `HQueueClient` service will exist in
+    Windows Services.
+  - Go to the Clients page in the HQueue web interface to confirm that the
+    machine was successfully added to the farm.
+
+  NOTE:
+    Repeat these steps for each additional client machine you want
+    to add to the farm.
+
+  NOTE:
+    The HQueue Client by default runs with a generic Windows network
+    service account.  The account has limited network access and may not have
+    permission to access your network folder.
+
+    It is recommended that the HQueue Client be changed so that is run
+    with a real Windows user account to avoid possible file permission errors
+    in jobs.  To change the HQueue Client's user account, please follow this
+    [FAQ|/hqueue/faqs#change_client_user_account_windows].
+
+
+=== Setting up a farm on Linux === (farm_setup_linux)
+#display: collapsible collapsed
+
+Here are the steps for setting up HQueue on a farm of Linux machines:
+
+# *Install the HQueue Server*
+  - Choose a machine, say `serverMachine`, to run the HQueue Server.
+  - On the machine, download the Houdini installer tarball, unpack it
+    and run the Houdini installer with `sudo`.
+    
+    For example:
+    {{{
+        tar zxf houdini-X.Y.ZZZ-linux_x86_64_gcc6.3.tar.gz
+        cd houdini-X.Y.ZZZ-linux_x86_64_gcc6.3
+        sudo ./houdini_install
+    }}}
+  - In the installer:
+    - Uncheck all components except for `HQueue Server`.
+    - Proceed with the installation and when prompted leave all HQueue Server
+      options at their default values.
+  - After installation completes the server will be installed at
+    `/opt/hqueue`.
+  - You can open a web browser and navigate to `http://serverMachine:5000` to
+    confirm that the HQueue server is running.
+
+    NOTE:
+      If DNS is not configured for `serverMachine` then you can connect
+      to HQueue using the server machine's IP address.
+
+      For example, `http://X.X.X.X:5000`.
+
+# *Register the network folder with HQueue*
+  - On the server machine, open the HQueue Server configuration file,
+    `/opt/hqueue/hqserver.ini`, in a text editor.
+  - Look for the `hqserver.sharedNetwork.mount.linux` key and set it
+    to where the network folder is mounted on the machines.
+
+    For example, if the network folder is mounted at `/mnt/myShare`
+    then the hqserver.ini file should contain this line:
+    {{{
+      hqserver.sharedNetwork.mount.linux = /mnt/myShare
+    }}}
+  - Save the changes to the hqserver.ini file.
+  - Then restart the HQueue Server by executing these commands in a terminal:
+    {{{
+      #!bash
+      cd /opt/hqueue
+      sudo ./scripts/hqserverd restart
+    }}}
+
+# *Add a client machine*
+  - On the machine to be added, download the Houdini installer
+    tarball, unpack it and run the Houdini installer (without `sudo`).
+  
+    For example:
+    {{{
+      #!bash
+      tar zxf houdini-X.Y.ZZZ-linux_x86_64_gcc6.3.tar.gz
+      cd houdini-X.Y.ZZZ-linux_x86_64_gcc6.3
+      ./houdini_install
+    }}}
+
+  NOTE:
+    The HQueue Client will execute jobs using the user account that runs
+    the `./houdini_install` installer script.
+
+  - In the installer:
+    - When asked to re-run the installer as root, enter "no".
+    - Uncheck all components except for `HQueue Client`.
+    - Proceed with the installation and when prompted for the HQueue Server to
+      connect to, set the URL to point to your farm.  For example,
+      `http://serverMachine:5000`.
+
+      NOTE:
+        If DNS is not configured for `serverMachine` then you can alternatively
+        use the server machine's IP address in the URL.
+
+        For example, `http://X.X.X.X:5000`.
+    - Leave the rest of the HQueue Client options at their default values. 
+
+  - After installation completes the HQueue Client will be installed in your
+    home directory, `$HOME/hqclient`.
+
+    NOTE:
+      If the installer fails to unpack HQueue installation files due to
+      "Cannot open: File exists" errors, then remove the local `hqueue`
+      subdirectory.  For example:
+      {{{
+        #!bash 
+        cd houdini-X.Y.ZZZ-linux_x86_64_gcc6.3
+        sudo rm -rf hqueue
+      }}}
+
+      Then re-run the Houdini installer:
+      {{{
+        #!bash
+        ./houdini_install
+      }}}
+
+  - Go to the Clients page in the HQueue web interface to confirm that the
+    machine was successfully added to the farm.
+
+  NOTE:
+    Repeat these steps for each additional client machine you want
+    to add to the farm.
+
+
+== Testing the Farm ==
+
+To test that the HQueue farm is configured correctly you can submit a simple
+Houdini render job.
+
+Here's how:
+
+# Launch Houdini.
+
+# Create a simple scene.  At a minimum, put down some
+  geometry, a light, a camera and a Mantra ROP for rendering.
+
+# Navigate to the `/out` node network and put down an `HQueue Render ROP`.
+
+# In the Parameters pane, set the `Output Driver` parameter to your
+  Mantra ROP.
+  
+# Point the `HQueue Server` parameter to your HQueue farm.  
+  For example, `http://serverMachine:5000`.
+
+  NOTE:
+    If DNS is not configured for `serverMachine` then you can alternatively
+    use the server machine's IP address in the URL.
+    For example, `http://X.X.X.X:5000`.
+
+# Then set __Target HFS__ to where Houdini is installed
+  on the client machines.
+  
+    :platform:Mac
+        For macOS, set __Target HFS__ to:
+        {{{
+            /Applications/Houdini/HoudiniX.Y.ZZZ/Frameworks/Houdini.framework/Versions/Current/Resources
+        }}}
+  
+    :platform:Windows
+        For Windows, set __Target HFS__ to:
+        {{{
+            C:/Program Files/Side Effects Software/Houdini X.Y.ZZZ
+        }}}
+  
+    :platform:Linux
+        For Linux, set __Target HFS__ to:
+        {{{
+            /opt/hfsX.Y.ZZZ
+        }}}
+
+# Save the .hip file somewhere in your network folder.
+
+    :platform:Mac
+        On macOS, the network folder is defined by the
+        `hqserver.sharedNetwork.mount.macosx` key in the HQueue Server
+        configuration file.  For example, save the .hip file to
+        `/Volumes/myShare/test.hip`.
+
+    :platform:Windows
+        On Windows, the network folder is defined by the
+        `hqserver.sharedNetwork.mount.windows` key in the HQueue Server
+        configuration file.  For example, save the .hip file to
+        `X:/test.hip`.
+
+    :platform:Linux
+        On Linux, the network folder is defined by the
+        `hqserver.sharedNetwork.mount.linux` key in the HQueue Server
+        configuration file.  For example, save the .hip file to
+        `/mnt/myShare/test.hip`.
+
+# Click __Submit Job__ at the top of the Parameters pane.
+  - A new job will appear in the HQueue web interface.
+  - You can click on the job's id to dive into the job and see more details.
+
+
+== Troubleshooting ==
+
+When a job fails, you can find out why by clicking on the job's id in the HQueue
+web interface.  This will take you inside of the job where you can see more
+details.  If any of the job's `Child Jobs` failed then click on the child job's
+id to further dive inside.  Eventually you will see an `Output Log` field with
+the job's output.  The output will contain an error message indicating why
+the job failed.
+
+Check out the [Troubleshooting FAQs|faqs#troubleshooting_faqs] for information
+on common job failure errors and possible solutions.
+
+
+== Optional: `hquser` account ==
+
+On client machines you can optionally set up an `hquser` user and `hqgroup` user group to run Hqueue as. By convention the user and group ID are both `601`, and the user's password is `hqpass`, but you can change these.
+
+:platform: Linux:
+    Your Linux distribution may come with a user interface for creating user accounts, otherwise use the `adduser` command.
+
+:platform: Mac:
+    You can create users and groups in the __Users and Groups__ panel of System Preferences.
+
+Having consistent user accounts across clients has benefits:
+
+* Don't have to keep track of different user accounts on different machines when you need to log into a particular client.
+
+* All files created by the client software are owned by a single consistent user.
+
+Once you have created the user and group, you should start the HQueue server/client as `hquser`. 
+
+
+
+

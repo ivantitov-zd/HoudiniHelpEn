@@ -1,0 +1,91 @@
+= File Pattern =
+
+#type:      node
+#context:   top
+#internal:  filepattern
+#icon:      TOP/filepattern
+
+"""Creates work items based on files that match a certain pattern."""
+
+This node generates a work item for each file (and/or directory) name that matches a pattern in a directory (and optionally all sub-directories).
+
+The pattern field specifies the path to start searching in as well as the pattern to match. For example, `$PDG_DIR/geo/*.bgeo` finds all files ending in `.bgeo`, looking in the `geo` directory inside the project working directory.
+
+NOTE:
+    The pattern is always expanded on the machine where the network cooks, not on a remote host on the render farm. The expanded file names should still be under the working directory in the shared network filesystem. The node will automatically convert local matched file paths to paths that are relative to the working directory.
+
+See the [pattern parameter|#pattern] for an explanation of the pattern syntax.
+
+This node has two modes for generating work items:
+
+* When __Split Results into Separate Items__ is on (the default), it creates separate work items for each matched name, with the file name data stored in attributes.
+
+* When __Split Results into Separate Items__ is off, it creates _one_ work item, with the matching file paths set as the item's output results.
+
+    This is useful if the node you're wiring this node into operates on results data.
+
+Whenever this node is asked to generate items (when it cooks, or when you ask nodes to pre-generate static items), the node checks if the pattern matches different files from the last cook, and also if the modification times have changed on any files. If so, it updates and marks dirty the changed items. So if the directory contents change, normally only the changed items need to recook.
+
+
+@top_attributes
+
+When __Split Results into Separate Items__ is on, the node sets the following attributes on each work item.
+
+::`directory`:
+    #type: string
+
+    The directory containing the file associated with the work item, without
+    the file name or extension.
+
+::`extension`:
+    #type: string
+
+    The extension of the file associated with the work item. Not set if
+    __File Types__ is set to __Directories Only__ or when the globbed path is
+    a directory.
+
+::`filename`:
+    #type: string
+
+    The name of file, including the extension. Not set if __File Types__ is set
+    to __Directories Only__ or when the globbed path is a directory.
+
+
+@parameters
+
+[Include:processor_common#pdg_workitemgeneration]
+
+File Types:
+    #id: filetypes
+
+    Whether to match Files Only, Directories Only, or All (both files and directories).
+
+Glob Pattern:
+    #id: pattern
+
+    Match file paths against this pattern. Note that the pattern specifies where to look for files, for example `$PDG_DIR/geo/*.bego`. The pattern allows wildcards such as `?` (match any character), `*` (match any string of characters), and `[abc]` (match any one of the characters inside the square brackets). For example, `*.png` matches any file that ends with `.png`.
+
+Recursive:
+    #id: recursive
+
+    Also look for matching file names in sub-directories of the path specified in the pattern parameter.
+
+Result Data Tag:
+    #id: resultdatatag
+
+    When this is on and __Split Results into Separate Items__ is off, assign this [file tag|/tops/filetags] to the output file paths. If this is off, the node guesses appropriate file tags based on filename extensions.
+
+Index From File Sequence:
+    #id: indexfromfilesequence
+
+    Looks for a final numeric sequence in the matched filenames (for example, `frame<<001>>.exr`) and uses that value as each work item's `index`.
+
+Split Results into Separate Items:
+    #id: split
+
+    When this is on (the default), the node creates separate work items for each matched name, with the file name data stored in attributes. When this is off, the node creates _one_ work item, with the matching file paths set as the item's output results. Turning this off can be useful if the node you're wiring this node into operates on results data.
+
+Error on No Matches:
+    #id: errornomatch
+
+    Report an error on the node if the pattern doesn't match any files. This defaults to off, but you may want to turn it on at least while you're building and debugging a network, and/or if the match should never be empty (for example, it's gathering necessary configuration files).

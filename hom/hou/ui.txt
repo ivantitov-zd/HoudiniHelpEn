@@ -330,7 +330,7 @@ details_expanded=False)` -> int:
 
     See also [Hom:hou.ui#readInput] 
 
-::`selectFile(start_directory=None, title=None, collapse_sequences=False, file_type=hou.fileType.None, pattern=None, default_value=None, multiple_select=False, image_chooser=False, chooser_mode=hou.fileChooserMode.ReadAndWrite)` -> `str`:
+::`selectFile(start_directory=None, title=None, collapse_sequences=False, file_type=hou.fileType.None, pattern=None, default_value=None, multiple_select=False, image_chooser=False, chooser_mode=hou.fileChooserMode.ReadAndWrite, width=0, height=0)` -> `str`:
     #cppname: HOM_ui::selectFile
     #replaces: Cmd:filechooser
     Pop up a window with a file chooser dialog and wait for the user to
@@ -368,7 +368,15 @@ details_expanded=False)` -> int:
 	    A [Hom:hou.fileChooserMode] enumeration value to say if the user is
 	    being prompted for a file to read from, write to, or either.
 
-::`selectFromList(choices, default_choices=(), exclusive=False, message=None, title=None, column_header="Choices", num_visible_rows=10, clear_on_cancel=False)` -> `tuple` of `int`:
+    width:
+	    The chooser dialog's width.  If 0, then the chooser dialog uses a
+	    default width.
+
+    height:
+	    The chooser dialog's height.  If 0, then the chooser dialog uses a
+	    default height.
+
+::`selectFromList(choices, default_choices=(), exclusive=False, message=None, title=None, column_header="Choices", num_visible_rows=10, clear_on_cancel=False, width=0, height=0)` -> `tuple` of `int`:
     #cppname: HOM_ui::selectFromList
     #replaces: Cmd:listchooser
     Pop up a window with a set of choices in a list box and prompt the user to
@@ -392,7 +400,7 @@ details_expanded=False)` -> int:
     title:
 	    The window's title.  If `None`, the title is "Houdini".
 
-    column_header
+    column_header:
 	    The column header for the list of choices.  Users can click this header
 	    label to sort the list.  If `None`, then the header is removed.  Note that
 	    the tuple of integers represents the original order of items,
@@ -408,7 +416,15 @@ details_expanded=False)` -> int:
 	    Otherwise the initial selection (default_choices) is returned when
 	    selection is cancelled.
 
-::`selectFromTree(choices, picked=(), exclusive=False, message=None, title=None, clear_on_cancel=False)` -> `tuple` of `str`:
+    width:
+	    The chooser dialog's width.  If 0, then the chooser dialog uses a
+	    default width.
+
+    height:
+	    The chooser dialog's height.  If 0, then the chooser dialog uses a
+	    default height.
+
+::`selectFromTree(choices, picked=(), exclusive=False, message=None, title=None, clear_on_cancel=False, width=0, height=0)` -> `tuple` of `str`:
     #cppname: HOM_ui::selectFromTree
     #replaces: Cmd:treechooser
     Pop up a window with a set of choices in a tree chooser and prompt the user
@@ -438,13 +454,23 @@ details_expanded=False)` -> int:
 	    Otherwise the initial selection (picked) is returned when
 	    selection is cancelled.
 
-::`selectNode(relative_to_node=None, initial_node=None, node_type_filter=None)` -> `str` or `None`:
+    width:
+	    The chooser dialog's width.  If 0, then the chooser dialog uses a
+	    default width.
+
+    height:
+	    The chooser dialog's height.  If 0, then the chooser dialog uses a
+	    default height.
+
+::`selectNode(relative_to_node=None, initial_node=None, node_type_filter=None, title=None, width=0, height=0, multiple_select=False, custom_node_filter_callback=None)` -> `str`, `list of str`, or `None`: 
     #cppname: HOM_ui::selectNode
     Pop up a window with a node tree view and prompt the user to choose a node.
 
     If the user selects a node, returns a string containing the path to the
-    node.  If the user presses clear, returns an empty string.  If the user
-    presses cancel, returns `None`.
+    node.  If the user presses clear, returns `None`.  If the user
+    presses cancel, returns `None`. If the user sets multiple_select to `True`,
+    returns a list of strings containing the selected paths, or `None` if clear or
+    cancel were pressed.
 
     relative_to_node:
 	    A [Hom:hou.Node] for relative paths, or `None` if relative paths are
@@ -460,6 +486,29 @@ details_expanded=False)` -> int:
     node_type_filter:
 	    An optional [Hom:hou.nodeTypeFilter] enumerated value that determines
 	    which types of nodes appear in the tree view.
+    
+    title:
+	    The chooser dialog's window title.  If set to `None` then the window
+	    title defaults to "Choose Operator".
+
+    width:
+	    The chooser dialog's width.  If 0, then the chooser dialog uses a
+	    default width.
+
+    height:
+	    The chooser dialog's height.  If 0, then the chooser dialog uses a
+	    default height.
+
+    multiple_select:
+	    Whether or not multiple nodes can be selected in the chooser. If set to
+	    `True` then the return type will be a list of paths. If set to `False` 
+	    the return type will be a string containing the name of the path.
+
+    custom_node_filter_callback:
+	A Python callback function that is invoked for each node in the chooser
+	dialog. The callback accepts a single [Hom:hou.Node] argument and
+	returns a boolean of whether or not the node should be shown in the 
+	chooser dialog.
 
     The following function takes a [Hom:hou.Parm], prompts the user to choose
     a node, and sets the value of the parameter as long as the user does not
@@ -478,12 +527,35 @@ details_expanded=False)` -> int:
     >>> setParmOnNode(hou.parm("/obj/box_object1/shop_materialpath"), hou.nodeTypeFilter.Shop)
     }}}
 
-::`selectMultipleNodes(relative_to_node=None, initial_node=None, node_type_filter=None)` -> `tuple` of `str` or `None`:
+    Here is an example of specifying a custom node filter:
+    {{{
+    #!python
+    # Define the callback for filtering nodes.
+    def hasNumberInName(node):
+        # Only show nodes with numbers in the name.
+	for letter in node.name():
+	    if letter in "1234567890":
+		return True
+
+	# Don't show nodes without a number in the name.
+	return False
+
+    # Prompt the user to select node data.
+    selected_data = hou.ui.selectNode(custom_node_filter_callback=hasNumberInName)
+
+    # Output the selected data.
+    print selected_data
+    }}}
+
+
+::`selectMultipleNodes(relative_to_node=None, initial_node=None, node_type_filter=None, title=None, width=0, height=0, custom_node_filter_callback=None)` -> `tuple` of `str` or `None`:
     #cppname: HOM_ui::selectMultipleNodes
+
+    This method is deprecated in favor of [Hom:hou.ui#selectNode].
     Same behavior as selectNode however if the user holds 'Ctrl' they
     can select multiple nodes which are returned as a list of paths.
 
-::`selectAttrib(initial_selection=(), multiple_select=False, expand_components=True)` -> `tuple` of `([Hom:hou.Attrib], int)`
+::`selectAttrib(initial_selection=(), multiple_select=False, expand_components=True, width=0, height=0)` -> `tuple` of `([Hom:hou.Attrib], int)`
     #cppname: HOM_ui::selectAttrib
     Pop up a chooser dialog that prompts the user to select a geometry
     attribute in the scene.  Return a tuple of the selected attributes
@@ -510,6 +582,14 @@ details_expanded=False)` -> int:
 
         If set to False then the user is prompted to select attributes and the
         integer values in the returned tuple are set to -1.
+
+    `width`:
+	    The chooser dialog's width.  If 0, then the chooser dialog uses a
+	    default width.
+
+    `height`:
+	    The chooser dialog's height.  If 0, then the chooser dialog uses a
+	    default height.
 
     Example:
     {{{
@@ -546,7 +626,7 @@ details_expanded=False)` -> int:
     print selected_attribs
     }}}
 
-::`selectNodeData(title=None, message=None, width=0, height=0, initial_selection=0, node_type_filter=None, multiple_select=False, include_data_type_headers=True, include_parms=True, include_object_transforms=True, include_geometry_bounding_boxes=True, include_geometry_attributes=True, expand_components=True, custom_data_callback=None, help_url=None)` -> `dict`
+::`selectNodeData(title=None, message=None, width=0, height=0, initial_selection=0, node_type_filter=None, multiple_select=False, include_data_type_headers=True, include_parms=True, include_object_transforms=True, include_geometry_bounding_boxes=True, include_geometry_attributes=True, expand_components=True, custom_data_callback=None, custom_node_filter_callback=None, help_url=None)` -> `dict`
     #cppname: HOM_ui::selectNodeData
 	
     Pop up a chooser dialog that prompts the user to select data from a node.
@@ -669,6 +749,11 @@ details_expanded=False)` -> int:
         selectable then the callback should return `("Fruits", "Fruits/Apples",
         "Fruits/Bananas", "Fruits/Oranges")`.
 
+    `custom_node_filter_callback`:
+	A Python callback function that is invoked for each node in the chooser
+	dialog. The callback accepts a single [Hom:hou.Node] argument and
+	returns a boolean of whether or not the node should be shown in the 
+	chooser dialog.
 
     `help_url`:
         Optional argument for associating a help page with the node data
@@ -768,7 +853,27 @@ details_expanded=False)` -> int:
     print selected_data
     }}}
 
-::`selectParmTag()` -> `tuple` of `str`:
+    Here is an example of specifying a custom node filter:
+    {{{
+    #!python
+    # Define the callback for filtering nodes.
+    def hasNumberInName(node):
+        # Only show nodes with numbers in the name.
+	for letter in node.name():
+	    if letter in "1234567890":
+		return True
+
+	# Don't show nodes without a number in the name.
+	return False
+
+    # Prompt the user to select node data.
+    selected_data = hou.ui.selectNodeData(custom_node_filter_callback=hasNumberInName)
+
+    # Output the selected data.
+    print selected_data
+    }}}
+
+::`selectParmTag(width=0, height=0)` -> `tuple` of `str`:
     #cppname: HOM_ui::selectParmTag
     Pop up a window with a tree view of recognized parameter tags and prompt
     the user to choose a tag.  Parameter tags are metadata that can be attached
@@ -784,7 +889,15 @@ details_expanded=False)` -> int:
     selected or if the selection operation is cancelled, then a 2-tuple of
     empty strings is returned.
 
-::`selectParm(category=None, bound_parms_only=False, relative_to_node=None, message=None, title=None, initial_parms=(), multiple_select=True)` -> `tuple` of `str`:
+    width:
+	    The chooser dialog's width.  If 0, then the chooser dialog uses a
+	    default width.
+
+    height:
+	    The chooser dialog's height.  If 0, then the chooser dialog uses a
+	    default height.
+
+::`selectParm(category=None, bound_parms_only=False, relative_to_node=None, message=None, title=None, initial_parms=(), multiple_select=True, width=0, height=0)` -> `tuple` of `str`:
     #cppname: HOM_ui::selectParm
     Pop up a window with a parameter tree view and prompts the user to select
     parameters, populated initially with `initial_parms`.  
@@ -808,11 +921,19 @@ details_expanded=False)` -> int:
 
     title:
     The title of the dialog.
-
+	    
     multiple_select:
     Whether the user may select multiple parameters.
 
-::`selectParmTuple(category=None, bound_parms_only=False, relative_to_node=None, message=None, title=None, initial_parm_tuples=(), multiple_select=True)` -> `tuple` of `str`:
+    width:
+    The chooser dialog's width.  If 0, then the chooser dialog uses a
+    default width.
+
+    height:
+    The chooser dialog's height.  If 0, then the chooser dialog uses a
+    default height.
+
+::`selectParmTuple(category=None, bound_parms_only=False, relative_to_node=None, message=None, title=None, initial_parm_tuples=(), multiple_select=True, width=0, height=0)` -> `tuple` of `str`:
     #cppname: HOM_ui::selectParmTuple
     Pop up a window with a parameter tree view and prompts the user to select
     parameter tuples, populated initially with `initial_parm_tuples`.
@@ -863,25 +984,44 @@ details_expanded=False)` -> int:
 
 ::`openValueLadder(initial_value, value_changed_callback, type=hou.valueLadderType.Generic, data_type=hou.valueLadderDataType.Float)`:
     #cppname: HOM_ui::openValueLadder
-    Open the Houdini value ladder window that typically appears when ((MMB)
-    clicking on an input field.  This function returns immediately.  The window
-    remains open until [Hom:hou.ui#closeValueLadder] is called.
 
-    Only one value ladder window can be opened at a time.  This function raises
+    Displays a "value ladder" control, the UI that typically appears when you
+    press ((MMB)) on a field in Houdini. This lets you display ladder controls
+    on your own custom UI, such as Qt edit fields.
+
+    The typical workflow is:
+
+    # You should listen for ((MMB)) press and release events on your field.
+
+    # When the user presses ((MMB)) on the field, call this function to show
+      the ladder. The function returns immediately but the ladder stays visible.
+
+    # As the user moves the mouse with ((MMB)) pressed down, you must call
+      [Hom:hou.ui#updateValueLadder] with the mouse pointer coordinates.
+
+    # The ladder calls the `value_changed_callback` function you supplied as
+      the user changes the value.
+      
+    # When the user releases ((MMB)), call [Hom:hou.ui#closeValueLadder].
+
+    Only one value ladder window can be open at a time.  This function raises
     [Hom:hou.OperationFailed] if another ladder window is currently open.
 
-    `initial_value` is the numeric value that the ladder window is initially
-    set to when it opens.
+    `initial_value`:
+        The initial numeric value the ladder is set to when it opens.
 
-    `value_changed_callback` is a callback function that is invoked whenever
-    the value in the window changes.  The function accepts a single argument
-    which is the current ladder value.
+    `value_changed_callback`:
+        A function that takes a single argument. As the user edits the number
+        with the ladder, the ladder calls this function with each new
+        value.
 
-    `type` specifies the type of value ladder window to open.  It must be a
-    [Hom:hou.valueLadderType] enumeration value.
+    `type`:
+        One of the values in [Hom:hou.valueLadderType]. The available types
+        are "Generic" and "Angle". This affects the increments on the ladder.
 
-    `data_type` specifies the type of data that the value ladder window displays.
-    It must be a [Hom:hou.valueLadderDataType] enumeration value.
+    `data_type`:
+        One of the values in [Hom:hou.valueLadderDataType]. Integer and Float
+        ladders have different increments.
 
     This examples demonstrates how to add value ladder window support to an input
     field class that derives from Qt's QLineEdit class:
@@ -890,43 +1030,51 @@ details_expanded=False)` -> int:
     #!python
 
     from PySide2 import QtWidgets
+    from PySide2.QtCore import Qt
+    import hou
+
 
     class LineEditWithValueLadder(QtWidgets.QLineEdit):
-        def __init__(self):
-            QtWidgets.QLineEdit.__init__(self)
-        self.isValueLadderOpen = False
+        def __init__(self, parent=None):
+            super(LineEditWithValueLadder, self).__init__(parent)
+            self._pressed = False
 
         def mousePressEvent(self, event):
-        # Show the value ladder window if MMB was pressed.
-            if event.button() == QtCore.Qt.MiddleButton and modifiers == 0:
-                hou.ui.openValueLadder(
-            0.0, self._handleXCFValueChange,
-                    hou.valueLadderType.Generic,
-                    hou.valueLadderDataType.Float)
-                self.isValueLadderOpen = True
+            # Show the value ladder window if MMB was pressed.
+            if event.button() == Qt.MiddleButton:
+                try:
+                    hou.ui.openValueLadder(
+                        float(self.text()),
+                        self._ladderchange,
+                        data_type=hou.valueLadderDataType.Float
+                    )
+                except hou.OperationFailed:
+                    # A ladder is already open somewhere
+                    return
+                else:
+                    self._pressed = True
 
         def mouseMoveEvent(self, event):
-        if self.isValueLadderOpen:
-            hou.ui.updateValueLadder(
-                    event.globalX(), event.globalY(),
-                    bool(event.modifiers() & QtCore.Qt.AltModifier),
-                    bool(event.modifiers() & QtCore.Qt.ShiftModifier))
+            if self._pressed:
+                hou.ui.updateValueLadder(
+                    event.globalX(),
+                    event.globalY(),
+                    bool(event.modifiers() & Qt.AltModifier),
+                    bool(event.modifiers() & Qt.ShiftModifier)
+                )
 
-            def mouseReleaseEvent(self, event):
-            if event.button() == QtCore.Qt.MiddleButton and self.isValueLadderOpen:
+        def mouseReleaseEvent(self, event):
+            if event.button() == Qt.MiddleButton and self._pressed:
                 hou.ui.closeValueLadder()
-                self.isValueLadderOpen = False
+                self._pressed = False
 
-        def _handleXCFValueChange(self, ladder_value):
-            str_value = str(ladder_value)
-            self.setText(str_value)
-
-            # Notify observers that the text contents have changed.
-            self.textChanged.emit(str_value)
+        def _ladderchange(self, new_value):
+            self.setText(str(new_value))
     }}}
 
 ::`updateValueLadder(cursor_x, cursor_y, alt_key, shift_key)`:
     #cppname: HOM_ui::updateValueLadder
+
     Updates the value in the currently opened ladder value window based on the
     given cursor position and boolean arguments.
 
@@ -934,28 +1082,31 @@ details_expanded=False)` -> int:
     called.  Raises [Hom:hou.OperationFailed] if no value ladder window is
     currently open.
 
-    `cursor_x` must be the x-coordinate for the current mouse cursor position.
+    `cursor_x`:
+        The horizontal coordinate of the current mouse cursor position.
 
-    `cursor_y` must be the y-coordinate for the current mouse cursor position.
+    `cursor_y`:
+        The vertical coordinate of the current mouse cursor position.
 
-    Set `alt_key` to True to inform the ladder window that the Alt key is held down.
-    Holding down the Alt key while changing the ladder value will scale the
-    value.
+    `alt_key`:
+        Whether the ((Alt)) modifier key is currently held.
+        This scales the ladder value.
 
-    Set `shift_key` to True to inform the ladder window that the Shift key is
-    held down.  Holding down the Shift key while changing the ladder value will
-    change the active level in the ladder window.
+    `shift_key`:
+        Whether the ((Shift)) modifier key is currently held.
+        This changes the ladder's active level.
 
-    For example code, see the Value Ladder example in the @examples section below.
+    See [Hom:hou.ui#openValueLadder] for more information.
 
 ::`closeValueLadder()`:
     #cppname: HOM_ui::closeValueLadder
-    Close the current value ladder window that was open by a previous call
+
+    Closes the current value ladder window that was open by a previous call
     to [Hom:hou.ui#openValueLadder].
 
-    Raise [Hom:hou.OperationFailed] if no value ladder window is open.
+    Raises [Hom:hou.OperationFailed] if no value ladder window is open.
 
-    For example code, see the Value Ladder example in the @examples section below.
+    See [Hom:hou.ui#openValueLadder] for more information.
 
 
 == Help ==
@@ -1042,6 +1193,67 @@ details_expanded=False)` -> int:
     open the edit capture weight spreadsheet for the node. If a string is passed 
     for pattern, then only the points specified by the pattern will be shown, 
     otherwise all the points for the node will be displayed in the spreadsheet.
+
+::`openFileEditor(title, file_path, action_callback=None, params=None)`:
+    #cppname: HOM_ui::openFileEditor
+    Open a modeless window for editing and saving a text file.
+
+    The editor buttons:
+
+    * `Apply`: Save the file only if the source has changed.
+    * `Accept`: Save the file if the source has changed and close the window.
+    * `Cancel`: Close the window without saving the file and prompting the user.
+
+    NOTE:
+        If the editor is opened and then reopened with a new file, the user may get 
+        prompted to save or discard the file being edited before the new file gets
+        loaded.
+
+    An optional callback and a dictionary of user-defined parameters can 
+    be specified to customize the `Apply` and `Accept` operations. 
+
+    `title`:
+        Name of the window title.
+
+    `file_path`:
+        A string set with a full path to the file to edit. Exception is raised if the string is empty.
+
+        The file extension determines the language settings used by the editor. The following file types are supported:
+
+        Extension ||
+            Language ||
+
+        .py |
+            Python
+        .cmd |
+            hscript
+        .txt/no extension |
+            Text document
+
+    `action_callback`:
+        An optional callback triggered by the editor when either the `Apply` or `Accept` button is clicked. The callback can be used 
+        to perform a custom operation. The editor saves the file being edited, if required, before calling the callback. 
+        
+        The callback name is user-defined and takes a dictionary argument as input:
+        {{{
+        #!python
+        def myApplyAction( **kwargs )
+        }}}
+
+    `params`:
+        A dictionary mapping user-defined entries to values of type `int`, `double`, `bool` and `string`. The dictionary is passed as argument to the callback specified with `action_callback`.
+
+    Example:
+    {{{
+    #!python
+    
+    def myAction(**kwargs):
+        hou.ui.printViewerStateMessage(kwargs['msg'] + ' saved.', kwargs['msg_type'])
+
+    file_path = '/var/tmp/main.py'
+    hou.ui.openFileEditor( 'My Editor Title', file_path, action_callback=myAction, 
+        params={ 'msg' : file_path, 'msg_type' : hou.severityType.Message })
+    }}}
 
 == Status line ==
 
@@ -1469,6 +1681,11 @@ details_expanded=False)` -> int:
     Raises [Hom:hou.NameConflict] if the registration fails because a state with the same name is already registered.
     Raises [Hom:hou.OperationFailed] if the registration fails (for example, the state to register has no factory).
 
+::`registerViewerStates()`
+    #cppname: HOM_ui::registerViewerStates
+
+    Scans the viewer state folders (`$HH/viewer_states` and `$HOUDINI_USER_PREF_DIR/viewer_states`) to register all viewer states they both contain. Viewer states already registered in Houdini are simply updated with the version on disk. 
+
 ::`unregisterViewerState(state_name)`
     #cppname: HOM_ui::unregisterViewerState
   
@@ -1516,6 +1733,142 @@ details_expanded=False)` -> int:
         Array of state names to reload. Empty by default.
 
     Raises [Hom:hou.OperationFailed] if the reload fails (for example, if no state with a given name is registered).
+
+::`viewerStateInfo()` -> `string`
+    #cppname: HOM_ui::viewerStateInfo
+
+    Return a JSON dictionary string describing all registered viewer states keyed by state type.
+    {{{
+    #!python
+    >>> print hou.ui.viewerStateInfo()
+    {
+        "sidefx_stroke":{
+                "Label":"Stroke",
+                "Type":"sidefx_stroke",
+                "Category":"Sop",
+                "Source":"$HFS/viewer_states/sidefx_stroke.py",
+                "Handles":{
+                },
+                "Selectors":{
+                },
+                "Menus":{
+                        "Stroke":{
+                                "Type":"Menu",
+                                "Handle":"stroke_menu",
+                                "Draw realtime":{
+                                        "Type":"Toggle",
+                                        "Handle":"realtime_mode",
+                                        "Hotkey":"h.pane.gview.state.sop.sidefx_stroke.realtime_mode",
+                                        "Keys":[48
+                                        ]
+                                },
+                                "Brush settings...":{
+                                        "Type":"Menu",
+                                        "Handle":"brush_menu",
+                                        "Cycle brushes":{
+                                                "Type":"Action",
+                                                "Handle":"cycle_brushes",
+                                                "Hotkey":"h.pane.gview.state.sop.sidefx_stroke.cycle_brushes",
+                                                "Keys":[49
+                                                ]
+                                        },
+                                        "Brush display mode":{
+                                                "Type":"Radio strip",
+                                                "Handle":"brush_display_mode",
+                                                "Wireframe":{
+                                                        "Type":"Radio strip item",
+                                                        "Handle":"brush_wireframe_display",
+                                                        "Hotkey":"h.pane.gview.state.sop.sidefx_stroke.set_wireframe_brush",
+                                                        "Keys":[50
+                                                        ]
+                                                },
+                                                "Viewport":{
+                                                        "Type":"Radio strip item",
+                                                        "Handle":"brush_viewport_display",
+                                                        "Hotkey":"h.pane.gview.state.sop.sidefx_stroke.set_viewport_brush",
+                                                        "Keys":[51
+                                                        ]
+                                                }
+                                        }
+                                },
+                        }
+                }
+        },
+        ...
+    }
+      
+    }}}
+
+::`addViewerStateEventCallback(self, callback)`:
+	#cppname: HOM_ui::addViewerStateEventCallback
+	Register a Python callback to be called whenever a [Hom:hou.viewerStateEventMessage] event occurs. 
+
+	'callback':
+	    Any callable Python object that expects a keyworded argument. 
+
+	    The keyworded argument contains the following:
+	    * `event_type`: [Hom:hou.viewerStateEventMessage] event.
+	    * `state_type`: The viewer state type that triggered the event. The state type can be used for indexing the dictionary returned from [Hom:hou.ui#viewerStateInfo].
+
+::`removeViewerStateEventCallback(self,callback)`:
+    #cppname: HOM_ui::removeViewerStateEventCallback
+    Remove a specific Python callback previously registered with [Hom:hou.ui#addViewerStateEventCallback].
+
+::`fireViewerStateCustomEvent(user_data, queue=True)`:
+    #cppname: HOM_ui::fireViewerStateCustomEvent
+
+    This function triggers a [custom viewer state event|Hom:hou.viewerStateEventMessage#OnCustomEvent] which can be used for implementing specific workflows. Client callbacks registered 
+    with [Hom:hou.ui#addViewerStateEventCallback] will get notified with the input `user_data` argument. The event can be processed immediately or later when Houdini is idle, see the `queue` argument 
+    for details.
+
+    `user_data`:
+        A dictionary mapping user-defined entries to values of type `int`, `double`, `bool` and `string`. An exception 
+        is raised if `user_data` is empty or contains unsupported value types.
+        
+        `fireViewerStateCustomEvent` adds a new entry (`event_type`) to the dictionary for storing the [OnCustomEvent|Hom:hou.viewerStateEventMessage#OnCustomEvent] event type.
+
+    `queue`:
+        If True (default), the event is put on a queue and processed when Houdini is idle. If False, the event is processed immediately. 
+
+    Here's how a custom event can be used.
+    {{{
+    #!python
+
+    # Register a callback for viewer state events
+    hou.ui.addViewerStateEventCallback(myEventHandler)
+    
+    def myEventHandler(**kwargs):
+        import json
+        if kwargs['event_type'] == hou.viewerStateEventMessage.OnCustomEvent:
+            if 'load_file' in kwargs:
+                # load a json file and store results 
+                with open(kwargs['load_file']) as file:
+                    json_values = json.load(file)                
+            elif 'save_file' in kwargs:
+                # save json_values to a json file
+                with open(kwargs['save_file'], 'w') as file:
+                    json.dump(json_values, file, indent=3)
+
+        # process other non-custom viewer state events
+        elif kwargs['event_type'] == hou.viewerStateEventMessage.OnEnter:        
+            pass
+
+    ...
+    # load a json file via a custom event
+    hou.ui.fireViewerStateCustomEvent( { 'load_file': '/var/tmp/somefile.json'} )
+    }}}
+
+
+::`printViewerStateMessage(message, message_type=hou.severityType.Message)`:
+    #cppname: HOM_ui::printViewerStateMessage
+
+    Print a user message in the message window of a Viewer State Browser. The [Hom:hou.viewerStateEventMessage#OnPrintMessage] event is sent when calling this function.
+
+    `message`:
+        String message to print.
+
+    `message_type`:
+        [Type|Hom:hou.severityType] of message to print. [Fatal|Hom:hou.severityType#Fatal] and [Important|Hom:hou.severityType#ImportantMessage] types are ignored and default to [Message|Hom:hou.severityType#Message].
 
 == Hotkeys ==
 

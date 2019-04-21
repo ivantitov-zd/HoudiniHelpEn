@@ -1,0 +1,103 @@
+= Integrating PDG and render farm software =
+
+"""How to use different schedulers to schedule and execute work."""
+
+
+== Overview ==
+
+To actually do the work you specified when the network runs, _something_ must take the commands that are ready to go, create an execution environment, and run them. In a TOP network, this is the _scheduler_ node.
+
+:fig: [Image:/images/pdg/topnet_scheduler.png]
+    You can have more than one scheduler in a TOP network, however the scheduler that cooks the network is specified on the TOP network node.
+
+    Having multiple schedulers allows you to set up different "profiles" and switch between them (for example, a local scheduler for small-scale testing, and a render farm scheduler for full production runs).
+
+    You can [override the scheduler|#override] used for certain nodes. This lets you run small jobs and filesystem modifications locally, instead of incurring the overhead of sending them out to a farm. (Some nodes even have an option to do work in the main process, rather than scheduling them at all.) A node can also override certain top-level job parameters.
+
+The [default scheduler node|Node:top/localscheduler] for new TOP networks schedules work using a process queue. Depending on the workload, this may actually be faster than using a render farm because of the lower overhead.
+
+Out of the box, TOPs has built-in scheduler nodes for [several render farm packages|#types] (see below).
+
+TOPs only works with distributed setups where the controlling machine and all servers share a network filesystem.
+
+
+== Scheduler types == (types)
+
+[Largeicon:TOP/scheduler] |
+    [Local scheduler|Node:top/localscheduler] |
+        #width: 20%
+        The default scheduler: schedules work using a process queue on the local machine. 
+
+[Largeicon:MISC/hqueue_logo] |
+    [HQueue scheduler|Node:top/hqueuescheduler] |
+        This is Houdini's free management software, suitable for small render farms. See [how to install HQueue|/hqueue/].
+
+[Largeicon:TOP/deadlinescheduler] |
+    [Deadline scheduler|Node:top/deadlinescheduler] |
+        [Compute management toolkit|https://deadline.thinkboxsoftware.com] by Thinkbox software.
+
+[Largeicon:TOP/tractorscheduler] |
+    [Tractor scheduler|Node:top/tractorscheduler] |
+        [Render management software|https://renderman.pixar.com/tractor] by Pixar.
+
+
+== Custom schedulers ==
+
+You can use [custom scheduler bindings|custom_scheduler] to integrate other third party or in-house scheduling software.
+
+
+== Scheduler overrides == (override)
+
+:task: To override the scheduler used for a single node:
+
+    # Select the node whose scheduler you want to override.
+
+    # In the parameter editor, click the __Schedulers__ tab.
+
+    # Set the __TOP scheduler path__ to the node path to the scheduler node you want to use.
+
+        [Image:/images/pdg/override_job_parms.png]
+
+        TOP network are often defined entirely at the top level (without subnets), so it's likely the node is at the same level as the scheduler node, in which case a relative path to the scheduler is just the scheduler node's name, such as `local_scheduler`.
+
+        Alternatively you can click the [Icon:BUTTONS/chooser_node] node chooser icon next to the field to select the scheduler node interactively. This will fill in an absolute path to the scheduler.
+
+    To revert a node to using the default scheduler specified on the network node, set the node's __TOP scheduler path__ field to be blank.
+
+:task: Override job execution parameters for a single node:
+    Schedulers can have individual parameters for how they schedule and execute commands. You can override these settings per-node.
+
+    # Select the node whose scheduler you want to override.
+
+    # In the parameter editor, click the __Schedulers__ tab.
+
+    # The tab has sub-tabs for each scheduler node in the network. Click the tab corresponding to the scheduler whose settings you want to override. (The override will only apply when that scheduler is the one cooking this node.)
+
+    # Inside the sub-tab, turn on __Override job parameters__.
+
+        This shows the set of scheduler parameters you can override.
+
+        [Image:/images/pdg/override_job_parms.png]
+
+
+== Working around work item overhead ==
+
+Starting operations in separate processes, scheduling work on the farm, and moving data across the network filesystem all add overhead to work you do in TOPs. Some nodes have options to do small jobs inside the process cooking the graph, and you can [override|#override] small work items to run on the same maching instead of being scheduled on the farm.
+
+However, even for an [HDA Processor node|Node:top/hdaprocessor] running locally, if the asset cooks quickly, the overhead of running it in a separate process still kills overall performance. There are few things you can do to optimize or work around this:
+
+* Use a [ROP Geometry node|Node:top/ropgeometry] to generate geometry instead of HDA Processor, and do your wedging using time/frame number.
+
+    In the same HIP file as your TOP Network, instantiate your asset, and point a ROP Geometry node at the SOP network. On the ROP Geometry node, turn on __All Frames in One Batch__ on the __ROP Fetch__ tab. That will create a single process that cooks the full frame range one frame at a time, which is typically used for simulations but is often more efficient for light-weight geometry jobs.
+
+    You can also play with a custom batch size. For example, instead of __All Frames in One Batch__, you could use 20 frames per batch.
+
+* If possible, you can try using the [Invoke node|Node:top/invoke] instead of HDA Processor. The Invoke node cooks a SOP chain in the process cooking the graph instead of in its own process. The limitation is that you can only use it on a [compiled block|/model/compile]. For small/quick operations this is _much_ more efficient.
+
+* You can also try increasing the number of processes on the local machine in the Local Scheduler. The default maximum is very low (number of cores / 4) to avoid slowing down the local machine, but if you're overriding small jobs to run locally you should probably increase this to the number of cores.
+
+* On the Local Scheduler, turn on __HDAProcessor pool__ and set it to a number greater than `0`. This creates a pool of HDAProcessor instances that will be re-used for HDAProcessor jobs, instead of each new HDAProcessor job running in a separate instance.
+
+A future version of Houdini will probably add batching to the HDA Processor so it can cook multiple asset variations (wedges) in a single process, much like the ROP Geometry's batching mode.
+
+

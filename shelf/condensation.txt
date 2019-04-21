@@ -1,0 +1,76 @@
+#icon: SHELF/condensation
+#tags: particlefluids
+
+= Condensation =
+
+"""Creates a particle simulation to mimic condensation on geometry."""
+
+This tool sets up a particle system to simulate liquid forming, flowing, and dripping off the surface of the selected object. 
+
+The created dynamics network contains the following components:
+
+- [Static Object|Node:dop/staticobject] from the selected geometry to allow the
+particles to collide with the object.
+- A [particle system|/dopparticles/] consisting of a [POP Object|Node:dop/popobject] and [POP Solver|Node:dop/popsolver].
+- [Geometry Wrangle|Node:dop/geometrywrangle] that applies a custom force on
+particles, causing them to stick to the object.
+- An emitter to continuously inject new fluid into the simulation.
+- [POP Fluid|Node:dop/popfluid] node that causes the particles to behave like fluid.
+
+NOTE:
+    This tool is designed for objects whose dimensions are in the ballpark of a single unit; simulation forces may need to be adjusted if the object's size is considerably different.
+
+== Using Condensation ==
+
+# Create a geometry object for the condensation to form around.
+
+# Click the [Icon:SHELF/condensation]Condensation tool on the
+__Particle Fluids__ shelf tab.
+
+# Select your input geometry and press ((Enter)) to confirm the selection.
+
+:video:
+    #src: videos/pop_condensation.mp4
+
+The distance between fluid particles in the simulation is controlled by __Particle Separation__ on the [POP Fluid|Node:dop/popfluid] node. Consider changing this value if you want a different density of points in your fluid.
+
+NOTE:
+        Emission (handled by the `source_fluid` node) accounts for __Particle Separation__ when seeding particles.
+
+== Controlling Emission ==
+
+The amount of condensation largely depends on the source points, which are generated in the selected object's network. An effective way to gauge where liquid will be injected into the simulation is to inspect the `emit` attribute on these source points. You can do this by creating an attribute visualizer or
+looking at the geometry spreadsheet. `SOURCE_OUT` is a convenience [null|Node:sop/null] that holds the final source points.
+
+The following list outlines some basic ways to control the emission of liquid. All nodes referenced below are located inside the object-level node of your selected geometry.
+
+:task:Change the number of droplets that appear:
+    Change the __Force Total Count__ parameter on the [Scatter SOP|Node:sop/scatter] (`create_droplet_points`). This parameter's value controls the number of droplets that form over the entire simulation.
+
+:task:Control when the droplets form:
+    Change the __Min Value__ and __Max Value__ parameters on the [Attribute Randomize|Node:sop/attribrandomize] node (`add_emission_frame`). This node randomly selects the frame to activate each droplet on, and the aforementioned parameters specify the frame range within which droplets may appear.
+
+:task:Control how long droplets emit liquid:
+    Tweak fade parameters under the __Timings__ tab of the [Attribute Fade|Node:sop/attribfade] node (`fade_emission`).
+
+:task:Modify the emission size for droplets:
+    Change the __Distance Threshold__ on the [Attribute Transfer|Node:sop/attribtransfer] node (`transfer_emission`).
+    
+:task:Change where the droplets appear:
+    Modify the __Global Seed__ parameter on the [Scatter SOP|Node:sop/scatter] (`create_droplet_points`).
+    
+:task:Choose exactly where condensation will appear on your object:
+    Replace the `create_droplet_points`, `add_emission_frame`, and `fade_emission` nodes with your own manually created points and wire them into the `DROPLETS_OUT` node. You must also create an attribute called `emit` on those points that will be picked up by the [Attribute Transfer|Node:sop/attribtransfer] node (`transfer_emission`).
+
+NOTE:
+        As far as [POP Fluid|Node:dop/popfluid] DOP is concerned, each simulation particle represents an equally massive chunk of liquid. This is very different from a FLIP simulation, where particles signal the presence, but not amount, of fluid. Placing a large number of particles in close proximity is akin to compressing a liquid, and will result in particles exploding outwards. Great care must be taken should you choose to modify sourcing parameters in the DOP network.
+        
+        
+
+== Changing the behavior of the condensation ==
+
+:task:Make the liquid drip off the object quicker:
+    Lower the __Strength Multiplier__ parameter on the [Geometry Wrangle|Node:dop/geometrywrangle] (`adhesion_force`). This parameter controls how strong the force is that holds the particles to the geometry. If this value is 0, the liquid will not follow the surface to the lowest point before dripping off. It will simply fall down as gravity pulls it.
+    
+:task:Control how slowly the liquid flows over the object:
+    The __Friction__ parameter on the [POP Object|Node:dop/popobject] controls how the liquid moves along the surface of the object. This can be modified along with the __Strength Multiplier__ parameter on the [Geometry Wrangle|Node:dop/geometrywrangle] node (`adhesion_force`) to control the behavior of the fluid along the surface of the object.

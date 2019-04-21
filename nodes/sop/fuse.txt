@@ -4,22 +4,26 @@
 #context: sop
 #internal: fuse
 #icon: SOP/fuse
+#version: 2.0
 #tags: topology, points
 
-"""Merges or splits (uniques) points."""
+"""Merges points."""
 
-The Fuse SOP is used to snap points together, make the points unique, or snap points to a 3d grid.
+The Fuse SOP is used to snap points together or snap points to a 3D grid, and optionally fusing points after the snap.
 
-You can consolidate points based on their proximity to each other (given by the distance threshold) or you can have all the points in the given group be consolidated to the first point of that group. This option is commonly used in a procedural fashion to clean up models that may have unshared edges that need to be removed. This is necessary to have certain surfaces subdivide properly. Generally the entire geometry set (empty Group field) or large parts of the geometry are procedurally processed in this method.
-
-To consolidate all points in the group to the first point in the Group point list, turn off the distance field.
+To restrict the points that can fuse and be fused to, points can be query points, or target points, or both. With only one input to the node, both query and target points are from the single input. However, with a second input to the node, only points in the first input can be query points and only points in the second input can be target points.
 
 TIP:
     When fusing multiple line primitives into a single line, they will still maintain separate primitives. If you wish to make the result into a single primitive, append the [Node:sop/join] SOP with `Only Connected` enabled.
 
-You can snap points based on their proximity to each other (given by the distance threshold) but no consolidation is done. The snap option has more options on the actual snap behavior. This method is commonly used on a small selection of points in classic modeling operations.
+You can snap points based on their proximity to each other (given by the distance threshold) without fusing them. The snap type has more options on the actual snap behavior. This method is commonly used on a small selection of points in classic modeling operations.
 
-Snapping to a grid is useful for grabbing points and ordering them to a 3d grid. This method is commonly used on individual point selections in classic modeling operations. Snapping to a grid is also useful when outputting to low res consoles as you can truncate vertices to lie on a certain integer boundaries globally on the model.
+Snapping to a grid is useful for grabbing points and ordering them to a 3D grid. This method is commonly used on individual point selections in classic modeling operations. Snapping to a grid is also useful when outputting to low res consoles as you can truncate vertices to lie on a certain integer boundaries globally on the model.
+
+Snapping only moves points to new positions. To rewire the vertices of points that were snapped together, you can choose to fuse points after snapping so that only one point retains vertices from the original points.
+
+You can select point attributes and groups that you want to be modified after a point is snapped. You can also specify the heuristics for how the attributes values should be interpolated and how group membership should be assigned.
+
 
 == Using Fuse == (includeme)
 
@@ -27,7 +31,7 @@ Snapping to a grid is useful for grabbing points and ordering them to a 3d grid.
 
 # Click the [Icon:SOP/fuse][Fuse|/nodes/sop/fuse] tool on the __Polygon__ tab.
 
-The merge is based on the proximity of the points to each other. The threshold distance for consolidation can be modified in the [parameter editor|/ref/panes/parms].
+The merge is based on the proximity of the points to each other. The threshold distance for snapping can be modified in the [parameter editor|/ref/panes/parms].
 
 [Image:/images/shelf/fuse_before.png]
 [Image:/images/shelf/fuse_after.png]
@@ -35,115 +39,105 @@ The merge is based on the proximity of the points to each other. The threshold d
 @parameters
 
 Group:
-    Subset of points to unique or consolidate.
+    #id: querygroup
 
-Update Point Normals:
-    Recomputes point normals, if they exist.
+    Subset of points that will be snapped.
 
-Use Accurate Distance:
-    #id: accurate
+Target Group:
+    #id: targetgroup
 
-    Forces Distance to represent consolidate or snap distances accurately,
-    and forces consolidation or snapping to be performed in order of point
-    number, (reverse for snapping to highest point number), to avoid moving
-    points to within Distance of other points.  That issue may
-    still occur for snapping to average value, as no snap order can then
-    guarantee that points aren't moved to within Distance of other points.
+    When enabled, this is the subset of points that will be snapped to
+    by query points. Otherwise, the query group is also the target group,
+    and the behavior is as if __Modify Target__ is on, regardless of its
+    actual value.
+    When there is a second input connected, this group refers to the
+    second input. When __Snap Type__ is "Grid", there is no target group.
 
-== Consolidate ==
+Modify Target:
+    #id: modifyboth
 
-Overview:
-    Points within a specified distance of each other will share
-    a point.
+    When disabled, target point attribute values will stay fixed and be
+    copied over to query points, which is useful for fusing to existing
+    geometry.
+    When enabled, both query and target point attributes will be modified
+    and used to interpolate the new attribute value. This is useful if
+    you still want only one subset of points to fuse with another subset,
+    but so that both subsets can be modified (for example, when snapping
+    two mirrored halves together).
+    This parameter is not applicable when a second input is connected,
+    since that geometry cannot be modified.
 
-Distance:
-    #id: dist
+Position Attribute:
+    #id: posattrib
 
-    Threshold distance for consolidation.
+    This attribute will be used as the position for determining what to
+    snap where.  This attribute can be a point, vertex, or primitive
+    attribute in the first input, and can be a point, vertex, primitive,
+    or detail attribute in the second input; they do not need to be the
+    same.  The __Group__ and __Target Group__ parameters will be parsed
+    as the corresponding type of group.  If this attribute is not a point
+    attribute in the first input, the Fuse options do not apply, because
+    only points can be fused together.
 
-Remove Degenerate Primitives:
-    Cleans up any degenerate polygons.
+Snap To:
+    #id: snaptype
 
-Keep Unused Points:
-    Keeps any points that were not part of a primitive before
-    the fuse and, if __Remove Degenerate Primitives__ is set,
-    any points orphaned by removing degenerate polygons.
+    The method used to which points to snap where. The "Points" snap
+    type snaps points within the tolerance together. The "Grid" snap type
+    snaps to points in a 3D grid.
 
-Keep Consolidated Points:
-    Keeps any points that are orphaned and not part of any
-    polygons because they have been consolidated.
+=== Points ===
 
-Group Propagation:
-    This lets you specify how the fused points get assigned to
-    the Point Groups from the original points.
+Using:
+    #id: algorithm
 
-    Least Point Number:
-        The fused point will belong to same groups that the
-        original point with the least point number belongs to.
-        This is the fastest method.
-    Union:
-        The fused point will belong to any group that contains
-        at least one of the original points. For example, if two
-        original points are fused and one of them belongs to
-        Group A and the other belongs to Group B, the fused
-        point will belong to Groups A and B. In other words, the
-        fused point will belong to the union of the groups of
-        the original points.
-    Intersect:
-        The fused point will belong to the groups that contain
-        all of the original points. As an example, if two
-        original points are fused and one belongs to Groups A
-        and B while the other belongs to Groups B and C, the
-        fused point will belong to Group B. In this case, the
-        fused point will belong to the intersection of the
-        groups of the original points.
-
-== Unique ==
-
-Makes each vertex a unique point.
-
-== Snap ==
-
-Overview:
-    Point positions and/or point attributes only will be
-    altered.
-
-Distance/Grid:
-    How to do the snapping. Internal will snap points to other
-    points in the same object. Grid will snap to user specified
-    grid lines.
-
-=== Distance ===
-
-Snap Type:
-    What heuristic to use to determine the position or attribute
-    values of snapped points. It can be the average of all the
-    points to be snapped. Or, it can snap to the least or
-    greatest point number, which is useful if you know one of
-    those is the real value.
+    The overall method used for determining which points to snap together.
+    The "Least Target Point Number" method snaps points to the lowest
+    target point number in range, which can ensure that after snapping,
+    if __Output Positions__ is "Least Point Number", no differently
+    snapped points will be within __Snap Distance__ of each other.
+    The "Closest Target Point" method snaps points to the closest
+    target point, if it is in range, which is preferable if snapping
+    disjoint pieces together.
 
 Snap Distance:
     #id: tol3d
 
-    The maximum distance to snap points together
+    The maximum distance to snap points together.
 
-Snap Point Positions:
-    Moves the point positions according to the __Snap Type__.
-    If this is turned off, the point positions will not be
-    changed. This is mainly useful if you enable __Snap Point
-    Attributes__ and only want to snap together the point
-    attributes.
+Output Positions:
+    #id: positionsnapmethod
 
-Snap Point Attributes:
-    Snaps together the point attribute values of the snapped
-    points. The values are set according to the __Snap Type__,
-    so the new attribute values can be an average, or taken from
-    the point with the least or greatest point number.
+    The method to use to combine values of __Position Attribute__
+    when snapping points together.
 
-Point Attributes:
-    Select the point attributes that you want to snap together.
-    If you set __Snap Type__ to "Average", you can only snap
-    floating point-, vector- or integer- valued attributes.
+Radius Attribute:
+    #id: radiusattrib
+
+    When enabled, the point attribute with this name is used to specify
+    the radii of the points. Two points will be able to fuse together
+    if the closest distance between their spheres with
+    the corresponding radius is within the __Snap Distance__.
+
+Match Attribute:
+    #id: matchattrib
+
+    When enabled, the point attribute with this name is used to limit
+    which points can be snapped together by comparing this attribute's
+    values for the corresponding points.  The comparison is specified
+    by the __Match Type__.  This attribute can only be an integer or
+    string attribute.
+
+Match Condition:
+    #id: matchtype
+
+    The comparison to use for comparing the __Match Attribute__ values of points.
+    "Equal Attribute Values" requires values of __Match Attribute__ to be equal in order for
+    points to be considered for snapping together, which is useful for snapping within
+    several separate pieces and not between pieces.  "Unequal Attribute Values" requires that
+    at least one point has a different value than the rest, which is useful for snapping
+    between several separate pieces and not within pieces.
+
 
 === Grid ===
 
@@ -184,8 +178,92 @@ Grid Tolerance:
 
     Maximum distance to move points to grid
 
+    
+== Fuse ==
+
+Fuse Snapped Points:
+    #id: consolidatesnappedpoints
+
+    When enabled, points that are snapped to the same position will be replaced
+    with a single point, connected to all vertices of the original points.
+
+Keep Fused Points:
+    #id: keepconsolidatedpoints
+
+    When enabled, points that would otherwise be deleted by the
+    __Fuse Snapped Points__ option are kept.
+
+Remove Repeated Vertices and Degenerate Primitives:
+    #id: deldegen
+
+    Remove sequential vertices that reference the same point in polygons or
+    curves, and then deletes any degenerate primitives, such as closed polygons
+    with 2 or fewer vertices, or polygon curves with 1 or fewer vertices.
+
+Remove Unused Points from Degenerate Primitives:
+    #id: deldegenpoints
+
+    Remove any points that no longer have vertices connected to them
+    due to the deletion of degenerate primitives.
+
+Remove All Unused Points:
+    #id: delunusedpoints
+
+    Remove all points that have no vertices connected to them.
+
+
+== Output Attributes and Groups ==
+
+Recompute Affected Normals:
+    #id: recomputenml
+
+    Recomputes any normals that are affected by polygons that use any
+    fused points.
+
+Snapped Points Group:
+    #id: snappedgroupname
+
+    When enabled, a point group with this name is created containing all
+    points that snapped to another point.
+
+Snapped Destination Attribute:
+    #id: snappedattribname
+
+    When enabled, a point attribute with this name is created, which
+    contains the point number of the point that was snapped to, or -1
+    if not applicable.
+
+Attributes to Snap:
+    #id: numpointattribs
+
+    The number of patterns of attributes to be modified.
+
+Output Values:
+    The heuristic to use to determine the new attribute value of a point
+    based on the points that it snapped to. These interpolate over only
+    target points, unless __Modify Target__ is enabled.
+    "First Match" will snap to the attribute value of the point with
+    the least point number. Likewise, "Last Match" will snap to the point
+    with the greatest number. 
+    
+Point Attributes:
+    The point attributes that you want to be merged together after fusing.
+    Only certain types of attributes can be used for each __Snap Method__.
+
+Groups to Snap:
+    #id: numgroups
+
+    The number of patterns of groups to be modified.
+
+Group Propagation:
+    The heuristic to use to determine how the points get assigned to the
+    Point Groups of the points they snapped to.
+
+Point Group Names:
+    The names of the point groups that you want to be updated after
+    fusing according to the __Group Propagation__.
+
 @related
 
 - [Node:sop/facet]
 - [Node:sop/uvfuse]
-

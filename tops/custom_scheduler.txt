@@ -1,0 +1,262 @@
+= Custom schedulers =
+
+"""It is possible to use third-party or in-house scheduler software by writing a custom scheduler in Python."""
+
+
+== Overview ==
+
+You can create a custom scheduler node to send work to scheduler software not supported by the [built-in scheduler nodes|/tops/schedulers]. The custom node could schedule work itself (for example, if you wanted to use a custom scheduling algorithm), or access the API of a third-party or in-house scheduler.
+
+WARNING:
+	*Making a custom scheduler requires Python programming experience and knowledge of the scheduler software you want to integrate*. What you do in the Python code, and what is efficient or inefficient, depends entirely on the scheduler software, so it's not possible to give step-by-step instructions here. Writing the integration snippets may require threading programming, running servers, and other non-beginner programming.
+
+	Also, the current implement can be considered a *first draft* and may be fixed/changed in the future. We welcome any feedback you may have on trying to implement a custom scheduler. It can help guide future efforts in this area.
+
+
+== How to create a custom scheduler ==
+
+To implement a custom scheduler, do the following:
+
+# Create a [Python Scheduler node|Node:top/pythonscheduler] in your TOP network.
+
+	This node provides fields for callback functions that define the behavior of the scheduler. The node will function just like any other scheduler, and will evaluate and execute the python code entered into its callback function fields. This is very useful to let you prototype your scheduler code in a working network.
+
+# See [implementing the callbacks|#callbacks] below for how to fill out the various Python snippets on the node's tabs.
+
+# [Add spare parameters|#spare] to allow the user to control how the node works.
+
+    This is much more flexible and convenient than hard-coding values into the Python code. You can continue to refine the interface as you work on the code, adding or removing parameters as you work out the code.
+
+    See [how to give your custom scheduler a parameter interface|#spare] below.
+
+# Once the scheduler is working correctly, you can convert it into a [digital asset|/assets/] for use by other users and in other networks. This also allows individual TOP nodes to override scheduler parameters (you can't override a Python Scheduler instance).
+
+
+== Implementing the scheduler == (callbacks)
+
+You _must_ implement the following callbacks. They do not have reasonable "fallback" behavior.
+
+
+=== Initialization and cleanup > Start and Stop ===
+
+Use the Python snippets on the __Initialization and cleanup__ tab for code that should run when the scheduler first starts, should run when the TOP network starts cooking, should run when the network stops cooking, and/or should run when the scheduler is no longer needed.
+
+For example, you might start a timer thread that checks the status of jobs periodically in the __Start cook__ snippet, and then in the __Stop cook__ snippet, set a flag on the timer thread object telling it to stop.
+
+
+=== Scheduling > Schedule ===
+
+This is the key method that does the "real work" of scheduling jobs. It is called by cooking nodes to process and schedule their work items. It receives a [Py:pdg.WorkItem] object as `work_item`.
+
+This is where you must implement the _scheduler-specific_ logic to take `WorkItem` data and use it to create a scheduled job in whatever custom system you are integrating. This may involve running the command line in an environment with certain variables defined, copying dependent files, calling scheduler APIs, and so on.
+
+* The `command` string attribute contains the command line the job should run.
+
+* If the scheduler needs/accepts a per-job unique key to look up the job later, use `WorkItem.name`.
+
+* The snippet should return a [Py:pdg.scheduleResult] value once the job is scheduled (or encounters an error). 
+
+	This enumeration has values that signal _final_ success (`CookSucceeded`) and failure (`CookFailed`) of the _whole job_, as well as values that mean "successfully scheduled" (`Succeeded`) or "unsuccessfully scheduled" (`Failed`).
+
+	For example, the scheduler software might immediately be able to say the job itself succeed (`CookSucceeded`), such as if it has no work to do. The more likely scenario is that the status is simply that the job was successfully scheduled to be run later (`Succeeded`). Once the job is scheduled, later status changes are handled through [notifications|#notify].
+
+	{{{
+	#!python
+	# Imaginary API to schedule a job
+	jobid = myscheduler.submit_job(command=work_item.data.getString("command"),
+		                           name=work_item.name,
+		                           metadata={"pdg_index": work_item.index})
+
+	# In this example the scheduler returns None if the submission was rejected
+	if not jobid:
+		# Failed at scheduling the job
+		return pdg.scheduleResult.Failed
+
+	# Imaginary call to check the status of a job
+	status = myscheduler.get_status(jobid)
+	if status == "done":
+		# Immediate success!
+		return pdg.scheduleResult.CookSucceeded
+	elif status == "failed":
+		# Immediate failure!
+		return pdg.scheduleResult.CookFailed
+	elif status == "scheduled":
+		# Successfully put in the queue to run later
+		return pdg.scheduleResult.Succeeded
+	}}}
+
+	See the help for [Py:pdg.scheduleResult] for more information.
+
+
+=== Scheduling > Schedule static ===
+
+This is called once at the start of a cook, so your code can schedule all "statically known" work items. The `onSchedule` callback (on the __Scheduling > Schedule__ tab) is then called individually for dynamic items.
+
+* The `dependencies` variable contains a `dict`-like object that maps a [Py:pdg.WorkItem] object to a list of `WorkItem` objects that item depends on.
+
+* The `dependents` variable is the inverse of `dependencies`: it contains a `dict`-like object that maps a `WorkItem` object to a list of objects that depend on it.
+
+* The `ready_items` variable contains a list of `WorkItem` objects that are ready to run.
+
+It is up to your code to schedule the ready items, and communicate the dependency information encoded in the map objects to the scheduler software so they are run in the correct order.
+
+Unfortunately, you _must_ implement this snippet. If you don't, statically-known work items are simply never scheduled.
+
+
+=== Job status notification === (notify)
+
+You must implement a method to communicate job status changes back to the TOP network. How to get notifications back from the scheduler software is implementation specific. For example:
+
+* If the scheduler software is Python code you're running in the Houdini Python process, you might be able to set up a callback function that is called when a job's status changes.
+
+* If the scheduler software is running in a separate process, but has a network based callback mechanism (such as a REST API), you could start a server in a Python background thread (in the __Initialization and cleanup > Start__ snippet) to listen for the callbacks.
+
+* If the scheduler requires polling to detect status changes, you could start a Python (or Qt) timer thread to check the status periodically.
+
+Remember to keep a reference to `self` (the `Scheduler` object) in any threads or callbacks you use.
+
+NOTE:
+	The `pdg.Scheduler` notification methods require you pass the `name` string and `index` integer of the original work item that created the job. If your scheduler software may allow you to attach them to the job as data, or you may need to store them yourself somehow (for example, you might need to keep a Python `dict` in memory mapping the scheduling software's internal job IDs to `(name, index)` tuples).
+
+However you detect status changes in the scheduler software, you would then call one of the following methods on [Py:pdg.Scheduler] (`self`):
+
+`self.onWorkItemStartCook(item_name, index)`:
+	Call this method when a job that was previously queued starts running.
+
+`self.onWorkItemSucceeded(name, index, cook_duration)`:
+	Call this method if the job succeeded. In addition to `name` and `index`, pass it the `cook_duration` (the duration, in floating point seconds, that the job ran for).
+
+`self.onWorkItemFailed(name, index)`:
+	Call this method if the job succeeded. Pass it the original work item's `name` and `index`.
+
+`self.onWorkItemCanceled(name, index)`:
+	Call this method is the job was manually canceled by a user. Pass it the original work item's `name` and `index`.
+
+`onWorkItemFileResult(name, index, result, tag, checksum)`:
+	Called when a work item has a file result. The `result` is the path to the file as a string, `tag` is the [file tag|/tops/filetags] string (for example, `file/geo`), and `checksum` is an integer value.
+
+
+=== Scheduling > Submit as job ===
+
+This is called if a user tries to submit an entire TOP network as a single job. This is optional functionality you can choose to implement. For example, the HQueue Scheduler has a __Submit graph as job__ button, but the Deadline Scheduler does not support this.
+
+* The `graph_file` variable contains the path to a HIP file containing the TOP network to cook. This path is relative to the working directory on the machine cooking the network.
+
+* The `node_path` variable contains a node path of the TOP network node to cook inside the HIP file.
+
+*If* you want to support this functionality, it is up to your code to create and schedule a script job that runs Houdini, loads the specified HIP file, and cooks the specified network.
+
+TIP:
+	To tell Houdini to cook a TOP network in HOM, find the parent network, find the TOP node inside with the display flag, and call the [Hom:hou.TopNode#executeGraph] method on it.
+
+	{{{
+	#!python
+	hou.hipFile.load(graph_file)
+	network = hou.node(node_path)
+	to_cook = network.displayNode()
+	if not disp_node:
+		to_cook = network
+
+	# Make sure the network is initialized
+	to_cook.parent().cook()
+	# Run the network
+	to_cook.executeGraph(False)
+	}}}
+
+
+=== File paths > Working directory ===
+
+This should return a path string representing the TOP network's working directory on the machine where the code runs. In a farm set-up, the working directory should be on a shared network filesystem.
+
+If the `local` variable is True, the path should be valid on the machine _where the network is cooking_ (not necessarily valid on remote hosts). If it is False, the path should be valid on a remote render farm host.
+
+The code to generate/translate local and remote paths is scheduler-specific. For example, your scheduler software may have its own API for discovering the shared directory, or it might have set system environment variables (for example, `$REPO_DIR`). 
+
+The Python Scheduler node has a __Working directory__ parameter that you can access in the code using `self["pdg_workingdir"].evaluateString()`. Since this should be a valid path on the machine cooking the network, you can handle the local case like this:
+
+	{{{
+	#!python
+	if local:
+		return self["pdg_workingdir"].evaluateString()
+	else:
+		# Translate the local directory into a remote path using
+		# self.localizePath()
+	}}}
+
+See the localize path snippet below.
+
+
+=== File paths > Localize path ===
+
+This snippet should take a file path string that's relative to `__PDG_SHARED_ROOT__` and return an absolute path valid for the machine the code is running on.
+
+
+=== Shared servers > Transfer file ===
+
+Called when a file dependency at `file_path` should be copied from the local machine to a remote location (e.g. a shared network drive). This is used for files that are necessary to work scripts, so they are copied to the working directory. This snippet should return True if the file copied successfully.
+
+Note that the default implementation does nothing but returns True as if it had copied to file successfully. If you use the file dependency system, you _must_ replace the default implementation with code that actually copies the file.
+
+A future revision should fix this to provide a reasonable default behavior.
+
+
+=== Logging ===
+
+These snippets provide a [Py:pdg.WorkItem] object in the `work_item` variable. If you can use work item's data, in combination with the scheduler's API if necessary, to calculate the location of the corresponding job's logs and/or status page, the TOPs interface can then display them as part of the work item's information.
+
+Log URI:
+	For the work item, return a URL the system can retrieve to show the corresponding job's output/error logs. This can be a `file:` URL to refer to files on the shared network filesystem, for example `file:///myfarm/tasklogs/jobid20.log`.
+
+	If your scheduler does not support this, return an empty string.
+
+Status URI:
+	For the work item, return a URL the system can open to show the corresponding job's status. This will usually be a `http:` link to the job's status page in a scheduler's web interface.
+
+	If your scheduler does not support this, return an empty string.
+
+
+== Creating a user interface == (spare)
+
+_Spare parameters_ are "extra" parameters you add to an existing node's parameter interface. This is how you add user-configurable options to your scheduler. If you later convert the node to an asset, it will automatically use the spare parameters as the asset's interface.
+
+* See [spare parameters|/network/spare] for how to add spare parameters. 
+
+* Within the Python code snippets on the node, you can use `self` to reference a [Py:pdg.Scheduler] instance representing this scheduler (this is _not_ a Houdini network node object).
+
+    Any spare parameters on the Python Processor node/asset are copied into this object as [Py:pdg.Port] objects. You can access them using `self["<<parm_name>>"]` and read the value using `Port.evaluateFloat()`, `Port.evaluateInt()`, and so on.
+
+    {{{
+    #!python
+    # Get the value copied from the node's "url" parameter
+    url = self["url"].evaluateString()
+    }}}
+
+* Try to give the parameters short but meaningful internal names, so you can refer to them easily in scripts.
+
+* *For parameters you want to allow individual nodes to override*: in the spare parameter editing interface, add a `jobParm` tag to the parameter. This tells the system to show an option for individual TOP nodes to override that parameter.
+
+	* See [scheduler overrides|schedulers#override] for more information.
+
+	* The tag value is not currently used. The system only checks if tag named `jobParm` exists.
+
+	* Note that this only works once the node is converted into an asset. You cannot override parameters on a Python Scheduler instance.
+
+	[Image:/images/pdg/custom_scheduler_job_parms_interface.png]
+
+
+== Using the custom scheduler ==
+
+You can set your Python Dcheduler instance or custom scheduler asset as the default TOP scheduler for the entire graph (i.e. all work items), or for only work items generated from specific nodes.
+
+* To set as the default TOP scheduler, select the TOP network, and change the __Default TOP Scheduler__ to the custom scheduler node.
+
+	[Image:/images/pdg/custom_scheduler_set_default.png]
+
+* To set for a specific TOP node, select the TOP node, and set the __Override TOP Scheduler__ to the custom scheduler node.
+
+	[Image:/images/pdg/custom_scheduler_set_node.png]
+
+Now when the TOP network or node is cooked, the custom scheduler will be used to process the work items.
+
+
+

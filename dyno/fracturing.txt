@@ -1,6 +1,5 @@
 = Fracturing objects for simulation =
 
-
 == Overview ==
 
 Often in rigid body simulations, you want a solid object to break into pieces because of some impact or force. For example, you might want an earthquake to destroy a house, with the concreate walls fracturing, the wood door splintering, and glass windows shattering. Or you might want a swinging demolition crane ball to cave in a wall.
@@ -9,7 +8,7 @@ Often in rigid body simulations, you want a solid object to break into pieces be
 
     The high-level tool for pre-fracturing geometry is the [RBD Material Fracture SOP|Node:sop/rbdmaterialfracture], with plenty of controls over different types of fracturing. There are many lower-level SOPs if you need even more control over fracturing.
 
-    [Image:/images/dynamics/rbdmaterialfracture_house.png]
+    [Image:/images/sop/destruction_constaints.jpg]
 
 * You can also do _dynamic fracturing_ during the DOP simulation. See the help for [Make Breakable|/shelf/makebreakable] tool for more information.
 
@@ -52,14 +51,9 @@ See the rest of this page for more information on the available tools.
 
 * If you see pieces spinning/wobbling in the simulation, you can particle drag to freeze them.
 
+* You can use the __Output for view__ ((RMB)) menu on RBD SOPs to choose which output is displayed. By default, the first output (__Geometry__) is displayed. However, you can also toggle between __Constraint Geometry__ and __Proxy Geometry__.
 
-== Pre-constraining pieces == (existing_constraints)
-
-If you have multiple connected pieces you want to fracture in different ways, you can *optionally* set up [glue constraints|#constraints] between these pieces using [Connect Adjacent Pieces|Node:sop/connectadjacentpieces] nodes before you use RBD Material Fracture to break them up.
-
-For example, if you are destroying a house, you can start by constraining the door and windows to the walls they're embedded in.
-
-As the RBD Material Fraceture node breaks up the individual objects, it tries to intelligently update existing constraints. So, for example, if a pane of window glass starts constrained to the surrounding window frame, even as RBD Material Fracture shatters the glass, the node will keep the outer shards attached to the frame.
+* Clicking ((MMB)) on outputs of the RBD SOPs will show the data for each individual output. Additionally, if you click ((MMB)) on the inputs, it will trace up to the geometry data coming in.
 
 
 == RBD SOP inputs and outputs == (inputs)
@@ -77,6 +71,35 @@ The RBD Material Fracture node and [several other RBD SOP nodes|#support] share 
 
 == Constraint networks == (constraints)
 
+The [RBD Material Fracture|Node:sop/rbdmaterialfracture] tool not only fractures your geometry, but it also creates constraints for you between those pieces. If you want to create more constraints, there are 3 SOPs that allow you to do so, separate from the fracturing process. They follow the same 3 input/3 output RBD workflow, and give you a lot of control for building constraints. This is useful when you're fracturing two different types of materials, and want to create boundary constraints between them.
+
+[Icon:SOP/rbdconstraintsfromlines] [RBD Constraints From Lines|Node:sop/rbdconstraintsfromlines]:
+    This tool is a very interactive way to build constraints, as you can simply click and draw constraints between the pieces you want to be connected in the viewport. Once the constraint is drawn, you can choose the __Connection Type__ to determine how the constraints are set up. For more information, see the [RBD Constraints From Lines|Node:sop/rbdconstraintsfromlines] help page.
+
+[Icon:SOP/rbdconstraintsfromcurves][RBD Constraints From Curves|Node:sop/rbdconstraintsfromcurves]:
+    This tool lets you draw a curve in the viewport, and will create constraints between points on the geometry of nearby pieces within a specified search radius. RBD Constraints from Curves also gives you the option to provide a curve in the 4th input, so that you can use it procedurally. For more information, see the [RBD Constraints From Curves|Node:sop/rbdconstraintsfromcurves] help page.
+        
+[Icon:SOP/rbdconstraintsfromrules][RBD Constraints From Rules|Node:sop/rbdconstraintsfromrules]:
+    This tool is a procedural node for creating constraints based on a set of rules and conditions. For example, you can constrain pieces based on groups and then only constrain the pieces that are within a certain bounding region.
+
+All three constraint nodes will create simple primitives with a rest length attribute. The [RBD Constraint Properties SOP|Node:sop/rbdconstraintproperties] node can be used afterward to create constraint groups and set up constraint types (such as glue or soft constraints). The help for the [Constraint Network DOP|Node:dop/constraintnetwork] has more background information about constraint networks (Constraint Network is the low-level DOP node responsible for converting SOP constraint geometry into the equivalent DOP constraints).
+
+=== Types of connections === (types)
+
+    All three constraint nodes ([RBD Constraints From Lines|Node:sop/rbdconstraintsfromlines], [RBD Constraints From Curves|Node:sop/rbdconstraintsfromcurves], and [RBD Constraints From Rules|Node:sop/rbdconstraintsfromrules]) will let you choose between the following types of connections.
+     
+    [Image:/images/sop/RBD_hinge.png] |
+        The default connection that's created is __Hinges__. These create a hinge-like constraint between pieces, which you can visualize by the white dot on the constraint line.
+        
+    [Image:/images/sop/RBD_surfacepoints.png] |
+        Drawing __Surface Points__ constraints will create anchor points where you clicked the mouse on the piece to place the constraint.
+        
+    [Image:/images/sop/RBD_COM.png] |
+        __Center of Mass__ constraints will calculate the center of mass for the constrained pieces and create constraints between their centroids.
+
+=== Understanding constraint networks ===
+#display: collapsible collapsed 
+
 Houdini lets you set up constraints in SOPs using _constraint geometry_. This is a set of polylines with attributes that represent constraint relationships between geometry pieces. These are translated into the equivalent DOP constraints when the geometry is imported into the DOP network. This is to make it easy to set up, edit, and visualize constraints using the large number of SOP nodes dedicated to editing geometry and attributes.
 
 * Each constraint is represented by a two-point polyline.
@@ -93,9 +116,14 @@ Houdini lets you set up constraints in SOPs using _constraint geometry_. This is
 
 * The position of the endpoints may be used by different constraints, for example as anchor points.
 
-You can use the [Connect Adjacent Pieces SOP|Node:sop/connectadjacentpieces] to set up constraint geometry, and the [RBD Constraint Properties SOP|Node:sop/rbdconstraintproperties] node to edit constraint geometry.
+=== Pre-constraining pieces === (existing_constraints)
+#display: collapsible collapsed 
 
-The help for the [Constraint Network DOP|Node:dop/constraintnetwork] has more background information about constraint networks (Constraint Network is the low-level DOOP node responsible for converting SOP constraint geometry into the equivalent DOP constraints).
+If you have multiple connected pieces you want to fracture in different ways, you can *optionally* use the [RBD Constraints From Rules|Node:sop/rbdconstraintsfromrules] node before you use [RBD Material Fracture|Node:sop/rbdmaterialfracture] to break them up.
+
+For example, if you are destroying a house, you can start by constraining the door and windows to the walls they're embedded in.
+
+As the RBD Material Fracture node breaks up the individual objects, it tries to intelligently update existing constraints. For example, if a pane of window glass starts constrained to the surrounding window frame, even as RBD Material Fracture shatters the glass, the node will keep the outer shards attached to the frame.
 
 
 == Low-res proxy geometry == (proxy)
@@ -143,7 +171,7 @@ Other rigid body simulation tools:
         Sets up an object for _dynamic fracturing_ in response to simulated impacts.
 
 [Icon:SHELF/debris] |
-    Debris shelf tool |
+    [Debris shelf tool|/shelf/debris] |
         Generates particles from the edges of crumbled pieces. You can use these particles to instance smoke, dust, pebbles, and so on as secondary effects.
 
 
@@ -188,6 +216,21 @@ The following nodes work with the RBD Material Fracture node. They all have the 
 [Icon:SOP/rbdunpack] |
     [RBD Unpack|Node:sop/rbdunpack] |
         Splits out geometry, constraint geometry, and proxy geometry into separate RBD SOP-style [outputs|#inputs].
+        
+        ~~~~~
+
+[Icon:SOP/rbdconstraintsfromlines] |
+    [RBD Constraints From Lines|Node:sop/rbdconstraintsfromlines] |
+
+        Creates rigid body constraint geometry from interactively drawn lines in the viewport.
+
+[Icon:SOP/rbdconstraintsfromcurves] |
+    [RBD Constraints From Curves|Node:sop/rbdconstraintsfromcurves] |
+        Creates rigid body constraint geometry from curves drawn in the viewport.
+
+[Icon:SOP/rbdconstraintsfromrules] |
+    [RBD Constraints From Rules|Node:sop/rbdconstraintsfromrules] |
+        Creates rigid body constraint geometry from a set of rules and conditions.
 
 
 == Related SOPs ==

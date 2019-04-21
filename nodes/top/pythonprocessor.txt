@@ -1,0 +1,106 @@
+#type:     node
+#context:  top
+#internal: pythonprocessor
+#icon:     MISC/python
+
+= Python Processor =
+
+"""Generate work items using a Python script"""
+
+This node can be used to write custom processor logic using the Python API.
+
+For uses cases that need a single work item per upstream item that runs a
+Python Script, the [Python Script|Node:top/pythonscript] or [Generic Generator|
+Node:top/genericgenerator] are simpler alternatives.
+
+@parameters
+
+[Include:python_common#savenodescript]
+
+[Include:python_common#savenodehda]
+
+[Include:processor_common#pdg_workitemgeneration]
+
+[Include:processor_common#pdg_command]
+
+onGenerate Callback:
+    #id: generate
+
+    This script is run whenever the node needs to generate new work items from
+    upstream items, or from nothing if it has no inputs. It is used for both
+    static and dynamic work item generation.
+
+    When generating static work items, a single will be made to the script and 
+    it will receive the entire list of upstream static items in the
+    `upstream_items` variable. When generating dynamic work items, the script
+    will be called once for each upstream item that has finished cooking.
+    
+    Several variables are available in the script:
+
+    `self`:
+        Refers to the underyling PDG node associated with the TOP node. Note
+        that this is different than TOP node itself, which is a standard Houdini
+        operator.
+
+        Spare parameters added to the TOP node's parameter interface will
+        automatically be added to the PDG node.
+
+    `item_holder`:
+        The work item holder used to construct new work items. Items in the
+        holder will be committed to the node once the script is completed. If
+        the script fails, the items will be discarded.
+
+    `upstream_items`:
+        The list of upstream items.
+
+    `generation_type`:
+        The type of work item generation the script is doing.
+
+onRegenerateStatic Callback:
+    #id: regeneratestatic
+
+    This script is run whenever the node needs to generate static items, but
+    already has existing items. It can be used to add new static items, and dirty
+    or delete existing ones.
+
+    The following variables are available in the script:
+
+    `self`:
+        Refers to the underlying PDG node associated with the TOP node.
+
+    `item_holder`:
+        The work item holder used to construct new work items.
+
+    `existing_items`:
+        The list of existing static work items currently in the node.
+
+    `upstream_items`:
+        The list of upstream work items.
+
+onAddInternalDependencies Callback:
+    #id: addinternaldependencies
+
+    Called when the node should add dependencies between sibling work items.
+    This is called once for each call to the __onGenerate Callback__. It
+    can be used to add dependencies between the items created in that 
+    callback invocation.
+
+    The following variables are available in the script:
+
+    `self`:
+        Refers to the underlying PDG node associated with the TOP node.
+
+    `dependency_holder`:
+        The work item holder used to assign dependency pairs.
+
+    `internal_items`:
+        The list of work items added by the last __onGenerate Callback__
+        execution.
+
+    `is_static`:
+        Boolean that is set to `True` if the last generation was static, else
+        `False`.
+
+@related
+- [Node:top/genericgenerator]
+- [Node:top/pythonscript]

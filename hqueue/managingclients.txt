@@ -1,228 +1,238 @@
-= Managing Clients =
-HQueue clients are machines on the farm that execute jobs assigned by the server.
+= Managing clients =
 
-Use the __CLIENTS__ page on the HQueue web interface to add and manage clients on the farm.
+"""How to use the web interface or local logins to add, remove, restart, and manage client machines."""
 
-<center>
+
+== How to ==
+
+In a web browser, connect to the HQueue server (`http://<<hostname>>:5000/`). Click the [Image:/images/hqueue/clients.svg] Clients icon at the top-right corner of the web interface to go to the clients page.
+
+[Image:/images/hqueue/client_view.png]
+
+TIP:
+    Remote management from the web console uses SSH to connect to the client hosts. If remote management fails, make sure `sshd` (the SSH server process) is installed and running on the host, and that HQueue has the correct username and password for the host (see below).
+
+:task: Add a client from the web interface:
+
+    # On the Clients page, click __Add Clients__.
+    
+    # Set the __Platform__ to the OS of the new host machine, then click __Continue__.
+    
+    # On the next page:
+        * Enter the hostname of the machine to be added in the __Machines__ field.
+
+        * For the __Admin. Username__ and __Admin. Password__ fields, enter the username and password of an administrator account that exists on the machine.  *The client software does not need to run as admin*, however HQueue needs the administrator account to remotely log into the machine and install the HQueue Client.
+
+    # Click __Add Machines__ and wait a few seconds.  The new host should appear in the client list.
+
+    If adding the machine from the HQueue web interface fails with a "Connection Refused" error, refer to [this FAQ|/hqueue/faqs#connection_refused_add_client_linux].
+
+:task: Set rules for when a client is available to the farm:
+
+    You can have a situation where certain computers are used by people during work hours, but are added to the farm late at night. You can do this automatically using [availability rules|#availability].
+
+    # On the Clients page, find the client you want to set the credentials for. Click the hostname to view the client details.
+
+    # Under Availability, you can add, edit, disable, or delete rules.
+
+        If *any* of the rules match current conditions, the server will consider the client available to accept jobs.
+
+:task: Restart a client from the web interface:
+
+    Currently you cannot restart Windows clients from the web console. See how to restart a client locally (below).
+
+    # On the Clients page, find the client you want to restart in the client list. Check the box at the start of the row for that client.
+
+    # Click the __Restart__ button below the client list.
+
+        (You can check multiple boxes and then click __Restart__ if you want to restart multiple clients at once.)
+
+:task: Set the username and password used to connect to a client machine:
+
+    # On the Clients page, find the client you want to set the credentials for. Click the hostname to view the client details.
+
+    # Under Client Details, click __Set username and password__.
+
+:task: Restart a client when logged into the host machine:
+    #id: restart_locally
+
+    If you can connect to the host machine manually, you can restart the HQueue client locally.
+
+    [Include:configuration#restart_locally/]
+
+:task: Upgrade client software from the web interface:
+
+    If a client is out-of-date, a "needs upgrade" message appears for it in the client list.
+
+    # Check the box at the start of the row for any clients you need to upgrade.
+
+    # Click the __Upgrade__ button below the client list.
+
+:task: Remove clients using the web interface:
+
+    *Important*: cancel any running jobs on the client before removing it from the client list.
+
+    Currently you cannot remove Windows clients from the web console. See [how to uninstall the client on the host machine|uninstall].
+
+    # On the Clients page, find the client you want to remove in the client list. Check the box at the start of the row for that client.
+
+    # Click the __Remove__ button below the client list.
+
+        (You can check multiple boxes and then click __Remove__ if you want to remove multiple clients at once.)
+
+:task: Uninstall client software when logged into the host machine:
+
+    See the [uninstalling page|uninstalling].
+
+
+== Client list table ==
+
 [Image:/images/hqueue/clients_table.png]
-The clients list on the HQueue web interface.
-</center>
-
-Below is a list of the columns that appear in the clients list:
 
 Column ||
+    #width: 20%
     Description ||
 
-(no name) |
-    Contains a checkbox for selecting a client.  Apply actions to selected clients using the buttons at the bottom of the list. 
-Status (no label) |
+<<checkboxes>> |
+    Allows you to select a client. You can apply actions to selected client(s) using the buttons below the list. 
 
-    The client's status:
+<<dots>> |
 
-    <font style="color:#00CC33">+(fa-circle)</font> -> client is available
+    The dot color indicates the client's status.
+
+    <font style="color:#00CC33">+(fa-circle)</font> Green -- available
     
-    <font style="color:#FF0000">+(fa-circle)</font> -> client is unavailable
+    <font style="color:#FF0000">+(fa-circle)</font> Red -- unavailable
     
-    <font style="color:#ff6600">+(fa-circle)</font> -> client is currently running jobs
+    <font style="color:#ff6600">+(fa-circle)</font> Orange -- currently running jobs
     
-    <font style="color:#555555">+(fa-circle)</font> -> client is offline
+    <font style="color:#555555">+(fa-circle)</font> Dark grey -- offline
 
 Client |
-    The machine name and IP address.  Click on the name to view the machine's profile.  If the client needs an upgrade, then a "`*NEEDS UPGRADE*`" message appears. 
+    The host's DNS name and IP address.  Click the name to view the machine's profile.  If the client is out of date, the cell displays a "needs upgrade" message. 
+
 Last Heartbeat |
-    The number of seconds that have passed since the client machine last contacted the HQueue server.  If the client has not contacted the server since the server started, then the column displays "No Response". 
+    The number of seconds since the client machine last contacted the HQueue server.  If the client has never contacted the server, the cell displays a "no response" message. 
+
 Platform |
-    The machine's operating system and architecture. 
+    The host's operating system and architecture. 
+
 CPUs |
-    The number of processors on the client machine and their processor speeds. 
+    The number of processors on the host and their speeds. 
+
 Memory |
-    The amount of memory installed on the client machine. 
+    The total memory on the host. 
+
 Load |
-    A measure of how busy the machine is.  The maximum load value is equal to the number of CPUs.  For example, a machine with 4 CPUs and a load of 4.0 means that all CPUs are at 100% usage. 
+    A measure of how busy the machine is. The maximum load is equal to the number of CPUs. For example, a machine with 4 CPUs and a load of 4.0 means all CPUs are at 100% usage.
+
 Idle Time |
-    The number of minutes that have passed since the machine received either a mouse or keyboard event from its primary user (Mac OS X and Linux only).  For Linux machines, the idle time is reported only if the client machine is configured to grant X11 display server access to the user account running the HQueue client daemon.  See the 'By Idle Time' subsection at [Client Availability Rules|managingclients#availability] for more details. 
+    The number of minutes since the host received either a mouse or keyboard event from its primary user (macOS and Linux only). If you are have hosts in your farm that are used by people during work hours, this can give you a sense of whether the host is in use or available.
+
+    For Linux hosts, the idle time is reported only if the client machine is configured to grant X11 display server access to the user account running the HQueue client daemon.  See the 'By Idle Time' subsection at [Client Availability Rules|#availability] for more details. 
+
 Enabled |
     Whether the machine is allowed to receive jobs or not. 
-Notes (no label) |
+
+<<note icon>> |
     Indicates whether the client has a note attached to it or not.
-    :box:
-        #display: bordered gray
-        [Icon:/images/hqueue/note.png] -> a note exists. Hover over the icon to view the note. Click on the icon to view the note's full thread.
-    
-        [Icon:/images/hqueue/add_note.png] -> no note. Click on the icon to attach a note.
+
+    [Icon:/images/hqueue/note.png]:
+        Note exists. Hover over the icon to view the note. Click the icon to view the note's full thread.
+
+    [Icon:/images/hqueue/add_note.png]:
+        No note. Click the icon to add a note.
 
 Availability |
-    The list of rules that determine when the server can assign jobs to the client.  See [Client Availability Rules|managingclients#availability]. 
+    A list of rules controlling when the client will accept jobs.  See [Client Availability Rules|#availability]. 
 
 
 == Viewing Clients == (viewing)
-Click on the client's name in the client list to view the machine's hardware specifications and configuration.  General information is located under the Client Details section as shown below.
 
-<center>
-[Image:/images/hqueue/client_view.png]
-The Client Details section on the client view page.
-</center>
+Click the client's name in the client list to view the machine's hardware specifications and configuration.  General information is located under the Client Details section as shown below.
 
 The following table describes the fields found in the __General__ group box:
 
 Field ||
+    #width: 20%
     Description ||
 
 Hostname |
     The client's machine name. 
+
 Status |
     The client's status. 
+
 Last Heartbeat |
     The number of seconds that have passed since the client machine last contacted the HQueue server.  If the client has not contacted the server since the server started, then the column displays "No Response". 
+
 Listen Port |
     The port number that the client is using to communicate with the server. 
+
 Load |
     A measure of how busy the machine is.  The maximum load value is equal to the number of CPUs.  For example, a machine with 4 CPUs and a load of 4.0 means that all CPUs are at 100% usage. 
+
 Groups |
     The groups that the client is a member of. 
+
 Install Location |
     The install location of the HQueue client files. 
-`(NEEDS UPGRADE)` |
-    This property appears when the client requires an upgrade. Clicking the 'Upgrade' button next to it will upgrade the client. 
 
-The following table describes the fields found in the __Machine Specifications__ group box:
-
-Property Name ||
-    Description ||
+Needs Upgrade |
+    This appears when the client requires an upgrade. Click the __Upgrade__ button next to it to upgrade the client. 
 
 IP Address |
     The machine's IP address. 
+
 Platform |
     The machine's operating system and architecture. 
+
 CPUs |
     The number of CPUs on the client machine and their frequency. 
+
 Memory |
     The amount of memory reported by the client machine. 
+
 Free Disk Space |
     The amount of free disk space on the client machine. 
+
 Disk Capacity |
     The total amount of disk space available on the client machine. 
 
-The following table describes the fields found in the __Remote Login__ group box:
-
-Property Name ||
-    Description ||
-
 Username |
     The username used to remotely log into the machine.  Remote login occurs when restarting the machine from the __CLIENTS__ page. 
+
 Password |
-    The password used to remotely log into the machine.  It appears as a series of *'s if a password is set and as NOT SET if no password is set.  Remote login occurs when restarting the machine from the __CLIENTS__ page. 
+    The password used to remotely log into the machine.  It appears as a series of `*`s if a password is set and as NOT SET if no password is set.  Remote login occurs when restarting the machine from the __CLIENTS__ page. 
+
 Set Username and Password |
     Click on this button to change the username and password used to remotely log into the machine.  Remote login occurs when restarting the machine from the __CLIENTS__ page. 
 
 
+== Client availability rules == (availability)
 
-== Client Availability Rules == (availability)
+The availability of a client machines to take on jobs is determined by a set of rules.
 
-The availability of a client machines to take on jobs is determined by a set of rules.  These rules can be based on the day and time of the week or they can be based on the machine's idle time (Linux only).  If *at least one rule* in the set is found to be true, then the client is available.
+This lets you create a situation where certain computers are used by people during the day, but are automatically added to the farm when nobody's using them.
 
-<center>
 [Image:/images/hqueue/client_availability_rules.png]
-Client availability rules.
-</center>
 
-=== 'By Time' Rules ===
+Currently there are two rule types:
 
-'By Time' rules specify the time of day and day of the week when the machine is available to take on jobs.  For a dedicated render machine, a rule of 'Anytime, Anyday' is sufficient to make the machine available all the time.  For a workstation, a couple of rules are typically needed to make the machine available outside of work hours.
+By time:
+    You can set the client to be available between certain hours (for example, from 11pm to 4am the next day on weeknights, all day on weekends).
 
-For example, the following set of rules makes a machine available outside of work hours (assuming a 9am-5pm work schedule):
+    For a dedicated render server, you can turn on the __Anytime__ checkbox.
 
-Rule # ||
-    Anytime ||
-        Day ||
-            Start Time ||
-                End Time ||
+By idle time (Mac and Linux only):
+    You can set the client to become available when it hasn't been used interactively for a certain number of minutes. This is only supported for Mac and Linux clients.
 
-1 |
-    No |
-        Weekdays |
-            5:00pm |
-                9:00am 
-2 |
-    Yes |
-        Weekends |
-            `--` |
-                `--` 
+    NOTE:
+        On Linux, the host must be configured to grant X11 display server access to the user account running the HQueue client. You can do this by logging into the host as the HQueue client user and running:
 
-=== 'By Idle Time' Rules ===
+        {{{
+        #!sh
+        xhost +local:
+        }}}
 
-'By Idle Time' rules specify the minimum number of minutes that the client machine must be idle when it is available to take on jobs.  A machine is considered to be idle if it does not receive any keyboard or mouse events from its primary user.  'By Idle Time' rules are useful for workstations but not so much for dedicated render machines.
-
-:box:
-    #display: bordered yellow
-    *Caveat:* 'By Idle Time' rules only apply to Mac OS X and Linux machines.
-    
-    For Linux machines, the machine must be configured to grant X11 display server access to the user account running the HQueue client daemon.  This can be done by logging into the machine as the primary user and running the following command in a terminal:
-
-    {{{
-    #!bash
-    xhost +local:
-    }}}
-
-
-
-== Adding Clients == (add)
-
-See [Adding a Linux Client|faqs#how-do-i-add-a-linux-client-machine-to-the-farm], [Adding a Windows Client|faqs#how-do-i-add-a-windows-client-machine-to-the-farm], and [Adding a Mac OSX Client|faqs#how-do-i-add-a-mac-osx-client-machine-to-the-farm].
-
-
-
-== Restarting Clients == (restart)
-
-=== Restarting from the HQueue Web Interface ===
-
-Go to the __CLIENTS__ page, check the box for the target machine and click on the 'Restart' button located below the client list.  Check multiple boxes to restart several machines at once.
-
-This feature uses secure shell (SSH) to remotely connect to the target machine.  If restarting fails, make sure that SSH is installed on the client and that the SSH daemon is running.  Additionally check that the correct username and password are registered with HQueue.  See the 'Remote Login' table at [Viewing Clients|managingclients#viewing] for more details.
-
-:box:
-    #display: bordered yellow
-    *Caveat:* Restarting from the HQueue web interface is currently not supported for Windows clients.
-
-=== Restarting Locally on the Client Machine ===
-
-See 
-[Restarting a Linux Client|faqs#how-do-i-restart-the-hqueue-client-on-my-linux-machine], 
-[Restarting a Mac OSX Client|faqs#how-do-i-restart-the-hqueue-client-on-my-mac-osx-machine],
-and
-[Restarting a Windows Client|faqs#how-do-i-restart-the-hqueue-client-on-my-windows-machine].
-
-
-
-== Upgrading Clients == (upgrade)
-
-Go to the __CLIENTS__ page, check the box for the target machine and click on the 'Upgrade' button located below the client list.  Check multiple boxes to upgrade several machines at once.
-
-Clicking on the 'Upgrade' assigns an upgrade job to the target machine instructing it to download and install the new client code.
-
-A `*NEEDS UPGRADE*` message appears beside the machine's hostname if the client is out-of-date.
-
-
-
-== Removing Clients == (remove)
-
-NOTE:
-     Jobs running on a removed client are eventually abandoned.  Make sure to cancel all running jobs before removing the client.
-
-=== Removing from the HQueue Web Interface ===
-
-Go to the __CLIENTS__ page, check the box for the target machine and click on the 'Remove' button located below the client list.  Check multiple boxes to remove several clients at once.
-
-This feature uses secure shell (SSH) to remotely connect to the target machine and remove the HQueue client.  If removing fails, make sure that SSH is installed on the client and that the SSH daemon is running.  Additionally check that the correct username and password are registered with HQueue.  See the 'Remote Login' table at [Viewing Clients|managingclients#viewing] for more details.
-
-:box:
-    #display: bordered yellow
-    *Caveat:* Removing from the HQueue web interface is currently not supported for Windows clients.
-
-=== Removing Locally on the Client Machine ===
-
-See 
-[Uninstalling a Linux Client|faqs#how-do-i-uninstall-the-hqueue-client-on-my-linux-machine], 
-[Uninstalling a Mac OSX Client|faqs#how-do-i-uninstall-the-hqueue-client-on-my-mac-osx-machine],
-and
-[Uninstalling a Windows Client|faqs#how-do-i-uninstall-the-hqueue-client-on-my-windows-machine].
+If you edit the rules, make sure to click __Save__ to save the new rules to the client.

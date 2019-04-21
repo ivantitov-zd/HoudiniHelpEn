@@ -10,8 +10,19 @@ For sliced simulations, the nodes on the network will talk to each other to comm
 
 For clustered fluid simulations, each cluster container solves independently, even if they overlap with other cluster containers. For smoke and pyro simulations this is often acceptable since the output volumes blend together visually.
 
-NOTE:
-    Distributed simulation are not supported on Macs.
+:platform:Mac
+    Distributed simulations are supported only on macOS 10.14.4 and above.
+    
+=== Methods of distributing fluid simulations ===
+
+No Partitioning:
+        This is a distribution method you can select from a pop-up after clicking the __Distribute Particle Fluid__ tool.Sends the entire simulation to another machine to be simulated as a whole.
+
+Clustering:
+       This is a distribution method you can select from a pop-up after clicking the __Distribute Particle Fluid__ tool. It allows you to partition the source into chunks along the X, Y, or Z axis. These pieces will be simulated simultaneously, but don't transfer particles between frames. It much faster than the slicing method, since it doesn't need to wait for each partition to finish simulating a frame before moving onto the next.
+            
+Slicing:
+        The [Slice|/shelf/slice] and [Slice Along Line|/shelf/slicealongline] shelf tools allows you to slice the space containing a particle fluid so that different machines on the HQueue farm can simulate different parts of the fluid. These tools give you more control over the direction and hierarchy of the pieces. This method also transfers particles between slices at the end of each frame, which is more precise but also more expensive. 
 
 == Set up distributing sliced simulations ==
 
@@ -66,26 +77,53 @@ If you want to check the simulation on a single machine, you can use parameters 
 
 === How to use particle fluid distribution with FLIP ===
 
-==== Fluid tanks ====
-
 Using particle distribution with tanks can sometimes lead to a loss of fluid. Turn on the __Distributed Pressure Solve__ checkbox on the [FLIP Solver|Node:dop/flipsolver] to avoid this issue. This will account for pressure in the tank and result in smoother seams between slices. 
 
-NOTE:
-    This option requires considerably more network bandwidth, and is specifically used for large tank-style simulations. It is not needed for flowing rivers.
-    
-[Image:/images/dynamics/distributedtank.png]
+==== Set up a distributed narrow band FLIP tank ==== (narrowband)
+
+# Create a [Icon:SHELF/flat_tank] FLIP tank using one of the tools on the __Oceans__ shelf. __Narrow Band Particles__ should be enabled by default.
+
+# Use the [Icon:DOP/sliceplane][Slice|/shelf/slice] tool on the __Particle Fluids__ shelf to slice the particle fluid.
+
+# Use the [Icon:SHELF/distribute_fluid_sim] __Distribute__ tool, and choose __Slicing__. This will set up the networks so that it can be solved in parallel on multiple machines using HQueue.
+
+[Image:/images/fluid/distributed_nb.png]
+
+
+
+=== Set up a distributed whitewater simulation === (whitewater)
+
+# Create a whitewater simulation using the tools on the __Oceans__ shelf.
+
+# Select the whitewater to distribute and click the [Icon:SHELF/distribute_fluid_sim] __Distribute Particle Fluid__ tool on the  __Particle Fluids__ shelf.
+
+# Choose between __No Partitioning__ and __Clustering__ as the distribution method from the pop-up dialog box.
+
+        NOTE:
+                If the whitewater is pre-sliced using the [Slice|/shelf/slice] or [Slice Along Line|/shelf/slicealongline] tools, there will also be an option to choose __Slicing__.
+
+        Selecting __No Partitioning__ allows you to send your entire simulation to another machine. Selecting __Clustering__ will allow you to divide up your simulation into chunks that will be simulated simultaneously on another machine. Both options will create an [HQueue Simulation|Node:out/hq_sim] for your distributed simulation.
+        
+# Choosing __Clustering__ will set your __Partition Type__ to __Clusters__ on the [HQueue Simulation|Node:out/hq_sim] render node. Click the [Icon:BUTTONS/jump] __Jump to operator__ button on __Cluster Node__ parameter to jump to the `partition_emission` Subnetwork. 
+
+# Set your clusters using the __Divisions__ parameter. 
+
+        NOTE:
+                You should set your particle fluid divisions parallel with the flow direction, because these clusters will be simulated independently and don't transfer particles between frames that are born in separate clusters. 
+
+        In the following example, a [Beach Tank|/shelf/beachtank] is divided along the Z-axis, which coincides with the flow of the waves up the beach.
+
+        [Image:/images/dynamics/distribute_cluster.png]
 
 == Set up distributing clustered smoke and pyro simulations ==
 
-=== How to ===
-
-# Create a clustered smoke or pyro simulation from point sources using the Smoke Cluster or Pyro Cluster tools on the __Pyro FX__ shelf tab (see [clustering|/pyro/clustering].
+# Create a clustered smoke or pyro simulation from point sources using the Smoke Cluster or Pyro Cluster tools on the __Pyro FX__ shelf tab (see [clustering|/pyro/clustering]).
 
 # On the __Container Tools__ shelf tab, click the [Icon:SHELF/distribute_fluid_sim] Distribute tool.
 
 # Select the container you want to distribute and press ((Enter)).
 
-    If you are distributing a clustered simulation with multiple one of the containers created by the smoke/pyro cluster tool, you can just select one of them.
+    If you are distributing a clustered simulation with multiple containers created by the smoke/pyro cluster tool, you can just select one of them.
     
     (Alternatively you can select the DOP object in the network editor and then press ((Enter)) in the viewport.)
 
@@ -97,7 +135,7 @@ NOTE:
 
 # The tool will create and select a [HQueue simulation render node|Node:out/hq_sim]. Set the node's __HQueue server__ parameter to the name of the HQueue server machine and port name (for example `hq.company.com:5000`).
 
-    If you are slicing, you can set the __Slice Divisions__ parameter. The default `1, 1, 1` slices the container into 8 smaller boxes for distribution. If you have a complex simulation, you can increase the divisions to get more, smaller slices.
+    If you are slicing, you can set the __Slice Divisions__ parameter. The default `1, 1, 1` slices does not actually divide the container into multiple subdomains. Increasing these values to `2, 2, 2`, for example, will slice the container into 8 smaller boxes for distribution.
 
 === Distributed clustering behind the scenes === (clustering_guts)
 

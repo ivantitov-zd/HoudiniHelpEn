@@ -1,0 +1,111 @@
+#type:     node
+#context:  sop
+#internal: vdbpotentialflow
+#icon:     SOP/vdbpotentialflow
+
+= VDB Potential Flow =
+
+"""Computes the steady-state air flow around VDB obstacles."""
+
+VDB Potential Flow computes how air will flow around obstacles
+by solving for the closest divergent free velocity field.  While
+this does not create any turbulence, it is effective for allowing
+particle streams to anticipate collisions and avoid them.
+
+The result is output as a vec3 VDB named `flowvel`.  The other
+VDBs are passed through unchanged.
+
+Note that this is a static solve - there is no history to the field
+so it may change substantially given slightly different colliders.
+
+@parameters
+
+Group:
+    #id: group
+
+    The first scalar VDB in this group is used as the collision
+    to compute the flow around.  If it isn't a SDF, it's activation
+    will be used instead.
+
+    NOTE: Only the first VDB is used.  If you have multiple colliders,
+    sample them into a single VDB before processing.
+    
+Velocity VDB:
+    #id: velocity
+
+    The first vec3 VDB in this group is used as the velocity of
+    the collision objects.  It is thus only used at the
+    collision boundary to set the solved velocities at those
+    locations.
+    
+Mask VDB:
+    #id: maskvdbname
+
+    Only perform the computation in the region specified by this mask.
+    The mask is provided on the second input.
+    
+    
+Domain Mask Type:
+    #id: masktype
+
+    How to treat the mask.
+    
+    Intersection:
+	Only process voxels within the the mask.
+        
+    Difference:
+        Process all voxels except those in the mask.
+    
+Iterations:
+    #id: iterations
+    
+    The potential flow will be computed until the specified tolerance
+    is reached.  However, some systems may never converge.  This caps
+    the number of iterations that are run before terminating the solve.
+    
+Tolerance:
+    #id: tolerance
+    
+    The potential solve is considered converged when the magnitude of
+    the absolute error is below this value.  If no tolerance is specified,
+    1e-20 is used.
+    
+Use World Space Units:
+    #id: useworldspace
+
+    If enabled, use world space distances to determine the bandwidth
+    around collisions to compute the potential flow.
+    
+Dilation Voxels:
+    #id: dilationvoxels
+
+    Distance in voxels around the collisions to compute the potential flow.
+    Beyond this range the air is assumed to be undisturbed, so this also
+    controls how tightly the air flow will wrap the collider.
+    
+Dilation:
+    #id: dilation
+
+    Distance in world space around the collisions to compute the potential flow.
+    Beyond this range the air is assumed to be undisturbed, so this also
+    controls how tightly the air flow will wrap the collider.
+    
+Background Velocity:
+    #id: backgroundvelocity
+    
+    Direction and magnitude of the default background velocity field.
+    This is applied across all voxels.
+    
+Apply Background Velocity to Flow Field:
+    #id: applybackgroundvelocity
+    
+    Include the background velocity in the output `flowfield`.  If not set,
+    the `flowfield` will provide the difference between the background
+    velocity and the solved velocity.
+    
+Output Potential:
+    #id: outputpotential
+
+    Output the scalar potential field, that can be thought of as pressure.
+    This scalar VDB is called `potential`.
+    

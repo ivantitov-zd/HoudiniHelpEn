@@ -1,0 +1,595 @@
+= Running external programs =
+
+"""How to wrap external functionality in a TOP node."""
+
+
+== Overview ==
+
+Houdini ships with several built-in nodes for running external programs/scripts in TOPs: [ImageMagick|Node:top/imagemagick], [FFmpeg Encode Video|Node:top/ffmpegencodevideo], [Shotgun Download|Node:top/shotgundownload], and so on. However, you will often need to make your own or other third party scripts/programs usable in TOPs.
+
+You can run external programs from a TOP network in a few ways:
+
+* You can [use a Python Script node|#pyscript] and type the script you want to run into the node.
+
+    The [Python Script|Node:top/pythonscript] node automatically creates new work items to run a work script once for each incoming work item. You can access the incoming work item's attributes in the script, and set output attributes on the outgoing work items based on the work the script does.
+
+    * Very useful for experimentation, and for "one-off" scripts that do something specific to one particular network.
+        #glyph: fa-plus
+
+    * Most convenient option, only requires writing a [work script|#script].
+        #glyph: fa-plus
+
+    * Not as flexible. If you need to create work items from scratch, or create multiple work items from upstream work items, you need to create a new processor type instead of using the Python Script node.
+        #glyph: fa-minus
+
+    * Can't have a custom user interface.
+        #glyph: fa-minus
+
+    See [writing a one-off script|#pyscript] below.
+
+* The [Generic Generator node|Node:top/genericprocessor] generates a new work item to execute a given command line for each incoming work item. You can set this command line to execute a [work script|#script]. This is effectively the same as the Python Script node but with an external script file instead of having the script embedded in the node.
+
+* You can [create a new Python Processor node|#processor].
+
+    The [Python Processor|Node:top/pythonprocessor] node lets you write custom Python to generate work items. You can create a [digital asset|/assets/] from this node, allowing you to share the new functionality across networks and users.
+
+    * Requires more advanced Python coding using the `pdg` API, as well as writing a [work script|#script].
+        #glyph: fa-minus
+
+    * More flexible: you have full control over generating work items. For example, you can create multiple work items based on incoming items. (You _cannot_ generate _fewer_ work item than are incoming. For that you would create a partitioner.)
+        #glyph: fa-plus
+
+    * You can give the node a custom interface using spare parameters, to allow the user to control how the node works.
+        #glyph: fa-plus
+
+    See [making a new processor type|#processor] below.
+
+Python Script will probably be your first option when building a network. If you find you need the greater flexibility of a custom Python Processor, you can still re-use the work script you created for the Python Script node.
+
+
+== Writing a one-off script with Python Script == (pyscript)
+
+# If the work done for each work item is small or localized such that it wouldn't make sense to schedule it on a process queue or render farm (for example, copying files), you can turn on __Evaluate in process__ to do the work in the main process.
+
+    When __Evaluate in process__ is on, you can use the `self` (the current [Py:pdg.Node] object) and `parent_item` (the upstream [Py:pdg.WorkItem] that spawned the current work item) variables are available in the work script.
+
+# If __Evaluate in process__ is off, you can set which Python executable to use to execute the script. If you need access to Houdini's `hou` module, use "Hython". If the script is pure Python (this includes the `pdgjson` and `pdgcmd` modules), you can set this to "PDG Python". The regular Python starts faster than Hython, and doesn't use a Houdini license.
+
+# Write the script to execute in the __Script__ editor.
+
+    For each incoming work item, the node will create a new work item that runs this script. A [Py:pdg.WorkItem] object representing the current work item is available in the script as `work_item`.
+
+    See [how to write a work script|#script] for more information.
+
+    Keep in mind that (unless __Evaluate in process__ is on) this script might be scheduled to run on a render farm server. Try not to make assumptions about the local machine. See [helper functions|#functions] for 
+
+
+== Making a new processor type with Python Processor == (processor)
+
+# In a TOP network, create a [Python Processor|Node:top/pythonprocessor] node.
+
+# If you know that this node can't create new work items until upstream work items are finished (that is, it needs to read data on the upstream items to know how many new items to create), set __Work item generation__ to "Dynamic". Otherwise, leave it set to "Automatic".
+
+# The __Command__ field on the __Processor__ tab doesn't do anything. It's meant to be referenced in the generation script as a spare parameter, to set the command line of new work items. Many people find it makes for easier editing to set up the command line in a parameter and reference it, rather than hard-coding it in the script.
+
+# [Add spare parameters|#spare] to allow the user to control how the node works.
+
+    This is much more flexible and convenient than hard-coding values into the Python code. You can continue to refine the interface as you work on the code, adding or removing parameters as you work out the code.
+
+    See the [help for building a spare parm interface below|#spare].
+
+# [Fill in the Generate tab|#generate]. The callback script on the __Generate__ tab controls what work items the node creates, what attributes the work items have, and the command line run by each work item.
+
+    See the [help for the generate tab below|#generate]. See the [generate example|#generate_example] for one example of a generation callback.
+
+    The generation callback is called differently depending on whether the node is static or dynamic.
+
+    * If the node is static, the generate callback is called _once_. The `upstream_items` list contains all statically known upstream items.
+
+    * If the node is dynamic, the generate callback is called _as each incoming work item finishes_. The `upstream_items` list contains one item only (the newly available work item).
+
+        If the node is dynamic but you want to wait until all upstream items are available, insert a [Wait for All node|Node:top/waitforall] above the Python Processor. Then in the Python Processor node you can access the `WorkItem` objects inside the partition using:
+
+        {{{
+        #!python
+        upstream_items[0].partitionItems
+        }}}
+
+    TIP:
+        If the node is static, you should use the `parent` keyword argument to specify which new work item it generated from which upstream item. If the node is dynamic, a new work item assumes its parent is the single available upstream work item.
+
+# We recommend that the command line run a Python [work script|#script]. This is more flexible than running an executable directly, and allows the script to report back results.
+
+    See the [help for writing a work script|#script] below.
+
+    You can put the work script in a known location in the shared network filesystem, and then use that shared location on the command line.
+
+    _or_
+
+    You can put the script somewhere on the Houdini machine, and set it as a file dependency on this node in the __File__ tab. This causes the file to be copied into a directory on each server. Then you can use `__PDG_SCRIPTDIR__` on the command line to refer to the shared script directory. (If you create different types of work items calling different wrapper scripts, you can set them as multiple file dependencies.)
+
+# You will usually not need to write a custom script on the __Regenerate static__ tab.
+
+    The default implementation dirties work items when any parameters change. This is usually sufficient, but if you want to use more clever logic (for example, checking the `etag` of a URL and dirtying the work item if it's changed), you can implement it on this tab.
+
+# You only need to write a custom script on the __Add internal dependencies__ tab if some work items generated by this node should depend on other new work items generated by this node.
+
+# If you want to package up the processor as an asset for re-use across users and networks, you can [build an asset from a Python Processor|#asset].
+
+
+=== Building the interface === (spare)
+
+If you know what you want your new processor to do, you can design the user interface using spare parameters, and then write the code to look up options in the parameters.
+
+TIP:
+    If you later convert the node to an asset, it will automatically use the spare parameters as the asset's interface.
+
+* See [adding spare parameters|/network/spare] for how to add extra "spare" parameters to the node.
+
+    Try to give the parameters short but meaningful internal names, so you can refer to them easily in scripts.
+
+* You can use parameter values to change how the node generates work items, and/or the attributes on work items. See below.
+
+* When setting default values for parameters:
+
+    * Do not use localized paths as default values. `__PDG_DIR__` will expand to the PDG working directory on any machine.
+
+    * Use `@pdg_name` in file paths to ensure they're unique to each work item. Work item names are unique across the HIP file. This means output files should not overwrite each other unless you store multiple HIP files in the same directory and cook them at the same time.
+
+
+=== Generating work items === (generate)
+
+The code to generate work items in on the __Generate__ tab in the __onGenerate callback__ editor. The network runs this code when the node needs to generate work items: for example, when the network starts cooking, or if the user requests pre-generation of static work items.
+
+This code runs in a context with some useful variables defined:
+
+Name ||
+    Type ||
+        Description ||
+
+`self` |
+    [Py:pdg.Node] |
+        A reference to the current PDG graph node (this is _not_ a Houdini network node).
+
+        Any spare parameters on the Python Processor node/asset are copied into this object as [Py:pdg.Port] objects. You can access them using `self["<<parm_name>>"]` (see below).
+
+`item_holder` |
+    [Py:pdg.WorkItemHolder] |
+        A reference to the work item holder object for this node. You can use this object's methods to create new work items.
+
+`upstream_items` |
+    `list` |
+        A list of incoming [Py:pdg.WorkItem] objects, or an empty list if there are no incoming items. You can use this list to generate new work items from incoming items, if that's how your node works.
+
+`generation_type` |
+    [Py:pdg.generationType] |
+        This is set to `pdg.generationType.Static`, `pdg.generationType.Dynamic`, or `pdg.generationType.Regenerate`, depending on how the node is being asked to generate.
+
+        Advanced scripts might use this to check certain pre-conditions when the node generates dynamically. For most users, you can ignore the value of this variable.
+
+The following describes how to accomplish common tasks in the Python code:
+
+:task: Generate a new work item in the generation callback:
+
+    * Call `item_holder.addWorkItem()`. This takes keyword arguments and returns a [Py:pdg.WorkItem] object. For example:
+
+        {{{
+        #!python
+        new_item = item_holder.addWorkItem(index=0)
+        }}}
+
+    * The keyword arguments to `addWorkItem()` correspond to the properties of the [Py:pdg.WorkItemOptions] class. These are generally basic metadata and options.
+
+    * You can use separate methods to set attributes on the newly created work items after creating them (see below).
+
+    * *Important*: if you generate new work item from an existing work item in a static node, set the upstream item as the new item's `parent`:
+
+        {{{
+        for upstream_item in upstream_items:
+            new_item = item_holder.addWorkItem(index=upstream_item.index,
+                                               parent=upstream_item)
+        }}}
+
+        (In a dynamic node, the generation callback is called _once for each upstream item_ as they become available, and `upstream_items` only contains one item each time. In that case, you don't need to specify the parent, the node will assume the parent is the single upstream item.)
+
+    * If you specify a `parent` work item, the new work item inherits the attributes from the parent, and has its `input` set to the parent item's `output`.
+
+:task: Set attributes on a newly created work item:
+
+    A work item's `data` property holds a [Py:pdg.WorkItemData] object. Use this object's methods to get or set attributes.
+
+    {{{
+    #!python
+    new_item = item_holder.addWordItem(index=0)
+    new_item.data.setString("url", "http://...", 0)
+    }}}
+
+:task: Read the values of spare parameters:
+
+    The node copies the values of any spare parameters into the `self` object as [Py:pdg.Port] objects. You can access a port using `self["<<parm_name>>"]` and read the value using `Port.evaluateFloat()`, `Port.evaluateInt()`, and so on.
+
+    You can supply a `WorkItem` object as an argument to the port's `evaluate*()` methods to evaluate the value _in the context of_ that work item. That means any `@attribute` expressions in the parameter value will be expanded using the attributes of the `WorkItem` object you supply.
+
+    *Important*: A work script _does not_ (usually) have access to the parameter ports, so if you want the parameters to influence how work gets done, you must copy evaluated parameter values into work item attributes:
+
+    {{{
+    #!python
+    new_item = item_holder.addWorkItem(index=0)
+
+    # Evaluate the URL parameter in the context of this new work item
+    url = self["url"].evaluateString(new_item)
+    # Put the evaluated value on the work item as an attribute
+    new_item.data.setString("url", url, 0)
+    }}}
+
+    In general, parameters should be evaluated _after_ a work item is created, using the new work item as the context in which the parameter is evaluated. This is so the user can use expressions such as `@pdg_index` and `@pdg_name` and get the correct values for the new item.
+
+    Of course, there may be parameters you must evaluate without a work item context, for example a parameter that specifies how many work items to create.
+
+:task: Specify the command line to run:
+
+    Use the `setCommand` method of a `WorkItem` object to set the work item's command line string:
+
+    {{{
+    #!python
+    new_item = item_holder.addWorkItem(index=0)
+    new_item.setCommand("__PDG_PYTHON__ /nfs/scripts/url_downloader.py")
+    }}}
+
+    You can reference the node's __Command__ parameter instead of hard-coding the command line here:
+
+    {{{
+    #!python
+    command_line = self["pdg_command"].evaluateString()
+    new_item.setCommand(command_line)
+    }}}
+
+    `__PDG_PYTHON__` points to the Python interpreter. See [environment variables|#env] for other placeholders you can use on the command line.
+
+    TIP:
+        If you specify a [work script|#script], you don't need to pass work item information on the command line, you can look it up in the script using Python helper functions (see [writing a work script|#script]).
+
+        If you want to pass other types of information/options to the script, you can use simple (positional arguments and `sys.argv`) or elaborate (`argparse` or `optparse` to define keyword arguments, optional arguments, and so on) methods. How to build command line interfaces is beyond the scope of this document.
+
+:task: Signal a warning or error to the user:
+
+    Raise `pdg.CookError("message")` to stop execution and set an error on the node. Or, call `self.cookWarning("message")` to set a warning on the node but continue running.
+
+    {{{
+    #!python
+    import pdg
+
+    # Get the number of new items to create for each incoming item
+    per_item = self["peritem"].evaluateInt()
+
+    if per_item > 16:
+        # Too many!
+        raise pdg.CookError(
+            "Can't create more than 16 items per incoming item"
+        )
+
+    # Go on to create new items...
+    }}}
+
+
+=== Example generation script === (generate_example)
+
+For example, we might be building a processor that downloads files from URLs using the `curl` utility program. If there are upstream items, we'll generate new work items from them, otherwise we'll create a single new item "from scratch" and set its attributes from the node's parameters.
+
+
+==== Add spare parameters ====
+#display: pull left
+
+For a URL downloading node, we might add two spare parameters: one to set the URL to download, and one to set the file path to download to.
+
+Internal name ||
+    Label ||
+        Parameter type ||
+
+`url` |
+    URL |
+        String
+
+`outputfile` |
+    Output File |
+        String
+
+Remember that the user can use `@attribute` expressions in these fields to change the parameter values based on attributes of the current work item.
+
+
+==== Generation script ====
+#display: pull left
+
+Enter the following in the __onGenerate callback__ editor on the __Generate__ tab:
+
+{{{
+#!python
+# Define a helper function that evaluates parameters and copies the values
+# into a work item's attributes
+def set_attrs(self, work_item):
+    # Evaluate the parameter ports in the context of this work item
+    url = self["url"].evaluateString(work_item)  # URL to download
+    outputfile = self["outputfile"].evaluateString(work_item)
+
+    # Set attributes on the new work item
+    work_item.data.setString("url", url, 0)
+    work_item.data.setString("outputfile", outputfile, 0)
+
+    # Set the command line that this work item will run
+    work_item.setCommand('__PDG_PYTHON__ __PDG_SCRIPTDIR__/url_downloader.py')
+
+
+if upstream_items:
+    # If there are upstream items, generate new items from them
+    for upstream_item in upstream_items:
+        # Create a new work item based on the upstream item
+        new_item = item_holder.addWorkItem(index=upstream_item.index,
+                                           parent=upstream_item)
+        # Set the item's attributes based on the parameters
+        set_attrs(self, new_item)
+else:
+    # There are no upstream items, so we'll generate a single new work item
+    new_item = item_holder.addWorkItem(index=0)
+    # Set the item's attributes based on the parameters
+    set_attrs(self, new_item)
+}}}
+
+
+==== Test generation ====
+#display: pull left
+
+With the generation script above, you should be able to test the Python Processor node by setting the output flag on it and choosing __Tasks > Generate Static Work Items__. Try it with no input and with the input connected so it has upstream work items. Open the task graph table to check the attributes on the generated items.
+
+
+==== Write a work script ====
+#display: pull left
+
+Now you just have to implement the `url_downloader.py` script you referenced in the work items' command line. See [writing a work script|#script] below for more information.
+
+
+== Writing a work script == (script)
+
+When a work item is actually scheduled on the local machine or render farm, and is run, it executes a command line. This can be a plain command line running an executable, but for flexibility and convenience we recommend you have the command line run a Python _work script_. This script lets you access attributes on the work item to influence execution, and set output attributes on the work item based on any files generated by the script.
+
+In a Python Script node, the work script is what you type in the __Script__ field, and the node automatically sets the work items it generates to execute it. In a Python Processor node, you should create this script externally (in the network filesystem shared with the render farm), and set the work items you create to execute it.
+
+
+=== Differences between Python Script and external script files ===
+
+* In the Python Script node, the `work_item` variable automatically contains a [Py:pdg.WorkItem] object representing the current work item.
+
+    If __Evaluate in process__ is on, `self` is a [Py:pdg.Node] representing the current graph node, and `parent_item` is a [Py:pdg.WorkItem] object representing the work item that spawned the current work item.
+
+* In an external wrapper script, you can get a [Py:pdg.WorkItem] object representing the current work item using this header code:
+
+    {{{
+    #!python
+    import os
+    from pdgjson import getWorkItemJsonPath, WorkItem
+
+    # The current work item's name is available in an environment variable
+    item_name = os.environ["PDG_ITEM_NAME"]
+    # Look up the work item data by name and build a WorkItem object from it
+    work_item = WorkItem(getWorkItemJsonPath(item_name))
+    }}}
+
+    NOTE:
+        `pdgcmd.py` and `pdgjson.py` will be automatically added as file dependencies if a Python Processor node is saved to a digital asset. If you want to use them otherwise, you need to add `pdgcmd.py` and
+        `pdgjson.py` as file dependencies. They can be found at:
+
+        * `$HFS/houdini/python2.7libs/pdgjob/pdgcmd.py`
+        * `$HFS/houdini/python2.7libs/pdgjob/pdgjson.py`
+
+* In the Python Script node, the [pdg package-level functions|/tops/pdg] (`floatData()`, `intData()`, etc.) are automatically available without import. In an external work script, you can import them from `pdgjson`:
+
+    {{{
+    #!python
+    # Don't need to do this import in a Python Script node,
+    # only in an external job script
+    from pdgjson import floatData, intData, strData
+
+    url = strData(work_item, "url", 0)
+    }}}
+
+* In an external work script, it may sometimes be easier to pass extra, untyped information from the work item to the script as command line options. The work script then decodes the options on its command line 
+
+
+=== Doing work ===
+
+* A work script might do all the work in Python, or it might just be a "wrapper" that calls an external executable.
+
+    For example, to download a file from a URL, you could use the built-in Python libraries, or call the external `curl` utility.
+
+    {{{
+    #!python
+    import requests
+    import pdgcmd
+
+    url = work_item.data.stringData("url", 0)
+    outfile = work_item.data.stringData("outputfile", 0)
+    local_outfile = pdgcmd.localizePath(outfile)
+
+    r = requests.get(url, allow_redirects=True)
+    open(outfile, "wb").write(r.content)
+    }}}
+
+    _or_
+
+    {{{
+    #!python
+    import subprocess
+    import pdgcmd
+
+    url = work_item.data.stringData("url", 0)
+    outfile = work_item.data.stringData("outputfile", 0)
+    local_outfile = pdgcmd.localizePath(outfile)
+
+    rc = subprocess.check_call(
+        ["curl", "--output", outfile, "--location", url]
+    )
+    }}}
+
+* If you get a file path from a work item, you can use `pdgcmd.localizePath()` to make sure to expand placeholders and environment variables to make the path specific to this machine.
+
+* If you are generating an intermediate result file in the script and want to put in the temp directory, you can access the directory path using `os.environ["PDG_TEMP"]`.
+
+* If the script/executable exits with a non-zero return code, the work item is marked as an error. Any output to `stdout` or `stderr` is captured on the work item.
+
+* To run external programs from the work script, use the following functions in Python's [subprocess|https://docs.python.org/2/library/subprocess.html] module. These functions replace several older, less capable or less secure functions in the Python standard library.
+
+    `subprocess.call()`:
+        Runs a command line and returns the return code.
+
+    `subprocess.check_call()`:
+        Runs a command line and raises an exception if the command fails (non-zero return code).
+
+    `subprocess.check_output()`:
+        Runs a command line and returns the output as a byte string. Raises an exception if the command fails (non-zero return code).
+
+    * Using the `check_` functions makes your script automatically exit with a non-zero return code, and print the OS error as part of the exception traceback (for example, `No such file or directory`). If you want more control you can catch the exception and print your own error messages to `stderr`.
+
+    * These functions can take a full command line string as the first argument, however the best practice for security and robustness is to pass the commands, options, and file paths as a list of separate strings:
+
+        {{{
+        #!python
+        import subprocess
+
+        rc = subprocess.call(["curl", "--config", configfile, "--output", outfile, url])
+        }}}
+
+        Using separated strings helps catch errors and prevents certain types of attacks. Another benefit is that you don't have to worry about escaping characters (such as spaces) in file names.
+
+    * These functions have arguments to let you pipe an open file to the `stdin` of the command, and/or pipe the command's `stdout` to an open file. You can specify `shell=True` if the command must be run inside a shell.
+
+
+=== Reporting results ===
+
+If your work script generates a file (or files), you should report the result using `pdgcmd.reportResultData()`:
+
+{{{
+#!python
+from pdgcmd import reportResultData
+
+# First argument is a file path string, or list of path strings
+reportResultData("output_file_path" result_data_tag="file/bgeo")
+}}}
+
+`reportResultData(result_data, item_name=None, server_addr=None, result_data_tag="", subindex=-1, and_success=False, to_stdout=True, duration=0.0, hash_code=0)`:
+    
+    `result_data`:
+        An output filename, or a list of output filenames.
+
+    `item_name`:
+        The name of the work item that generated this result. If you omit this argument, the function will look it up in the environment.
+
+    `server_addr`:
+        A string containing the IP address of the result server to report to. If you omit this argument, the function will look it up in the environment.
+
+    `result_data_tag`:
+        The "type tag" string to use for the output file(s). For example, `"file/geo"`.
+
+    `and_success`:
+        If this is `True`, the function call sets the work item's status to success as well as setting the output file.
+
+    `duration`:
+        If you set `and_success=True`, you should set this to the total runtime of the work script (float value in seconds). You can calculate this using `time.clock()`:
+
+        {{{
+        #!python
+        import time
+
+        # Get clock time at start of script
+        start_clock = time.clock()
+
+        # Do all the work of the script... wait for results...
+
+        # Duration is current clock time minus start clock time
+        duration = time.clock() - start_clock
+        }}}
+
+
+=== Environment variables === (env)
+
+The system runs a work item's command line in an environment with a few useful environment variables set.
+
+* In Houdini, you can use placeholders in the form `__<<varname>>__` (the variable name surrounded by double-underscores). The TOP schedulers will expand these placeholders properly using the environment variables at runtime.
+
+* In an external script run by a TOP scheduler, you can access the environment variables in the usual way for the given language, for example `os.environ["PDG_DIR"]` in Python or `$PDG_DIR` in shell.
+
+`PDG_RESULT_SERVER`:
+    A string containing the IP address and port of server to send results back to. You usually don't need to look this up manually, you can call `pdgcmd.reportResultData()` and it will automatically get this value from the environment.
+
+`PDG_ITEM_NAME`:
+    The name of the current work item. You can use this with `pdgjson` helper functions to look up the work item's data based on its name, and build a `WorkItem` object from the data.
+
+    {{{
+    #!python
+    import os
+
+    # The current work item's name is available in an environment variable
+    item_name = os.environ["PDG_ITEM_NAME"]
+    # Look up the work item data by name and build a WorkItem object from it
+    work_item = WorkItem(getWorkItemJsonPath(item_name))
+    }}}
+
+`PDG_INDEX`:
+    The index of the current work item.
+
+`PDG_DIR`:
+    The TOP network's working directory, as specified on the Scheduler node.
+
+`PDG_TEMP`:
+    A shared temporary file directory for the current session, inside the working directory. The default is `$PDG_DIR/pdgtemp/<<houdini_process_id>>`.
+
+`PDG_SCRIPTDIR`:
+    A shared script directory, inside the temp directory. Script files are copied into this directory if they are listed as file dependencies. The default is `$PDG_TEMP/scripts`. 
+
+    Alternatively, you can simply put scripts in known locations in the shared network filesystem.
+
+
+=== Helper functions === (functions)
+
+You can import these useful functions in both a Python Script node and in an external work script.
+
+{{{
+#!python
+from pdgcmd import reportResultData, localizePath, makeDirSafe
+}}}
+
+`localizePath(generic_path)`:
+    Takes a "generic" path string and returns the path after expanding `__PDG` placeholders and environment variables to make the path specific to the local machine.
+
+`makeDirSafe(local_path)`:
+    Tries to create the specified directory path (and all parent directories) but does not error if the directories already exist (on the assumption that another process already created them).
+
+
+== Create an asset from a Python Processor node == (asset)
+
+Once you have a Python Processor working the way you want, you can convert it to an asset to make it easier to re-use.
+
+# Select the Python Processor. In the parameter editor, click __Save to digital asset__.
+
+# Fill out the dialog and click __Accept__.
+
+    [Image:/images/pdg/save_to_hda_dialog.png]
+
+    The new asset type will automatically use any spare parameters on the Python Processor as parameter interface on the __Processor__ tab.
+
+    [Image:/images/pdg/curl_processor_tab.png]
+
+    File dependencies are automatically added for the support modules.
+
+    [Image:/images/pdg/curl_file_deps.png]
+
+# You can continue to edit the asset's parameter interface. However, note the following:
+
+    * If you edit the interface and Houdini asks you what to do with spare parameters, click __Destroy all spare parameters__.
+
+    * Do not remove the __Work item generation__ parameter. You can make it invisible if you don't want the user to change it.
+
+    * If you don't reference the __Command__ parameter to set the command line for work items, you should hide or delete it from the interface so it doesn't cause confusion.
+
+
+
+
+

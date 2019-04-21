@@ -1,0 +1,142 @@
+= Commonly used TOP nodes =
+
+"""A quick guide to the most commonly used TOP nodes."""
+
+
+This is not a [list of all TOP nodes|/nodes/top/]. This is a list of the most commonly useful nodes. These nodes should give you an idea of how to get started with common workflows in TOPs. See 
+
+
+== Kicking off ==
+
+If these nodes have no input, they create a number of static work items specified by their parameters. If their input is connected, they create the specified number of new work items _for each_ incoming work item.
+
+[Icon:TOP/filepattern] [File Pattern|Node:top/filepattern] |
+    #width: 25%
+
+    Creates a work item for each file that matches a pattern (for example, `*.exr`). You can then add processor nodes to do work on each file.
+
+[Icon:TOP/downloadfile] [Download File|Node:top/downloadfile] |
+    Generates work items to download one or more URLs to disk.
+
+[Icon:ROP/wedge] [Wedge|Node:top/wedge] |
+    Creates a work item for each variation of one or more attributes you specify.
+    See [wedging attributes|wedge] for more information.
+
+[Icon:ROP/mantra] [ROP Mantra Render|Node:top/ropmantrarender] |
+    Creates a work item to render each specified frame.
+
+[Icon:OBJ/geo] [ROP Geometry|Node:top/ropgeometry] |
+    Creates a work item to generate geometry for each specified frame.
+
+[Icon:TOP/ffmpeg] [FFmpeg Extract Images|Node:top/ffmpegextractimages] |
+    Creates a work item for each frame image extracted from a video file.
+
+[Icon:TOP/csvinput] [CSV Input|Node:top/csvinput],
+<br/>[Icon:TOP/jsoninput][JSON Input|Node:top/jsoninput],
+<br/>[Icon:TOP/xmlinput] [XML Input|Node:top/xmlinput]  |
+    Create new work items for each "row" in an input file.
+
+[Icon:TOP/sqlinput] [SQL Input|Node:top/sqlinput] |
+    Creates new work items for each row returned by a database query.
+
+
+== Doing work ==
+
+[Icon:TOP/hdaprocessor] [HDA Processor|Node:top/hdaprocessor] |
+    #width: 25%
+
+    Cooks a [digital asset|/assets/] and writes the asset's output to a file.
+
+[Icon:SOP/invoke] [Invoke|Node:top/invoke] |
+    Cooks another node in the same HIP file as this node.
+
+[Icon:MISC/python] [Python Script|Node:top/pythonscript] |
+    Runs a Python script for each incoming work item. This is the node you will usually use for making TOPs do custom work. You can set new output attributes on the work item from this script based on the work done.
+
+    This is easier to use than creating a custom processor code with [Python Processor|Node:top/pythonprocessor], but doesn't have the full flexibility (for example, this node can't create static work items from scratch, or generate multiple new items for each incoming item).
+
+[Icon:TOP/genericprocessor] [Generic Processor|Node:top/genericprocessor] |
+    Runs a command line executable for each incoming work item. This does not allow you to set attributes based on the result of the executable, so it is not as flexible as the [Python Script|Node:top/pythonscript] node. However, for simple jobs where you can infer the results (for example, you know the output files have a certain pattern), this may be useful.
+
+[Icon:TOP/sendcommand] [Send Command|Node:top/sendcommand] |
+    [Command servers|servers] let you start up a persistent shared "server" process (such as an instance of Houdini or Maya), send it commands, and then shut it down when all work is finished.
+
+See [wrapping external programs|stocknodes] and [command servers|servers] for more information.
+
+
+== Waiting for results ==
+
+See [waiting for results|wait].
+
+
+== Image/video outputs ==
+
+[Icon:TOP/ffmpeg] [FFmpeg Encode Video|Node:top/ffmpegencodevideo] |
+    Compiles a set of frame images into a video file.
+
+[Icon:TOP/imagemagick] [ImageMagick|Node:top/imagemagick] |
+    Manipulates an image file using the ImageMagick library.
+
+[Icon:TOP/overlaytext] [Overlay Text|Node:top/overlaytext] |
+    Writes text over an image. This is very useful for overlaying metadata (for example, frame number, wedge attributes, filename) over non-final images.
+
+
+== File management nodes == (files)
+
+[Icon:TOP/makedir] [Make Directory|Node:top/makedir] |
+    Creates a work item to create a new directory on disk. This can be useful for organizing output files and creating temporary storage areas.
+
+[Icon:MISC/rename] [File Rename|Node:top/filerename] |
+    Renames or moves a file. Turn on __Async__ to perform the rename(s) in work items at run time.
+
+[Icon:TOP/filecopy] [File Copy|Node:top/filecopy] |
+    Copies a file from one name/location to another. Turn on __Async__ to perform the copies in work items at run time.
+
+[Icon:TOP/fileremove] [Remove File|Node:top/fileremove] |
+    Deletes a file. Turn on __Async__ to perform the copies in work items at run time.
+
+TIP:
+    You may want to avoid destructive file operations such as move/rename and delete, to avoid making the dependency system do extra work because of missing files.
+
+    See [file management tips|tips#files].
+
+
+== Utilities ==
+
+[Attribute Create|Node:top/attributecreate]:
+    Adds one or more attributes to the incoming work items. You can use expressions to compute the contents of the new attribute(s).
+
+[Split|Node:top/split]:
+    Splits the incoming work items into separate outputs based on some criteria. This lets you process different types of work items using different node chains.
+
+[Work Item Expand|Node:top/workitemexpand]:
+    "Recreates" the work items that were merged into a given partition. This can be useful to wait for a group of items (by partitioning them) but then continue on to generate separate work from the items.
+
+
+== Finishing ==
+
+[Wait for All|Node:top/waitforall] |
+    This is a partitioner that puts all incoming work items in a single partition, so it doesn't proceed until all upstream work is done. This is usually needed at the end of the network (before clean up and/or notification nodes), and sometimes at the end of logically distinct pipeline steps, if the next step requires all work to be finished.
+
+[Send Email|Node:top/sendemail]:
+    Creates a work item that sends an email. This can be useful after a [Wait for All|Node:top/waitforall] at the very end of a large network, to notify a user/group that the work is finished.
+
+[Python Script|Node:top/pythonscript]:
+    For any other types of notifications besides email, you can use a [Python Script|Node:top/pythonscript] node to use a notification API. For example, you could post a Slack message at the end of the network:
+
+    {{{
+    #!python
+    import os
+    from slackclient import SlackClient
+
+
+    slack_token = os.environ["SLACK_API_TOKEN"]
+    client = SlackClient(slack_token)
+
+    client.api_call(
+        "chat.postMessage",
+        channel="C0XXXXXX",
+        text=":tada: The big long job finished!"
+    )
+    }}}
+

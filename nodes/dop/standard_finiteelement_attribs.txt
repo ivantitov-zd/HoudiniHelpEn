@@ -68,17 +68,51 @@ table>>
         td>> Float
         td>> Multiplier for the mass density of a Solid Object.
 
+== Collision Control Attributes ==
+
+The FEM solver looks at collision identifiers to decide which primitive pairs are allowed to collide.
+The rule is that a pair of primitives may collide if they have the same collision identifier.
+(This mechanism may possibly be extended in a future release, allowing the user to specify exactly which collision identifier pairs may collide.)
+Collisions can be suppressed altogether for certain primitives by setting the special value -1.
+A collision id may be specified separately for the interior and the exterior side of each polygon and tetrahedron.
+The exterior side of a polygon is decided using the winding order convention, just like the normal direction.
+If interiorcollisionid is not specified, then the default collision id of 0 is used for triangles, but interior collisions are disabled for tets.
+If exteriorcollisionid is not specified, then the default collision id of 0 is used for both tets and triangles.
+
+Consider, as an example, an FEM muscle simulation, we may want the muscles to collide only with the interior side of the skin polygons, so the exteriorcollisionid for those polygons may be set to -1 (disable).
+
+table>>
+    tr>>
+        th>> Name
+        th>> Class
+        th>> Type
+        th>> Description
+    tr>>
+        td>> `exteriorcollisionid`
+        td>> Primitive
+        td>> Integer
+        td>> Collision identifier for the exterior side of a polygon or tet surface
+    tr>>
+        td>> `interiorcollisionid`
+        td>> Primitive
+        td>> Integer
+        td>> Collision identifier for the interior side of a polygon or tet surface
+
 == Material Space Attributes ==
 
 The attribute `materialP` can be thought of as the positions of the simulated object in the material space.
 `materialP` is the undeformed configuration relative to which the current position `P` determines the deformation of a simulated object. 
-`materialP must stay the same throughout the entire simulation.
+`materialP` must stay the same throughout the entire simulation.
 The finite element solver relies on assumption that the `materialP` attribute remains unchanged from frame to frame; it should never be modified externally (e.g., through a SOP solver) otherwise bad simulation results will be produced.
 
 In the case where no __Rest Shape__ is specified and nor `restP` attribute is provided, `materialP` can be thought of as a permanent rest position.
 If no animation of the rest position is required in a sim, only `materialP` should be specified (no `restP`).
 At any stage in the simulation, it is the mapping from `materialP` to the current `P` that determines the deformation of tets in simulated objects.
 The deformation in turn defines the energy stored inside the object.
+
+To help determine the anisotropic behavior of solids, including fiber contraction, the solver can makes use of local UVW frames. These UVW frames may be specified directly using the vertex/point attributes `materialU`, `materialV`, and `materialW`. Alternatively, they may be inferred from UVW positions that may be specified by a vertex/point position attribute `materialuvw`. The FEM solver embeds the UVW directions within the material space that may be specified by the attribute `materialP`. To get the correct idea of how this works, UVW directions that are fed into the FEM solver should be visualized relative to the material position `materialP`.
+
+For FEM muscle simulations, the easiest way to specify the muscle fiber direction is through vertex/point attribute `materialW`. It is fine if no `materialU` and `materialV` directions are specified in this case, as the solver will infer arbitrary `materialU` and `materialV` directions from `materialW` in that case.
 
 The attribute `materialuvw` can be used to specify a UVW parametrization of the material space.
 The U, V and W directions that are implied by `materialuvw` matter if the anisotropic controls are used or when the fiber controls are used on a simulated object.
@@ -94,9 +128,24 @@ table>>
         th>> Description
     tr>>
         td>> `materialP`
-        td>> Point
+        td>> Point or Vertex
         td>> Vector
-        td>> Material position of each point.
+        td>> Material position of each point, defining the material space
+    tr>>
+        td>> `materialU`
+        td>> Point or Vertex
+        td>> Vector
+        td>> The U direction within the material space
+    tr>>
+        td>> `materialV`
+        td>> Point or Vertex
+        td>> Vector
+        td>> The V direction within the material space
+    tr>>
+        td>> `materialW`
+        td>> Point or Vertex
+        td>> Vector
+        td>> The W direction within the material space
     tr>>
         td>> `materialuvw`
         td>> Point or Vertex
@@ -107,6 +156,25 @@ table>>
         td>> Point or Vertex
         td>> Vector
         td>> Local material uvw coordinates for each point or vertex of a polygon or polysoup.
+
+== Material Property Multiplier Attributes ==
+
+table>>
+    tr>>
+        td>> `fracturepart`
+        td>> Primitive
+        td>> Integer
+        td>> Partitions the object into unbreakable parts. Must be either -1 (no part) or a nonnegative number that indicates a part.
+    tr>>
+        td>> `enablefracturing`
+        td>> Point/Vertex
+        td>> Integer
+        td>> Locally enable/disable fracturing for points or vertices.
+    tr>>
+        td>> `fracturethreshold`
+        td>> Point/Vertex
+        td>> Float
+        td>> Multiplier for the object's __Fracture Threshold__.
 
 == Fracturing Control Attributes ==
 
@@ -216,17 +284,18 @@ table>>
 == Fiber Attributes ==
 
 The `fiberscale` point attribute acts as a multiplier for the rest strain in the fiber direction.
+The fiber direction itself can be specified using the `materialW` vertex/point attribute.
 Among other things, this is useful for FEM muscle simulations.
 If the `fiberscale` is changed from 1 to 0.5, then the muscle wants to be half as long as before in the direction of the fiber.
 If you animate the `fiberscale` in a SOP Solver such that it decreases from 1 to a smaller value, you will cause a muscle contraction in the sim.
 
 The `fiberstiffness` point attribute acts as a multiplier for the stiffness along the fiber direction.
-The fiber direction of the material is determined by the W axis of the materialuvw coordinates.
+The fiber direction of the material is determined by the W axis of the `materialuvw` coordinates.
 `fiberstiffness` works as a multiplier on top of all the other material property multipliers, including the anisotropic multipliers.
 If the `fiberstiffness` changed from 1 to 10, then the stiffness along the fiber direction becomes 10 stronger than before.
-This can be used to control how strong and how quick the effect of muscle flexing using the fiberscale attribute takes effect. 
+This can be used to control how strong and how quick the effect of muscle flexing using the `fiberscale` attribute takes effect. 
 
-For fiberscale/fiberstiffness to have the desired effect, it is important that UVW directions are specified.
+For `fiberscale`/`fiberstiffness` to have the desired effect, it is important that UVW directions are specified.
 A material-space UVWs for FEM muscles can be specified using the `materialuvw` point/vertex attribute.
 By providing `materialuvw` as a vertex attribute, you are able to provide a local UVW space for each individual tet, which gives you to option of providing a separate UVW frame to each tet.
 
@@ -395,7 +464,7 @@ table>>
 
 == Legacy Attributes ==
 
-In most situations where you want to influence a finite-element simulation, you will want to use soft constraints to achieve this, for example, target constraints, region constraints, or the target strength/damping settings on the object. These are first-class solver features that work in a stable way with the solver and should produce high quality results when used correctly. Purely for backwards compability, a force force attribute is still supported. Because the force force attribute lacks essential information that the solver needs, this attribute cannot be relied on when stability and quality are important. When setting up a new sim, alternatives such as soft targeting, region constraints and animated rest positions should be considered instead of the force force attribute.
+In most situations where you want to influence a finite-element simulation, you will want to use soft constraints to achieve this, for example, target constraints, region constraints, or the target strength/damping settings on the object. These are first-class solver features that work in a stable way with the solver and should produce high quality results when used correctly. Purely for backwards compatibility, a force force attribute is still supported. Because the force force attribute lacks essential information that the solver needs, this attribute cannot be relied on when stability and quality are important. When setting up a new sim, alternatives such as soft targeting, region constraints and animated rest positions should be considered instead of the force force attribute.
  
 table>>
     tr>>

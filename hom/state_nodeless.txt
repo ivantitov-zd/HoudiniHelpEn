@@ -24,14 +24,15 @@ For example:
 
 # [Install and implement|python_states] your state.
 
-    For an inspector that's not tied to a specific node type, it makes sense to install the state code in a module in `HOUDINIPATH/viewer_states/` that will be automatically registered at startup.
+    For a state that's not tied to a specific node type, it makes sense to install the state code in a module in `$HOUDINI_USER_PREF_DIR/viewer_states/` that will be automatically registered at startup.
 
     However, if your nodeless tool happens to be embedded with an asset, you can [register the state in the asset's OnInstall script|python_states#embed].
 
 # Write a shelf tool script to launch the state.
 
-    *Currently, custom Python states are only available at the SOP level*. This somewhat limits the types of "inspector" tools you can write, since often you would want that kind of tool at the Object level. However, it is still very useful to create SOP-level inspection tools.
-
+    NOTE:
+        The script below setups a SOP-level inpector state. While this kind of inspector tool would typically be created at the Object level, it is still very useful to create SOP-level inspection tools.
+   
     In your shelf tool script, you can check whether the viewer is already at the SOP level, and if not, prompt the user to select a Geometry object to work inside.
 
     {{{
@@ -92,89 +93,87 @@ When Houdini instantiates your state class, it passes the initializer a [Hom:hou
 
 (A viewport is a specific view onto the geometry. The default viewer has a single viewport showing the Perspective view, however the user can set up different viewport arrangements, such as a "quad-view" showing Top, Front, Right, and Perspective viewports.)
 
-The [Hom:hou.Viewport] object has useful methods for inspecting what's under the mouse pointer, as well as changing the view.
+The [Hom:hou.GeometryViewport] object has useful methods for inspecting what's under the mouse pointer, as well as changing the view.
 
 
 == Example: Scrub tool ==
 
-This state lets you drag in the viewer to move forward/back along the timeline. You can use the context menu to choose between relative dragging and absolute positioning.
+This OBJ-level state lets you drag in the viewer to move forward/back along the timeline. You can use the context menu to choose between relative dragging and absolute positioning.
 
-:box:$HOUDINI_USER_PREFS/viewer_states/scrub.py
-    {{{
-    #!python
-    import hou
+{{{
+#!python
+import hou
 
 
-    class ScrubState(object):
-        def __init__(self, scene_viewer, state_name):
-            self.state_name = state_name
-            self.scene_viewer = scene_viewer
-            self._base_x = self._base_frame = None
+class ScrubState(object):
+    def __init__(self, scene_viewer, state_name):
+        self.state_name = state_name
+        self.scene_viewer = scene_viewer
+        self._base_x = self._base_frame = None
 
-        def onGenerate(self, kwargs):
-            self.scene_viewer.setPromptMessage(
-                "Drag left/right to scrub along timeline"
-            )
+    def onGenerate(self, kwargs):
+        self.scene_viewer.setPromptMessage(
+            "Drag left/right to scrub along timeline"
+        )
 
-        def onExit(self, kwargs):
-            self.scene_viewer.clearPromptMessage()
+    def onExit(self, kwargs):
+        self.scene_viewer.clearPromptMessage()
 
-        def _scrub_abs(self, x):
-            # Take the absolute position of the mouse pointer (as a percentage
-            # of the total viewer width) and move that far along the current
-            # frame range
+    def _scrub_abs(self, x):
+        # Take the absolute position of the mouse pointer (as a percentage
+        # of the total viewer width) and move that far along the current
+        # frame range
 
-            width, _ = self.scene_viewer.contentSize()
-            pct = x / float(width)
-            start_frame, end_frame = hou.timeline.frameRange()
-            frame = int((end_frame - start_frame) * pct + start_frame)
+        width, _ = self.scene_viewer.contentSize()
+        pct = x / float(width)
+        start_frame, end_frame = hou.timeline.frameRange()
+        frame = int((end_frame - start_frame) * pct + start_frame)
+        hou.setFrame(frame)
+
+    def _scrub_rel(self, x):
+        # Use the difference between the mouse pointer's current position
+        # and the previous position to calculate how many frames to move
+        # forward/back
+
+        if self._base_x is not None:
+            delta = int((x - self._base_x) / 10.0)
+            frame = max(0, self._base_frame + delta)
             hou.setFrame(frame)
+        else:
+            self._base_x = x
+            self._base_frame = hou.intFrame()
 
-        def _scrub_rel(self, x):
-            # Use the difference between the mouse pointer's current position
-            # and the previous position to calculate how many frames to move
-            # forward/back
-
-            if self._base_x is not None:
-                delta = int((x - self._base_x) / 10.0)
-                frame = max(0, self._base_frame + delta)
-                hou.setFrame(frame)
-            else:
-                self._base_x = x
-                self._base_frame = hou.intFrame()
-
-        def onMouseEvent(self, kwargs):
-            device = kwargs["ui_event"].device()
-            if device.isLeftButton():
-                x = device.mouseX()
-                if kwargs["mode"] == "abs":
-                    self._scrub_abs(x)
-                elif kwargs["mode"] == "rel":
-                    self._scrub_rel(x)
-            else:
-                self._base_x = None
+    def onMouseEvent(self, kwargs):
+        device = kwargs["ui_event"].device()
+        if device.isLeftButton():
+            x = device.mouseX()
+            if kwargs["mode"] == "abs":
+                self._scrub_abs(x)
+            elif kwargs["mode"] == "rel":
+                self._scrub_rel(x)
+        else:
+            self._base_x = None
 
 
-    template = hou.ViewerStateTemplate("scrub", "Scrub", hou.sopNodeTypeCategory())
-    template.bindFactory(ScrubState)
+template = hou.ViewerStateTemplate("scrub", "Scrub", hou.objNodeTypeCategory())
+template.bindFactory(ScrubState)
 
-    menu = hou.ViewerStateMenu("scrub", "Scrub")
-    menu.addRadioStrip("mode", "Mode", "rel")
-    menu.addRadioStripItem("mode", "rel", "Relative")
-    menu.addRadioStripItem("mode", "abs", "Absolute")
-    template.bindMenu(menu)
+menu = hou.ViewerStateMenu("scrub", "Scrub")
+menu.addRadioStrip("mode", "Mode", "rel")
+menu.addRadioStripItem("mode", "rel", "Relative")
+menu.addRadioStripItem("mode", "abs", "Absolute")
+template.bindMenu(menu)
 
-    hou.ui.registerViewerState(template)
-    }}}
+}}}
 
-    To quickly try this tool, paste the code for the tool into the Houdini Source Editor window. Then in the Python Shell do the following:
+To quickly try this tool, paste the code for the tool into the Houdini Source Editor window. Then in the Python Shell do the following:
 
-    {{{
-    #!pycon
-    >>> hou.ui.register(hou.session.scrub_template)
-    >>> scene_viewer = hou.ui.paneTabOfType(hou.paneTabType.SceneViewer)
-    >>> scene_viewer.setCurrentState("scrub")
-    }}}
+{{{
+#!pycon
+>>> hou.ui.registerViewerState(hou.session.template)
+>>> scene_viewer = hou.ui.paneTabOfType(hou.paneTabType.SceneViewer)
+>>> scene_viewer.setCurrentState("scrub")
+}}}
 
     
 

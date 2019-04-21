@@ -1,0 +1,121 @@
+= Switching to MySQL (Linux only) =
+
+"""You can optionally configure HQueue to use MySQL instead of SQLite on Linux."""
+
+
+== Overview ==
+
+By default, HQueue uses SQLite as a backend database. If the HQueue server is on Linux, you can configure it to use MySQL instead.
+
+You may want to do this if you already have a MySQL server infrastructure that's centrally managed, backed-up, and so on.
+
+The following procedure does *not* migrate the contents of the default database over to MySQL. You will need to re-add clients, groups, and jobs after switching to MySQL.
+
+
+== Required packages ==
+
+You must install the following Linux packages on the server machine, for example using `aptitude` or `yum` (depending on the Linux distribution):
+
+* `mysql-client`
+* `mysql-server`
+* `python-mysqldb`
+
+The packages may be named differently depending on your Linux distribution.
+
+
+== Setting up MySQL ==
+
+# Create the `hqserver` database.
+
+    Start a `mysql` session and run:
+
+    {{{
+    #!mysql
+    CREATE DATABASE `hqserver`;
+    }}}
+
+    You can also create an hquser user account which has access to the database.  In your mysql session, enter the following commands:
+
+    {{{
+    #!mysql
+    CREATE USER `hquser`@`localhost` IDENTIFIED BY "hqpass";
+    GRANT ALL ON `hqserver`.* TO `hquser`@`localhost`;
+    }}}
+
+# Edit the HQueue configuration file.
+
+    Open `/opt/hqueue/hqserver.ini` and look for the line with the `sqlalchemy.default.url` configuration value.  Replace it with:
+
+    {{{
+    #!ini
+    sqlalchemy.default.url = mysql://<mysql_user>:<mysql_user_password>@localhost/hqserver
+    }}}
+
+    If you created the _hquser_ account, then this would be:
+
+    {{{
+    #!ini
+    sqlalchemy.default.url = mysql://hquser:hqpass@localhost/hqserver
+    }}}
+
+    Additionaly, uncomment the lines with the `sqlalchemy.default.pool_size` and `sqlalchemy.default.max_overflow` configuration values.
+
+# Shutdown the HQueue server.
+
+    In a terminal run:
+
+    {{{
+    #!sh
+    cd /opt/hqueue
+    ./scripts/hqserverd stop
+    }}}
+
+# Find out where Python MySQLdb is installed.
+
+    In a terminal run `python` and then in Python type:
+
+    {{{
+    #!pycon
+    >>> import MySQLdb
+    >>> MySQLdb
+    <module 'MySQLdb' from '/usr/local/lib/python2.7/dist-packages/MySQL_python-1.2.5-py2.7-linux-x86_64.egg/MySQLdb/__init__.pyc'>
+    >>> 
+    }}}
+
+    You will need to remember where the MySQLdb module is installed for later use.  With the example above, the install location would be `/usr/local/lib/python2.7/dist-packages/MySQL_python-1.2.5-py2.7-linux-x86_64.egg`.
+
+# Modify the HQueue paster script so it can find Python MySQLdb.
+
+    Open `/opt/hqueue/bin/paster` in a text editor.
+    Then insert this line after the line that reads `import sys`:
+
+    {{{
+    #!python
+    sys.path.append("/usr/local/lib/python2.7/dist-packages/MySQL_python-1.2.5-py2.7-linux-x86_64.egg")
+    }}}
+
+    Save and close the file.
+
+# Setup the `hqserver` database.
+
+    In a terminal, run:
+
+    {{{
+    #!sh
+    # Add the MySQL install path to PYTHONPATH so that paster can find it.
+    export PYTHONPATH=/usr/local/lib/python2.7/dist-packages/MySQL_python-1.2.5-py2.7-linux-x86_64.egg
+
+    # Setup the hqserver database.
+    ./bin/paster setup-app hqserver.ini
+    }}}
+
+# Restart the HQueue server.
+
+    In a terminal, run:
+
+    {{{
+    #!sh
+    ./scripts/hqserverd restart
+    }}}
+
+Now your HQueue server is configured to use a MySQL database.

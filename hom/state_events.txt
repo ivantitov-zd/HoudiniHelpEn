@@ -24,10 +24,14 @@ However, sometimes you want the ability to interpret lower-level user input such
 
 == Input events ==
 
-The Python state impelementation supports the following callback methods:
+The Python state implementation supports the following callback methods:
 
 Method ||
     Called for ||
+
+`onKeyEvent` |
+    keyboard events |
+        See [reading the keyboard device|#keybdevice] below.
 
 `onMouseEvent` |
     input device moves/clicks |
@@ -127,6 +131,40 @@ class MyState(object):
 
 See the help for [Hom:hou.UIEventDevice#mouseWheel] for information about the number returned.
 
+== Reading the keyboard device == (keybdevice)
+
+The `onKeyEvent` handler let you process keyboard events such as single and modifier keys. The [Hom:hou.UIEventDevice] returned by `kwargs["ui_event"].device()` gives access to the key being pressed and other useful 
+information about the event.
+
+{{{
+#!python
+def onKeyEvent(self, kwargs):
+    ui_event = kwargs['ui_event']
+
+    # Log some key event info in the Viewer State Browser console
+    self.trace( ui_event.device().keyString(), name='key string' )
+    self.trace( ui_event.device().keyValue(), name='key value' )
+    self.trace( ui_event.device().isAutoRepeat(), name='isAutoRepeat' )
+
+    # Use the key string to decide if the event should be consumed or not.
+    # Store the pressed key for use in other handlers.
+    self.key_pressed = ui_event.device().keyString()
+    if self.key_pressed in ('a', 'shift a', 'ctrl g'):
+        # returns True to consume the event
+        return True
+
+    # Consume the event only if the 'f', 'p' or 'v' key is held
+    if ui_event.device().isAutoRepeat():            
+        ascii_key = ui_event.device().keyValue()
+        if ascii_key in (102, 112, 118):
+            self.key_pressed = ui_event.device().keyString()
+            return True
+
+    self.key_pressed = None
+
+    # return False if the event is not consumed
+    return False
+}}}
 
 == Tablet ==
 
@@ -193,7 +231,7 @@ You can check what geometry is under the pointer using [Hom:hou.Geometry#interse
 {{{
 #!python
 
-# In stateutils
+# In viewerstate.utils
 def sopGeometryIntersection(geometry, ray_origin, ray_dir):
     # Make objects for the intersect() method to modify
     position = hou.Vector3()
@@ -391,6 +429,101 @@ class MyState(object):
 
         print("position=", position)
 }}}
+
+
+== Snapping from intersected geometry == (snap)
+
+[Hom:hou.ViewerEvent#raySnapping] is great for snapping a ray position to Houdini construction or reference planes. But if you need to snap a ray position to geometry components then you need `viewerstate.utils.GeometryIntersector`. 
+
+`viewerstate.utils.GeometryIntersector` is a utility class which provides the same services as `sopGeometryIntersection()` for intersecting geometries. But beyond that, it provides a set of useful functionalities 
+for snapping geometry components from a geometry intersection point. Snapping works in conjunction with the settings of the `Snap Options` dialog available in the toolbar on the left of the Houdini viewer pane. If the `Snap Options` settings
+are not enabled, `GeometryIntersector` simply perforns a regular geometry intersection.
+
+These `GeometryIntersector` members are used for storing the snapping results:
+
+Member ||
+    Type ||
+        Content ||
+
+`snap_mode` |
+    [Hom:hou.snappingMode] |
+        Snapping operation mode.
+
+`snap_gravity` |
+    `int` |
+        The snap gravity value as set for the snapping mode. Used as a weighted value for fine tuning the snap operation.
+
+`snap_priority` |
+    [Hom:hou.snappingPriority] |
+        Indicates the priority value used for snapping.
+
+`snapped_position` |
+    [Hom:hou.Vector3] |
+        Closest snapped position to the intersected point.
+
+`snapped_edge` |
+    [Hom:hou.Edge] |
+        Snapped geometry edge closest to the intersected point.
+
+`snapped_point_num` |
+    `int` |
+        The snapped primitive point index.
+
+`test_dist` |
+    `double` |
+        Minimal distance value for snapping components. A snapping operation succeeds if the distance between the component to snap and the intersected point is within `test_dist`. 
+
+`tolerance` |
+    `double` |
+        Tolerance value used for intersecting the geometry (see [Hom:hou.Geometry#intersect]).
+
+
+`GeometryIntersector` performs snapping based on these 2 Houdini [snapping mode|Hom:hou.snappingMode]: point and multi. 
+
+* In point mode, `snapped_position` is set with the primitive point closest to the intersected point. `snap_priority` is set to [Hom:hou.snappingPriority#GeoPoint] to indicate which type of geometry component has snapped.
+
+* In multi mode, different snap operations are evaluated based on the snapping priorities set in the Multi tab of the `Snap Options` window. The order of execution of these operations are determined by the snapping priority settings:
+
+    `GeoPoint`: 
+        This will get the geometry point closest to the intersected point, same as the point mode.
+
+    `GeoEdge`: 
+        This operation sets `snap_edge` with the closest edge from the intersected point. `snapped_position` is set with the projection of the intersected point onto the edge. `snap_priority` is set [Hom:hou.snappingPriority#GeoEdge].
+
+    `Midpoint`: 
+        `snapped_position` is set with the midpoint of the closest edge to the intersected point. `snap_priority` is set to [Hom:hou.snappingPriority#Midpoint].
+
+Here's a simple `GeometryIntersector` usage:
+{{{
+#!python
+from __future__ import print_function
+
+import viewerstate.utils as su
+
+class MyState(object):
+    def __init__(self, state_name, scene_viewer):
+        self.state_name = state_name
+        self.scene_viewer = scene_viewer
+        self.geometry = None
+
+    def onEnter(self, kwargs):
+        node = kwargs["node"]
+        inputs = node.inputs()
+        if inputs and inputs[0]:
+            self.geometry = inputs[0].geometry()
+
+    def onMouseEvent(self, kwargs):
+        ui_event = kwargs["ui_event"]       
+        (mouse_point, mouse_dir) = ui_event.ray()
+
+        gi = su.GeometryIntersector(self.geometry, scene_viewer=self.scene_viewer)
+        gi.intersect(mouse_point, mouse_dir)
+
+        # log trace in viewer state console
+        self.trace( gi )
+}}}
+
+Load the `$HH/viewer_states/examples/snap_demo.hip` to see `GeometryIntersector` in action.
 
 
 == Compensating for parent transforms == (world)

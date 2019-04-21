@@ -1,6 +1,7 @@
 = Writing custom viewer states in Python =
 
 #flow: /hom/index#state
+#helpid: h.python_states
 
 """A viewer state controls how to interpret mouse movements, clicks, keys, and so on in the viewer."""
 
@@ -20,15 +21,18 @@ A custom state can, for example:
     * Display a [custom right-click menu|state_menus]
     * Respond to low-level mouse, keyboard, and tablet [events|state_events].
     * Wrap changes in [undo blocks|state_undo].
+    * Run across multiple [context-levels|Hom:hou.ViewerStateTemplate#__init__].
 
 A [Houdini digital asset|/assets/] can specify a state (for the [Icon:TOOLS/handles] Handles tool to use when a node of that type is current). Eventually you will be able to programmatically enter a state by calling [Hom:hou.SceneViewer#setCurrentState], for example in a shelf tool script (for tools that don't create a node, such as an inspection tool).
 
 To start playing with the code right away, see [implementing a state|#impl] below, which shows how to implement, register, and launch a minimal viewer state.
 
+TIP:
+    To see viewer states in action, check out the demo scene and asset files under `$HH/viewer_states/examples`. These samples provide a detailed coverage of the viewer state features.
 
 === Limitations ===
 
-* Currently Python states are *only available at the SOP (geometry) and OBJ levels*. It is not currently possible to have custom viewer states in other network types, for example Dynamic or Composite networks.
+* Currently Python states are available in the following contexts: *SOP* (geometry), *OBJ* and *DOP* levels.
     
 * There is currently no way to specify an icon for a state. 
 
@@ -83,14 +87,15 @@ There are currently two ways to make a custom state available in Houdini: [embed
 
 === Embedding a state in an asset === (embed)
 
-The following instructions create a SOP asset and a minimal state so you can try out the code.
+The following instructions create an asset and a minimal state so you can try out the code.
 
-# Start with a SOP asset you want to add a state to.
+# Start with an asset you want to add a state to.
 
-    If you just want to start with a blank asset, you can [follow these steps|Fold:1]
+    NOTE:
+        If you just want to start with a blank asset, you can [follow these steps|Fold:1] to create a SOP asset or [these steps|Fold:2] for an OBJ asset. The code snippet at step 5 should work for both types.
 
     :box:
-        #id: blank_asset
+        #id: blank_sop_asset
         #fold: 1
 
         To quickly create a "blank" SOP asset to experiment with:
@@ -100,6 +105,20 @@ The following instructions create a SOP asset and a minimal state so you can try
         # Double-click the `geo1` node to dive into the Geometry network inside.
 
         # Use the ((Tab)) menu to create a Subnetwork node.
+
+        # Right-click the `subnet1` node and choose __Create digital asset__.
+
+        # Set the __Operator name__ to `statedemo`, the __Operator Label__ to `State Demo`, and __Save to library__ to `Embedded`.
+
+            Setting the library location to `Embedded` saves the asset with the current scene file instead of in an asset library.
+
+    :box:
+        #id: blank_obj_asset
+        #fold: 2
+
+        To quickly create a "blank" OBJ asset to experiment with:
+
+        # At the Object level, use the ((Tab)) menu to create a Subnetwork node.
 
         # Right-click the `subnet1` node and choose __Create digital asset__.
 
@@ -157,7 +176,7 @@ template.bindFactory(MyState)
 
         {{{
         #!python
-        # Wrap the tempalte creation code in a function instead of creating the
+        # Wrap the template creation code in a function instead of creating the
         # template at the module level
         def createViewerStateTemplate():
             # Use the node's name and label as the state name and label
@@ -240,7 +259,7 @@ TIP:
 
 === Loading a state from the Houdini path === (file)
 
-The following instructions create a SOP viewer state that can be "shared" between multiple assets. This type of state (nicknamed `self-installed` state) is registered by Houdini on startup.
+The following instructions create a viewer state that can be "shared" between multiple assets. This type of state (nicknamed `self-installed` state) is registered by Houdini on startup.
 
 # In `$HOUDINI_USER_PREF_DIR`, create a new folder called `viewer_states`. Create a new file inside that folder called `mystate.py`.
 
@@ -286,21 +305,34 @@ def createViewerStateTemplate():
     return template
 }}}
 
-On startup, Houdini will call `createViewerStateTemplate` to access the state template and perform the registration. If omitted, Houdini will simply skip the state registration.
+# Find an asset you want to add a state to.
 
-See [implementing a state|#impl] below for more information on adding functionality to the state class.
+    NOTE:
+        If you just want to start with a blank asset, you can [follow these steps|Fold:3] for a SOP asset or [these steps|Fold:4] for an OBJ asset. If you choose to create an OBJ asset, make the following change in the sample script above:
 
-TIP:
-    Try to keep the filename (for example, `examplestudio_bend.py`) similar the state name you use when instantiate the template (for example, `examplestudio::bend`), to make it easy to see which file holds which state.
+        Swap this line:
+        {{{
+        #!python        
+        category = hou.sopNodeTypeCategory()
+        }}}
 
-# Find a SOP asset you want to add a state to.
+        with this one:
+        {{{
+        #!python        
+        category = hou.objNodeTypeCategory()
+        }}}
 
-    If you just want to start with a blank asset, you can [follow these steps|Fold:2]
+        This is to make sure the python state is registered as an OBJ-level state.
 
     :box:
-        #fold: 2
+        #fold: 3
 
-        [Include:#blank_asset/]
+        [Include:#blank_sop_asset/]
+
+    :box:
+        #fold: 4
+
+        [Include:#blank_obj_asset/]
 
 # Open the [type properties|/ref/windows/optype] window for the asset. (Right click an instance of the asset type and choose __Type properties__).
 
@@ -316,8 +348,18 @@ TIP:
 
     * The toolbar at the top of the viewer should display the state's label on the left.
 
+On startup, Houdini will call `createViewerStateTemplate` to access the state template and perform the registration. If omitted, Houdini will simply skip the state registration.
+
+See [implementing a state|#impl] below for more information on adding functionality to the state class.
+
+TIP:
+    Try to keep the filename (for example, `examplestudio_bend.py`) similar the state name you use when instantiate the template (for example, `examplestudio::bend`), to make it easy to see which file holds which state.
+
 TIP:
     To reload a `self-installed` state during a Houdini session, you must call [Hom:hou.ui#reloadViewerState] with the name of the state. This will allow you to test changes to your state without restarting Houdini. 
+    
+    NOTE:
+        You can easily perform this operation with the `Viewer State Browser` python panel. Just ((RMB)) on the state name listed in the tree and select `reload` in the context menu.
 
 
 == Implementing the state == (impl)
@@ -412,7 +454,7 @@ Method name ||
 
 Additional notes:
 
-* Houdini calls *either* `onEnter` (if the state should work on an existing node) *or* `onGenerate` (if the should create a new node) when the tool activates, never both. The dictionary passed to `onEnter` has a `node` item to access the existing node as a [Hom:hou.Node] object. See [editing nodes|state_nodes] for more information.
+* Houdini calls *either* `onEnter` (if the state should work on an existing node) *or* `onGenerate` (if the should create a new node) when the tool activates, never both. The dictionary passed to `onEnter` has a `node` item to access the existing node as a [Hom:hou.Node] object. See [editing nodes|state_node] for more information.
 
 * Houdini will call `onEnter`/`onGenerate` when the state begins, even if the mouse pointer is not over the viewer at the time. If you want to display screen visuals around the cursor, wait for an `onMouseEvent` call to show them.
 
@@ -425,7 +467,7 @@ Additional notes:
 * If your state is current but interrupted because Houdini is in the background, and the user switches to Houdini, even if the mouse pointer is over the viewer, your state will not receive an `onResume` call until the user makes some input (such as moving the mouse).
 
 
-=== UI event handlers ===
+=== UI event handlers === (ui_event_handlers)
 
 See [UI event handling|state_events] for more information.
 
@@ -453,6 +495,35 @@ Method name ||
     context menu choice |
         See [context menu handling|state_menus].
 
+`onMenuPreOpen` |
+    update menu state |
+        See [updating context menu|state_menus#updating_menu]. 
+        
+        The dictionary passed to this handler has the following extra items:
+
+        `menu`:
+            The identifier of the menu to update.
+
+        `menu_states`:
+            A dictionary of menu states holding update values. Use the `menu` value to index the dictionary. The value part holds a dictionary of states for the menu. 
+
+            States supported: 
+              `enable`: Enables or disables a menu.
+
+        `menu_item_states`:
+            A dictionary of menu item states holding update values. Use a menu item handle to index the dictionary. The value part holds a dictionary of states for the menu item. 
+            
+            States supported: 
+              `enable`: Enables or disables a menu item.
+
+              `value`: Corresponds to the menu item intrinsic state. For instance, `value` can be set to `True` to set a toggle menu item. 
+              
+              NOTE: 
+                For now, `value` is only supported for toggle menu items. 
+
+`onKeyEvent` |
+    Keyboard events |
+        See [keyboard handling|state_events#keybdevice].
 
 === Selection event handlers ===
 
@@ -465,20 +536,31 @@ Method name ||
 
 `onStartSelection` |
     user starts selecting |
-        None
+        The dictionary passed to this handler has the following item:
+
+        `name`:
+            The name of the current active selector (see [Hom:hou.ViewerStateTemplate#bindGeometrySelector]).
 
 `onSelection` |
     user selected geometry |
-        The dictionary passed to this handler has the following extra item:
+        The dictionary passed to this handler has the following extra items:
         
         `selection`:
             A [Hom:hou.GeometrySelection] object representing the completed selection.
+
+        `name`:
+            The name of the current active selector.
 
         You should *Return True from this method* to signal your state "accepts" the current selection and stop the selector. If the method returns any other value (or doens't contain a `return` statement), the selector will remain active.
 
 `onStopSelection` |
     user stops selecting |
         This is called when the state "accepts" a selection by returning `True` from `onSelection()`, or if the state [exits|#lifecycle] before accepting a selection.
+
+        The dictionary passed to this handler has the following item:
+
+        `name`:
+            The name of the current active selector.
 
 
 === Handle event handlers ===
@@ -505,6 +587,8 @@ Method name ||
         `prev_parms`:
             A dictionary containing the previous handle parameter values.
             This can be useful for computing deltas.
+        `ui_event`: 
+            [Hom:hou.UIEvent] object to know about the handle status such as start dragging or stop dragging. 
 
 `onStateToHandle` |
     node parameters change |
@@ -527,18 +611,33 @@ Method name ||
 * [Hom:hou.ui#reloadViewerState]
 * [Hom:hou.ui#reloadViewerStates]
 * [Hom:hou.Drawable]
+* [Hom:hou.Handle]
 * [Hom:hou.ViewerEvent]
 * [Hom:hou.UIEventDevice]
 * [Hom:hou.hotkeys#addCommand]
 * [Hom:hou.SceneViewer]
 
 
+== Viewer State Browser ==
+
+A convenient browser is available as a python panel. The browser can: 
+* list all registered viewer states.
+* inspect the content of viewer states.
+* identify viewer states with errors.
+* access the viewer state python code embedded in the scene or an HDA.
+* display messages in its console area.
+* add message markers to the console.
+* trace the execution of an active state.
+* display the content of the active state instance in the console.
+* edit, load, reload and, unload viewer state python modules.
+
+
+The browser can be loaded from the regular `Python Panels` menu or from the `New Pane Tab Type|Viewer State Browser` menu. 
+
 == Debugging tips == (debug)
 
 === Reloading states ===
-
-For states defined on disk, if the files on disk change, you can tell Houdini to reload the state using [Hom:hou.ui#reloadViewerState].
-
+For states defined on disk, if the files on disk change, you can tell Houdini to reload the state using [Hom:hou.ui#reloadViewerState]. The `Viewer State Browser` has this capability builtin.
 
 === Displaying debugging information ===
 

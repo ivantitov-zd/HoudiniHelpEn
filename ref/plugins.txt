@@ -1,0 +1,431 @@
+= Houdini Package =
+
+"""Tips for creating an installation package for plugin tools."""
+
+== Overview ==
+
+Creating an Houdini package file allows you to create an installation setup for plugin tools. 
+
+* A package file basically let you specify the location of tools with the `HOUDINI_PATH` environment variable.
+* The use of an Houdini package removes the need to edit `Houdini.env`.
+* Package files are processed on startup by Houdini.
+* With a package file you can set the `HOUDINI_PATH` variable but it's also possible to set other Houdini variables, set custom variables or set the system `PATH`. 
+* Packages let you enable/disable a tool installation or specify what package(s) are required by a tool. 
+* An expression language is also available for setting variables conditionally . For instance, you can set a path based on the current OS or if the Houdini version matches a specific version, etc...
+* The use of expressions allows you to use a single package file to create a multi-platform setup.
+
+== Package Files ==
+Houdini Package files are `JSON` files and must have a `.json` extension. Houdini will scan the following directories on startup for processing package files:
+* `$HOUDINI_USER_PREF_DIR/packages` 
+* `$HFS/packages`
+* `$HSITE/houdini<release version>/packages`
+* `$HOUDINI_PACKAGE_DIR`
+
+Multiple package files can be added directly under the `packages` directory. Adding package files in sub-directories is not supported and will be ignored.
+
+Package files are processed in the loading order (i.e. ordered by file name alphabetically). 
+
+NOTE:
+    `<release version>` refers to the version of the Houdini application, for instance this would be a valid path: `$HSITE/houdini17.5/packages`
+
+    Houdini will process the package files placed directly under `$HOUDINI_PACKAGE_DIR`, therefore it is not required to add a `packages` directory under `$HOUDINI_PACKAGE_DIR`. 
+
+== Package Examples ==
+Here are some examples of Houdini package files:
+
+1) Prepend `/user/bob/libs` to `HOUDINI_PATH` using the `path` key. 
+{{{
+{
+    "path" : "/user/bob/libs"
+}
+}}}
+
+2) Prepend multiple paths.
+{{{
+{
+    "path" : 
+    [
+        "/user/bob/libs",
+        "/user/tom/libs",
+        "/user/sam/libs"
+    ]
+}
+}}}
+
+3) Use `value` to specify the path value and `method` to specify how paths are added. `method` is optional, paths are prepended by default.
+{{{
+{
+    "path" : 
+    [
+        {
+            "value" : "/user/bob/libs",
+            "method" : "append"
+        },
+        "/user/tom/libs",
+        "/user/sam/libs"
+    ]
+}
+}}}
+
+4) `HOUDINI_PATH` can be reset and replaced with new paths (`method`=replace).
+{{{
+{
+    "path" : 
+    [
+        {        
+            "value" : 
+                [
+                    "/user/bob/libs",
+                    "/user/tom/libs",
+                    "/user/sam/libs"
+                ],
+            "method" : "replace"
+        }
+    ]
+}
+}}}
+
+5) Package installation can be skipped with the `enable` key without having to remove the file from disk.
+{{{
+{
+    "enable" : false,
+    "path" : "/user/bob/libs"
+}
+}}}
+
+6) Package dependency can be specified to enforce validation of an installation. Houdini issues a warning if the package(s) are missing.
+{{{
+{
+    "recommends" : "a_package_name",
+    "path" : "/user/bob/libs"
+}
+}}}
+
+7) Mandatory package dependency can be specified with `requires`. It is similar to `recommends` but Houdini issues an error and skips the installation of the enclosing package if the dependent package(s) are missing.
+{{{
+{
+    "requires" : ["package1","package2"],
+    "path" : "/user/bob/libs"
+}
+}}}
+
+8) Expressions can be used as key for setting variables conditionally.
+{{{
+{
+    "path" : 
+        [
+            {"houdini_os != 'windows'" : "/user/bob/libs"},
+            {"houdini_os == 'windows'" : "$HOME/bob_win_libs"},
+        ]
+}
+}}}
+
+9) `env` can be used for setting custom variables, `HOUDINI_PATH` and the system `PATH`.
+{{{
+{
+    "requires" : ["package1","package2"],
+    "env": [
+        {
+            "BOB": "$HOME/bob_tool"
+        },
+        {
+            "HOUDINI_PATH" :
+            [
+                "$BOB/libs",
+                {
+                    "houdini_version>'17.5' and houdini_version<'17.5.250'": "$BOB/test",
+                    "method": "append"
+                }
+            ]
+        }
+    ]
+}
+}}}
+
+10) Alternative syntax for defining environment variables using the reserved keywords "var" and "value".
+{{{
+{
+    "requires" : ["package1","package2"],
+    "env": [
+        {
+            "var": "BOB",
+            "value": "$HOME/bob_tool"
+        },
+        {
+            "var": "HOUDINI_PATH",
+            "value": [
+                "$BOB/libs",
+                {
+                    "houdini_version>'17.5' and houdini_version<'17.5.250'": "$BOB/test2",
+                    "method": "append"
+                }
+            ]
+        }
+    ]
+}
+}}}
+
+== Package Settings ==
+The list of the available keys for configuring an installation setup. Settings are basically `JSON` key/value pairs.
+
+Key ||
+    Description ||
+            Example ||
+
+`enable` |
+    Enable (default) or disable the package.|
+        {{{"enable": false}}}
+|
+    Using expressions.|
+        {{{
+        "enable": "houdini_os == 'linux'"
+        }}}
+        {{{
+        "enable": { "houdini_os == 'linux'": true }
+        }}}
+
+`env` |
+    Define multiple environment variables. |
+        {{{ 
+        "env" : 
+        [
+            {
+                "BOB" : "$HOME/bob_tool"
+            },
+            {
+                "TOM" : "$HOME/tom_tool"
+            }
+        ]
+        }}}
+|
+    Using expressions. |
+        {{{ 
+        "env" : 
+        [
+            {
+                "QUAD_LIBS" : 
+                { 
+                    "houdini_version > '17.0' and houdini_version < '17.5'" : "$HOME/quad_libs"
+                }
+            }
+        ]
+        }}}
+|
+    Create and reuse variables. |
+        {{{ 
+        "env" : 
+        [
+            {
+                "BOB" : "$HOME/bob_tool"
+            },
+            {
+                "BOB_TEST" : "$BOB/test"
+            }
+        ]
+        }}}
+|
+    Prepend (default) path to `HOUDINI_PATH`.|
+        {{{ 
+        "env" : 
+        [
+            {
+                "HOUDINI_PATH" : "$HOME/bob_tool"
+            }
+        ]
+        }}}
+|
+    Append path to `HOUDINI_PATH`.|
+        {{{ 
+        "env" : 
+        [
+            {
+                "HOUDINI_PATH" : 
+                {
+                    "value": "$HOME/bob_tool",
+                    "method": "append"
+                }
+            }
+        ]
+        }}}
+|
+   Replace `HOUDINI_PATH`.|
+        {{{ 
+        "env" : 
+        [
+            {
+                "HOUDINI_PATH" :
+                {
+                    "value": 
+                    [
+                        "$HOME/bob_tool",
+                        "$HOME/tom_tool"
+                    ],
+                    "method": "replace"
+                }
+            }
+        ]
+        }}}
+|
+    Multiple variables.|
+        {{{ 
+        "env": 
+        [
+            {
+                "BOB" : "$HOME/bob_tool"
+            },
+            {
+                "HOUDINI_PATH" :
+                {
+                    "value": 
+                    [
+                        "$BOB/libs",
+                        {
+                            "houdini_version>'17.5' and houdini_version<'17.5.250'": "$BOB/test",
+                            "method": "append"
+                        }
+                    ]
+                }
+            }
+        ]
+        }}}
+|
+    System `PATH`. |
+        {{{ 
+        "env" : 
+        [
+            {
+                "PATH" :
+                { 
+                    "value": 
+                    [
+                        "$HOME/bob_tool",
+                        {
+                            "value": "$HOME/tom_tool",
+                            "method": "append"
+                        }
+                    ]
+                }
+            }
+        ]
+        }}}
+
+`path` |
+    Shortcut for `HOUDINI_PATH` |
+        {{{"path": "$HOME/bob_tool/libs"}}}
+|
+    Add multiple paths|
+        {{{"path": ["$HOME/bob_tool/libs", "$HOME/bob_tool/test"]}}}
+|
+    |
+        {{{
+        "path": {"houdini_os == 'windows'"} : "$HOME/bob_tool/libs"}
+        }}}
+
+`recommends` |
+    Specifies dependent packages. Issue warning if packages are missing.|
+        {{{"recommends": "bob_tool"}}}
+        
+        Warning - The recommended package 'bob_tool' for 'tom_package' is missing or disabled.
+|
+    |
+        {{{
+        "recommends": [ "bob_tool", "tom_tool" ]
+        }}}
+|
+    |
+        {{{
+        "recommends": { "houdini_version > '17.0'": "sam_tool" }
+        }}}
+
+`requires` |
+    Specifies dependent mandatory packages. Issue error if packages are missing. |
+        {{{"requires": "bob_tool"}}}
+
+        Error - Package 'bob_tool' is required by 'tom_tool' but is missing or disabled.
+
+        Error - Package 'tom_tool' will be disabled.
+|
+    |
+        {{{
+        "requires": [ "bob_tool", "tom_tool" ]
+        }}}
+|
+    |
+        {{{
+        "requires": { "houdini_version > '17.0'": "sam_tool" }
+        }}}
+
+== Environment variables  ==
+The `env` array lets you define environment variables. You can create custom variables, set the system `PATH` and most of the [Houdini variables|/ref/env] as well. 
+
+Houdini only let you use `HOUDINI_PATH` for path configuration though, other path variables such as `HOUDINI_OTLSCAN_PATH` and `HOUDINI_OTL_PATH` are ignored.
+
+Custom path variables are not supported, you can only declare single value custom variables. 
+
+It is possible to define and reuse your variables within an `env` array. You must make sure the variables are declared before they are being used, otherwise it could break the installation.
+
+NOTE:
+        Environment variables are set by Houdini once all packages have been processed, therefore custom variables defined in a given package are not available to use in other packages.
+
+NOTE:
+        Environment variables can only be set in the Houdini process. Houdini won't let you set variables in its parent process.
+
+== Package Expressions ==
+Expressions are available for setting variables conditionally and for setting boolean variables. The expression grammar supports boolean expressions defined with a set of comparison and logical operators: 
+{{{
+( ) < > == <= >= != and or. 
+}}}
+
+The precedence order is similar to `python` and `C++`.
+* Higher precedence:
+    {{{
+    ( )
+    }}}
+
+* Lower precedence: 
+    {{{
+    < > == <= >= != 
+    }}}
+
+These Houdini variables are defined as identifiers in the expression language:
+* `houdini_version`: evaluates to the current Houdini version (full version path)
+* `houdini_os`: evaluates to the OS platform ('windows', 'linux', 'macos')
+
+The language supports string values only. Other types may be supported in the future for new identifiers. 
+
+String values must be enclosed within ' characters like the following:
+{{{
+'This is a valid string'
+}}}
+
+Here are some expression examples:
+{{{
+"houdini_version == '16.5'"
+}}}
+{{{
+"houdini_version == '16.5' and houdini_os=='linux'"
+}}}
+{{{
+"houdini_version => '16.5' and houdini_version < '17.5'"
+}}}
+{{{
+"houdini_os != 'windows' or houdini_version == '17.5' or houdini_version == '17.5.56'"
+}}}
+{{{
+"(houdini_os != 'macos') or (houdini_version >= '17.4' and houdini_version <= '17.5')"
+}}}
+
+Expressions can be to set boolean variables or as as keys to conditionally set variables as follows:
+{{{
+    {
+        "enable": "houdini_version > '15.0'",
+        "path": 
+        [
+            {
+                "houdini_version == '17.0' and houdini_os=='windows'": "/bob/libs",
+                "method": "append"
+            },
+            "houdini_os == 'linux'": "/tom/test"
+        ]
+    }
+}}}

@@ -1,0 +1,174 @@
+= Deadline Scheduler =
+
+#type:     node
+#context:  top
+#internal: deadlinescheduler
+#icon:     TOP/deadlinescheduler
+
+"""PDG Scheduler for Thinkbox's Deadline software."""
+
+
+== Overview ==
+
+Deadline supports a wide range of job types through its plug-in mechanism. This node lets you schedule the same types of jobs using TOPs. To do this, this scheduler invokes Deadline’s Command application.
+
+You can use other plug-ins with the __Plugin__ parameter. The __Job file key-values__ and __Plugin file key-values__ parameters let you set job- and plug-in-specific options.
+
+To use this scheduler, you must have Deadline installed and working on the local machine. 
+
+
+== Installation ==
+
+# Install Deadline on the machine you will use to cook the TOP network, and set up its database and repository. Refer to Thinkbox's instructions for how to install Deadline on each platform.
+
+# Make sure of the following:
+
+    * The `deadlinecommand` executable is working.
+
+    * The Deadline repository is accessible on the machine where the TOPs network will cook (either the repository is local, or the network mount/share it's on is available locally).
+
+    * If you want to run generic command line executables on Deadline, make sure the `CommandLine` plug-in is enabled in the Deadline Monitor.
+
+    * Set up path mapping to map `$PDG_SHARED_ROOT` to the root working directory on client machines, and `$HFS` to the Houdini install directory on each client machine.
+
+# Set the `$DEADLINE_PATH` variable to point to the Deadline installation directory.
+
+    If `DEADLINE_PATH` is not set:
+
+    * If the `deadlinepathcommand` is on the command path, the node will use the directory containing it.
+
+    * On macOS, the node falls back to checking the standard install directory.
+
+
+@top_attributes
+
+::`deadline_jobid`:
+    #type: integer
+
+    When the schedule submits a work item to Deadline, it will add this
+    attribute to the work item in order to track the Deadline job id.
+
+
+@parameters
+
+== Scheduler ==
+
+These parameters are specific to the Deadline setup, and the same values are 
+used for all jobs. Therefore, they can be thought of as global parameters for 
+scheduling jobs with Deadline.    
+    
+Repository:
+    #id: deadline_repository
+
+    The Deadline repository to use, along with SSL credentials if required. For 
+    a Direct connection type, this could be the path to the mounted directory 
+    (for example, `//testserver.sidefx.com/DeadlineRepository`). For a Proxy, this would 
+    be the URL to the repository along with the port, and login information. This field
+    can be left empty in which case the default Deadline repository will be used.
+
+Connection Type:
+    #id: deadline_connection_type
+
+    The type of connection ("Direct" or "Proxy") to the repository.
+
+[Include:_scheduler_common#pdg_workingdir]
+    
+[Include:_scheduler_common#localsharedroot]
+    
+[Include:_scheduler_common#remotesharedroot]
+    
+Launch Monitor Machine Name:
+    #id: deadline_launch_monitor
+
+    Set this to the name of the machine if you want to launch Deadline Monitor on that machine when jobs are scheduled. Otherwise leave this field empty.
+
+    
+== Job Parms ==
+
+These parameters affect all jobs on the scheduler. You can [override|/tops/schedulers#override] these settings in each node.
+
+Plugin:
+    #id: deadline_plugin
+
+    Name of the Deadline plugin to use for this job. The default is `CommandLine`. This must match an existing plugin in the repository.
+    
+Force Reload Plugin:
+    #id: deadline_force_reload_plugin
+
+    Whether to reload the plugin between frames of a job (the default is `false`). This can help deal with memory leaks or applications that do not unload all job aspects properly.
+
+Pre Job Script:
+    #id: deadline_pre_job_script
+
+    Path to a Python script to run when the job starts. The default (`$HFS/houdini/pdg/types/schedulers/deadline_jobpreload.py`) sets up some standard PDG environment variables, so if you want to replace it you should copy over the environment variable setup.
+    
+Post Job Script:
+    #id: deadline_post_job_script
+    
+    Path to a Python script to run after the job finishes.
+    
+Job Pool:
+    #id: deadline_job_pool
+
+    A named pool to use to execute the job (default is `none`).
+    
+Job Group:
+    #id: deadline_job_group
+
+    A named group to use to execute the job (default is `none`).
+    
+Frames:
+    #id: deadline_job_frames
+
+    The frame range (for a render job). See the Frame List Formatting Options in Deadline's Job Submission documentation.
+    
+Job Priority:
+    #id: deadline_job_priority
+
+    The default priority for new jobs. The default is `50`. The lowest priority is `0`. The maximum priority is a setting in Deadline's repository options, usually `100`.
+
+~~~~ Meta data ~~~~
+    
+Job Department:
+    #id: deadline_job_dept
+
+    The default department (for example, `Lighting`) for all jobs (you can override this in a node). This is optional, to allow grouping jobs together and provide information to the farm operator.
+    
+Job Batch Name:
+    #id: deadline_job_batch_name
+
+    An optional batch name to apply to all jobs (you can override this in a node).
+    
+Job Comment:
+    #id: deadline_job_comment
+
+    An optional comment to put on all jobs (you can override this in a node).
+    
+OnJobComplete:
+    #id: deadline_on_job_complete
+
+    What to do with a job's information when it finishes. The default is Nothing. See Deadline's documentation for more information.
+    
+
+== Job Key-Value Pairs ==
+
+Job File:
+    #id: deadline_jobfile_keyvalues
+
+    Lets you add custom options for this job.
+
+
+== Plugin key-value pairs ==
+
+Plugin File:
+    #id: deadline_pluginfile_keyvalues
+
+    Lets you add custom options for the plug-in.
+
+
+@related
+
+- [Node:top/localscheduler]
+- [Node:top/hqueuescheduler]
+- [Node:top/tractorscheduler]
+- [Node:top/pythonscheduler]

@@ -1,0 +1,42 @@
+= File paths =
+
+"""Best practices for input/output file paths in TOP networks."""
+
+
+== Overview ==
+
+Most TOP nodes that do work let you specify input and/or output file paths. In TOPs, each scheduler node can specify a working directory (this is because different render farm software may use different shared network filesystems). You should make all the file paths you output to relative to this `PDG_DIR` directory.
+
+
+== How to ==
+
+* Set the base working directory on the [scheduler node|schedulers]. This directory is available to work scripts as the `PDG_DIR` environment variable.
+
+    * Use separate working directories for each HIP file (that is, avoid having two HIP files writing to the same `PDG_DIR`). Many of the default generated filenames used in parameter defaults are only unique within the HIP file.
+
+    * For render farm schedulers, make sure the directory inside the network filesystem (for example, NFS mount of SMB share) shared with the render farm client machines.
+
+* When you specify filenames (for example, images to render or geometry files to generate), make sure the path is relative to `PDG_DIR`.
+
+* When you use environment variables such as `PDG_DIR` in filenames, use the form `__PDG_DIR__` instead of `${PDG_DIR}`. If you use `${PDG_DIR}`, Houdini will try and fail to expand the variable itself before the dependency graph gets it. Houdini will ignore `__PDG_DIR__` syntax, but the dependency graph knows to expand the text between double-underscores as an environment variable.
+
+* Put intermediate files under `__PDG_TEMP__` and "final output" files under `__PDG_DIR__`.
+
+    You probably want to categorize output files using subdirectories, for example `__PDG_TEMP__/geo` for intermediate geometry files and `__PDG_DIR__/geo` for final geometry output.
+
+
+== Environment variables == (env)
+
+`PDG_DIR`:
+    The TOP network's working directory, as specified on the Scheduler node.
+
+`PDG_TEMP`:
+    A shared temporary file directory for the current session, inside the working directory. The default is `$PDG_DIR/pdgtemp/<<houdini_process_id>>`.
+
+`PDG_SCRIPTDIR`:
+    A shared script directory, inside the temp directory. Script files are copied into this directory if they are listed as file dependencies. The default is `$PDG_TEMP/scripts`. 
+
+    Alternatively, you can simply put scripts in known locations in the shared network filesystem.
+
+
+

@@ -1,0 +1,158 @@
+= Introduction to TOPs =
+
+"""Explains the basic concepts behind TOP networks and what you can do with them."""
+
+
+== Overview ==
+
+A TOP network describes a "recipe" for generating work items for the computer to do, and efficiently runs them in processes on a single machine, or on a render farm, figuring out dependencies so it can run as many items in parallel as possible. The generated "recipe" is an underlying PDG (Procedural Dependency Graph) describing the work items to do and their dependencies.
+
+<img src="/images/pdg_logo.svg" width="96" />
+
+For example, you might have a city generation workflow involving terrain, road layout, varying building assets, scattering trees, placing street furniture, and so on. Some of the steps can be done in parallel, some steps cannot begin until certain other steps are complete.
+
+[Image:/images/pdg/city.jpg]
+
+If you were to automate building the city with a manually written script, you would probably break it into separate "passes" (terrain generation, road layout, buildings, and so on). This is actually quite inefficient, since it almost certainly misses opportunities for parallel execution within and between passes. For example, if a certain tile of terrain is done, we could start laying roads down or scattering trees in it without waiting for other tiles.
+
+:fig:[Image:/images/pdg/streets_trees.jpg]
+
+    By establishing the network of dependencies between all the bits of work needed to produce the final output, TOPs can find the more efficient way to "cook" the city recipe. It can also do the minimum amount of work necessary to "recook" the city when something changes, because it knows which parts depend on the changed information.
+
+    As part of Houdini, TOPs are especially geared toward accomplishing effects work, such as simulation, rendering, and compositing, however it can be useful for any kind of work that can be broken up into individual items with dependencies between them.
+
+    You specify the work to be done, and how to manipulate the results, by building a network of [TOP nodes|/nodes/top/]. Top nodes generate [work items|#items] to do work and/or store information in [attributes|#attrs]. There are two main types of TOP nodes: [processors|#nodes] generate new work items, [partitions|#nodes] create dependencies between items so they wait until all items in the partition finish.
+
+
+== Work items == (items)
+
+:col:
+    * Each processor node in the TOP network generates a certain number of _work items_. The work items created by a node a depicted inside the node body in the network editor (see [network interface|#ui] below for more information).
+
+    * Many work items represent a "job", that is, a script or executable to run, either in a process on a single computer or on a render farm. However, some work items exist simply to hold attributes, and don't actually cause any work to be done.
+
+        For example, work items created by the [HDA Processor|Node:top/hdaprocessor] node represent work: they cook a Houdini asset on an input file. However, items created by the [File Pattern|Node:top/filepattern] node are just holders for each matched file path. Work items in downstream processors are expected to do something with those file names.
+
+:col:
+    [Image:/images/pdg/work_items.png]
+
+
+== Attributes == (attrs)
+
+[Include:attributes#overview/]
+
+Nodes and [custom code|Node:top/pythonprocessor] can add arbitrary attributes, however work items also have a few [built-in attributes|attributes#builtin] that are always accessible.
+
+See [using attributes|attributes] for more information.
+
+
+== Processors, partitions, and mappers == (nodes)
+
+:col:
+    === Processors === (procs)
+        Processors generate new [work items|#items]. Processors can generate multiple new work items based on previous work items ("fan-out").
+
+        A processor node can create new work items from scratch, based on the node's parameters, or it can generate new work items from the work items incoming from the input node. Many nodes can work both ways. If the [Wedge|Node:top/wedge] node has no input, it will create work items for the number of wedges specified in its parameters. If it has an input, it create new work items for the number of wedges, multiplied by the number of incoming work items.
+
+        When a processor node generates a new "child" work item based on a "parent" item, it passes down the parent's _attributes_, so work items can pass results downstream.
+
+    === Partitions === (parts)
+        Partition nodes join together incoming work items together based on various criteria. This is how PDG combines multiple pieces of work into a single piece for further processing ("fan-in").
+        Different partition nodes group together upstream work items in different ways.
+
+        Partitioning has two effects:
+
+        * It creates dependencies between the grouped work items, so the partition doesn't continue processing until all the work items in the group are done.
+
+        * It (optionally) merges the attribute values on the grouped work items. So, for example, any work items created from the partition will receive the aggregated list of `output` file paths from the grouped work items as their `input` attribute.
+
+        The most commonly used partition node is [Wait for All|Node:top/waitforall], which groups _all_ incoming work items into a single partition, causing the partition to wait for all the upstream work to finish before moving on.
+
+        You can partition based on attributes (for example, grouping all items that worked on the same frame), by a custom function, or spatially. For example, if you scattered trees over a terrain, you could divide a terrain into a grid and group all the items generating geometry in a certain tile together.
+
+        By themselves, the items inside partition nodes don't do any work. They just hold the merged information of the grouped work items. Subsequent work items can then operate on the merged information.
+    
+:col:
+    === Mappers === (mappers)
+        #display: rounded silver
+
+        Mappers establish dependencies between otherwise unrelated work items in the graph. They often not necessary in normal use. For example, if you are generating work in two different node chains, but want to tell the system that work in one chain is actually dependent on something being finished in the other chain.
+
+
+    === Schedulers === (sched)
+        #display: rounded silver
+
+        Scheduler nodes actually run executables inside work items.
+
+        * Different scheduler types represent different methods for running the executables. For example, the Local Scheduler runs executables using a process pool on the local machine, while the HQueue Scheduler puts the executables on an HQueue render farm.
+
+        * You can have multiple scheduler nodes in a TOP network, allowing you to set up the network to cook in different ways depending on circumstances (for example, you might want to cook locally while testing changes and only cook on the farm as part of a nightly process). The TOP Network node's __Default TOP Scheduler__ parameter controls which scheduler is used to cook the network.
+
+        <img src="/icons/TOP/scheduler.svg" width="128" height="128" />
+
+
+=== Simplified example ===
+
+:col:
+    The simplified illustration on the right depicts a basic network to render out five frames of an animation at different quality levels, and create mosaics of the same frame at different qualities, so we can understand how the quality setting affects the final image.
+
+    # A [Wedge node|Node:top/wedge] generates four "dummy" work items containing wedge variants (for example, different values for Mantra's __Pixel Samples__ parameter).
+
+    # Append a [ROP Mantra Render|Node:top/ropmantrarender] node and set the frame range to 1-5. This generates 5 new work items for each "parent" item. The wedged attribute is passed down to the new work items.
+
+    # A [Partition by Frame|Node:top/partitionbyframe] node creates new "partition" items with dependencies on the work items with the same frame number. This makes the partition wait until all variants of the same frame are done before proceeding to the next step.
+
+    # An [ImageMagick node|Node:top/imagemagick] generates new work items to take the rendered variants of each frame and merge them together into a mosaic image.
+
+        Of course, we could do more like [overlay text|Node:top/overlaytext] on the image showing what settings correspond to each sub-image in the mosaic.
+
+    # A [Wait for All node|Node:top/waitforall] at the end generates a partition item that waits for all work to finish.
+
+        This lets you add work items after the "wait for all" that only run after all the "main" work is done. This is where you would put, for example, post-render scripts and/or notifications to the user that the work is done.
+
+    See [commonly used TOP nodes|nodes] for more information.
+
+:col:
+    :fig:[Image:/images/pdg/fan_out_in.svg]
+
+
+== Static vs. dynamic work items == (static)
+
+Static:
+    Some work items are known to be needed before the TOP network even starts running, just based on the node parameters. These are called _static_ work items.
+
+    For example, a [ROP Mantra|Node:top/ropmantra] TOP with no inputs generates a work item for each frame to render, and the number of frames to render is set in the parameters, so the number of work items is known ahead of time. And if the next node just generates a new work item for each incoming work item, then its work items are known "statically" as well.
+
+    Film workflows are often frame-based and so lend themselves to generating static work items, because the number of frames to render is known ahead of time.
+
+Dynamic:
+    Sometimes work items can only be generated once the work is being done. These are called _dynamic_ work items.
+
+    Games and effects workflows are often more dynamic. For example, a secondary simulation on top of crowd agents might divide up the crowd into tiles based on how many agents are in each tile. This can only be done _dynamically_ after generating the crowd simulation and reading in the files.
+
+* As a _general rule of thumb_, *static is preferable to dynamic*: because the number of work items is visible, you can get a sense of how much work will be done, and Houdini can give more accurate estimates of percent completed.
+
+* However, *depending on the workflows, dynamic work items can be unavoidable*, and in fact almost _the entire network_ may be dynamic. For example, in a games workflow where you generate a level from layout curves, you don't know how much work there is to do until you intersect the curves with other curves, intersect the curves with tiles, and so on.
+
+* There might be cases where Houdini can't tell whether work is static, and gives you the choice between generating work items dynamically or statically. In these cases, it's always _safe_ to mark the work dynamic, since the TOP network can always figure out what work items are needed at runtime. However, if you _know_ that the work items are static, you can mark the node as static to get the advantages of static items.
+
+    (A Wait for All node node can convert a dynamic number of work items to a static number (one). Other partitions may also convert dynamic to static. These cases should be handled by the Automatic setting, without you needing to change node settings manually.)
+
+    * Some processor nodes have a __Work item generation__ menu that lets you choose Static, Dynamic, or Automatic (Automatic means "if this node is capable of static generation, or it has no inputs, generate static"). Processors will lack this option if they can only work dynamically or only work statically.
+
+    * Some partition nodes have a parameter called __Use dynamic partitioning__. Turn this on when the partitioning depends on information generated dynamically. Turn it off if the partitioning only depends on information that was already "known" in the closest upstream static work items, in which case the groupings can also be computed statically. (Some partition nodes may not provide this option if how the node works dictates dynamic or static partitioning.)
+
+TIP:
+    If you have a TOP network that has no cached results (no work items inside the nodes), you can choose __TOPs > Generate Static Work Items__ in the network editor to generate all statically-known items. This can often help give a sense of how much work is involved in the network.
+
+
+== The TOP node network interface == (ui)
+
+[Image:/images/pdg/tops_node_ui.svg]
+
+See [TOP network user interface|ui] for more information.
+
+
+
+
+

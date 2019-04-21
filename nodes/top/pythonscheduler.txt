@@ -1,0 +1,181 @@
+#type:     node
+#context:  top
+#internal: pythonscheduler
+#icon:     TOP/scheduler
+
+= Python Scheduler =
+
+"""A Python-based programmable Scheduler for PDG."""
+
+This node provides an interface to write Python code for a custom PDG Scheduler
+and use it to schedule work items. The base Scheduler's callbacks are exposed
+as Python text fields which should be filled in according to their function
+definition. Each callback field is then evaluated and executed during the 
+general PDG work item schedule workflow.
+
+The Python Scheduler node can be used as is in a TOP network, or it can be 
+saved out to a Python file using the Save To Python button. The Save To Python
+functionality will write out a complete implementation of a custom Scheduler
+node with the filled in callback entries. The Python file should be placed in
+the PDG Python path (e.g. /home/username/houdini17.5/pdg/types/) so that it will
+be automatically picked up and registered with the Scheduler Factory. This 
+happens on the launch of Houdini, which means changes to the custom Scheduler
+will require a relaunch of Houdini.
+
+Once registered, the custom Scheduler node can be created by selecting it from
+the TAB menu under Schedulers. If it does not show up there, either the Python
+file was not found by Houdini at launch, or the Python file has errors.
+
+
+@parameters
+
+Save To Python:
+    #id: savenodescript
+    
+    Save this node out to a Python file, along with its custom callback entries.
+    
+[Include:_scheduler_common#pdg_workingdir]
+
+    
+== Scheduling ==
+
+=== Schedule ===
+
+onSchedule Callback:
+    #id: onschedule
+
+    Called when a work item needs to scheduled. Returns True if the  work item 
+    has been successfully scheduled.
+    
+    
+=== Schedule Static ===
+
+onScheduleStatic Callback:
+    #id: onschedulestatic
+
+    Called when the scheduler should process a static dependency graph.
+
+    
+    
+=== Submit As Job ===
+
+submitAsJob Callback:
+    #id: submitasjob
+
+    Called when the scheduler should cook the entire TOP Network as a standalone
+    job. Returns the status URI for the submitted job.
+    
+    
+== File Paths ==
+
+=== Working Directory ===
+
+workingDir Callback:
+    #id: workingdir
+
+    Returns the directory where the work will be generating intermediate and 
+    output files. The returned path should be accessible from the machine that 
+    will be use this path. The __local__ parameter is a boolean that specifies 
+    whether the returned path should be for the local machine or for a remote 
+    machine. 
+    
+    
+=== Localize Path ===
+
+localizePath Callback:
+    #id: localizepath
+    
+    Returns the localized version of the given path.
+
+    
+== Initialization and Cleanup ==
+
+=== Start ===
+
+onStart Callback:
+    #id: onstart
+    
+    Called when the scheduler is registered with PDG. Should initialize or
+    setup scheduler state.
+
+    
+=== Stop ===
+
+onStop Callback:
+    #id: onstop
+
+    Called when the scheduler is unregistered with PDG. Should clean up
+    scheduler state.
+    
+    
+=== Start Cook ===
+
+onStartCook Callback:
+    #id: onstartcook
+
+    Called when a cook starts. Starts a static job for the cook session. Returns
+    True if started.
+    
+    
+=== Stop Cook ===
+
+onStopCook Callback:
+    #id: onstopcook
+
+    Called when cook completes or is canceled. Returns True if stopped.
+    
+    
+== Shared Server ==
+
+=== End Shared Server ===
+
+endSharedServer Callback:
+    #id: endsharedserver
+
+    Closes an existing shared server instance. Returns True on success.
+    
+    
+=== Result Server Address ===
+
+workItemResultServerAddr Callback:
+    #id: workitemresultserveraddr
+
+    Returns the results server address. This is the TCP port that listens for
+    status being returned by jobs. It should be a string-based IP address:
+    (e.g. '192.168.1.123:83000').
+    
+    
+=== Transfer File ===
+
+transferFile Callback:
+    #id: transferfile
+
+    Called when a file should be copied from the local machine to a remote 
+    location (e.g. a shared network drive). These would be files that are 
+    necessary to do the wok, so they are copied to the working directory.
+    Returns True if copied the file.
+    
+    
+== Logging ==
+
+=== Log URI ===
+
+getLogURI Callback:
+    #id: getloguri
+
+    Returns the URI that points to the log of the given work item
+    (e.g. file:///myfarm/tasklogs/jobid20.log).
+    
+    
+=== Status URI ===
+
+getStatusURI Callback:
+    #id: getstatusuri
+
+    Returns the URI that points to the status of the given work item
+    (e.g. http://myfarm/status/jobid20)
+    
+    
+@related
+- [Node:top/deadlinescheduler]
+

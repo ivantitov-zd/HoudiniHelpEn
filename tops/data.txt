@@ -1,0 +1,99 @@
+= External configuration and data =
+
+"""How to read external configuration and source data in TOPs and use it to drive work."""
+
+
+== Overview ==
+
+It is often useful to drive a TOP network using a configuration file, or input data, or both. For example, you might have a settings file that defines a bunch of variables to use when running the network, and you might run the network once for each part listed in a manifest, or for each asset listed in an asset management system.
+
+TOPs lets you read external data and generate work items/attributes based on the data.
+
+
+== Loading data ==
+
+* SQL Database:
+
+    [SQL Input|Node:top/sqlinput] runs a query on a database server and generates a work item for each returned row, with attributes taken from the columns.
+
+    [SQL Output|Node:top/sqloutput] takes incoming work items and writes an `INSERT` query to insert a row for each work item, with the columns taken from attributes you specify.
+
+* CSV (comma separated values, typically exported by a spreadsheet):
+
+    [CSV Input|Node:top/csvinput] reads a CSV file and generates a work item for each row, with attributes taken from the columns.
+
+    [CSV Output|Node:top/csvoutput] takes incoming work items and writes out a new CSV file with a row for each work item, with the columns taken from the attributes.
+
+    [CSV Concat|Node:top/csvconcat] joins together multiple CSV files. [CSV Modify|Node:top/csvmodify] performs various manipulations of CSV files.
+
+* JSON files:
+
+    [JSON Input|Node:top/jsoninput] generates work items with attributes based on JSON files. Because JSON is so free-form, the node has parameters to try to extract items and attributes from various data "shapes".
+
+    [JSON Output|Node:top/jsonoutput] takes incoming work items and writes out a JSON file with a list of objects representing work items, containing key/value pairs taken from the attributes.
+
+* The [Environment Edit|Node:top/environmentedit] node lets you add extra environment variables to the environment in which work is run.
+
+
+== Manipulating data ==
+
+* Using Python:
+
+    If you don't mind programming, the simplest and most flexible way to pre-process data, or manipulate existing attributes, is with a Python snippet.
+
+    If you want to edit one or more attributes on every incoming work item:
+
+    # Add a [Python Script node|Node:top/pythonscript]. The Python Script node lets you edit incoming work items one at a time.
+
+    # In the parameters, turn on __In process__.
+
+    # Write a script to manipulate attributes. For example:
+
+        {{{
+        #!python
+        # Assume we've ingested data that sets the "detail" attribute to a string
+        # such as "low", "medium", or "high", and we want to translate that into
+        # a numeric value, eg. -1, 0, or 1.
+
+        # Define a dictionary mapping string values to numeric values
+        lookup = {"low": -1, "medium": 0, "high": 1}
+        # Get the value of the "detail" string attribute
+        detail = work_item.data.intData("detail", 0)
+        # Translate the string into the numeric equivalent
+        level = lookup.get(detail, 0)
+        # Create a new "level" attribute with the numeric equivalent
+        work_item.data.setInt("level", level)
+        }}}
+
+    If you want to compute aggregate statistics (for example, the average of an attribute):
+
+    # Add a [Wait for All|Node:top/waitforall]. This will pause processing until all work items are available, so the average will include all values.
+
+    # After the Wait for All, add a [Python Script node|Node:top/pythonscript].
+
+    # In the parameters, set __Work item generation__ to "Dynamic" and turn on __In process__.
+
+    # In the script, you can use `parent_item` to refer to the single item in the Wait for All nodes. That item has a `partitionItems` list attribute you can use to access the items in the partition:
+
+        {{{
+        #!python
+        # Get the work items in the input Wait for All's partition
+        items = part.partitionItems
+        # Calculate the average of the "foo" attribute
+        total = sum(it.data.floatData("foo", 0) for it in items)
+        average = total / float(len(items))
+        # Set the average as an attribute on the outgoing item
+        work_item.data.setFloat("average", average, 0)
+        }}}
+
+* Alternatively, you can use TOP nodes that manipulate attributes:
+
+    [Attribute Create|Node:top/attributecreate]. You can add or _redefine_ attributes using this node, and you can use expressions to compute the value of the new attribute based on existing attributes.
+
+    [Attribute Copy|Node:top/attributecopy] duplicates attributes from work items in one branch onto the work items in another branch, matching the work items up by index or by an attribute value.
+
+    [Attribute Delete|Node:top/attributedelete] removes attributes from work items. This can be useful, for example, before outputting to CSV to prevent "scratch" attributes from being written to disk.
+
+
+
+

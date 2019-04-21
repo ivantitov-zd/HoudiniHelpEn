@@ -12,13 +12,13 @@ Type ||
 
 `float` |
     `bend<<name>>`, `stretch<<name>>` |
-        __Scale by Attribute__ in [Vellum Constraints|Node:sop/vellumconstraints] defaults to these sorts to adjust the scale. Should be `0..1`, not exponential map.
-        
+        __Scale by Attribute__ in [Vellum Constraints|Node:sop/vellumconstraints] defaults to these sorts to adjust the scale. Should be `0..1`, note exponential map.
+
 == Sim Attributes: Geometry ==
 
 NOTE:
     Geometry is also considered particles, so all of [POP Attributes|/dopparticles/attributes] apply.
-    
+
 === Dynamics: parameters ===
 
 Type ||
@@ -28,30 +28,30 @@ Type ||
 `float` |
     `dragnormal`, `dragtangent` |
         (Point) How much to scale wind effects when the face of the cloth is heading straight into the wind versus sliding parallel to it. For hair, `normal` is cross-wise to the hair and `tangent` is along the hair direction.
-        
+
         NOTE:
             This controls the innate behavior of the cloth property, the strength of the wind is controlled with `airresist`.
-            
+
 `float` |
     `inertia` |
         (Point) The resistance of a particle to rotational hair constraints. If this is zero, the particle will not rotate.
-        
+
 `integer` |
     `weld`, `branchweld`, `collisionweld` |
         (Point) Default -1.
-        
+
         A value of 1 or a reference to itself means not welded, but something might be welded *to* this point.
         The value is a point number, unless there is an `@id` attribute. Then it is a point id.
-        
+
         `@weld` is the user accessible option. `@branchweld` is built by the hair constraints when it is forced to split points for hair simulation. `@collisionweld` is generated on demand to provide a single weld to the detangle algorithm.
-        
+
 `float` |
     `friction`, `dynamicfriction` |
         (Point, Detail) How much to scale the static friction (`friction`) and dynamic friction scale (`dynamicfriction`) settings by.
 
 	NOTE:
 	    These are combined by multiplication.  So if two objects have a `friction` of `0.5`, the applied friction will be `0.25`.
-        
+
 === Dynamics: state ===
 
 Type ||
@@ -65,7 +65,7 @@ Type ||
 `point`, `vector` |
     `orient`, `orientprevious`, `orientlast`, `w`, `wprevious`, `wlast` |
         (Point) Hair requires point orientations and the corresponding angular velocity (w). Same previous/last.
-        
+
 `integer`|
     `stopped` |
         (Point) This is a standard POP attribute, but it is used and respected by Vellum. Auto-sleep and awaken will manipulate the stopped attribute. Pins that are to be released can be controlled using stopped rather than setting the mass to zero.
@@ -86,7 +86,7 @@ Type ||
 `float` |
     `pscale` |
         (Point) Radius at each point. Triangles are fattened at their corners by spheres of the corner `pscales`, tapered tubes on edges, and sloped planes in center.
-        
+
 `integer` |
     `layer` |
         (Point) Controls soft priority of collisions. Only greater/less matters, not magnitude of difference.
@@ -96,13 +96,13 @@ Type ||
         (Point) A value of 0 means this point will use self collisions or external collisions. If an edge or tri has any disabled point, it is fully disabled.
 
         Auto-disabling will "or" 2 to this value - 0 will become 2, 1 will become 3. Likewise, auto-enabling will clear out 2, 2 will become 0, 3 will become 1. Users should set to 1 to disable something independent of auto detection. But if you re-enable something and aren't sure if it is still tangled, you can set to 2 rather than 0, this will delay the enabling until it is detected clean.
-        
+
 `float` |
     `overlap_self`, `overlap_external` |
         (Point) The default value is 10000.
 
         Stores how much of the original `pscale` is overlapped. So 0 means that the `pscale` is fully used. This avoids first-frame explosion by effectively reducing the effective `pscale` by `overlap_foo` for collisions, so points don't start overlapping. Visualizing thickness will draw cyan rather than green for points modified this way. As points separate, this will decrease to grab any exposed room. Thus a `pscale` that is too high will become unsteady as points grow and then fight distance constraints.
-        
+
 === Targeting ===
 
 Type ||
@@ -112,7 +112,10 @@ Type ||
 `string`, `integer` |
     `target_path`, `target_pt`, `pintoanimation`, `gluetoanimation` |
         (Point) The target path and point number for any pins when the __Target__ parameter is set in [Vellum Source|Node:dop/vellumsource]. If `pintoanimation` is 1, the pinned points' position will be updated to match the specified target point on the target path geometry. If `gluetoanimation` is 1, both the position and orientation will be updated.
-        
+`float` |
+    `targetweight` |
+	(Point) Affect the strength of the pinned points using a 0..1 weighting value.
+
 === Breaking ===
 
 Type ||
@@ -122,7 +125,7 @@ Type ||
 `integer`, `string` |
     `breakthreshold`, `breaktype` |
         (Point) The threshold for breaking welds and branch welds, measured against the breaktype, which can be one of the following: `stretchstress`, `bendstress`, `stretchdistance`, `stretchratio`, or `bendangle`. If `breakthreshold` is less than zero, no breaking will occur.
-        
+
 === Pressure ===
 
 Type ||
@@ -132,7 +135,7 @@ Type ||
 `vector`, `integer` |
     `pressuregradient`, `volumepts`, `volume` |
         (Point) When a point is part of a Pressure constraint, these attributes hold values computed during constraint evaluation. The `pressuregradient` is a vector pointing outwards along the direction of greatest volume gain, usually very close to a point normal. The `volumepts` array contains the points needed to compute the volume attribute for each point, which are added together to compare against the Pressure constraint's `restlength`.
-        
+
 === Internal worker variables ===
 
 Removing/adding attributes every frame is expensive, so we have a few internal things that leak out.
@@ -141,14 +144,14 @@ Type ||
     Name ||
         Description ||
 
-`vector` |
+`float` |
     `dP`, `dPw` |
         (Point) Constraint displacements/weights. Likely of last iteration, so out of date.
-        
+
 `string` |
     `patchname` |
         (Point) Identifies each generated patch in a simulation so it can be updated/replaced.
-        
+
 == Sim Attributes: Constraints ==
 
 There are many types of constraints, so the meaning of these variables is often dependent on the constraint type. They usually live on the primitive.
@@ -161,18 +164,97 @@ Type ||
 
 `float` |
     `dampingratio` |
-        (Prim) 0..1 damping ratio. 
-        
+        (Prim) `0..1` damping ratio.
+
         NOTE:
             Higher than `0.1` likely stops the constraint from converging. Helps suck energy from system.
-            
+
 `float` |
     `restlength`, `restlengthorig` |
         (Prim) The initial "distance" of the constraint. The units are variable. Distance constraints use distance, bend constraints use angle in degrees, volume and pressure constraints use volume.
 
         The actual dynamics use only `restlength`. `restlengthorig` is for convenience so you can animate scaling effects without extra math.
-        
+
 `point` |
     `restvector` |
-        (Prim) Orientation constraints need a rest orientation, so store a quaternion here. This vector is also used to store target positions for pin constraints. 
+        (Prim) Orientation constraints need a rest orientation, so store a quaternion here. This vector is also used to store target positions for pin constraints.
 
+`float` |
+    `stiffness` |
+        (Prim) `0..1e10`. How strongly to enforce the constraint. High values may not be achieved with a given iteration count, but low values should stop getting stronger at a certain iteration level.
+
+`float` |
+    `compressionstiffness` |
+        (Prim) `0..1e10`. How strongly to enforce the constraint when it is being compressed. High values may not be achieved with a given iteration count, but low values should stop getting stronger at a certain iteration level.
+
+`float` |
+    `stiffnessdropoff` `stiffnessscaled` |
+        (Prim) The distance from the rest state at which the stiffness of the constraint drops off to zero, or increases from zero to full stiffness, depending on the direction of the dropoff.  A negative values indicates a decreasing dropoff, where the stiffness starts at full strength and decreases to zero at the Dropoff distance from the rest state.  A positive value indicates an increasing dropoff, where the stiffness starts at zero and increases to full stiffness at the specified distance from rest.  For stretch constraints this value is in length units; for bend constraints it is stored in degrees. The effective stiffness value used in constraint solving will be stored in `stiffnessscaled` when `stiffnessdropoff` is in effect.
+
+`string` |
+    `type` |
+        (Prim) Type of the constraint.
+
+        `distance`, `stitch`, `branchstitch`:
+                Constraints the points to be `restlength` apart. `distance` is used for intrinsic distance constraints, like the edges of triangles or hairs. `stitch` is an alias for distance. It acts the same, but semantically is used for non-topological elastics added to the sim. `branchstitch` is used for the automatic branch welding.
+
+        `bend`:
+                A four-point constraint. The points represent the 4 points of two triangles that share an edge. The constraint is applied to maintain an angle along the shared edge.
+
+        `trianglebend`:
+                A three-point constraint. The constraint maintains the distance between the middle point and the centroid of the triangle. This maintains the bend of lines.
+
+        `angle`:
+                A three-point constraint. Maintains the dihedral angle measured at the middle points. This is used by the String constraint types.
+
+        `tetvolume`:
+                A four-point constraint. Maintains the volume of the tetrahedron described by the four points.
+
+        `pressure`:
+                A many-point constraint. All the points represent a surface of a mesh. Volume is computed on the mesh and stored on the points, and then all the points are inflated or deflated to maintain that volume.
+
+        `attach`, `pin`:
+                Pins a point to a certain world space location. `attach` implies updating the target location from the target attributes per-substep. `pin` by contrast is updated according to the `matchanimation` attribute.
+
+        `pinorient`:
+                Pins the orientation of the point to match the rest orientation.
+
+        `bendtwist`:
+                Two point constraint. Constrains the orientation of points on an edge to be consistent, thereby creating torsion effects along hairs.
+
+        `stretchshear`:
+                Two point constraint. Combination of both a distance constraint and a bend constraint for edges. This is used by hair.
+
+=== Dynamics: state ===
+
+`float` |
+    `stress` |
+        The amount of stress applied by the constraint.
+
+==== Breaking ====
+
+`integer`, `string` |
+    `breakthreshold`, `breaktype` |
+        (Prim) The threshold for breaking the constraint, measured against the `breaktype`, which can be one of the following: `stretchstress`, `bendstress`, `stretchdistance`, `stretchratio`, `bendangle`. If `breakthreshold` is less than zero, no breaking will occur.
+
+==== Plasticity ====
+
+`float` |
+    `plasticthreshold`, `plasticrate`, `plastichardening`, `plasticflow` |
+        The threshold for applying plasticity to the constraint, which modifies the constraint's `restlength` to match the current state, at a rate specified by `plasticrate`. If `plastichardening` is > 1, the constraint's stiffness will be scaled higher at the same rate; if < 1 it will be scaled lower. The amount of plastic flow that occurs for a constraint is stored in `plasticflow`. Setting `plasticrate` to zero is the easiest way to disable plasticity for a constraint. If the `plasticthreshold` is negative for a stretch constraint, it is treated as a ratio of the current `restlength`. For example, `-0.1` means plasticity occurs when the current length has deformed over 10% from the `restlength`.
+
+==== Targeting ====
+
+`integer` |
+    `matchanimation` |
+        (Prim) If set to 1 for pin constraints, the solver will lookup the constrained point's `target_path` and `target_pt`, and update the constraint `restvector` to the specified point position, so that the pin constraint follows the target animation.
+
+==== Internal worker variables ====
+
+`vector` |
+    `L` |
+        (Prim) The amount of work done by a constraint, possibly along different stiffness or compression stiffness axes. Generally you should use the stress attribute instead to determine how much work a constraint is doing.
+
+`integer` |
+    `pts` |
+        (Prim) Array of points affected by this constraint.

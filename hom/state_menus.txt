@@ -7,7 +7,9 @@
 
 == Overview ==
 
-You can use the [Hom:hou.ViewerStateMenu] object to build a custom context menu that appears when the user presses ((RMB)) while your state is active.
+You can use the [Hom:hou.ViewerStateMenu] object to build a custom context menu that appears when the user presses ((RMB)) while your state is active. 
+
+Optionally, you can manage the UI states of the custom context menu with the [`onMenuPreOpen` handler|python_states#ui_event_handlers].
 
 See [viewer state user interface guidelines|state_guidelines] for information about how to design the context menu for your state.
 
@@ -155,7 +157,7 @@ TIP:
     #!python
     # When you create the menu
     menu = hou.ViewerStateMenu('bend_menu', 'Bend')
-    menu.addRadioStrip("deform_type", "Deformation Type")
+    menu.addRadioStrip("deform_type", "Deformation Type", "bend")
     menu.addRadioStripItem("deform_type", "bend", "Bend")
     menu.addRadioStripItem("deform_type", "squash", "Squash")
 
@@ -262,6 +264,7 @@ NOTE:
 #!python
 import hou
 
+
 # Create hotkey symbols
 
 # Need to create the hotkey context first with addContext
@@ -287,4 +290,169 @@ menu = hou.ViewerStateMenu('bend_menu', 'Bend')
 menu.addActionItem("delete", "Delete", del_key)
 menu.addActionItem("dup", "Duplicate", dup_key)
 menu.addActionItem("done", "Finish", end_key)
+}}}
+
+
+== Updating the menu == (updating_menu)
+
+To improve the workflow of your python state, you might want to update the context menu state dynamically. For instance, enabling/disabling a specific menu or menu item, or setting a toggle item check mark based on some other state in Houdini. 
+
+The [`onMenuPreOpen` handler|python_states#ui_event_handlers] is the right tool to use for managing the UI states of a context menu. If `onMenuPreOpen` is implemented, Houdini will invoke it right before the menu is displayed, giving you a chance to perform the updates.
+
+{{{
+#!python
+import hou
+
+# State class implementation
+class MyState(object):
+    def __init__(self, state_name, scene_viewer):
+        self.state_name = state_name
+        self.scene_viewer = scene_viewer
+
+        # handle accessors
+        self.hvector = hou.Handle(self.scene_viewer, 'Vector')
+        self.hdist = hou.Handle(self.scene_viewer, 'Distance')
+        self.hmodif = hou.Handle(self.scene_viewer, 'Modifier')
+        self.hupdir = hou.Handle(self.scene_viewer, 'Up Direction')
+
+    # Update menu and menu item states
+    def onMenuPreOpen( self, kwargs ):
+        menu_id = kwargs['menu']
+        node = kwargs['node']
+        menu_states = kwargs['menu_states']
+        menu_item_states = kwargs['menu_item_states']
+
+        if menu_id == 'handle_show_menu':
+            # Updates the 'handle_show_menu' items with the handles visibility 
+            # property.
+            
+            menu_item_states['show_distance_handle']['value'] = self.hdist.visible()
+            menu_item_states['show_modifier_handle']['value'] = self.hmodif.visible()
+            menu_item_states['show_up_direction_handle']['value'] = self.hupdir.visible()
+            menu_item_states['show_vector_handle']['value'] = self.hvector.visible()
+
+        elif menu_id == 'select_parm_menu':
+            # Enables the 'select_parm_menu' menu
+
+            menu_states['enable'] = True
+
+        elif menu_id == 'bend_menu':
+            # Enables 'bend_menu' toggle items if the matching node parameter 
+            # is unlocked. Disables it otherwise.
+
+            bend = node.parm('bend')
+            squish = node.parm('squish')
+            twist = node.parm('twist')
+            lengthscale = node.parm('lengthscale')
+            taper = node.parm('taper')
+
+            menu_item_states['bend_toggle_item']['enable'] = not bend.isLocked()
+            menu_item_states['squish_toggle_item']['enable'] = not squish.isLocked()
+            menu_item_states['twist_toggle_item']['enable'] = not twist.isLocked()
+            menu_item_states['lengthscale_toggle_item']['enable'] = not lengthscale.isLocked()
+            menu_item_states['taper_toggle_item']['enable'] = not taper.isLocked()
+
+        elif menu_id == 'bend_parm_radio':
+            # Enables 'bend_parm_radio' toggle items if the matching node 
+            # parameter is unlocked. Disables it otherwise.
+
+            bend = node.parm('bend')
+            squish = node.parm('squish')
+            twist = node.parm('twist')
+            lengthscale = node.parm('lengthscale')
+            taper = node.parm('taper')
+
+            menu_item_states['bend']['enable'] = not bend.isLocked()
+            menu_item_states['squish']['enable'] = not squish.isLocked()
+            menu_item_states['twist']['enable'] = not twist.isLocked()
+            menu_item_states['lengthscale']['enable'] = not lengthscale.isLocked()
+            menu_item_states['taper']['enable'] = not taper.isLocked()
+
+    # Menu action callback
+    def onMenuAction( self, kwargs ):
+        menu_item = kwargs['menu_item']
+    
+        if menu_item == 'show_vector_handle':
+            self.hvector.show(kwargs['show_vector_handle'])
+        elif menu_item == 'show_distance_handle':
+            self.hdist.show(kwargs['show_distance_handle'])
+        elif menu_item == 'show_up_direction_handle':
+            self.hupdir.show(kwargs['show_up_direction_handle'])
+        elif menu_item == 'show_modifier_handle':
+            self.hmodif.show(kwargs['show_modifier_handle'])
+
+    def onEnter( self, kwargs ):
+        # we want to hide the modifier hud slider handle when entering the state
+        self.hmodif.show( False );
+
+    def onHandleToState( self, kwargs ):	
+        pass
+
+    def onStateToHandle( self, kwargs ):
+        pass
+
+# Create a custom context menu
+def createContextMenu():
+    menu = hou.ViewerStateMenu('bend_menu', 'Bend')
+
+    menu.addToggleItem( 'bend_toggle_item', 'Bend', True )
+    menu.addToggleItem( 'twist_toggle_item', 'Twist', False )
+    menu.addToggleItem( 'lengthscale_toggle_item', 'Length Scale', False )
+    menu.addToggleItem( 'taper_toggle_item', 'Taper', False )
+    menu.addToggleItem( 'squish_toggle_item', 'Squish', False )
+
+    menu.addSeparator()
+
+    select_parm_menu = hou.ViewerStateMenu( 'select_parm_menu', 'Select Parm to Modulate...' )
+    select_parm_menu.addRadioStrip( 'bend_parm_radio', 'Bend Parm', 'bend' )  
+    select_parm_menu.addRadioStripItem( 'bend_parm_radio', 'bend', 'Bend' )
+    select_parm_menu.addRadioStripItem( 'bend_parm_radio', 'lengthscale', 'Length Scale' )
+    select_parm_menu.addRadioStripItem( 'bend_parm_radio', 'squish', 'Squish' )
+    select_parm_menu.addRadioStripItem( 'bend_parm_radio', 'taper', 'Taper' )
+    select_parm_menu.addRadioStripItem( 'bend_parm_radio', 'twist', 'Twist' )
+    menu.addMenu(select_parm_menu)
+
+    menu.addSeparator()
+
+    # handle menu for handles
+    handle_show_menu = hou.ViewerStateMenu( 'handle_show_menu', 'Show Handles...' )
+    handle_show_menu.addToggleItem( 'show_distance_handle', 'Show Distance', True )
+    handle_show_menu.addToggleItem( 'show_modifier_handle', 'Show Modifier', False )
+    handle_show_menu.addToggleItem( 'show_up_direction_handle', 'Show Up Direction', True )
+    handle_show_menu.addToggleItem( 'show_vector_handle', 'Show Vector', True )
+    menu.addMenu(handle_show_menu)    
+    
+    menu.addSeparator()
+    
+    return menu
+
+# Register the python state
+def createViewerStateTemplate():
+    # Create the template object
+    template = hou.ViewerStateTemplate("mystate", "My State", hou.sopNodeTypeCategory())
+
+    # Bind the implementation class
+    template.bindFactory(MyState)
+
+    # attach popupmenu to state
+    template.bindMenu(createContextMenu())
+
+    # bind the handles
+    template.bindHandle( 'vector', 'Vector', cache_previous_parms=True )
+    template.bindHandle( 'distance', 'Distance' )
+    template.bindHandle( 'hudslider', 'Modifier', cache_previous_parms=True, 
+        settings="hudrangelow(0) hudrangehigh(5) hudlocklow(0) hudlockhigh(5)" )
+    template.bindHandleStatic( 'vector', 'Up Direction', 
+        [
+			('group', 'input'),
+			('originx', 'tx'),
+			('originy', 'ty'),
+			('originz', 'tz'),
+			('upx', 'vx'),
+			('upy', 'vy'),
+			('upz', 'vz')
+		]
+    )
+
+    return template
 }}}

@@ -1,0 +1,82 @@
+= Cooking the TOP network =
+
+"""How to cause the TOP network to actually do the work and produce the results specified by the network."""
+
+See also [visualizing TOP network performance|perf].
+
+
+== Overview ==
+
+The TOP network attempts to minimize extra work by only re-doing work that changed (or might have changed) since the previous cook. This means a cook might do no work at all if nothing has changed.
+
+TOPs uses a concept of marking work items "dirty" if they are (or might be) out of date and need to recook. The following rules how the TOP network decides what to recook.
+
+* If a node generates different work items than it did in the previous cook, it dirties all subsequent nodes.
+
+* Nodes that deal with _external files_ (files not created within the TOPs network), such as [File Pattern|Node:top/filepattern] and [Geometry Import|Node:top/geometryimport], scan the files when they start and mark existing work items dirty if the corresponding file has changed.
+
+* Nodes that reference external Houdini nodes (such as [ROP Geometry Output|Node:top/ropgeometryoutput]) check the references data when they start and mark existing work items dirty if the data has changed.
+
+* TOPs does _not_ currently check input and output result files. For example, deleting or replacing an intermediate file will _not_ automatically dirty work items that use that file as input.
+
+* Any work item whose attributes have changed since the last cook are considered dirty.
+
+* Changing parameters on a node dirties the node (since most work items are generated based on both incoming work items and parameter values).
+
+    When parameters on a TOP node change (meaning the node must recook), the status icon next to the node becomes dim:
+
+    [Image:/images/pdg/status_icon_dimmed.svg]
+
+* You can manually mark a work item, node, or the entire network dirty to force it to recook.
+
+
+== Cooking ==
+
+:task: Cook the parts of the network that need cooking:
+
+    Choose __Tasks > Cook Output Node__.
+
+:task: Cook a single node (only if it needs cooking):
+
+    * Select the node and choose __Tasks > Cook Selected Node__
+
+        _or_
+
+    * Right-click the node and choose __Cook this node__.
+
+:task: Force Houdini to recook the entire network:
+
+    Choose __Tasks > Dirty and Cook Output Node__.
+
+:task: Force a single node to cook:
+
+    * Select the node and choose __Tasks > Dirty and Cook Selected Node__.
+
+        _or_
+
+    * Right-click the node and choose __Dirty and cook this node__.
+
+:task: Mark the entire network dirty but don't recook yet:
+
+    Choose __Tasks > Dirty All__.
+
+:task: Recook a single work item:
+
+    Right-click the work item dot and choose __Cook task__.
+
+:task: Mark a single work item dirty but don't recook yet:
+
+    Right-click the work item dot and choose __Dirty task__.
+
+
+== Output flag and output nodes ==
+
+* Inside a TopNet, the output flag controls which node the network "works toward". Only nodes upstream from the node with the output flag cook when you ask the network to cook.
+
+* Inside a TOP _subnetwork_, if the subnet has an [Output|Node:top/output] node, it represents the output of the subnet, ignoring any output flag.
+
+* If you create multiple [Output|Node:top/output] nodes inside a TOP subnet, the subnet will have multiple output connectors, similar to the Split TOP.
+
+
+
+

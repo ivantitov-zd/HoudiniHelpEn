@@ -1,0 +1,46 @@
+= File tags =
+
+"""Work items track the "results" created by their work. Each result is tagged with a type."""
+
+
+== Overview ==
+
+Work items track results created by the item in the `output` attribute. The results are strings, usually file paths to files created by the work item. All results are tagged with a "tag" string that describes the type of the result. The tag string is a hierarchy of broad types down to more specific types, separated by slashes (similar to MIME types but totally free-form). For example:
+
+Tag ||
+    Description ||
+`file/geo`|
+    Geometry file
+`file/geo/terrain` |
+    Terrain geometry file
+`file/geo/building` |
+    Geometry file containing a building
+
+Some nodes and API functions let you match files by their tag. Tag matching is by prefix, so a file tagged as `file/geo/terrain` will match both `file/geo` and `file`, but not `file/geo/building`.
+
+Although work item outputs are typically files, it is possible to have other types of information reported back as a result. For example, when using the [ROP Fetch|Node:top/ropfetch] to cook a distributed simulation, the sim tracker work item will report a `socket/ip` and `socket/port` result, which other work item can use to connect to the tracker.
+
+
+== Tagging results ==
+
+* Nodes that generate files usually have a parameter for specifying how to tag work item results. The default tag is usually set based on the intended use of that node.
+
+    For example, the [Geometry Import|Node:top/geometryimport] lets you cook a SOP network and write the result to a geometry file on disk. The node has a __Result tag__ parameter that sets the tag for the generated file. The default tag is `file/geo`.
+
+
+== Using tags ==
+
+* You can see the tag assigned to a result in the work item info window, and in the task graph table.
+
+* Tags can be useful when a work item has muliple files associated with it.
+
+    For example, the [Partition by Bounds|Node:top/partitionbybounds] node can create partitions from terrain tiles, and road geometry that intersect the tiles. The partition may end up having several files associated with it: a terrain file and zero or more road files. Tagging the files as `file/geo/terrain` and `file/geo/road` would make it easier to work with the files.
+
+* You can query results by tag using the Python scripting API. The [Py:pdg#input()] function takes a `tag` parameter that only returns the results where the tags match by prefix.
+
+    {{{
+    #!python
+    # Returns all input files tagged file/image on the incoming work item
+    pdg.input(tag='file/image')
+    }}}
+

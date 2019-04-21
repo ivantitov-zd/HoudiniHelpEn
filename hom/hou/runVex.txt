@@ -3,31 +3,77 @@
 #cppname: hom::runVex
 #group: vex
 
-"""Invoke VEX code, passing in arrays of inputs and receiving arrays of
-outputs."""
+"""Invokes the main function in a compiled VEX file, returning the exported values."""
 
 :usage: `runVex(vex_file, inputs, precision="32")` -> `dict` of `str` to values
 
-inputs:
-    A dictionary mapping VEX input names to values.  Each value may be a tuple
-    or a single value; tuples of values become varying inputs and single values
-    become uniform inputs.  If the input value is a tuple, all elements in the
-    tuple must be the same type.
 
-    Values may be single values or tuples of the following types:
-    `int`, `float`, `str`, [Hom:hou.Vector3], [Hom:hou.Vector4],
-    [Hom:hou.Matrix3], or [Hom:hou.Matrix4].
+== Arguments ==
 
-    The precision argument can either be "32" or "64" (but not anything else).
-    "64" instructs VEX to run in 64 bit mode.
+`vex_file`:
+    A string containing the path to a _compiled_ VEX object file (`.vex`) on disk. This function does not accept VEX source code (`.vfl`), you must compile the source code first.
 
-return value:
-    A dictionary mapping VEX output names to values.  Like the inputs
-    dictionary, values will be tuples if the output is varying and single
-    values if it is uniform.
+    Currently this function only works with functions in the `cvex` context.
 
-For example, suppose you had the following VEX function and compiled it to the
-file `code.vex` using [vcc|/vex/vcc]:
+    `runVex` currently raises an exception if the file path does not end with `.vex`.
+
+    NOTE:
+        `runVex` _always_ calls the "main function" in the compiled file (the function whose return type is the context type, `cvex`). It is not currently possible to call another function in the compiled file by name.
+
+`inputs`:
+    A dictionary mapping VEX input names to values.
+
+    * If a value is a single number, string, [Hom:hou.Vector3], [Hom:hou.Vector4], [Hom:hou.Matrix3], or [Hom:hou.Matrix4], it is treated as a "static" value.
+
+    * If a value is a sequence of values, it is treated as _varying data_ the function will "iterate over" (possibly in parallel) automatically. This is the same as when, for example, a VEX snippet runs over all the points in a geometry. It is more efficient to call the function once with varying data than to call it separately for each of a list of different values.
+
+    * If you supply multiple "varying" inputs, *they must all be the same length* and all values must be the same type. Houdini iterates over the corresponding values at each index of the varying sequences.
+
+        For example, you might have two arguments corresponding to a point's color (`Cd`) and position (`P`) attributes:
+
+        {{{
+        #!python
+        runVex("test.vex", {
+            "Cd": [hou.Vector3(1.0, 0, 0), hou.Vector3(0, 1.0, 0), hou.Vector3(0, 0, 1.0)],
+            "P": [hou.Vector3(1.0, 1.0, 1.0), hou.Vector3(2.0, 2.0, 2.0), hou.Vector3(3.0, 3.0, 3.0)]
+        })
+        }}}
+
+        Houdini would "zip" the two lists together and iterate using the following values:
+
+        Iteration ||
+            `Cd` ||
+                `P` ||
+        1 |
+            `Vector3(1.0, 0, 0)` |
+                `Vector3(1.0, 1.0, 1.0)`
+        2 |
+            `Vector3(0, 1.0, 0)` |
+                `Vector3(2.0, 2.0, 2.0)`
+        3 |
+            `Vector3(0, 0, 1.0)` |
+                `Vector3(3.0, 3.0, 3.0)`
+
+    NOTE:
+        Because this function interprets a sequence as varying data, it is *not currently possible* for this function to call VEX with array arguments.
+
+`precision`:
+    Either `"32"` or `"64"`. If you specify `"64"` Houdini will run the VEX snippet in 64-bit mode.
+
+
+== Returns ==
+
+`runVex()` returns a dictionary mapping VEX output names to values.
+
+The "main" VEX function does not directly return values, it can only write to arguments marked `export`. This dictionary contains the output value of the exported arguments.
+
+If the input to the argument was static, the output will be a single value. If the input to the argument was "varying", the output will be a tuple of values. If multiple arguments were varying, the output tuples will all be the same length.
+
+
+== Example ==
+
+For example, if you have the following `code.vfl` file and compile it to `code.vex` using [vcc|/vex/vcc]:
+
 {{{
 #!vex
 cvex add(float x=0; float y=0; export float out=0)
@@ -36,7 +82,8 @@ cvex add(float x=0; float y=0; export float out=0)
 }
 }}}
 
-You could then invoke it from Python using the following:
+You can then invoke it from Python using the following:
+
 {{{
 #!pycon
 >>> hou.runVex("code.vex", {"x":(1.0, 2.0, 3.0), "y":(7.1, 8.1, 9.1)})
@@ -49,16 +96,22 @@ You could then invoke it from Python using the following:
 {"out": 1.5}
 }}}
 
-The following function shows how you can run VEX on the code created by a VOP
-network node, such as a CVEX VOP:
+
+== Using a VOP network ==
+
+The following code shows how you can write the VEX code created by a VOP network node (such as a CVEX VOP) to a file, for use with `runVex`:
+
 {{{
 #!python
 import os
-import tempdir
+import tempfile
 
-def runVexFromNode(vop_node, inputs):
-    temp_file_path = tempfile.gettempdir() + "/%s.vex" % vop_node.name()
-    vop_node.saveCompiledCookCodeToFile(temp_file_path)
-    os.unlink(temp_file_path)
+def runVexFromNode(vop_node, input_dict):
+    handle, path = tempfile.mkstemp(prefix=vop_node.name(), suffix=".vex")
+    vop_node.saveCompiledCookCodeToFile(path)
+    os.close(handle)
+    output_dict = hou.runVex(path, input_dict)
+    os.remove(path)
+    return output_dict
 }}}
 

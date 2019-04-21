@@ -1,0 +1,268 @@
+= Geometry Import =
+
+#type:     node
+#context:  top
+#internal: geometryimport
+#icon:     TOP/geometryimport
+
+"""Load points or primitives from SOP or file geometry into work item attributes or a temporary file."""
+
+What this node does can vary greatly based on the parameters.
+
+* You can extract points, vertices, or primitives from a SOP or geometry file, and turn them into work items, with SOP attributes converted to work item attributes.
+
+    This is useful, for example, to extract points or curves from a file and use them to generate parallel simulations.
+
+* You can extract points, primitives, or bounding boxes from a SOP or geometry file and save them out to separate files on disk.
+
+* You can load whole geometry from a SOP or geometry files, and store it in work items. Currently the only node that can operate on this kind of stored geometry is the [Invoke TOP|Node:top/invoke].
+
+* You can cook a SOP network and save the output geometry to disk.
+
+The main parameters to set are __Geometry source__ (where to load the geometry from), __Store geometry as__ (where to write the geometry to disk, you can set this to "None" to not write to disk, or "Memory" to store the geometry in work items), and __Class__ (whether to operate on points, primitives, bounding boxes, or "detail", meaning the whole geometry).
+
+By default, this node loads the geometry whenever the node generates (including when you ask the network to generate static work items). If you intend to load files generated earlier in the network, turn on __Load geometry during cook__.
+
+
+@top_attributes
+
+The geometry import TOP will create attributes on work items based on the
+attributes specified in the __Copy Attributes__ parameter. In addition, it
+will also create several other attributes based on the __Class__ of geometry
+being imported.
+
+::`sopname`:
+    #type: string
+
+    When loading geometry from a SOP Node, this attribute is set to the name
+    of the node.
+
+::`soppath`:
+    #type: string
+
+    When loading geometry from a SOP Node, this attribute is set to the full
+    path to the SOP.
+
+::`*attribs`:
+    #type: string array
+
+    A string array of attribute names is created for each of the element types:
+    `pointattribs`, `vertexattribs`, `primitiveattribs` and `detailattribs`. If
+    the geometry is being loaded a Detail then all four attributes will be
+    created, otherwise only the attribute for the specified __Class__ will be
+    created.
+
+    When creating work items using __All Groups__ or __Specified Group__, a
+    `<groupname>attribs` attribute will be created containing the list of
+    attributes on elements of the group.
+
+::`groupname`:
+    #type: string
+
+    When loading geometry elements from a particular group, this attribute will
+    be set to the name of the group.
+
+::`groupsize`:
+    #type: integer
+
+    When creating work items from __All Groups__ or __Specified Group__, this
+    attribute is set to the size of the group.
+
+::`*offset`:
+    #type: integer
+
+    When loading points, vertices or primitives, the node will create a `pointoffset`,
+    `vertexoffset` or `primitiveoffset` attribute that identifies the element in
+    the source geometry.
+
+::`point*`:
+    #type: float array
+
+    When loading primitives with the __Include Points from Primitives__ parameter
+    enabled, a float array attribute will be created for each point in the
+    primitive.
+
+::`primitive`:
+    #type: string
+
+    When loading primitives with the __Include Points from Primitives__ parameter
+    enabked, a string parameter with the full list of prim coordinates will
+    be created.
+
+::`pointcount`:
+    #type: integer
+
+    When loading primitives, this attribute is set to the number of points in
+    the primitive.
+
+::`numpoints`:
+    #type: integer
+
+    When loading the geometry as a full detail, this is the number of points
+    in the geometry.
+
+::`numvertices`:
+    #type: integer
+
+    When loading the geometry as a full detail, this is the number of vertices
+    in the geometry.
+
+::`numprimitives`:
+    #type: integer
+
+    When loading the geometry as a full detail, this is the number of primitives
+    in the geometry.
+
+::`minbounds`:
+    #type: float array
+
+    When the __Class__ parameter is set to __Bounds__, this attribute will 
+    contain the minimum x, y and z values of the geometry bounds.
+
+::`maxbounds`:
+    #type: float array
+
+    When the __Class__ parameter is set to __Bounds__, this attribute will 
+    contain the maximum x, y and z values of the geometry bounds.
+
+
+@parameters
+
+~~~~ Source ~~~~
+
+Geometry Source:
+    #id: geometrysource
+
+    Where to load the geometry from:
+
+    SOP Node:
+        Enter the path to a SOP node in the current HIP file. This node will cook that node and store its output geometry. Note that you can use the __Evaluation time__ parameter to cook the SOP node at a different point in the timeline.
+
+    Upstream Result File:
+        Get the file path from the incoming work item's `output` attribute and read the file in as geometry. This is useful, for example, to use a [File Pattern|Node:top/filepattern] node to generate work items representing geometry files and then load them in this node.
+
+    Upstream Geometry Data:
+        Get the geometry data from an attribute on the incoming work item. For example, if it has geometry data loaded by a previous Geometry Import node.
+
+    Custom File Path:
+        Load the geometry data from a file at a given path.
+
+SOP Path:
+    #id: soppath
+
+    When __Geometry source__ is "SOP Node", the network path of the SOP node to cook. For example, `/obj/geo1/output1`.
+
+Evaluation Time:
+    #id: time
+
+    When __Geometry source__ is "SOP Node", the time at which to cook the SOP (in seconds). If this is off, the geometry is cooked at the time specified by the work item's `frame` attribute. If the work item does not have a frame defined, the geometry is cooked at time `0`.
+
+Evaluate with Work Item Attributes:
+    #id: evaluateattributes
+
+    When __Geometry source__ is "SOP Node", turn this on if the SOP network uses `@attribute` expressions to [pull|/tops/intro] values from work items, for example for wedging. (If you use `@attribute` expressions, this node needs to cook the SOP separately for each work item. If you don't, the node only has to cook the SOP once.)
+
+Result Tag:
+    #id: filetag
+
+    When __Geometry source__ is "Upstream result file", only load from file paths tagged with this [file tag|/tops/filetags] (for example, `file/geo`).
+
+Load Geometry During Cook:
+    #id: asyncload
+
+    When __Geometry source__ is not "SOP Node", load the geometry when each work item cooks. Turn this on if you need to load files that are generated earlier in the network. When this is off, the node loads the geometry when the work items generate (including when you request generation of static work items ahead of time) rather than when the work items run.
+
+Merge Input Geometry:
+    #id: mergeinput
+
+    When __Geometry source__ is "Upstream result file", what to do if an upstream work item has more than one path in the `output` attribute. If this is on, the multiple files are merged into one piece of geometry. If this is off, ???.
+
+File Path:
+    #id: filepath
+
+    When __Geometry source__ is "Custom file path", the file path of the geometry file to import.
+
+
+~~~~ Storage ~~~~
+
+Store Geometry As:
+    #id: storagetype
+
+    Where to keep loaded geometry data:
+
+    None:
+        Extract information from the geometry and store it as work item attributes, but don't store the actual geometry data.
+
+    External File:
+        Write the loaded geometry data to a file on disk.
+
+    Raw Memory:
+        "Attach" the geometry to the work item. Currently the only node that can work with attached geometry is [Invoke|Node:top/invoke].
+
+Set Item Index To:
+    #id: indextype
+
+    How to 
+
+    Element Index:
+	   For settings that generate new work items for each element (point, vertex, or primitive) in the geometry, set each work item's `index` to the element number.
+
+    Upstream Item Index:
+	   Set each work item's `index` to the upstream item's `index`. For settings that generate multiple work items for each incoming work item, this will result in duplicate `index` values.
+
+External File Path:
+    #id: externalpath
+
+    When __Store geometry as__ is "External file", the file path to write the geometry data to. This is set as the `output` file for the work items.
+
+External File Tag:
+    #id: externaltag
+
+    When __Store geometry as__ is "External file", the [file tag|/tops/filetags] to apply to the `output` file.
+
+
+~~~~ Source Geometry ~~~~
+
+Class:
+    #id: class
+
+    How to create work items from the loaded geometry: per point, vertex, primitive, or one work item for the entire geometry ("Detail"), or one work item with just the bounding box data of the entire geometry ("Bounds"). By default the node copies attributes from the geometry elements (or detail attributes for the whole geometry) onto the work items (see __Copy attributes__ below).
+
+Copy Attributes:
+    #id: attributes
+
+    When this is turned on, the node copies attributes from the loaded geometry elements (points, vertices, primitives, or detail attributes) onto the corresponding work items. The default is to copy all attributes (`*`). You can enter a space-separated list of patterns in the text field to specify which attributes to copy.
+
+Include Bounding Box:
+    #id: copybbox
+
+    Create `minbounds` and `maxbounds` attributes on each work item containing the bounding box of the corresponding geometry element.
+
+Include Points from Primitives:
+    #id: primpoints
+
+    When __Class__ is "Primitive", create attributes on each work item containing the positions of the primitive's points.
+
+Create Work Item For:
+    #id: grouptype
+
+    When __Class__ is point, vertex, or primitive, how to handle geometry groups:
+
+    All Groups:
+        Instead of creating a work item for each element, create a work item for each _group_.
+
+    Specified group:
+        Create a single work item for the group(s) specified in the __Group__ field.
+
+    Elements in Specified Group:
+        Create a work item for each element in the group(s) specified in the __Group__ field. If the __Group__ field is blank, creates a work item for every element regardless of group (the default behavior).
+
+Group:
+    #id: group
+    
+    When __Create work item for__ is "Specified group" or "Elements in specified group", this is a space-separated list of group names/patterns.
+
+
+@related
+
+- [Node:top/invoke]

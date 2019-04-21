@@ -1,0 +1,68 @@
+= Command servers =
+
+"""Command blocks let you start up remote processes (such as Houdini or Maya instances), send the server commands, and shut down the server."""
+
+
+== Overview ==
+
+A "command server" is a long-running process. You can start a command server and interact with it sequentially across multiple nodes/work items within a session (between starting the server and shutting it down).
+
+This lets you start up a remote application, such as an instance of Houdini or Maya, and send it a series of commands. For example, to open a starting geometry file, perform some operations on it, and write out the result.
+
+(See also the [HDA Processor|Node:top/hdaprocessor] and [Geometry Import|Node:top/geometryimport] nodes, which can run Houdini geometry-generation networks as "one-shots" rather than as a command server.)
+
+Command blocks are similar to [feedback loop blocks|looping]: work items inside are run serially in sequence inside the session. The block parameters let you start up multiple serial sessions.
+
+Houdini ships with two built-in command chain tools: one for sending Python scripts to a persistent Houdini instance, and one for sending MEL scripts to a persistent Maya instance. There is also a Generic command chain which can start, stop, and send commands to an arbitrary server using XML-RPC or raw TCP.
+
+TIP:
+    One important advantage of using Houdini as a command server over calling networks or assets is that you can use Houdini as a _content creation_ tool. For example, you could use a Houdini server to generate a new HIP file in a branch of the TOP network, and then use the generated HIP file later in the network.
+
+
+== How to ==
+
+:fig: [Image:/images/pdg/command_block.png]
+    # In a TOP network editor, press ((Tab)) and choose a "command chain" tool, such as "Maya Command Chain".
+
+        The tool puts down a "Service Begin" node and a "Server End" node specific to the service type.
+
+    # Select the Begin node. In the parameter editor, choose how to specify the number of sessions:
+
+        * The default is to run the number of iterations specified in the __Number of sessions__ parameter. If the Begin node has upstream items, the command chain runs <<session_count>> times for each incoming item.
+
+        * If the Begin node has static work items, you can turn on __Session count from upstream items__. This sets the number of sessions to be the number of upstream items. This repeats the command chain within the block once for each input item.
+
+        Multiple sessions are cooked serially: the block will cook the first session from top to bottom before starting the second session.
+
+    # If you Begin node generates items dynamically, you must also turn on __Use dynamic partitioning__ on the End node.
+
+    # Wire [Command Send nodes|Node:top/commandsend] between the start and end nodes to make them part of the loop. 
+
+    Houdini draws a border around the nodes in the block to help you visualize it.
+
+
+== Notes ==
+
+* The Begin node generates work items that start one or more server sessions. The server process keeps running after the "startup" item completes.
+
+* The End node runs the server shutdown code after the last upstream command in each session completes. (If the graph stops cooking before then, the scheduler automatically terminates all known server processes.)
+
+* If you are using a render farm scheduler, each server session is locked to one machine.
+
+* You should color the start and end nodes of a block the same to make their relationship clear. The default nodes put down by the built-in command chain tools have different colors. You can [change the node colors|/network/organize]. This is especially useful to distinguish nested loops.
+
+    The border around the block takes on the color of the end node.
+
+* Newly created servers are registered with the active scheduler. You can get a reference to a server by name using the scheduler API. The server itself is started by a work item, but runs much longer than the cook duration of that work item.
+
+
+== Examples ==
+
+The following directories contain example HIP files demonstrating how to use Houdini and Maya command server blocks.
+
+* `$HFS/houdini/pdg/examples/top_houdinipipeline`
+
+* `$HFS/houdini/pdg/examples/top_mayapipeline`
+
+
+

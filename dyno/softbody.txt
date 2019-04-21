@@ -1,0 +1,60 @@
+= Vellum Softbodies =
+
+== Strut Softbody vs Tetrahedral Softbody ==(softbody)
+
+        The [Vellum Strut Softbody|/shelf/vellumsoftbody] tool uses a collection of random struts that are formed between opposite interior points to create a rough form of volume preservation.  This is similar to connecting opposing points with toothpicks to hold it apart, which in some poking artifacts. It also uses the original geometry to do the simulation. 
+        
+        The [Vellum Tetrahedral Softbody|/shelf/vellumtetsoftbody] tool will polyreduce, remesh to create a low-res proxy, and tetrahedralize the input geometry before simulation. Once the tetrahedral mesh is created, distance constraints are created along each edge to act as springs to maintain the general shape of the object and volume constraints are created to maintain the volume of each tetrahedron preventing the tets from collapsing in on themselves. Once the simulation is done, a [Point Deform|Node:sop/pointdeform] is used to automatically capture and deform the geometry.
+        
+        NOTE:
+                You can also put down a Vellum Configure Tetrahedral Softbody using the TAB menu. However, this will only create a [Solid Conform|Node:sop/solidconform] node, which tetrahedralizes your geometry. It will not simplify and remesh your geometry like the shelf tool does. It is important to note if you don't polyreduce and remesh your geometry before tetrahedralizing it, not only will it be slower but it will likely also have widely varying tetrahedral sizes which could make it difficult to get the desired stiffness. This approach is for advance users.
+                
+== Differences between softbody types ==
+
+Although [Vellum Balloon|/shelf/vellumballoon], [Vellum Strut Softbody|/shelf/vellumsoftbody], and [Vellum Tetrahedral Softbody|/shelf/vellumtetsoftbody] all look like malleable squishy objects, the main difference is in the way they preserve volume.
+
+Vellum Balloon preserves global volume, as it uses a pressure constraint to uniformly push the cloth outwards. This means that squeezing one area will bulge out distant areas. As the name implies, this is useful for balloon-like softbodies, where you want to maintain volume over the entire closed object.
+
+Vellum Tetrahdral Softbody preserves more localized volume, since each tetrahedron preserves volume. This is useful for things like organic material, where you press down in one area and the local volume is preserved.
+
+Vellum Strut Softbody doesn't preserve volume at all, as it uses a collection of struts that are formed between opposite interior points. They act like objects with a bunch of springs inside that are trying to maintain the shape of the object.
+                
+== Vellum Fiber ==
+
+:video:
+        #src: /videos/vellum_fiber.mp4
+
+Vellum Fiber is a type of softbody constraint that causes a piece of geometry to compress along a fiber direction, resulting in the geometry expanding in the other directions as a result of volume preservation.
+
+=== Setting up a fiber constraint ===
+
+# Create a piece of geometry, such as a rectangular block with lots of divisions.
+
+        [Image:/images/vellum/fiber1.png]
+
+# Put down a Vellum Configure Tetrahedral Softbody from the TAB menu.
+
+# Set the __Stretch Stiffness__ on the distance constraint to `100`.
+
+# Set the __Stretch Stiffness__ on the volume constraint to `1e+10`.
+
+# Append a [Vellum Constraints|Node:sop/vellumconstraints] node and change the __Constraint Type__ to __Tetrahedral Fiber__.
+
+# Set the __Output Group__ to `fiber` and set the __Stiffness__ to `0`.
+
+# Append a [Vellum Solver|Node:sop/vellumsolver] and turn on the __Ground Position__ checkbox. This will turn on the ground plane so that your box doesn't fall.
+        NOTE:
+                You may need to lower the ground plane below your object if it intersects.
+
+# Dive inside the Vellum Solver, and create a [Vellum Constraint Property|Node:dop/vellumconstraintproperty] to animate the geometry.
+
+        For example, you can set the __Group__ to `fiber`, set the __Stiffness__ to `10`, and use the following VEXpression to have it shrink and expand over time.
+        
+        `stiffness *= 1 - cos( radians(@Frame - 1)*3 );`
+        
+        [Image:/images/vellum/fiber2.png]
+        
+        This will compress your box along the Z-axis, causing it to expand along the X and Y axis getting taller and wider in order to preserve volume.
+        
+        NOTE:
+                The fiber does not cause an expansion. The expansion is caused by the volume constraint. If you only applied the fiber constraint, it would compress in one direction but not expand in the others.

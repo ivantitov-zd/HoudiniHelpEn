@@ -294,6 +294,7 @@ grows by expanding `A` at each generation, the dual rules of
 between replacing `A` with `" [B] //// [B] //// [B]` and replacing
 `B` with `&FFFA`.
 
+
 == Turtle command reference ==
 
 Normally turtle symbols use the current length/angle/thickness etc. to
@@ -303,6 +304,9 @@ to override the normal values used by the turtle command.
 The following list shows the bracketed arguments. Remember that you can
 simply use the single-character command without the arguments and
 Houdini will simply use the normal values.
+
+See [local functions and variables|#locals] below for what functions and
+variables you can use in argument expressions inside the brackets.
 
 `F(l,w,s,d)` :
     Move forward (creating geometry) distance <<l>> of width <<w>>
@@ -321,7 +325,7 @@ Houdini will simply use the normal values.
     Move forward a half length (no geometry created) distance <<l>>
     of width <<w>> using <<s>> cross sections of <<d>> divisions
     each.
-`J(s,x,a,b,c) K(s,x,a,b,c) M(s,x,a,b,c)` :
+`J(s,x,a,b,c)`, `K(s,x,a,b,c)`, `M(s,x,a,b,c)` :
     Copy geometry from leaf input J, K, or M at the turtle's
     position after scaling and reorienting the geometry. The
     geometry is scaled by the s parameter (default Step Size) and
@@ -404,6 +408,96 @@ Houdini will simply use the normal values.
     `a("Cd", 1, 0, 1)` added to the start of the premise will make
     the L-system a nice pugnacious purple.
 
+
+== Local functions and variables == (locals)
+
+These functions and variables are available in arguments to turtle commands such as `F()`. These are separate from [parameter expression functions|/expressions/] and node local variables.
+
+`acos(v)`:
+    Arc cosine, the inverse of cosine. Returns the result in degrees.
+
+`asin(v)`:
+    Arc sine, the inverse of sine. Returns the result in degrees.
+
+`cos(angle)`:
+    Cosine. Takes an angle in degrees.
+
+`sin(angle)`:
+    Sine. Takes an angle in degrees.
+
+`chan(idx)`:
+    Returns the value of an animated spare parameter on this node at the current time.
+
+    You can [add a spare parameter|/network/spare] to the node, keyframe it, and then use the animated values to change the Lsystem over time.
+
+    Specify the name of the spare parameter using the __LSystem channel prefix__ parameter.
+
+    For example, if you add a spare parameter tuple named `spare`, set the __Lsystem channel prefix__ to `spare`. Then, to reference the value of `spare`'s first component (at the current time), use `chan(0)` (this evaluates the channel named `spare0`). To access the second component, use `chan(1)`, for the third component use `chan(2)`, and so on.
+
+`min(a, b)`:
+    Returns the lower of a or b.
+
+`max(a, b)`:
+    Returns the higher of a or b.
+
+`in(x, y, z)`:
+    This determines if the point (x, y, z) is inside the Meta Test Input.
+
+`pic(x, y, plane)`:
+    This evaluates the LSystem Picture at coordinates `(x, y)`. These should be in the range 0..1.
+
+    `plane`:
+        Which image channel to get. `0` = luminance, `1` = red, `2` = green, and `3` = blue.
+    
+    Returns a value from 0..1.
+
+`rand(seed)`:
+    Same as the [Exp:rand] expression function.
+    You can get a quick random number using `rand(i)`.
+
+`a`:
+    The LSystem angle parameter.
+
+`b`:
+    The LSystem b parameter.
+
+`c`:
+    The LSystem c parameter.
+
+`d`:
+    The LSystem d parameter.
+
+`g`:
+    Initially 0. After that it is set to the age of the current rule.
+
+`i`:
+    The offset into the current lsystem string where the rule is being applied.
+
+`t`:
+    Initially 0. After that it is set to the iteration count.
+
+`x`, `y`, `z`:
+    The current turtle position in space.
+
+`A`:
+    The arc length from the root of the tree to the current point.
+
+`L`:
+    The current length increment at the point.
+
+`T`:
+    The LSystem gravity parameter.
+
+`U`:
+    The color map U value.
+
+`V`:
+    The color map V value.
+
+`W`:
+    The current width at the current point.
+
+
 == Use modeled geometry in an L-system ==
 
 Houdini lets you create a copy of some geometry at the turtle's location
@@ -458,6 +552,7 @@ Rule 1 prefaces the `K` and `J` commands with `f` (move forward
 without drawing) to offset the geometry a little bit. Otherwise, the
 leaf would be attached at its center, rather than the edge.
 
+
 == Symbol variables ==
 
 Each symbol can have up to five user-defined variables associated
@@ -499,6 +594,7 @@ This way <<i>> is scaled before <<A>> is re-evaluated. The important
 part is the premise: you need to start with a value to be able to
 scale it.
 
+
 == Stamp variables onto input geometry ==
 
 The third argument to the `J`/`K`/`M` commands is passed to the
@@ -530,6 +626,7 @@ TIP:
   pass <<number>> to the J geometry. For example, `J(,,4)`
   produces a square, `J(,,5)` produces a pentagram.
 
+
 == Create groups within L-systems ==
 
 The `g` command puts all geometry currently being built into a
@@ -548,6 +645,7 @@ things like `gF [ gFF ] F` to put the first and last `F` into group
 0, and the middle (branched) `FF` into group 1.
 
 To exclude a branch from its parent's group, use `g(-1)`.
+
 
 == Edge rewriting ==
 
@@ -642,6 +740,7 @@ table>>
         td>>3
         td>>`F+F++-F-F+`
 
+
 == Limit L-system growth inside a shape ==
 
 The L-system node's meta-test input lets you generate rules that will
@@ -663,36 +762,33 @@ steps>>
 
 == Example ==
 
-    table>>
-        tr>>
-            td>> Premise
-            td>>
-                `FA`
-        tr>>
-            td>> Rule 1
-            td>>
-                `A: in(x,y,z) = F [+FA] -FA : 80`
-        tr>>
-            td>> Rule 2
-            td>>
-                `A: ! in(x,y,z) = A%`
-    * This L-system checks to see if the next iteration of growth will
-      be within the Meta-test bounds, and if not it prunes the current
-      branch.
+Premise |
+    `FA`
 
-    * Rule 1 executes 80% of the time when the branch is within the
-      meta-test boundary.
+Rule 1 |
+    `A: in(x,y,z) = F [+FA] -FA : 80`
 
-    * Rule 2 executes when the branch is _not_ within the meta-test
-      boundary (the `!` negates the `in(x,y,z)` condition). The `%`
-      command ends the branch.
+Rule 2 |
+    `A: ! in(x,y,z) = A%`
+
+* This L-system checks to see if the next iteration of growth will
+  be within the Meta-test bounds, and if not it prunes the current
+  branch.
+
+* Rule 1 executes 80% of the time when the branch is within the
+  meta-test boundary.
+
+* Rule 2 executes when the branch is _not_ within the meta-test
+  boundary (the `!` negates the `in(x,y,z)` condition). The `%`
+  command ends the branch.
 
 NOTE:
     If the L-system start point is not inside the metaball envelope, it
     will stay dormant. Once you have set up your L-system and metaballs,
     make sure you transform them together so the L-system is not
     accidentally moved outside the metaball.
-                
+
+
 == Arrange geometry instances with L-systems ==
 
 L-systems can be a powerful tool for arranging modeled geometry. By
@@ -703,6 +799,7 @@ For example, you could use the "arc approximation" L-system from the
 [L-system basics|#basics]  (premise=`A`, rule=`A=F+A`) to arrange
 a series of spheres in an arc or circle. This gives you parametric
 control of the bending and spacing of the arc of spheres.
+
 
 == Further reading ==
 
@@ -717,283 +814,266 @@ It is the definitive work on the subject. It contains many L-systems
 examples along with ideas and theories about modeling realistic
 plant growth.
 
+
 == Speed up calculations ==
 
 Modeling something like a whole tree as single large L-System may cause collision resolution calculations to be single threaded. The wire solver will look for pieces of wire objects that can be solved independently and divide the work among the available cores. One large connected L-System means the work cannot be divided into smaller work units.
 
 Try using a [Wire Glue Constraint DOP|Node:dop/wireglueconstraint] to constrain a point on the L-System where the branches join together near the root of the tree (constrain the point to its world space position). This will cause the wire solver to see the separate branches as distinct pieces that can be solved independently. Since the constrained point will not move, any motion on one of the branches will not affect the other branches. If possible, reducing the number of points in the wire object should also speed up the calculations. 
 
+
 @parameters
 
-    == Geometry ==
+== Geometry ==
 
-        Type:
-            The type of geometry to create as the turtle moves.
-
-
-            TIP:
-                You can create a tube path from a skeleton L-system using
-                a [Polywire SOP|Node:sop/polywire].
+Type:
+    The type of geometry to create as the turtle moves.
 
 
-            Skeleton:
-                Draw polylines.
-            Tube:
-                Draw tubes.
-        Generations:
-            The number of times to repeat the rule-substitution. If you
-            specify a fractional number and __Continuous angles__ and/or
-            __Continuous length__ are on (below), Houdini scales the
-            geometry generated by the last substitution to give smooth
-            growth between generations.
-
-        Start Position:
-            This is the starting point position for the turtle.
-
-        Random Scale:
-            If non-zero, randomly scales all the lengths specified by F
-            and other similar turtle functions.
-
-        Random Seed:
-            The seed to use for the random number generator. By varying
-            this on a L-system using random rules (Ie: random scale, ~,
-            or probabilistic rules) one can generate different instances
-            of the L-system.
-
-        Continuous Angles:
-            If set, the angles rotated by the last generation's turtle
-            operations will be scaled by the amount into the
-            generation.
-
-        Continuous Length:
-            If set, the lengths taken by the last generation's turtle
-            operations will be scaled by the amount into the
-            generation.
-
-        Continuous Width:
-            If set, the widths generated by the last generation's turtle
-            operations will be scaled by the amount into the
-            generation.
-
-        Apply Color:
-            If set, the L-system will output a color attribute on each
-            point. The color value will be found by looking up into the
-            Image File at the current U & V positions. The current U & V
-            is altered with the ' and # turtle operations.
-
-        Image File:
-            This is the image file which is used for the Apply Color
-            operation. The image files used by the pic() expression is
-            under Funcs tab.
-
-        UV Increment:
-            These determine the default U and V increments of the ' and
-            # turtle operations.
-
-        Point Attributes:
-            If the type is Skeleton, this is available. Turning this on
-            will cause the creation of many point attributes to be
-            created to track how each point was generated:
+    TIP:
+        You can create a tube path from a skeleton L-system using
+        a [Polywire SOP|Node:sop/polywire].
 
 
-            width:
-                The width of the tube that would have been generated.
-            segs:
-                The number of segments that would be made on a tube.
-            div:
-                The number of divisions the tube would be divided into.
-            lage:
-                The vertical increment from the root of the tree. This
-                is affected by the Tube::Vertical Increment parameter.
-                It is similar to arc, but not dependent on edge length.
-            arc:
-                The arc length from the root of the turtles path to this
-                point.
-            up:
-                The up vector of the turtle at this point.
-            gen:
-                The generation that created this point.
+    Skeleton:
+        Draw polylines.
+    Tube:
+        Draw tubes.
+Generations:
+    The number of times to repeat the rule-substitution. If you
+    specify a fractional number and __Continuous angles__ and/or
+    __Continuous length__ are on (below), Houdini scales the
+    geometry generated by the last substitution to give smooth
+    growth between generations.
 
-    == Tube ==
+Start Position:
+    This is the starting point position for the turtle.
 
-        Rows:
-            The number of rows to divide tubes into. A value of 3 will
-            cause the tubes to be swept triangles.
+Random Scale:
+    If non-zero, randomly scales all the lengths specified by F
+    and other similar turtle functions.
 
-        Cols:
-            The number of columns to divide the tubes in. A value of 4
-            means one F will create 4 cross sections.
+Random Seed:
+    The seed to use for the random number generator. By varying
+    this on a L-system using random rules (Ie: random scale, ~,
+    or probabilistic rules) one can generate different instances
+    of the L-system.
 
-        Tension:
-            How straight the tubes should sweep to their destination
-            point.
+Continuous Angles:
+    If set, the angles rotated by the last generation's turtle
+    operations will be scaled by the amount into the
+    generation.
 
-        Branch Blend:
-            How much a new branch should inherit off an old branches
-            direction.
+Continuous Length:
+    If set, the lengths taken by the last generation's turtle
+    operations will be scaled by the amount into the
+    generation.
 
-        Thickness:
-            Default width of the tubes.
+Continuous Width:
+    If set, the widths generated by the last generation's turtle
+    operations will be scaled by the amount into the
+    generation.
 
-        Thickness Scale:
-            How much the ! operation will affect the thickness.
+Apply Color:
+    If set, the L-system will output a color attribute on each
+    point. The color value will be found by looking up into the
+    Image File at the current U & V positions. The current U & V
+    is altered with the ' and # turtle operations.
 
-        Apply Tube Texture Coordinates:
-            If checked, the tubes will generate uv texture coordinates.
+Image File:
+    This is the image file which is used for the Apply Color
+    operation. The image files used by the pic() expression is
+    under Funcs tab.
 
-        Vertical Increment:
-            The amount each tube will increment the V texture
-            coordinate.
+UV Increment:
+    These determine the default U and V increments of the ' and
+    # turtle operations.
 
-
-    == Values ==
-
-        Step Size:
-            The default size of a movement, such as F, command.
-
-        Step Size Scale:
-            The number used by the " command.
-
-        Angle:
-            The default angle for an angle, such as /, command. This
-            also becomes the variable a in the expression.
-
-        Angle Scale:
-            The number used by the ; command.
-
-        Variable b:
-            The value of the expression variable b.
-
-        Variable c:
-            The value of the expression variable c.
-
-        Variable d:
-            The value of the expression variable d.
-
-        Gravity:
-            The amount of tropism from the T command. Also becomes the
-            value of the expression variable T.
-
-        Number Of Variables:
-            This multiparm allows the assignment of an arbitrary number
-            of new expression variables.
-
-        Variable Name:
-            The name of the expression variable. This is a single
-            character. Check the Local Variables section to see what
-            variables are already reserved.
-
-        Variable Value:
-            The value of the expression variable.
+Point Attributes:
+    If the type is Skeleton, this is available. Turning this on
+    will cause the creation of many point attributes to be
+    created to track how each point was generated:
 
 
-    == Funcs ==
-
-        Pic Image File:
-            The image file to use with the pic() expression function.
-
-        Group Prefix:
-            The prefix used by g command.
-
-        Channel Prefix:
-            The prefix used by the chan() expression function.
-
-        Leaf Param A:
-            This is the name of the stamp parameter to stamp the leaf
-            with. The value of the stamp comes from the J, K, or M
-            operation. It can be read upstream using the stamp()
-            function.
-
-        Leaf Param B:
-            This is the name of the stamp parameter to stamp the leaf
-            with. The value of the stamp comes from the J, K, or M
-            operation. It can be read upstream using the stamp()
-            function.
-
-        Leaf Param C:
-            This is the name of the stamp parameter to stamp the leaf
-            with. The value of the stamp comes from the J, K, or M
-            operation. It can be read upstream using the stamp()
-            function.
+    width:
+        The width of the tube that would have been generated.
+    segs:
+        The number of segments that would be made on a tube.
+    div:
+        The number of divisions the tube would be divided into.
+    lage:
+        The vertical increment from the root of the tree. This
+        is affected by the Tube::Vertical Increment parameter.
+        It is similar to arc, but not dependent on edge length.
+    arc:
+        The arc length from the root of the turtles path to this
+        point.
+    up:
+        The up vector of the turtle at this point.
+    gen:
+        The generation that created this point.
 
 
-    == Rules ==
+== Tube ==
 
-        Read Rules From File:
-            If this is set, the rule fields are ignored. Instead, the
-            Rule File is read and used as the rules.
+Rows:
+    The number of rows to divide tubes into. A value of 3 will
+    cause the tubes to be swept triangles.
 
-        Write Rule Parameters to File:
-            This will write all the current rules to the Rule File.
+Cols:
+    The number of columns to divide the tubes in. A value of 4
+    means one F will create 4 cross sections.
 
-        Rule File:
-            The name of the file to use as a source of rules. This file
-            should have one line per rule. Blank lines and lines that
-            start with '#' will be ignored, so comments may be added to
-            the rule file with '#'.
+Tension:
+    How straight the tubes should sweep to their destination
+    point.
 
-        Context Ignore:
-            This is a list of symbols. They will be ignored when trying
-            to determine contexts.
+Branch Blend:
+    How much a new branch should inherit off an old branches
+    direction.
 
-	Context Includes Siblings:
-	    By default, the context of each branch only includes the
-	    symbols in that branch.  Any sub-branches or parent
-	    branches will be skipped over.  Given the rule `A>B=F`, `A[B]`
-	    will not resolve as B is in a sub-branch.  `A[Q]B` will
-	    resolve because the `[Q]` is ignored.  If you change the
-	    Context Ignore to have `[]`, this effect is removed and
-	    `A[Q]B` will not resolve but `A[B]` will.  The Context
-	    Includes Siblings flag restores the pre-Houdini 10
-	    behavior of context of sibling branches being included.
-	    For example, `[A]Q[B]` will resolve if this flag is set, but
-	    not resolve if it is not set.
+Thickness:
+    Default width of the tubes.
 
-        Premise:
-            The initial state of the L-system. This is the state of the
-            L-system at generation 0.
+Thickness Scale:
+    How much the ! operation will affect the thickness.
 
-        Rule #:
-	    A rule to apply to the L-system.  Applying the toggle will disable
-	    the rule, removing it from the generation procedure.
+Apply Tube Texture Coordinates:
+    If checked, the tubes will generate uv texture coordinates.
+
+Vertical Increment:
+    The amount each tube will increment the V texture
+    coordinate.
+
+
+== Values ==
+
+Step Size:
+    The default size of a movement, such as F, command.
+
+Step Size Scale:
+    The number used by the " command.
+
+Angle:
+    The default angle for an angle, such as /, command. This
+    also becomes the variable a in the expression.
+
+Angle Scale:
+    The number used by the ; command.
+
+Variable b:
+    The value of the expression variable b.
+
+Variable c:
+    The value of the expression variable c.
+
+Variable d:
+    The value of the expression variable d.
+
+Gravity:
+    The amount of tropism from the T command. Also becomes the
+    value of the expression variable T.
+
+Number Of Variables:
+    This multiparm allows the assignment of an arbitrary number
+    of new expression variables.
+
+Variable Name:
+    The name of the expression variable. This is a single
+    character. Check the Local Variables section to see what
+    variables are already reserved.
+
+Variable Value:
+    The value of the expression variable.
+
+
+== Funcs ==
+
+Pic Image File:
+    The image file to use with the pic() expression function.
+
+Group Prefix:
+    The prefix used by g command.
+
+Channel Prefix:
+    The prefix used by the chan() expression function.
+
+Leaf Param A:
+    This is the name of the stamp parameter to stamp the leaf
+    with. The value of the stamp comes from the J, K, or M
+    operation. It can be read upstream using the stamp()
+    function.
+
+Leaf Param B:
+    This is the name of the stamp parameter to stamp the leaf
+    with. The value of the stamp comes from the J, K, or M
+    operation. It can be read upstream using the stamp()
+    function.
+
+Leaf Param C:
+    This is the name of the stamp parameter to stamp the leaf
+    with. The value of the stamp comes from the J, K, or M
+    operation. It can be read upstream using the stamp()
+    function.
+
+
+== Rules ==
+
+Read Rules From File:
+    If this is set, the rule fields are ignored. Instead, the
+    Rule File is read and used as the rules.
+
+Write Rule Parameters to File:
+    This will write all the current rules to the Rule File.
+
+Rule File:
+    The name of the file to use as a source of rules. This file
+    should have one line per rule. Blank lines and lines that
+    start with '#' will be ignored, so comments may be added to
+    the rule file with '#'.
+
+Context Ignore:
+    This is a list of symbols. They will be ignored when trying
+    to determine contexts.
+
+Context Includes Siblings:
+    By default, the context of each branch only includes the
+    symbols in that branch.  Any sub-branches or parent
+    branches will be skipped over.  Given the rule `A>B=F`, `A[B]`
+    will not resolve as B is in a sub-branch.  `A[Q]B` will
+    resolve because the `[Q]` is ignored.  If you change the
+    Context Ignore to have `[]`, this effect is removed and
+    `A[Q]B` will not resolve but `A[B]` will.  The Context
+    Includes Siblings flag restores the pre-Houdini 10
+    behavior of context of sibling branches being included.
+    For example, `[A]Q[B]` will resolve if this flag is set, but
+    not resolve if it is not set.
+
+Premise:
+    The initial state of the L-system. This is the state of the
+    L-system at generation 0.
+
+Rule #:
+    A rule to apply to the L-system.  Applying the toggle will disable
+    the rule, removing it from the generation procedure.
+
 
 @inputs
-    Leaf J,K & M:
-        This geometry is used by the J, K & M rules
-    Meta Test Input:
-        This geometry is used by the in() function to determine bounding
-        regions (for topiaries)
-@locals
-    a:
-        The value of the __Angle__ parameter.
-    b:
-        The value of the __b__ parameter.
-    c:
-        The value of the __c__ parameter.
-    d:
-        The value of the __d__ parameter.
-    g:
-        The age of the current rule, initially 0.
-    i:
-        The offset into the current L-system string where the rule is
-        being applied.
-    t:
-        The iteration count, initially 0.
-    x, y, z:
-        Current turtle position in space.
-    A:
-        Arclength from the root of the tree to the current point.
-    L:
-        Current length increment at the point.
-    T:
-        The value of the __Gravity__ parameter.
-    U:
-        Color map U value.
-    V:
-        Color map V value.
-    W:
-        Width at the current point.
+
+Leaf J:
+    This geometry is used by the `J` rules.
+
+Leaf K:
+    This geometry is used by the `K` rules.
+
+Leaf M:
+    This geometry is used by the `M` rules.
+
+Meta Test Input:
+    This geometry is used by the `in()` [function|#locals] to check bounding regions (for topiaries).
+
 
 @related
-    - [Node:sop/polywire]
+
+* [Node:sop/polywire]
 

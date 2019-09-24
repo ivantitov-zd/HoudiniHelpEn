@@ -10,6 +10,42 @@ If you set up an event handler on a node or graph (using
 the graph passes an `Event` object to the handler when the corresponding
 event occurs as the graph is running.
 
+{{{
+#!python
+import hou
+import time
+import pdg
+
+topnode_path = '/obj/topnet1/genericgenerator1'
+top_node = hou.node(topnode_path)
+
+# Register Handler
+
+# ensure the TOP graph has been cooked so that we can 
+# access the underlying PDG graph
+top_node.executeGraph(False, False, False, True)
+
+pdg_node = top_node.getPDGNode()
+context = top_node.getPDGGraphContext() 
+
+def print_state_change(event):
+    work_item = context.graph.workItemById(event.workItemId)
+    if work_item:
+        print ("workitem %s now in state %s" % (work_item.name, event.currentState))
+    else:
+        print ("workitem with id %d deleted" % event.workItemId)
+
+handler = pdg_node.addEventHandler(print_state_change, pdg.EventType.WorkItemStateChange)
+
+# Do a blocking cook of the PDG Graph
+top_node.executeGraph(False, True, False, False)
+
+# Remove Handler
+pdg_node = top_node.getPDGNode()
+pdg_node.removeEventHandler(handler)
+
+}}}
+
 
 @methods
 
@@ -19,7 +55,7 @@ event occurs as the graph is running.
     The PDG graph context that emitted the event, or contains the [Py:pdg.Node]
     that emitted the event.
 
-::`currentState` : [Py:pdg.WorkItemState]:
+::`currentState` : [Py:pdg.workItemState]:
     #cppname: PDG_Event::currentState
 
     If the event is a work item event, this is set to the current state of the
@@ -31,7 +67,7 @@ event occurs as the graph is running.
     If the event is a dependency or parent change event, this is the id of
     the dependency/parent work item
 
-::`lastState` : [Py:pdg.WorkItemState]:
+::`lastState` : [Py:pdg.workItemState]:
     #cppname: PDG_Event::lastState
 
     If the event is a work item state change event, this is set to the previous
@@ -57,4 +93,4 @@ event occurs as the graph is running.
 ::`workItemId` : `int`:
     #cppname: PDG_Event::workItemId
 
-    The id of the work item, if the event is a work item related event.
+    The id of the work item, if the event is a work item related event.  This can be passed to [Py:pdg.Graph#workItemById].

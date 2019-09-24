@@ -259,7 +259,7 @@ Be careful not to confuse this class with the function [hou.node|Hom:hou.node_].
 
     See also [Hom:hou.Node#recursiveGlob].
 
-::`recursiveGlob(self, pattern, filter=hou.nodeTypeFilter.NoFilter)` -> tuple of [Hom:hou.Node]:
+::`recursiveGlob(self, pattern, filter=hou.nodeTypeFilter.NoFilter, include_subnets=True)` -> tuple of [Hom:hou.Node]:
     #cppname: HOM_Node::recursiveGlob
     #replaces: Cmd:opglob, Cmd:opfind
     Like [Hom:hou.Node#glob], return a tuple of children nodes whose name
@@ -270,16 +270,17 @@ Be careful not to confuse this class with the function [hou.node|Hom:hou.node_].
     adds the subchildren of matching children, and then applies the filter.
 
     `pattern`:
-        Child node names will be matched against this string pattern.  See
-        [Hom:hou.Node#glob] and [Hom:hou.NodeBundle] for information about the
-        pattern syntax.  Note that if a child node matches the pattern, all of
-        its subchildren will be added to the result (subject to filtering),
-        regardless of the pattern.
+        Child node names will be matched against this string pattern.
+        See [Hom:hou.Node#glob] and [Hom:hou.NodeBundle] for information about the pattern syntax.
+        Note that if a child node matches the pattern and `include_subnets` is `True`, all of its subchildren will be added to the result (subject to filtering), regardless of the pattern.
 
     `filter`:
         A [Hom:hou.nodeTypeFilter] enumeration value to limit matched nodes
         to a particular type (e.g. object nodes, geometry object nodes,
         surface shader SHOPs, etc.).
+
+    `include_subnets`:
+        Specifies whether the children of a matching node will also be returned, regardless of the pattern.
 
     The pattern and filter behavior is very similar to that used by node
     bundles in Houdini.  See [Hom:hou.NodeBundle] for more information.
@@ -353,7 +354,7 @@ Be careful not to confuse this class with the function [hou.node|Hom:hou.node_].
     implemented for SOP and VOP nodes. Other node types do nothing when
     this method is called.
 
-::`destroy(self)`:
+::`destroy(self, disable_safety_checks=False)`:
     #cppname: HOM_Node::destroy
     #replaces: Cmd:oprm
     Delete this node.
@@ -363,6 +364,10 @@ Be careful not to confuse this class with the function [hou.node|Hom:hou.node_].
 
     Raises [Hom:hou.OperationFailed] if you try to delete a node inside a
     locked asset.
+
+    When `disable_safety_checks` is `True`, this disables safety checks that
+    might otherwise crash Houdini when this method is called while nodes are
+    cooking.
 
 ::`copyTo(destination_node)` -> [Hom:hou.Node]:
     #cppname: HOM_Node::copyTo
@@ -396,7 +401,7 @@ Be careful not to confuse this class with the function [hou.node|Hom:hou.node_].
     Raises [Hom:hou.OperationFailed] if this node cannot contain children.
     Raises [Hom:hou.PermissionError] if this node is inside a locked asset.
 
-::`deleteItems(self, items)`:
+::`deleteItems(self, items, disable_safety_checks=False)`:
     #cppname: HOM_Node::deleteItems
     Destroys all the items in the provided tuple of
     [Hom:hou.NetworkMovableItem] objects. This is significantly more efficient
@@ -408,6 +413,10 @@ Be careful not to confuse this class with the function [hou.node|Hom:hou.node_].
     not a child of this node.
     Raises [Hom:hou.PermissionError] if this node is or is inside a locked
     digital asset.
+
+    When `disable_safety_checks` is `True`, this disables safety checks that
+    might otherwise crash Houdini when this method is called while nodes are
+    cooking.
 
 
 == Selection ==
@@ -1433,7 +1442,7 @@ Be careful not to confuse this class with the function [hou.node|Hom:hou.node_].
     #cppname: HOM_Node::canCreateDigitalAsset
     Return `True` if [Hom:hou.Node#createDigitalAsset] can succeed.
 
-::`createDigitalAsset(self, name=None, hda_file_name=None, description=None, min_num_inputs=None, max_num_inputs=None, compress_contents=False, comment=None, version=None, save_as_embedded=False, ignore_external_references=False, change_node_type=True, create_backup=True)` -> `Node`:
+::`createDigitalAsset(self, name=None, hda_file_name=None, description=None, min_num_inputs=0, max_num_inputs=0, compress_contents=False, comment=None, version=None, save_as_embedded=False, ignore_external_references=False, change_node_type=True, create_backup=True)` -> `Node`:
     #cppname: HOM_Node::createDigitalAsset
     Create a digital asset from this node.  You would typically call this
     method on subnet nodes.
@@ -2267,7 +2276,7 @@ Be careful not to confuse this class with the function [hou.node|Hom:hou.node_].
     def name_changed(node, event_type, **kwargs):
         print("The geometry object is now named", node.name())
     
-    hou.node("/obj/geo1").addEventCallback(hou.nodeEventType.NameChanged, name_changed)
+    hou.node("/obj/geo1").addEventCallback((hou.nodeEventType.NameChanged, ), name_changed)
     }}}
 
     See also [Hom:hou.Node#removeEventCallback] and [Hom:hou.Node#removeAllEventCallbacks].

@@ -13,11 +13,15 @@ There are three ways to support selection for custom tools with Python states:
 
 * [Manually script asking the user for each selection|#manual]. This is the traditional way that existing shelf tools work. We strongly suggest you use this method 
 
-* [Bind persistent geometry selectors|#selector]. This makes the active Python state ask for a selection. When the user completes a selection you can accept the selection by returning `True` from the `onSelection()` callback. One or many geometry selectors can be added. 
+* [Bind persistent geometry selectors|#geo_selector]. This makes the active Python state ask for a selection. When the user completes a selection you can accept the selection by returning `True` from the `onSelection()` callback. One or many geometry selectors can be added. 
 
-* [Bind persistent object selectors|#selector]. Similar to geometry selectors but expect object selections instead. One or many object selectors can be added. 
+* [Bind persistent object selectors|#obj_selector]. Similar to geometry selectors but expect object selections instead. One or many object selectors can be added. 
 
 * [Bind one or more entry selectors|#bindings]. This is similar to manually scripting selections. This method is currently not recommended.
+
+* [Handle volatile selection|#vol_selection]. Support for accessing a volatile selection when a viewer state is active.
+
+* [Handle existing selection|#existing_selection]. Support for accessing an existing selection when a viewer state is activated.
 
 
 == Manually scripting selection == (manual)
@@ -182,7 +186,7 @@ template.bindObjectSelector(
 
 See the help for [Hom:hou.ViewerStateTemplate#bindObjectSelector] for information about the method's arguments.
 
-== Binding entry selectors ==
+== Binding entry selectors == (bindings)
 
 *This method is currently not recommended*.
 
@@ -190,3 +194,24 @@ Theoretically, you can use [Hom:hou.ViewerStateTemplate#bindSelector] to bind on
 
 However, we recommend you manually script the selections and creating the node using utility functions as described above.
 
+== Handle volatile selection == (vol_selection)
+
+Volatile selection (i.e. selection via the `select` state) is supported with viewer states by simply 
+implementing the `onSelection` handler. This is the same handler you would normally implement when 
+binding a viewer state selector of a given [category|Hom:hou.NodeTypeCategory]. But there is no need to 
+bind any selectors to support the volatile selection. Details about selection handlers can be found 
+[here|python_states#selection_event_handlers]. 
+
+When you terminate the volatile selection by tapping the `S` key, `onSelection` will be called with 
+the selected elements as input. Optionally, you can implement the `onStartSelection` and `onStopSelection` 
+handlers if you wish to get called when the volatile selector starts or terminates. 
+
+
+== Handle existing selection == (existing_selection)
+It is possible to access the current selection when a state is entered. If a selection already exists 
+when the state is entered, Houdini will pass the selected element(s) to the `onSelection` handler and 
+will consume the selection automatically. 
+
+Like for a volatile selection, there is no need to bind a selector for handling an existing selection, 
+just implementing `onSelection` will suffice. If one or more selectors are bound, Houdini will use 
+either the `auto_start` selector or the first one set with `use_existing_selector=True`. 

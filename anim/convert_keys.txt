@@ -1,0 +1,141 @@
+= Converting animation key values between Houdini and Maya =
+
+"""Houdini stores key tangents using second-based "slope" and "acceleration", while Maya uses frame-based "angle" and "weight". This page shows how to convert between the two."""
+
+
+== Overview ==
+
+Maya's animation key tangent parameters are based on _frames_ while Houdini's are based on _seconds_ instead. Except for this difference, Maya's tangent "angle" corresponds to Houdini's "slope" while Maya's tangent "weight" corresponds to Houdini's "acceleration". In both cases, the units for a key's "value" are the same.
+
+The formulas below show how to convert between Maya's angle/weight and Houdini's slope/acceleration parameters.
+
+Variable ||
+    Meaning ||
+`V` |
+    Key's value.
+
+`F` |
+    Frame containing key in Maya.
+
+`Angle` |
+    Maya animation key parameter.
+
+`Weight` |
+    Maya animation key parameter.
+
+`FPS` |
+    Frame rate (frames per second) in Maya.
+
+`S` |
+    Houdini key "slope" parameter.
+
+`A` |
+    Houdini key "acceleration" parameter.
+
+`DT`, `DF` |
+    An arbitrary time delta where DT is in seconds while DF is in frames.
+
+`DV` |
+    An arbitrary value delta.
+
+NOTE:
+    Make sure when using trig functions your inputs are in the correct unit (radians or degrees) depending on which `tan()` function you use in which software package. For example, VEX and Python `tan()` functions expect radians, while the HScript expression `tan()` expects degrees.
+
+
+== Maya to Houdini == (maya_to_h)
+
+Although we're using Maya as an example, the formulas below apply to any animation software that expresses their key tangent parameters in frames instead of seconds. Houdini's animation keys are expressed in seconds so that they are indepedendent of the scene's frame rate.
+
+NOTE:
+    The formulas assume that the converted values are put into Houdini keys using the `bezier()` expression.
+
+=== Angle to slope ===
+
+Given:
+
+{{{
+DF = FPS * DT                                  (1)
+tan(Angle) = DV / DF                           (2)
+S = DV / DT                                    (3)
+}}}
+
+We can derive the formula for slope by rearranging these and substituting:
+{{{
+S = DV / DT                                    (3)
+  = (DF * tan(Angle)) / (DF / FPS)             (from 2 and 1 respectively)
+  = (DF * tan(Angle)) * (FPS / DF)
+  = FPS * tan(Angle)                           (4)
+}}}
+
+The final formula for slope is:
+
+{{{
+S = FPS * tan(Angle)
+}}}
+
+=== Weight to acceleration ===
+
+Given:
+
+{{{
+DF = FPS * DT                                  (1)
+tan(Angle) = DV / DF                           (2)
+tan(Angle) = S / FPS                           (5, from 4 above)
+Weight^2 = DF^2 + DV^2                         (6)
+A^2 = DT^2 + DV^2                              (7)
+}}}
+
+We can derive the formula for acceleration by rearranging these and substituting:
+
+{{{
+DV^2 / DF^2 = S^2 / FPS^2                      (8, from 2 and 5)
+
+Weight^2 / DF^2 = 1 + DV^2 / DF^2              (6 divided by DF^2)
+                = 1 + S^2 / FPS^2              (from 8)
+                = (FPS^2 + S^2) / FPS^2
+==> DF^2 = (Weight^2 * FPS^2) / (S^2 + FPS^2)  (9)
+
+A^2 / DF^2 = DT^2 / DF^2 + DV^2 / DF^2         (7 divided by DF^2)
+           = 1 / FPS^2 + DV^2 / DF^2           (from 1, since DT^2 = DF^2 / FPS^2)
+           = 1 / FPS^2 + S^2 / FPS^2           (from 8)
+           = (S^2 + 1) / FPS^2
+==> A^2 = DF^2 * (S^2 + 1) / FPS^2
+        = ((Weight^2 * FPS^2) * (S^2 + 1)) / ((S^2 + FPS^2) * FPS^2)  (from 9)
+        = (Weight^2 * (S^2 + 1)) / (S^2 + FPS^2)
+==>   A = sqrt( (Weight^2 * (S^2 + 1)) / (S^2 + FPS^2) )              (10)
+}}}
+
+The final formula for acceleration is:
+
+{{{
+A = sqrt( (Weight^2 * (S^2 + 1)) / (S^2 + FPS^2) )
+}}}
+
+NOTE:
+    Weight cannot be negative.
+
+
+== Houdini to Maya == (h_to_maya)
+
+=== Slope to angle ===
+
+We can convert slope to angle by rearranging the slope (S) formula from above to get:
+
+{{{
+Angle = atan2(S, FPS)
+}}}
+
+NOTE:
+    `atan2(S, FPS)` is equivalent to `atan(S / FPS)` except it is more robust and can compute the correct quandrant. You should use `atan2` instead of `atan` when possible.
+
+
+=== Acceleration to weight ===
+
+We can re-arrange the acceleration (A) formula from above to get:
+
+{{{
+Weight = sqrt( (A^2 * (S^2 + FPS^2)) / (S^2 + 1) )
+}}}
+
+
+

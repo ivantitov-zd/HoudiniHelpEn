@@ -7,9 +7,19 @@
 
 """Schedules work items on the local machine."""
 
-This node is the default scheduler that executes work items on the local 
-machine. Works items are scheduled to run in parallel based on either the number
-of CPUs available on the local machine or specified by __Maximum CPUs to Use__.
+This node is the default scheduler that executes work items on the local
+machine. Works items are scheduled to run in parallel.  The total number
+of running at once is specified by the parm __Maximum CPUs to Use__ in
+combination with the job parm __CPUs per Task__.
+
+TIP:
+    If some tasks consume a lot of computational or memory resources, you can
+    use the job parm __CPUs per Task__ to change the maximum number of such processes
+    that are run in parallel.  For example by default if there are 8 CPUs available
+    as determined by __Maximum CPUs to Use__ there will be a maximum of 8 processes
+    executed in parallel.  However if __CPUs per Task__ is set to 2 on the processor
+    node, there will be a maximum of 4 such processes executed in parallel, with each
+    task consuming 2 CPUs worth of resources in the scheduler.
 
 To execute work items on a farm or remote machines, another scheduler should be
 utilized such as [HQueue Scheduler|Node:top/hqueuescheduler].
@@ -22,75 +32,113 @@ utilized such as [HQueue Scheduler|Node:top/hqueuescheduler].
 These are global parameters for all work items using this scheduler.
 
 [Include:_scheduler_common#pdg_workingdir]
-    
-    
+
+Directory Location:
+    #id: tempdirmenu
+
+    Select where local temporary files should be written.  Files that are written here are needed for the PDG cook, but are typically not the end product, and can be removed when the cook completes.  Log files and python scripts are examples of files that are typically written during the cook.
+
+    Working Directory:
+    A pdgtemp sub directory of the __Working Directory__
+
+    Houdini Temp:
+    A pdgtemp sub directory of $HOUDINI_TEMP_DIR
+
+    Custom:
+    A custom directory specified by __Custom Directory__
+
+Append PID:
+    #id: tempdirappendpid
+
+    Adds a sub directory to the Location specified by __Directory Location__, which is the value of the PID (Process Identifier) of your session of Houdini.  This is typically a 3-5 digit number.  This is necessary if multiple sessions of Houdini are cooking TOP graphs at the same time.
+
+Custom Directory:
+    #id: tempdircustom
+
+    The full path to the temporary directory when __Directory Location__ is set to __Custom__.
+
 Maximum CPUs to Use:
+    #id: maxprocsmenu
+
+    Specify the number of CPUs that are available for this scheduler to use to
+    execute work items.
+
+    __Use 1/4 of Total CPU Count:__ Use the number of logical cores divided by four.
+
+    __Use All CPUs Except One:__ Use the number of logical cores less 1.
+
+    __Use Custom CPU Count:__ Use the number as specified by __Custom CPU Count__.
+
+Custom CPU Count:
     #id: maxprocs
 
-    The maximum number of processors to use to execute work items. Numbers
-    greater than 0 indicate how many processors will be used. When this is set
-    to 0, the number of processors used will be equal to the number of logical
-    cores in the system divided by 4. A negative number indicates that the
-    number of processors used will be the total logical cores minus the
-    specified number. 
-    
+    The maximum number of CPUs to use to execute work items. Positive
+    numbers indicate how many CPUs will be used. A negative number
+    indicates that the number of CPUs used will be the total logical cores
+    minus the specified number.
+
 Use HDA Pools:
     #id: local_usepool
 
     Enabling this will limit the number of Houdini sessions created for
     executing HDAProcessor work items. These sessions will be managed in a pool
     and reused.
-    
-    
+
+
 HDAProcessor Pool Size:
     #id: hdaprocessorpoolsize
 
     Specifies the maximum number of Houdini sessions to be created in the pool
     for executing HDAProcessor work items. These sessions are reused in order
     to reduce the overhead of creating and shutting down Houdini sessions.
-    
-    
+
+
 == Job Parms ==
 
-These job specific parameters can be overridden by each node under the 
+These job specific parameters can be overridden by each node under the
 __Local Scheduler__ tab on the node's __Schedulers__ parameter interface.
 
 Single:
     #id: local_single
 
     Enabling this will force one work item to be executed at a time.
-    
-    
+
+
 Use CPUs per Task:
     #id: local_is_CPU_number_set
 
     Enabling this will use the __CPUs per Task__ value when deciding the number
-    of CPUs to use per work item.
-    
-    
+    of CPUs to use per work item.  Otherwise the work item will be assumed to
+    consume one CPU.
+
+
 CPUs per Task:
     #id: local_CPUs_to_use
 
-    The number of CPUs to use for each work item.
-    
-    
+    The number of CPUs to use for each work item.  This work item will only be
+    run by the scheduler if at least this number of CPUs are available.  The
+    total number of CPUs available is specified by __Maximum CPUs to Use__.
+
 Use Houdini Max Threads:
     #id: local_usehoudinimaxthreads
 
     Enabling this will set the __HOUDINI_MAXTHREADS__ environment to the value
-    specified in __Houdini Max Threads__.
-    
-    
+    specified in __Houdini Max Threads__.  By default __HOUDINI_MAXTHREADS__ is
+    set to total number of logical cores divided by the value of
+    __Maximum CPUs to Use__, which is 4 if __Maximum CPUs to Use__ is left at
+    it's default value of __Use 1/4 of Total CPU Count:__.
+
+
 Houdini Max Threads:
     #id: local_houdinimaxthreads
 
-    Maximum number of threads to use for each work item in Houdini. This sets 
+    Maximum number of threads to use for each work item in Houdini. This sets
     the __HOUDINI_MAXTHREADS__ environment value.
-    
-    
+
+
 [Include:/nodes/top/_scheduler_task_env_common]
-    
-    
+
+
 @related
 - [Node:top/pythonscheduler]
 - [Node:top/hqueuescheduler]

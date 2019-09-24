@@ -43,6 +43,18 @@ Use the Python snippets on the __Initialization and cleanup__ tab for code that 
 
 For example, you might start a timer thread that checks the status of jobs periodically in the __Start cook__ snippet, and then in the __Stop cook__ snippet, set a flag on the timer thread object telling it to stop.
 
+In the __Start cook__ method, you should tell PDG what the user's working directory is by calling:
+{{{
+#!python
+self.SetWorkingDir(local_path, remote_path)
+}}}
+
+The working directory is a directory where the TOP network's code runs, and is usually where generated files are saved. In a farm set-up, the working directory should be on a shared network filesystem.  PDG needs to know the `local` path to the working directory, as well as the `remote`.  These correspond to a path which is valid on the user's file-system (_where the network is cooking_), and a path which is valid on a remote render farm host respectivly. The paths supplied to PDG will be used to convert file paths between local and remote (referred to as `localize` and `delocalize`)
+
+The code to generate/translate local and remote paths is scheduler-specific. For example, your scheduler software may have its own API for discovering the shared directory, or it might have set system environment variables (for example, `$REPO_DIR`).
+
+The Python Scheduler node has a __Working directory__ parameter that you can access in the code using `self["pdg_workingdir"].evaluateString()`.  By convention, this parm can be either a full `local` path, or a relative path which is assumed to be realtive to the mount point for your farm file system.
+
 
 === Scheduling > Schedule ===
 
@@ -54,7 +66,7 @@ This is where you must implement the _scheduler-specific_ logic to take `WorkIte
 
 * If the scheduler needs/accepts a per-job unique key to look up the job later, use `WorkItem.name`.
 
-* The snippet should return a [Py:pdg.scheduleResult] value once the job is scheduled (or encounters an error). 
+* The snippet should return a [Py:pdg.scheduleResult] value once the job is scheduled (or encounters an error).
 
 	This enumeration has values that signal _final_ success (`CookSucceeded`) and failure (`CookFailed`) of the _whole job_, as well as values that mean "successfully scheduled" (`Succeeded`) or "unsuccessfully scheduled" (`Failed`).
 
@@ -163,34 +175,6 @@ TIP:
 	to_cook.executeGraph(False)
 	}}}
 
-
-=== File paths > Working directory ===
-
-This should return a path string representing the TOP network's working directory on the machine where the code runs. In a farm set-up, the working directory should be on a shared network filesystem.
-
-If the `local` variable is True, the path should be valid on the machine _where the network is cooking_ (not necessarily valid on remote hosts). If it is False, the path should be valid on a remote render farm host.
-
-The code to generate/translate local and remote paths is scheduler-specific. For example, your scheduler software may have its own API for discovering the shared directory, or it might have set system environment variables (for example, `$REPO_DIR`). 
-
-The Python Scheduler node has a __Working directory__ parameter that you can access in the code using `self["pdg_workingdir"].evaluateString()`. Since this should be a valid path on the machine cooking the network, you can handle the local case like this:
-
-	{{{
-	#!python
-	if local:
-		return self["pdg_workingdir"].evaluateString()
-	else:
-		# Translate the local directory into a remote path using
-		# self.localizePath()
-	}}}
-
-See the localize path snippet below.
-
-
-=== File paths > Localize path ===
-
-This snippet should take a file path string that's relative to `__PDG_SHARED_ROOT__` and return an absolute path valid for the machine the code is running on.
-
-
 === Shared servers > Transfer file ===
 
 Called when a file dependency at `file_path` should be copied from the local machine to a remote location (e.g. a shared network drive). This is used for files that are necessary to work scripts, so they are copied to the working directory. This snippet should return True if the file copied successfully.
@@ -219,7 +203,7 @@ Status URI:
 
 _Spare parameters_ are "extra" parameters you add to an existing node's parameter interface. This is how you add user-configurable options to your scheduler. If you later convert the node to an asset, it will automatically use the spare parameters as the asset's interface.
 
-* See [spare parameters|/network/spare] for how to add spare parameters. 
+* See [spare parameters|/network/spare] for how to add spare parameters.
 
 * Within the Python code snippets on the node, you can use `self` to reference a [Py:pdg.Scheduler] instance representing this scheduler (this is _not_ a Houdini network node object).
 
@@ -233,11 +217,11 @@ _Spare parameters_ are "extra" parameters you add to an existing node's paramete
 
 * Try to give the parameters short but meaningful internal names, so you can refer to them easily in scripts.
 
-* *For parameters you want to allow individual nodes to override*: in the spare parameter editing interface, add a `jobParm` tag to the parameter. This tells the system to show an option for individual TOP nodes to override that parameter.
+* *For parameters you want to allow individual nodes to override*: in the spare parameter editing interface, add a `pdg::scheduler` tag to the parameter. This tells the system to show an option for individual TOP nodes to override that parameter. Then move all the override parms into a folder called `Job Parms`.
 
 	* See [scheduler overrides|schedulers#override] for more information.
 
-	* The tag value is not currently used. The system only checks if tag named `jobParm` exists.
+	* The tag value is not currently used. The system only checks if tag named `pdg::scheduler` exists.
 
 	* Note that this only works once the node is converted into an asset. You cannot override parameters on a Python Scheduler instance.
 

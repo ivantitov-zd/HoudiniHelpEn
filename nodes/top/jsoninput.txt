@@ -11,9 +11,67 @@ This node will read in JSON files and extract data that is specified by the
 user. The user can specify the name of the work item attribute in which the data
 will be placed as well as its type and list index.
 
+@top_attributes
+
+::`json_arrayindex`
+    #type: integer
+
+    When performing the Array Retrieve operation, this will be set to the
+    object's index in the array from which it was retrieved, or to 0 if the
+    retrieved value was not stored in an array.
+
+::`obj_index`
+    #type: integer
+
+    When performing the Array Retrieve operation, this will be set to the index
+    of the object. This is useful when performing queries that use the wildcard
+    operator, as this attribute acts as an identifier of the object from which
+    the information was retrieved.
+
+::`query`
+    #type: string
+
+    When performing the Array Retrieve operation, this shows the query that was
+    used to conduct the operation. If the wildcard operator was used in the
+    query, the wildcard will be replaced with the resolved value.
+
+::`field`
+    #type: string
+
+    When performing the Array Retrieve operation, this attribute is set to the
+    field that was retrieved during the operation.
+
 @parameters
 
 == Node ==
+
+[Include:processor_common#pdg_workitemgeneration]
+
+=== Source ===
+
+JSON File:
+    #id: jsonsource
+
+    The source of the JSON file
+
+    Upstream Result File:
+	Uses the result file produced by the upstream work item as the path to
+	the JSON file.
+
+    Custom File Path:
+	JSON file specified by a custom filepath.
+
+Result Data Tag:
+    #id: filetag
+
+    The data tag used to select the result from the upstream work item.
+
+File Path:
+    #id: filepath
+
+    The path to the JSON file.
+
+=== Operation ===
 
 Operation:
     #id: op
@@ -31,6 +89,31 @@ Operation:
 
     This operation allows a specified field to be extracted from each index of a
     list within the JSON file.
+
+    <b>Deserialize Work Item</b>
+
+    This operation will deserialize a workitem from the given JSON file, the
+    file should be formatted as a serialized work item file, such as that
+    produced by [Node:top/jsonoutput].
+
+On Query Failure:
+    #id: keyerrormode
+
+    This parameter controls what happens when any part of the query fails. An
+    example of a query failure would be using an index in the query that is
+    larger than the size of the array that is being indexed.
+
+    If the node is set to *Raise Error* mode, the node will automatically fail
+    the entire operation when a query fails.
+
+    If the node is set to *Add Warning* mode, the node will attach a warning but
+    the node will finish cooking. If an Array Retrieve operation is being
+    performed, the node will attmept to complete the other queries.
+
+
+    *Add Warning* mode is useful if the JSON file contains non-uniform data --
+    for example, when an array of objects may or may not contain a specific
+    sub-object.
 
 Data Extractions:
     #id: extractmult
@@ -68,7 +151,50 @@ Query:
     <code>plants/1/name</code>
 
     When performing the <b>Array Retrieve</b> operation, the query <i>must</i>
-    point to a list in the JSON.
+    point to a list in the JSON, with one exception described below.
+
+    The <b>Array Retrieve</b> operation can make use of the wildcard (*)
+    operator in its queries. The wildcard will cause branching traversal of the
+    JSON hierarchy, where each object at that level becomes a branch of the JSON
+    traversal.
+
+    If we have the following JSON file:
+
+    <code>
+    {
+	"Houdini" : {
+	    "Contexts" : {
+		"Sop" : {
+		    "mountain" : {
+			"name" : "Mountain"
+		    },
+		    "polybevel" : {
+			"name" : "PolyBevel"
+		    }
+		},
+		"Top" : {
+		    "jsoninput" : {
+			"name" : "Json Input"
+		    },
+		    "jsonoutput" : {
+			"name" : "Json Output"
+		    }
+		}
+	    }
+	}
+    }
+    </code>
+
+    And we wanted to go the names of all the nodes in this JSON file, we could
+    perform the following query:
+
+    <code>Houdini/Contexts/<verbatim>*</verbatim>/<verbatim>*</verbatim></code>
+
+    with the field parameter set to <i>name</i>.
+
+    This will create 4 separate work items, each containing a node name. Note
+    that <i>json_arrayindex</i> will be set to 0 on each, because these objects
+    are all independent and not part of the same array.
 
 Field:
     #id: field
@@ -76,6 +202,10 @@ Field:
     This parameter is only used when the <b>Array Retrieve</b> operation is
     being performed. It is used to specify the property that should be retrieved
     from <b>each</b> array index in the list pointed to by the query.
+
+    If the array pointed to by the <i>Query</i> is filled with anonymous objects
+    (such as an array of integers), this parameter can be set to the wildcard
+    operator (*) which simply means that it will get everything in the array.
 
 Attribute Name:
     #id: attributename#
@@ -94,9 +224,6 @@ PDG Attribute Type:
 
     This specifies the type of the data. It can be a string, integer, or float.
 
-== Processor ==
-
-[Include:processor_common#pdg_workitemgeneration]
 
 @related
 - [Node:top/jsonoutput]

@@ -10,103 +10,135 @@
 
 == Overview ==
 
-Deadline supports a wide range of job types through its plug-in mechanism. This node lets you schedule the same types of jobs using TOPs. To do this, this scheduler invokes Deadline’s Command application.
+This scheduler node utilizes Thinkbox's Deadline to schedule and execute PDG work items on a Deadline farm.
 
-You can use other plug-ins with the __Plugin__ parameter. The __Job file key-values__ and __Plugin file key-values__ parameters let you set job- and plug-in-specific options.
+To use this scheduler, you must have the Deadline client installed and working on the local machine. As well, you must have Deadline setup on your farm machines to receive and execute jobs.  __Deadline 10.0.16.6__ was the most recent version tested.
 
-To use this scheduler, you must have Deadline installed and working on the local machine. 
+
+== Scheduling ==
+
+The scheduling behaviour of this node is such that for a PDG cook operation a single Deadline job is created, and each PDG work item is scheduled as a task under it. The first task (task ID 0) will start a server called `PDGMQ` that runs in the background on that Slave machine throughout the entire cook process, and stopped after all other tasks are completed. This server runs on the farm in order to receive result data over the network from other running tasks on other Slave machines, and relay that information to the job submitter's machine via a known port. This design works around certain network limitations such as DNS routing and firewalled networks.
+
+
+== PDGDeadline Plugin ==
+
+By default, this scheduler requires and uses the custom `PDGDeadline` plugin which is shipped with Houdini (in `$HFS/houdini/pdg/plugins/PDGDeadline`). No setup is necessary to enable this plugin as it should work out of the box. Note that the rest of this documentation assumes the use of the PDGDeadline plugin.
+
+On Windows, Deadline processes require executables to have the `.exe` suffix. To appease this requirement, `\$PDG_EXE` can be appended to executables. The PDGDeadline plugin will evaluate the `\$PDG_EXE` specified in work item executables as follows:
+
+    * On Windows, `$PDG_EXE` will be replaced by `.exe`.
+
+    * On other platforms, `$PDG_EXE` will be removed.
+
+For example, hython will be framed between `$HFS` and `\$PDG_EXE` and evaluated on Windows as:
+
+    `\$HFS/bin/hython\$PDG_EXE` -> `C:/Program Files/Side Effects Software/Houdini 17.5.173/bin/hython.exe`
 
 
 == Installation ==
 
-# Install Deadline on the machine you will use to cook the TOP network, and set up its database and repository. Refer to Thinkbox's instructions for how to install Deadline on each platform.
+# Install Deadline client on the machine you will use to cook the TOP network. Refer to Thinkbox's instructions for how to install Deadline on each platform.
 
 # Make sure of the following:
 
-    * The `deadlinecommand` executable is working.
+    * The `deadlinecommand` executable is working. See `$DEADLINE_PATH` note below.
 
     * The Deadline repository is accessible on the machine where the TOPs network will cook (either the repository is local, or the network mount/share it's on is available locally).
 
-    * If you want to run generic command line executables on Deadline, make sure the `CommandLine` plug-in is enabled in the Deadline Monitor.
+    * If you are using a mixed farm setup (i.e. any combination of Linux, macOS, Windows machines) then set the following path mapping for each OS. To do this, in Deadline's `Configure Repository Options`, under `Mapped Paths`:
 
-    * Set up path mapping to map `$PDG_SHARED_ROOT` to the root working directory on client machines, and `$HFS` to the Houdini install directory on each client machine.
+        * On Windows:
+
+            * Set up path mapping for `$HFS` to the Houdini install directory on Deadline Slave machines.
+
+            * Set up path mapping for `$PYTHON` to `<expanded HFS path>/bin/python.exe` or local Python installation.
+
+        * On Linux or macOS:
+
+            * Set up path mapping for `$HFS` to the Houdini install directory. Or override the default parm values for Hython and Python in the Job Parms interface.
+
+        [Image:/images/nodes/top/deadline_hfs_config_repo.png]
+
+        Then use `\` in front of `$HFS` to escape Houdini's local evaluation. Using `\$HFS` will make sure to evaluate it on farm marchine running the job.
+
+        [Image:/images/nodes/top/deadline_hfs_mapping_h.png]
+
+        Repeat for any other variable that needs to be evaluated on the farm machine.
 
 # Set the `$DEADLINE_PATH` variable to point to the Deadline installation directory.
 
     If `DEADLINE_PATH` is not set:
 
-    * If the `deadlinepathcommand` is on the command path, the node will use the directory containing it.
+    * You can add the Deadline installation directory to the system path.
 
-    * On macOS, the node falls back to checking the standard install directory.
+    * On macOS, the node falls back to checking the standard Deadline install directory.
 
 
 @top_attributes
 
-::`deadline_jobid`:
-    #type: integer
+::`deadline_job_task_id`:
+    #type: string
 
     When the schedule submits a work item to Deadline, it will add this
-    attribute to the work item in order to track the Deadline job id.
+    attribute to the work item in order to track the Deadline job and task IDs.
 
 
 @parameters
 
 == Scheduler ==
 
-These parameters are specific to the Deadline setup, and the same values are 
-used for all jobs. Therefore, they can be thought of as global parameters for 
-scheduling jobs with Deadline.    
+These are global parameters for all work items.
+
+Submit Graph As Job:
+    #id: submitjob
+
+    Called when the scheduler should cook the entire TOP Network as a standalone job.
+
+~~~~ Working Directory ~~~~
     
-Repository:
-    #id: deadline_repository
+Local Shared Path:
+    #id: pdg_workingdir
 
-    The Deadline repository to use, along with SSL credentials if required. For 
-    a Direct connection type, this could be the path to the mounted directory 
-    (for example, `//testserver.sidefx.com/DeadlineRepository`). For a Proxy, this would 
-    be the URL to the repository along with the port, and login information. This field
-    can be left empty in which case the default Deadline repository will be used.
+    The root path on the local machine pointing to the directory where the job will be generating intermediate files and output. 
+    The intermediate files will be placed in a subdirectory. Use this if the local and farm marchines have same path configuration.
 
-Connection Type:
-    #id: deadline_connection_type
+Override Remote Shared Path:
+    #id: overrideremoterootpath
 
-    The type of connection ("Direct" or "Proxy") to the repository.
-
-[Include:_scheduler_common#pdg_workingdir]
+    Enable this if the farm machines have different path configuration than the local submission machine. This is required for mixed farms
+    where due to different OS, the mounted paths are different.
     
-[Include:_scheduler_common#localsharedroot]
+Remote Shared Path:
+    #id: remotesharedroot
+
+    When `Override Remote Shared Path` is enabled, this is the path to the mounted directory on Deadline Slave machines which the working directory will be rooted at. This can include variables that the farm is set to resolve to platform-specific paths (if using a multi-platform farm). If using the default value of `$PDG_DIR` then `$PDG_DIR` should be mapped to the actual mounted value for each operating system used by Slaves in Deadline's Path Mapping. It can be set to a value that Slaves are already using in an existing farm.
+
+~~~~ Job Description ~~~~
+
+These are the job description properties that will be written to a Deadline job file.
+
+Job Name:
+    #id: deadline_job_name
+
+    The required name of the job.
+
+Job Comment:
+    #id: deadline_job_comment
+
+    An optional comment to put on all jobs.
+
+Job Department:
+    #id: deadline_job_dept
+
+    The default department (for example, `Lighting`) for all jobs. This is optional, to allow grouping jobs together and provide information to the farm operator.
+
+~~~~ Job Options ~~~~
     
-[Include:_scheduler_common#remotesharedroot]
-    
-Launch Monitor Machine Name:
-    #id: deadline_launch_monitor
+Job Batch Name:
+    #id: deadline_job_batch_name
 
-    Set this to the name of the machine if you want to launch Deadline Monitor on that machine when jobs are scheduled. Otherwise leave this field empty.
+    An optional batch name to group the job under.
 
-    
-== Job Parms ==
-
-These parameters affect all jobs on the scheduler. You can [override|/tops/schedulers#override] these settings in each node.
-
-Plugin:
-    #id: deadline_plugin
-
-    Name of the Deadline plugin to use for this job. The default is `CommandLine`. This must match an existing plugin in the repository.
-    
-Force Reload Plugin:
-    #id: deadline_force_reload_plugin
-
-    Whether to reload the plugin between frames of a job (the default is `false`). This can help deal with memory leaks or applications that do not unload all job aspects properly.
-
-Pre Job Script:
-    #id: deadline_pre_job_script
-
-    Path to a Python script to run when the job starts. The default (`$HFS/houdini/pdg/types/schedulers/deadline_jobpreload.py`) sets up some standard PDG environment variables, so if you want to replace it you should copy over the environment variable setup.
-    
-Post Job Script:
-    #id: deadline_post_job_script
-    
-    Path to a Python script to run after the job finishes.
-    
 Job Pool:
     #id: deadline_job_pool
 
@@ -117,54 +149,172 @@ Job Group:
 
     A named group to use to execute the job (default is `none`).
     
-Frames:
-    #id: deadline_job_frames
-
-    The frame range (for a render job). See the Frame List Formatting Options in Deadline's Job Submission documentation.
-    
 Job Priority:
     #id: deadline_job_priority
 
     The default priority for new jobs. The default is `50`. The lowest priority is `0`. The maximum priority is a setting in Deadline's repository options, usually `100`.
 
-~~~~ Meta data ~~~~
-    
-Job Department:
-    #id: deadline_job_dept
+Concurrent Tasks:
+    #id: deadline_concurrent_tasks
 
-    The default department (for example, `Lighting`) for all jobs (you can override this in a node). This is optional, to allow grouping jobs together and provide information to the farm operator.
-    
-Job Batch Name:
-    #id: deadline_job_batch_name
+    The number of tasks to run simultaneously for each Deadline Slave. The default is `1` meaning one task at a time.
 
-    An optional batch name to apply to all jobs (you can override this in a node).
-    
-Job Comment:
-    #id: deadline_job_comment
+Pre Job Script:
+    #id: deadline_pre_job_script
 
-    An optional comment to put on all jobs (you can override this in a node).
+    Path to a Python script to run when the job starts.
     
+Post Job Script:
+    #id: deadline_post_job_script
+    
+    Path to a Python script to run after the job finishes.
+
+Machine Limit:
+    #id: deadline_machine_limit
+    
+    Limit the number of Deadline Slaves that can execute this job. The default is `0` which means no limit.
+
+Machine List:
+    #id: deadline_machine_list
+    
+    Restricted list of Deadline Slaves that can execute this job. The list is written out as `Whitelist` in the job info file, unless `Machine List is A Blacklist` below is enabled, in which case it is written out as a `Blacklist`.
+
+Machine List Is A Blacklist:
+    #id: deadline_machine_list_black
+
+    If enabled, the Machine List is written out as `Blacklist` therefore not allowing the listed machines to execute this job. If disabled, the list of machines are only allowed to execute this job.
+
 OnJobComplete:
     #id: deadline_on_job_complete
 
     What to do with a job's information when it finishes. The default is Nothing. See Deadline's documentation for more information.
+
+~~~~ Job File Key-Values ~~~~
+
+Job File Key-Values:
+    #id: deadline_jobfile_kvpair
+
+    Lets you add custom key-value options for this job. These will be written out to the job file required by the Deadline plugin specified above.
+
+Plugin File Key-Values:
+    #id: deadline_pluginfile_kvpair
+
+    Lets you add custom key-value options for the plug-in. These will be written out to the plugin file required by the Deadline plugin specified above.
+
+~~~~ Deadline ~~~~
+
+Verbose Logging:
+    #id: deadline_verbose_log
+
+    Enable this to print information that could be useful for debugging problems during cooking.
+
+Use IP Address for PDGMQ:
+    #id: deadline_pdgmq_use_ip
+
+    Enable this to use IP address, instead of hostname, for connecting to the PDGMQ server. This should work around networking issues such as DNS not working or the hostname not properly resolving to the correct farm machine running the PDGMQ server.
+
+PDGMQ Server As Task:
+    #id: deadline_pdgmq_as_task
+
+    Whether to execute the PDGMQ server as a separate task instead of a background monitor program on the first slave. If enabled, PDG cooks will require at least
+    2 Deadline Slave instances available or the `ConcurrentTasks` to be set greater than 1. This is required to be enabled if `Force Reload Plugin` needs to be enabled.
+
+Force Reload Plugin:
+    #id: deadline_force_reload_plugin
+
+    Whether to reload the plugin between frames of a job (the default is `false`). This can help deal with memory leaks or applications that do not unload all job aspects properly.
+    Note that this can only be enabled if `PDGMQ Server As Task` is also enabled since reloading the plugin between tasks will force shutdown the PDGMQ server.
+
+Launch Monitor Machine Name:
+    #id: deadline_launch_monitor
+
+    Set this to the name of the machine if you want to launch Deadline Monitor on that machine when jobs are scheduled. Otherwise leave this field empty.
+
+~~~~ Advanced ~~~~
+
+Override Repository:
+    #id: deadline_override_repo
+
+    Enable this to use another Deadline repository than the system default.
+
+Repository:
+    #id: deadline_repository
+
+    If you have a single Deadline repository or want to use your system's default Deadline Repository, you should leave this field empty.
+    Otherwise, you can specify another Deadline repository to use, along with SSL credentials if required. For a Direct connection type, this could be the path to the mounted directory 
+    (for example, `//testserver.com/DeadlineRepository`). For a Proxy, this would be the URL to the repository along with the port, and login information.
+
+Connection Type:
+    #id: deadline_connection_type
+
+    The type of connection ("Direct" or "Proxy") to the repository.
+
+Override Plugin:
+    #id: deadline_overrideplugin
+
+    Enable this to use another Deadline plugin than the shipped PDGDeadline plugin. Do not enable this unless you have written a custom Deadline plugin that supports the PDG cooking process. The other plugins shipped with Deadline will not work out of the box.
+
+Plugin:
+    #id: deadline_plugin
+
+    Specify custom Deadline plugin to execute each PDG work item. If you want to control the execution of the PDG work item's process, then you can write a custom Deadline plugin and specify it here, along with the directory below. The custom plugin must utlize the task files written out for each work item, and set the evaluated environment variables in the process. Check the
+    PDGDeadline.py for reference.
+
+Plugin Directory:
+    #id: deadline_plugin_directory
+
+    Specify the path to the custom Deadline plugin specified above.
+
+~~~~ Message Queue ~~~~
+
+Task Callback Port:
+    #id: taskcallbackport
+
+    Set the TCP Port used by the Message Queue Server for the XMLRPC callback API.  The port must be accessible between farm blades.
+
+Relay Port:
+    #id: mqrelayport
+
+    Set the TCP Port used by the Message Queue Server connection between PDG and the blade that is running the Message Queue Command.  The port must be reachable on farm blades by the PDG/user machine.
     
+== Job Parms ==
 
-== Job Key-Value Pairs ==
+These parameters can be set for each TOP node via the [override|/tops/schedulers#override] settings in each node.
 
-Job File:
-    #id: deadline_jobfile_keyvalues
+~~~~ Paths ~~~~
 
-    Lets you add custom options for this job.
+HFS:
+    #id: deadline_hfs
 
+    The rooted path to Houdini installation on all Deadline Slave machines. If variables are used, they will be evaluated locally unless escaped with `\`. For example, `$HFS` will be evaluated on the local machine then the result value is sent to the farm. To force evaluation on the Slave instead (for a mixed farm setup), use `\$HFS`. The following should then be set in Deadline's Path Mapping:
+    (e.g. `$HFS` = `C:/Program Files/Side Effects Software/Houdini 17.5.173`).
 
-== Plugin key-value pairs ==
+Python:
+    #id: deadline_python
 
-Plugin File:
-    #id: deadline_pluginfile_keyvalues
+    The rooted path to python, which should point to the required Python version installed on all Slave machines, such as `$HFS/bin/python`. If variables are used, then they should be mapped in Deadline's Path Mapping (e.g. $HFS should be path mapped if using default value). On Windows, the path mapping should add `.exe` or `\$PDG_EXE` for a mixed farm setup.
+    (e.g. `$HFS/bin/python\$PDG_EXE` -> `C:/Program Files/Side Effects Software/Houdini 17.5.173/bin/python.exe`).
 
-    Lets you add custom options for the plug-in.
+Inherit Local Environment:
+    #id: deadline_inheritlocalenv
 
+    When enabled, environment variables in the current session of PDG will be copied into the task's environment.
+
+Houdini Max Threads:
+    #id: deadline_usehoudinimaxthreads
+
+    Set the __HOUDINI_MAXTHREADS__ environment to the given value.  By default __HOUDINI_MAXTHREADS__ is set to the value of __At Most Slots__, if enabled.
+
+    The default of 0 means to use all available processors.
+
+    Positive values will limit the number of threads that can be used. A value of 1 will disable multithreading entirely (limiting to only one thread). Positive values will be clamped to the number of CPU cores available.
+
+    If the value is negative, the value is added to the maximum number of processors to determine the threading limit. For example, a value of -1 will use all CPU cores except 1.   
+
+Environment Key-Values:
+    #id: deadline_envmulti
+
+    Lets you add custom key-value environment variables for each task.
 
 @related
 
